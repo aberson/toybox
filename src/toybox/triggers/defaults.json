@@ -1,0 +1,166 @@
+{
+  "version": 1,
+  "patterns": [
+    {
+      "id": "lets_play_with_X",
+      "regex": "(?i)\\blet'?s play with\\s+(.+?)[!.?]*$",
+      "intent": "request_play",
+      "slot_group": 1,
+      "version": 1
+    },
+    {
+      "id": "lets_play_X",
+      "regex": "(?i)\\blet'?s play\\s+(.+?)[!.?]*$",
+      "intent": "request_play",
+      "slot_group": 1,
+      "version": 1
+    },
+    {
+      "id": "i_want_to_play_X",
+      "regex": "(?i)\\bi want to play\\s+(.+?)[!.?]*$",
+      "intent": "request_play",
+      "slot_group": 1,
+      "version": 1
+    },
+    {
+      "id": "can_we_play_X",
+      "regex": "(?i)\\bcan we play\\s+(.+?)[!.?]*$",
+      "intent": "request_play",
+      "slot_group": 1,
+      "version": 1
+    },
+    {
+      "id": "wanna_play",
+      "regex": "(?i)\\b(?:wanna|want to|wanta) play\\b",
+      "intent": "request_play",
+      "slot_group": null,
+      "version": 1
+    },
+    {
+      "id": "tell_me_a_story_about_X",
+      "regex": "(?i)\\btell me a story about\\s+(.+?)[!.?]*$",
+      "intent": "request_story",
+      "slot_group": 1,
+      "version": 1
+    },
+    {
+      "id": "story_about_X",
+      "regex": "(?i)\\b(?:i want|can i hear|can you tell me) a story about\\s+(.+?)[!.?]*$",
+      "intent": "request_story",
+      "slot_group": 1,
+      "version": 1
+    },
+    {
+      "id": "story_time",
+      "regex": "(?i)\\bstory time\\b",
+      "intent": "request_story",
+      "slot_group": null,
+      "version": 1
+    },
+    {
+      "id": "read_me_a_story",
+      "regex": "(?i)\\bread me a (?:story|book)\\b",
+      "intent": "request_story",
+      "slot_group": null,
+      "version": 1
+    },
+    {
+      "id": "im_bored",
+      "regex": "(?i)\\bi[' ]?a?m (?:so |really |kinda )?bored\\b",
+      "intent": "boredom",
+      "slot_group": null,
+      "version": 1
+    },
+    {
+      "id": "nothing_to_do",
+      "regex": "(?i)\\b(?:there'?s |i have )?nothing to do\\b",
+      "intent": "boredom",
+      "slot_group": null,
+      "version": 1
+    },
+    {
+      "id": "lets_go_on_an_adventure",
+      "regex": "(?i)\\b(?:can we|let'?s) go on an adventure\\b",
+      "intent": "request_activity",
+      "slot_group": null,
+      "version": 1
+    },
+    {
+      "id": "lets_build_a_fort",
+      "regex": "(?i)\\blet'?s build a (?:fort|blanket fort|pillow fort)\\b",
+      "intent": "request_activity",
+      "slot_group": null,
+      "version": 1
+    },
+    {
+      "id": "lets_have_a_tea_party",
+      "regex": "(?i)\\blet'?s have a tea party\\b",
+      "intent": "request_activity",
+      "slot_group": null,
+      "version": 1
+    },
+    {
+      "id": "lets_pretend",
+      "regex": "(?i)\\blet'?s pretend\\b",
+      "intent": "request_activity",
+      "slot_group": null,
+      "version": 1
+    },
+    {
+      "id": "play_pretend",
+      "regex": "(?i)\\bplay pretend\\b",
+      "intent": "request_activity",
+      "slot_group": null,
+      "version": 1
+    },
+    {
+      "id": "play_a_game",
+      "regex": "(?i)\\b(?:let'?s |can we |wanna )?play a game\\b",
+      "intent": "request_activity",
+      "slot_group": null,
+      "version": 1
+    },
+    {
+      "id": "sing_a_song",
+      "regex": "(?i)\\b(?:sing|sing me) a song\\b",
+      "intent": "request_activity",
+      "slot_group": null,
+      "version": 1
+    },
+    {
+      "id": "lets_dance",
+      "regex": "(?i)\\blet'?s dance\\b",
+      "intent": "request_activity",
+      "slot_group": null,
+      "version": 1
+    },
+    {
+      "id": "lets_draw",
+      "regex": "(?i)\\blet'?s (?:draw|color|paint)\\b",
+      "intent": "request_activity",
+      "slot_group": null,
+      "version": 1
+    },
+    {
+      "id": "hide_and_seek",
+      "regex": "(?i)\\b(?:play |let'?s play )?hide and seek\\b",
+      "intent": "request_activity",
+      "slot_group": null,
+      "version": 1
+    },
+    {
+      "id": "i_want_to_X",
+      "regex": "(?i)\\bi (?:wanna|want to)\\s+(.+?)[!.?]*$",
+      "intent": "request_activity",
+      "slot_group": 1,
+      "version": 1
+    },
+    {
+      "id": "what_should_we_do",
+      "regex": "(?i)\\bwhat (?:should|can) we do\\b",
+      "intent": "request_activity",
+      "slot_group": null,
+      "version": 1
+    }
+  ]
+}

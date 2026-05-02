@@ -1110,6 +1110,7 @@ Goal: parent clicks "trigger demo," sees suggestion, approves, child app runs ac
 - **Type:** code
 - **Issue:** #6
 - **Flags:** --reviewers code
+- **Status:** DONE (2026-05-01)
 
 #### Step 7: Offline activity generator
 
