@@ -6,6 +6,12 @@ Runs entirely on home hardware. Internet is optional — Claude is reached over 
 
 **v1 ship point:** end of Phase A — the closed-loop demo with a manual "trigger" button instead of a real mic. v1 testing is **adult-only** before children participate.
 
+## Build status
+
+**Phase A 8/10 complete** — issues #1–#8 closed; Steps 9 (Parent UI) and 10 (Child UI) remain. 284 tests passing, 0 type errors, 0 lint violations, 0 format violations.
+
+Backend modules live: `core/`, `db/`, `personas/`, `ai/`, `triggers/`, `activities/`, `api/{listening,activities,auth,auth_dep}`, `ws/{server,heartbeat}`, plus `core/{auth,version_check,queue,pubsub}`. REST + ws contract is stable; UI steps build against it.
+
 ## Stack
 
 | Layer | Tool | Why |
