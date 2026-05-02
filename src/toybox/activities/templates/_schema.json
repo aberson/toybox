@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://toybox.local/schemas/activity-template-file.json",
+  "title": "ActivityTemplateFile",
+  "description": "One file per intent — a JSON object whose `templates` array holds individual offline activity templates for that intent. Validated by toybox.activities.generator.load_templates at startup.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["intent", "templates"],
+  "properties": {
+    "intent": {
+      "type": "string",
+      "enum": ["request_play", "request_story", "request_activity", "boredom"]
+    },
+    "templates": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/template" }
+    }
+  },
+  "$defs": {
+    "template": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "steps"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "Stable identifier for this template — used as Activity.template_id and as part of the Phase D step 19 signature."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Human-readable title; supports placeholder substitution."
+        },
+        "buckets": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["morning", "afternoon", "evening", "wind_down", "always"]
+          },
+          "uniqueItems": true,
+          "default": [],
+          "description": "Time-of-day buckets where this template is eligible. Empty array (or omitted) means 'no time-of-day preference' — equivalent to 'always'. The 'wind_down' bucket is only eligible at hours 19..21."
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/step" }
+        }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text"],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 600,
+          "description": "Step text; may contain {slot} and {toy} placeholders."
+        },
+        "sfx": {
+          "type": ["string", "null"],
+          "maxLength": 64
+        },
+        "expected_action": {
+          "type": ["string", "null"],
+          "maxLength": 64
+        }
+      }
+    }
+  }
+}

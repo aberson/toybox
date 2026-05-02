@@ -1,0 +1,65 @@
+{
+  "intent": "request_story",
+  "templates": [
+    {
+      "id": "story_morning_sunrise",
+      "title": "Sunrise tale of {slot}",
+      "buckets": ["morning"],
+      "steps": [
+        { "text": "{toy} stretches and yawns as the sun rises over a sleepy land." },
+        { "text": "{toy} hears something rustling — could it be a {slot}?" },
+        { "text": "Following the sound, {toy} discovers footprints leading toward a meadow." },
+        { "text": "In the meadow, {toy} meets the {slot} and offers a warm hello.", "expected_action": "child_says_hello" },
+        { "text": "{toy} and the {slot} share breakfast as the day begins. The end!" }
+      ]
+    },
+    {
+      "id": "story_afternoon_journey",
+      "title": "{slot} journey",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "{toy} packs a tiny backpack for an afternoon journey to find a {slot}." },
+        { "text": "Crossing a wobbly bridge, {toy} steps very carefully.", "sfx": "creak" },
+        { "text": "{toy} climbs a small hill and looks out across the land." },
+        { "text": "At the top of the hill, {toy} spots the {slot} resting in the grass." },
+        { "text": "{toy} waves hello, makes a friend, and walks home with a happy heart." }
+      ]
+    },
+    {
+      "id": "story_evening_campfire",
+      "title": "Campfire story about {slot}",
+      "buckets": ["evening"],
+      "steps": [
+        { "text": "{toy} sits by a glowing campfire, ready to tell a tale of {slot}." },
+        { "text": "Long ago, {toy} says, the {slot} lived deep in a forest of singing trees." },
+        { "text": "One night, the {slot} got lost — but a kind firefly lit the way." },
+        { "text": "The firefly led the {slot} to a clearing full of sleeping animals.", "sfx": "soft_chirp" },
+        { "text": "The {slot} curled up safe and sound — and so does {toy}, ending the tale." }
+      ]
+    },
+    {
+      "id": "story_winddown_lullaby",
+      "title": "Lullaby story of {slot}",
+      "buckets": ["wind_down"],
+      "steps": [
+        { "text": "{toy} whispers: tonight's story is about a sleepy {slot}." },
+        { "text": "The {slot} lived in a quiet valley where the stars hummed lullabies." },
+        { "text": "Each night the {slot} brushed its soft blanket and counted falling petals." },
+        { "text": "When the moon rose, the {slot} closed its eyes and dreamed of soft clouds." },
+        { "text": "{toy} yawns. Goodnight, {slot}. Goodnight, friends." }
+      ]
+    },
+    {
+      "id": "story_anytime_curious",
+      "title": "The curious {slot}",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "Once upon a time, a very curious {slot} lived next door to {toy}." },
+        { "text": "Every morning the {slot} asked {toy} the same question: 'What's that?'" },
+        { "text": "Today, {toy} answered with a riddle instead of a fact." },
+        { "text": "The {slot} thought hard, scratched its chin, and guessed three silly answers.", "expected_action": "child_guesses" },
+        { "text": "Together, {toy} and the {slot} solved the riddle — and laughed all afternoon." }
+      ]
+    }
+  ]
+}

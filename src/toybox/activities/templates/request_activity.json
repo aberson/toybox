@@ -1,0 +1,65 @@
+{
+  "intent": "request_activity",
+  "templates": [
+    {
+      "id": "activity_morning_stretch",
+      "title": "Morning stretch with {toy}",
+      "buckets": ["morning"],
+      "steps": [
+        { "text": "Stand tall next to {toy}. Reach for the ceiling like a tree growing." },
+        { "text": "Bend down and touch your toes — show {toy} how!", "expected_action": "child_touches_toes" },
+        { "text": "Twist side to side three times. {toy} watches and copies." },
+        { "text": "Hop on one foot for a count of five. Switch feet and hop again.", "sfx": "boing" },
+        { "text": "Take a deep breath. Tell {toy} you are ready for the day!" }
+      ]
+    },
+    {
+      "id": "activity_afternoon_build",
+      "title": "Afternoon {slot} building project",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "Gather three soft objects (pillows, plushies, towels) into one spot with {toy}." },
+        { "text": "Stack the objects to make a small tower or fort." },
+        { "text": "Place {toy} on top — or inside — of your build.", "expected_action": "child_places_toy" },
+        { "text": "Decide what your build is for: a {slot} hideout, a lookout, a cozy nest?" },
+        { "text": "Show your build to a grown-up and tell them the story of it." }
+      ]
+    },
+    {
+      "id": "activity_evening_drawing",
+      "title": "Evening drawing time",
+      "buckets": ["evening"],
+      "steps": [
+        { "text": "Gather paper and crayons next to {toy}." },
+        { "text": "Draw {toy} as the main character of the picture." },
+        { "text": "Add a friend to the drawing — anyone or anything you choose.", "expected_action": "child_draws_friend" },
+        { "text": "Color in the background — the sky, the ground, or a room." },
+        { "text": "Hold up your drawing for {toy} to admire." }
+      ]
+    },
+    {
+      "id": "activity_winddown_breathing",
+      "title": "Calm breathing with {toy}",
+      "buckets": ["wind_down"],
+      "steps": [
+        { "text": "Sit cross-legged with {toy} resting on your lap." },
+        { "text": "Breathe in slowly through your nose for a count of four." },
+        { "text": "Hold the breath for two, then breathe out through your mouth for four." },
+        { "text": "Repeat the slow breath three more times — {toy} is breathing too.", "expected_action": "child_breathes_slowly" },
+        { "text": "Open your eyes. Whisper goodnight to {toy} or thank you for the calm." }
+      ]
+    },
+    {
+      "id": "activity_anytime_scavenger",
+      "title": "{slot} scavenger hunt with {toy}",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "{toy} announces a scavenger hunt for things related to {slot}." },
+        { "text": "Find one thing that is the right COLOR.", "expected_action": "child_finds_color" },
+        { "text": "Find one thing that is the right SHAPE." },
+        { "text": "Find one thing that is the right SIZE." },
+        { "text": "Bring all three finds back to {toy} and tell the story they make together." }
+      ]
+    }
+  ]
+}

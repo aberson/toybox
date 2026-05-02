@@ -1,0 +1,65 @@
+{
+  "intent": "request_play",
+  "templates": [
+    {
+      "id": "play_morning_parade",
+      "title": "Morning {slot} parade with {toy}",
+      "buckets": ["morning"],
+      "steps": [
+        { "text": "Good morning! Let's get {toy} ready for a {slot} parade." },
+        { "text": "Line up three of your favorite things for {toy} to march past.", "expected_action": "child_lines_up_objects" },
+        { "text": "March around the room with {toy}, calling out what you see.", "sfx": "drumroll" },
+        { "text": "Pick the silliest object from the parade and give it a name.", "expected_action": "child_names_object" },
+        { "text": "Take a bow with {toy} — the {slot} parade was a hit!" }
+      ]
+    },
+    {
+      "id": "play_afternoon_quest",
+      "title": "Afternoon {slot} quest",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "{toy} has heard rumors of a {slot} hidden in this very room." },
+        { "text": "Search high for clues — check shelves and tables.", "expected_action": "child_searches_high" },
+        { "text": "Search low for clues — check under the couch and in baskets.", "expected_action": "child_searches_low" },
+        { "text": "Bring three clues back to {toy} and arrange them on the floor." },
+        { "text": "Together, decide what the clues mean and where the {slot} must be!" }
+      ]
+    },
+    {
+      "id": "play_evening_show",
+      "title": "Evening {slot} puppet show",
+      "buckets": ["evening"],
+      "steps": [
+        { "text": "{toy} wants to put on a small puppet show about {slot}." },
+        { "text": "Build a stage from a couch cushion or a chair seat." },
+        { "text": "Pick two helper toys to play the other characters." },
+        { "text": "Act out the story — what happens when {toy} meets the {slot}?", "expected_action": "child_acts_out" },
+        { "text": "Take a bow together. The audience claps for {toy}!", "sfx": "applause" }
+      ]
+    },
+    {
+      "id": "play_winddown_quiet",
+      "title": "Quiet {slot} cuddle with {toy}",
+      "buckets": ["wind_down"],
+      "steps": [
+        { "text": "Curl up somewhere cozy with {toy}." },
+        { "text": "Whisper a secret about {slot} to {toy}." },
+        { "text": "Imagine {slot} on a calm, slow adventure — picture it together." },
+        { "text": "Tell {toy} one favorite thing about today.", "expected_action": "child_shares_highlight" },
+        { "text": "Give {toy} a gentle goodnight squeeze." }
+      ]
+    },
+    {
+      "id": "play_anytime_dance",
+      "title": "{toy} and the {slot} dance party",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "Hold {toy} up high and announce the {slot} dance party!" },
+        { "text": "Pick a song or hum a tune for {toy} to dance to." },
+        { "text": "Spin around three times with {toy}.", "sfx": "spin_whoosh" },
+        { "text": "Freeze like a statue when {toy} says STOP!", "expected_action": "child_freezes" },
+        { "text": "Bow to {toy} and end the dance party with a giggle." }
+      ]
+    }
+  ]
+}

@@ -1118,6 +1118,7 @@ Goal: parent clicks "trigger demo," sees suggestion, approves, child app runs ac
 - **Type:** code
 - **Issue:** #7
 - **Flags:** --reviewers code
+- **Status:** DONE (2026-05-01)
 
 #### Step 8: Activity API + ws + auth scaffolding
 
