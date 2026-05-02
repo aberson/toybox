@@ -1144,7 +1144,9 @@ Goal: parent clicks "trigger demo," sees suggestion, approves, child app runs ac
 - **Flags:** --reviewers full --start-cmd "uv run python -m toybox.main" --url "http://localhost:3000/child" --ui
 - **Status:** DONE (2026-05-02)
 
-**End of Phase A = v1.** Adult-only smoke test, then move to Phase B.
+**End of Phase A = v1 — COMPLETE (2026-05-02).** All 10 steps DONE. 286 backend pytest + 99 frontend vitest + 2 Playwright specs passing. Adult-only smoke test now; Phase B (audio capture + STT) follows.
+
+Step 10 also fixed a pre-existing SQLite cross-thread bug in three FastAPI deps (`api/auth_dep.py`, `api/activities.py`, `api/listening.py`) surfaced by the v1-loop runtime test, plus closed Step 9's open MEDIUM follow-up (reconnect REST refetch race) via new version-aware `applyMutationResult` / `applyReconnectResync` reducers in both child and parent stores. Frontend bootstrap path now retries on transient 5xx via `retryWithBackoff`. See commit `0e55576` and the Step 10 issue (#10) for the full iteration history.
 
 #### Manual steps
 

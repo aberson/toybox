@@ -8,9 +8,9 @@ Runs entirely on home hardware. Internet is optional — Claude is reached over 
 
 ## Build status
 
-**Phase A 8/10 complete** — issues #1–#8 closed; Steps 9 (Parent UI) and 10 (Child UI) remain. 284 tests passing, 0 type errors, 0 lint violations, 0 format violations.
+**Phase A complete (10/10) — v1 ship point reached.** Issues #1–#10 closed. 286 backend pytest + 99 frontend vitest + 2 Playwright specs passing. 0 type errors, 0 lint violations, 0 format violations.
 
-Backend modules live: `core/`, `db/`, `personas/`, `ai/`, `triggers/`, `activities/`, `api/{listening,activities,auth,auth_dep}`, `ws/{server,heartbeat}`, plus `core/{auth,version_check,queue,pubsub}`. REST + ws contract is stable; UI steps build against it.
+Backend modules live: `core/`, `db/`, `personas/`, `ai/`, `triggers/`, `activities/`, `api/{listening,activities,auth,auth_dep}`, `ws/{server,heartbeat}`, plus `core/{auth,version_check,queue,pubsub}`. Frontend ships both routes: `/parent` (suggestion + activity panel + trigger button) and `/child` (full-bleed kiosk with persona avatar, step card, advance button, "all done" terminal state). Adult-only smoke testing now; Phase B (audio capture + STT) follows.
 
 ## Stack
 
@@ -133,9 +133,11 @@ toybox/
 │   ├── audio/                        # sounddevice + VAD + STT
 │   └── triggers/                     # curated NLP registry
 ├── frontend/
-│   ├── src/parent/                   # parent route
-│   ├── src/child/                    # child kiosk route
-│   └── src/shared/                   # types.ts, errors.ts (codegen)
+│   ├── src/parent/                   # parent route (App + api + ws + store + components)
+│   ├── src/child/                    # child kiosk route (App + api + ws + store + sfx + components)
+│   ├── src/shared/                   # types.ts, errors.ts (codegen)
+│   ├── public/sfx/                   # SFX assets (silence-stub for v1; real WAVs in M4)
+│   └── playwright/                   # e2e smoke specs (parent.spec.ts + child.spec.ts)
 ├── data/                             # runtime: db, images, models (gitignored)
 └── tests/                            # pytest unit + integration
 ```
