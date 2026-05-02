@@ -25,17 +25,23 @@ _PRAGMAS: tuple[str, ...] = (
 )
 
 
-def connect(path: Path) -> sqlite3.Connection:
+def connect(path: Path, *, check_same_thread: bool = True) -> sqlite3.Connection:
     """Open a SQLite connection at ``path`` with the toybox pragmas applied.
 
     Args:
         path: Filesystem path to the SQLite database file.
+        check_same_thread: When ``False``, allow the connection to be
+            used from a thread other than the one that created it. The
+            FastAPI WebSocket entry point passes ``False`` so the
+            background-thread Starlette TestClient (and uvicorn's
+            asyncio + threadpool dispatch) can share the connection
+            opened in the request handler.
 
     Returns:
         A ``sqlite3.Connection`` with ``row_factory=sqlite3.Row`` and the
         four required pragmas applied.
     """
-    conn = sqlite3.connect(path)
+    conn = sqlite3.connect(path, check_same_thread=check_same_thread)
     conn.row_factory = sqlite3.Row
     for pragma in _PRAGMAS:
         conn.execute(pragma)

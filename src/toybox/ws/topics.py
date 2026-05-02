@@ -21,6 +21,7 @@ class Topic(StrEnum):
     system = "system"
     triggers_invalidate = "triggers.invalidate"
     activity = "activity"
+    activity_state = "activity.state"
     transcript = "transcript"
 
 
