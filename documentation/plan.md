@@ -1134,6 +1134,7 @@ Goal: parent clicks "trigger demo," sees suggestion, approves, child app runs ac
 - **Type:** code
 - **Issue:** #9
 - **Flags:** --reviewers full --start-cmd "uv run python -m toybox.main" --url "http://localhost:3000/parent" --ui
+- **Status:** DONE (2026-05-02)
 
 #### Step 10: Child UI — kiosk activity view
 

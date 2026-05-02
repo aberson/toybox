@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import type { JSX } from "react";
 import { createRoot } from "react-dom/client";
 
-import { Parent } from "./parent/Parent";
+import { App as ParentApp } from "./parent/App";
 import { Child } from "./child/Child";
 
 // Phase A: simple path-based routing. Step 9/10 may swap in react-router
@@ -14,7 +14,7 @@ function App(): JSX.Element {
     return <Child />;
   }
   if (path.startsWith("/parent")) {
-    return <Parent />;
+    return <ParentApp />;
   }
   return (
     <main>
