@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://toybox.local/schemas/persona.json",
+  "title": "Persona",
+  "description": "Schema for a single persona library entry shipped under src/toybox/personas/library/.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "display_name",
+    "archetype",
+    "system_prompt",
+    "avatar_image_path",
+    "behavior_tags",
+    "age_range_min",
+    "age_range_max",
+    "source"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "archetype": {
+      "type": "string",
+      "enum": ["princess", "wizard", "detective", "periodic_table", "custom"]
+    },
+    "system_prompt": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "avatar_image_path": {
+      "type": "string",
+      "pattern": "^library/avatars/[a-z0-9_-]+\\.png$"
+    },
+    "behavior_tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64
+      },
+      "minItems": 1,
+      "maxItems": 32
+    },
+    "age_range_min": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 99
+    },
+    "age_range_max": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 99
+    },
+    "language": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 32,
+      "default": "en"
+    },
+    "source": {
+      "type": "string",
+      "enum": ["library"]
+    },
+    "default_voice_tone": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    }
+  }
+}

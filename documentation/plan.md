@@ -1086,6 +1086,7 @@ Goal: parent clicks "trigger demo," sees suggestion, approves, child app runs ac
 - **Type:** code
 - **Issue:** #3
 - **Flags:** --reviewers code
+- **Status:** DONE (2026-05-01)
 
 #### Step 4: Listening mode state machine
 
@@ -1261,7 +1262,7 @@ What to look for table is "if X happens, run Y"; the operator doc holds the full
   "display_name": "Marvelous the Wizard",
   "archetype": "wizard",
   "system_prompt": "You are Marvelous, a kindly old wizard who speaks in rhymes and treats every problem as a magical puzzle. You never frighten children. You love nature, riddles, and small kindnesses. When invited to play, you propose challenges that involve searching, naming, or making things up.",
-  "avatar_image_path": "library/wizard.png",
+  "avatar_image_path": "library/avatars/wizard.png",
   "behavior_tags": ["kind", "rhyming", "puzzling", "gentle"],
   "age_range_min": 3,
   "age_range_max": 12,
