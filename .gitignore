@@ -39,3 +39,6 @@ Thumbs.db
 test-results/
 playwright-report/
 playwright/.cache/
+
+# build-step UI review evidence (ephemeral; per-run output)
+.ui-review-evidence/
