@@ -9,7 +9,7 @@ from starlette.websockets import WebSocketDisconnect
 
 @pytest.mark.parametrize(
     "origin",
-    ["http://127.0.0.1:3000", "http://localhost:3000"],
+    ["http://127.0.0.1:4000", "http://localhost:4000"],
 )
 def test_origin_loopback_allowed(
     client: TestClient,
@@ -55,7 +55,7 @@ def test_lan_ip_added_via_env(
     monkeypatch.setenv("TOYBOX_LAN_IP", "192.168.7.42")
     with client.websocket_connect(
         f"/ws?token={parent_token}",
-        headers={"origin": "http://192.168.7.42:3000"},
+        headers={"origin": "http://192.168.7.42:4000"},
     ) as ws:
         ready = ws.receive_json()
         assert ready["type"] == "ready"
@@ -64,7 +64,7 @@ def test_lan_ip_added_via_env(
 def test_missing_token_closed_1008(client: TestClient) -> None:
     with client.websocket_connect(
         "/ws",
-        headers={"origin": "http://127.0.0.1:3000"},
+        headers={"origin": "http://127.0.0.1:4000"},
     ) as ws:
         # The server is waiting for an ``auth`` message; sending the
         # wrong type drops it into the close path with code 1008.
@@ -77,7 +77,7 @@ def test_missing_token_closed_1008(client: TestClient) -> None:
 def test_invalid_token_closed_1008(client: TestClient) -> None:
     with client.websocket_connect(
         "/ws?token=not-a-real-token",
-        headers={"origin": "http://127.0.0.1:3000"},
+        headers={"origin": "http://127.0.0.1:4000"},
     ) as ws:
         with pytest.raises(WebSocketDisconnect) as exc:
             ws.receive_json()
@@ -95,7 +95,7 @@ def test_subscribe_reply_includes_rejected_names(
     """
     with client.websocket_connect(
         f"/ws?token={parent_token}",
-        headers={"origin": "http://127.0.0.1:3000"},
+        headers={"origin": "http://127.0.0.1:4000"},
     ) as ws:
         ready = ws.receive_json()
         assert ready["type"] == "ready"
@@ -120,7 +120,7 @@ def test_invalid_token_via_auth_message_closed_1008(client: TestClient) -> None:
     """
     with client.websocket_connect(
         "/ws",
-        headers={"origin": "http://127.0.0.1:3000"},
+        headers={"origin": "http://127.0.0.1:4000"},
     ) as ws:
         ws.send_json({"type": "auth", "token": "definitely-not-issued"})
         with pytest.raises(WebSocketDisconnect) as exc:

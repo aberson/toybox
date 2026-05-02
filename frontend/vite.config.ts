@@ -1,13 +1,13 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// Pin port 3000 + strictPort so dev/ tooling lines up. See
+// Pin port 4000 + strictPort so dev/ tooling lines up. See
 // dev/ memory `feedback_vite_dev_port` — vite's default :5173 collides
 // with project assumptions everywhere else.
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 3000,
+    port: 4000,
     strictPort: true,
     proxy: {
       "/api": {

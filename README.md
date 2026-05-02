@@ -78,10 +78,10 @@ uv run python -m toybox.main --host 127.0.0.1 --port 8000
 # Terminal 2 — frontend
 cd frontend; npm run dev
 
-# Open http://localhost:3000/parent
+# Open http://localhost:4000/parent
 ```
 
-Vite pins `server.port: 3000, strictPort: true` and proxies `/api` + `/ws` to the backend at `:8000`.
+Vite pins `server.port: 4000, strictPort: true` and proxies `/api` + `/ws` to the backend at `:8000`.
 
 ## Quality gates
 

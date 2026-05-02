@@ -27,7 +27,7 @@ def test_server_pings_periodically(fast_heartbeat: FastAPI, parent_token: str) -
     with TestClient(fast_heartbeat) as client:
         with client.websocket_connect(
             f"/ws?token={parent_token}",
-            headers={"origin": "http://127.0.0.1:3000"},
+            headers={"origin": "http://127.0.0.1:4000"},
         ) as ws:
             ready = ws.receive_json()
             assert ready["type"] == "ready"
@@ -43,7 +43,7 @@ def test_no_pong_closes_connection(fast_heartbeat: FastAPI, parent_token: str) -
     with TestClient(fast_heartbeat) as client:
         with client.websocket_connect(
             f"/ws?token={parent_token}",
-            headers={"origin": "http://127.0.0.1:3000"},
+            headers={"origin": "http://127.0.0.1:4000"},
         ) as ws:
             ready = ws.receive_json()
             assert ready["type"] == "ready"

@@ -45,8 +45,8 @@ from .topics import Topic
 _logger = logging.getLogger(__name__)
 
 DEFAULT_ORIGIN_ALLOW_LIST: tuple[str, ...] = (
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
+    "http://localhost:4000",
+    "http://127.0.0.1:4000",
 )
 
 LAN_IP_ENV = "TOYBOX_LAN_IP"
@@ -89,7 +89,7 @@ def origin_allow_list() -> tuple[str, ...]:
     bases = list(DEFAULT_ORIGIN_ALLOW_LIST)
     lan_ip = os.environ.get(LAN_IP_ENV)
     if lan_ip:
-        bases.append(f"http://{lan_ip}:3000")
+        bases.append(f"http://{lan_ip}:4000")
     return tuple(bases)
 
 

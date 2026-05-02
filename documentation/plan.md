@@ -39,7 +39,7 @@ Runs entirely on home hardware. Internet is optional — Claude is reached over 
 | Type check | mypy strict | dev/ standard |
 | Package mgmt | uv | dev/ standard |
 
-Vite config pins `server.port: 3000, strictPort: true` (per dev/ memory `feedback_vite_dev_port`); proxies `/api` and `/ws` to backend at `:8000` in dev.
+Vite config pins `server.port: 4000, strictPort: true` (per dev/ memory `feedback_vite_dev_port`); proxies `/api` and `/ws` to backend at `:8000` in dev.
 
 **Process model:** single uvicorn worker. SQLite + multi-worker leads to silent corruption under contention; the listening loop, AI calls, and mic capture all live in one async process anyway.
 
@@ -562,7 +562,7 @@ Plain CRUD form; no AI assist.
 ## Modules
 
 ### `src/toybox/main.py`
-FastAPI entrypoint. Mounts the React build for production; in dev, frontend runs on Vite at `:3000` and proxies to backend at `:8000`. Mic-capture loop runs as an asyncio background task started during app lifespan.
+FastAPI entrypoint. Mounts the React build for production; in dev, frontend runs on Vite at `:4000` and proxies to backend at `:8000`. Mic-capture loop runs as an asyncio background task started during app lifespan.
 
 **Lifespan & shutdown:** `@asynccontextmanager` lifespan starts (1) DB migrations, (2) persona loader, (3) Claude OAuth client + refresh task, (4) STT/VAD model load, (5) mic capture, (6) ws subscriber pruner. On shutdown (SIGINT or uvicorn graceful), an `asyncio.Event` is set; each task observes it, drains its in-flight work (≤5 sec), and exits. After 5 sec, remaining tasks are cancelled. Then connections close. Order is reverse of startup.
 
@@ -725,9 +725,9 @@ Tokens are random 32-byte hex strings; revocation is tracked via `auth_tokens.re
 
 `/ws` upgrade and all `POST`/`PATCH`/`DELETE` REST handlers reject requests whose `Origin` header is not in the configured allow-list. Default allow-list:
 
-- `http://localhost:3000`
-- `http://127.0.0.1:3000`
-- `http://<TOYBOX_LAN_IP>:3000` if `TOYBOX_LAN_IP` env var is set (Phase D LAN-bind path only)
+- `http://localhost:4000`
+- `http://127.0.0.1:4000`
+- `http://<TOYBOX_LAN_IP>:4000` if `TOYBOX_LAN_IP` env var is set (Phase D LAN-bind path only)
 
 Mitigates DNS rebinding and cross-site websocket hijacking from a phishing tab on the same machine. `GET` requests skip the check (no state change).
 
@@ -800,7 +800,7 @@ toybox/
 │       └── gen_error_codes_ts.py            # fallback if pydantic2ts can't emit StrEnum (per Phase A step 1 spike)
 ├── frontend/
 │   ├── package.json
-│   ├── vite.config.ts              # port 3000, strictPort
+│   ├── vite.config.ts              # port 4000, strictPort
 │   ├── tsconfig.json
 │   ├── index.html
 │   ├── public/
@@ -993,7 +993,7 @@ uv run python -m toybox.main --host 127.0.0.1 --port 8000
 # Terminal 2 - frontend
 cd frontend; npm run dev
 
-# Open http://localhost:3000/parent on the home machine
+# Open http://localhost:4000/parent on the home machine
 ```
 
 ### Run dev — child tablet on LAN (Phase D and later only)
@@ -1011,7 +1011,7 @@ uv run python -m toybox.main --host 0.0.0.0 --port 8000
 # Frontend on LAN
 cd frontend; npm run dev -- --host 0.0.0.0
 
-# Pair the tablet from the parent UI; tablet opens http://<lan-ip>:3000/child
+# Pair the tablet from the parent UI; tablet opens http://<lan-ip>:4000/child
 ```
 
 **LAN trust assumption:** binding `0.0.0.0` exposes toybox to anyone on your home Wi-Fi. The LAN-binding startup guard prevents it without a PIN; the PIN gate + Origin check are the actual controls. Do not run toybox on a public, hotel, or shared Wi-Fi even with a PIN — these have no defense against pairing-flow phishing.
@@ -1059,14 +1059,14 @@ Goal: parent clicks "trigger demo," sees suggestion, approves, child app runs ac
 | 6 | Curated NLP trigger registry | #6 | `--reviewers code` | 20+ trigger patterns parse correctly; dynamic toy-name trigger registers; user-editable copy seeded to `data/triggers.json` on first run; loader merges shipped defaults into user file |
 | 7 | Offline activity generator | #7 | `--reviewers code` | Given (intent, slot, context, hour-of-day) returns a 5-step activity; deterministic given seed; 10 sample inputs produce coherent outputs; time-of-day routing tested |
 | 8 | Activity API + ws + auth scaffolding | #8 | `--reviewers code` | Full state machine enforced; `If-Match-Version` enforced on all mutations (409 on mismatch, response body includes current `version`); proposed-queue capped at 5 (oldest auto-dismissed); ws envelope shape matches contract; ws auth requires session token (pre-Phase-D `/api/auth/parent` returns a token without PIN check, but LAN-bind guard from step 1 blocks LAN exposure); Origin header check enforced on `/ws` upgrade + state-changing REST handlers (allow-list test: `Origin: http://evil.example` rejected with 403); per-subscriber bounded queue with drop-oldest + emits `system` notice (`code=ws_backpressure_drop`); ws heartbeat: server pings every 20s, closes connection if no pong within 30s; tests cover happy path + invalid transitions + version conflicts + auth-required topics + Origin reject + backpressure drop-oldest under synthetic burst (200 messages to a stalled subscriber) + concurrent `If-Match-Version` race (two clients, same version, exactly one 409); `child_ids` selected at approval (server fills if 1 child profile) |
-| 9 | Parent UI — suggestion + activity panel + mic-hot indicator | #9 | `--reviewers full --start-cmd "<see step 1>" --url "http://localhost:3000/parent" --ui` | Mic-hot indicator visible in header (green/red/grey states); trigger button creates suggestion; approve transitions to running; skip/regenerate/end work; "didn't work" persists; capability banner appears when offline; mic mute toggle works |
-| 10 | Child UI — kiosk activity view | #10 | `--reviewers full --start-cmd "<see step 1>" --url "http://localhost:3000/child" --ui` | Persona avatar + current step render; sfx fires on transition (silence stub OK); next-step button advances; ws auto-reconnect tested with state resync on reconnect |
+| 9 | Parent UI — suggestion + activity panel + mic-hot indicator | #9 | `--reviewers full --start-cmd "<see step 1>" --url "http://localhost:4000/parent" --ui` | Mic-hot indicator visible in header (green/red/grey states); trigger button creates suggestion; approve transitions to running; skip/regenerate/end work; "didn't work" persists; capability banner appears when offline; mic mute toggle works |
+| 10 | Child UI — kiosk activity view | #10 | `--reviewers full --start-cmd "<see step 1>" --url "http://localhost:4000/child" --ui` | Persona avatar + current step render; sfx fires on transition (silence stub OK); next-step button advances; ws auto-reconnect tested with state resync on reconnect |
 
 **Phase A step 1 spike — pydantic2ts + StrEnum:** before declaring step 1 done, write a 30-line scratch script that defines `class ErrorCode(StrEnum)` with two members, runs `pydantic2ts` on the module, and inspects the generated TS. If `pydantic2ts` emits the enum as a TS string-literal union (`type ErrorCode = "upload_too_large" | ...`), the codegen path works as planned. If not (older pydantic2ts versions skip non-Pydantic exports), fall back to a 20-line `tools/gen_error_codes_ts.py` that walks `ErrorCode` and writes `frontend/src/shared/errors.ts` directly; wire it into the same pre-commit hook slot. Either way, `errors.ts` must regenerate from `core/errors.py` deterministically.
 
 #### Step 1: Project skeleton
 
-- **Problem:** Stand up the backend (FastAPI + uvicorn entrypoint) and frontend (Vite, two routes `/parent` and `/child`) scaffolds, plus the toolchain (ruff line-length=100, mypy strict, pytest) and the pydantic-to-typescript codegen path. Backend serves `GET /api/health` returning `capability_reason`. Default bind is `127.0.0.1`; LAN-bind startup guard refuses non-loopback host without a parent PIN (`TOYBOX_HOST=0.0.0.0` → exit non-zero with `code=lan_bind_requires_pin`). Vite pins `server.port: 3000, strictPort: true` and proxies `/api` + `/ws` to `:8000`. The pydantic2ts + StrEnum spike must verify the codegen path emits a string-literal union (or activate the `tools/gen_error_codes_ts.py` fallback) before this step is "done." See issue #1 for full file list, Done-when, and spike procedure.
+- **Problem:** Stand up the backend (FastAPI + uvicorn entrypoint) and frontend (Vite, two routes `/parent` and `/child`) scaffolds, plus the toolchain (ruff line-length=100, mypy strict, pytest) and the pydantic-to-typescript codegen path. Backend serves `GET /api/health` returning `capability_reason`. Default bind is `127.0.0.1`; LAN-bind startup guard refuses non-loopback host without a parent PIN (`TOYBOX_HOST=0.0.0.0` → exit non-zero with `code=lan_bind_requires_pin`). Vite pins `server.port: 4000, strictPort: true` and proxies `/api` + `/ws` to `:8000`. The pydantic2ts + StrEnum spike must verify the codegen path emits a string-literal union (or activate the `tools/gen_error_codes_ts.py` fallback) before this step is "done." See issue #1 for full file list, Done-when, and spike procedure.
 - **Type:** code
 - **Issue:** #1
 - **Flags:** --reviewers full --start-cmd "uv run python -m toybox.main" --url "http://localhost:8000/api/health"
@@ -1122,7 +1122,7 @@ Goal: parent clicks "trigger demo," sees suggestion, approves, child app runs ac
 
 #### Step 8: Activity API + ws + auth scaffolding
 
-- **Problem:** REST + ws contract for activity lifecycle: propose / approve / skip / regenerate / advance / end / "didn't work." Optimistic concurrency via `If-Match-Version` (decimal integer header) returning 409 + current version on mismatch. Proposed-queue capped at 5 (drop-oldest). ws envelope shape `{topic, ts, payload, schema_version}`. ws auth requires session token; `/api/auth/parent` issues tokens without PIN check pre-Phase-D, but the LAN-bind guard from step 1 blocks LAN exposure regardless. Origin allow-list (`http://localhost:3000`, `http://127.0.0.1:3000`, optional `http://${TOYBOX_LAN_IP}:3000`) enforced on `/ws` upgrade + state-changing REST handlers. Per-subscriber bounded queue (drop-oldest + emits `system` notice with `code=ws_backpressure_drop`). Heartbeat: server pings every 20s, closes on 30s no-pong. Internal pub/sub: publish never blocks; coalesce `triggers.invalidate`. `child_ids` selected at approval time (server fills if exactly 1 child profile exists). Tests cover happy path, invalid transitions, version conflicts, auth-required topics, Origin reject, backpressure drop-oldest under 200-message burst, concurrent `If-Match-Version` race (exactly one 409). See issue #8 for full test matrix.
+- **Problem:** REST + ws contract for activity lifecycle: propose / approve / skip / regenerate / advance / end / "didn't work." Optimistic concurrency via `If-Match-Version` (decimal integer header) returning 409 + current version on mismatch. Proposed-queue capped at 5 (drop-oldest). ws envelope shape `{topic, ts, payload, schema_version}`. ws auth requires session token; `/api/auth/parent` issues tokens without PIN check pre-Phase-D, but the LAN-bind guard from step 1 blocks LAN exposure regardless. Origin allow-list (`http://localhost:4000`, `http://127.0.0.1:4000`, optional `http://${TOYBOX_LAN_IP}:4000`) enforced on `/ws` upgrade + state-changing REST handlers. Per-subscriber bounded queue (drop-oldest + emits `system` notice with `code=ws_backpressure_drop`). Heartbeat: server pings every 20s, closes on 30s no-pong. Internal pub/sub: publish never blocks; coalesce `triggers.invalidate`. `child_ids` selected at approval time (server fills if exactly 1 child profile exists). Tests cover happy path, invalid transitions, version conflicts, auth-required topics, Origin reject, backpressure drop-oldest under 200-message burst, concurrent `If-Match-Version` race (exactly one 409). See issue #8 for full test matrix.
 - **Type:** code
 - **Issue:** #8
 - **Flags:** --reviewers code
@@ -1133,7 +1133,7 @@ Goal: parent clicks "trigger demo," sees suggestion, approves, child app runs ac
 - **Problem:** Build the parent route (`/parent`) in React + TypeScript + Vite + Zustand: mic-hot indicator (green = capturing, red = error, grey = paused) in header, mic mute toggle, manual trigger button (replaces real mic until Phase B), suggestion card with approve/skip/dismiss, activity panel with regenerate-from-here / end / "didn't work," capability banner that surfaces `capability_reason` when offline. ws auto-reconnect with exponential backoff (1s → 2s → 4s → 8s → 16s → cap at 30s, jitter ±25%) and state resync via REST on reconnect. 409 handling refetches activity and surfaces a toast (no blind retry). Suggestion card "why this?" expandable panel ships in Phase D step 22 — leave a stub. See issue #9 for component file list.
 - **Type:** code
 - **Issue:** #9
-- **Flags:** --reviewers full --start-cmd "uv run python -m toybox.main" --url "http://localhost:3000/parent" --ui
+- **Flags:** --reviewers full --start-cmd "uv run python -m toybox.main" --url "http://localhost:4000/parent" --ui
 - **Status:** DONE (2026-05-02)
 
 #### Step 10: Child UI — kiosk activity view
@@ -1141,7 +1141,7 @@ Goal: parent clicks "trigger demo," sees suggestion, approves, child app runs ac
 - **Problem:** Build the child kiosk route (`/child`) in React + TypeScript: full-bleed persona avatar + current step text, next-step button (calls `POST /api/activities/{id}/advance` with `If-Match-Version`), SFX firing on step transition (silence stub acceptable for v1; M4 sources the real WAVs in `frontend/public/sfx/`). ws auto-reconnect with state resync — child page recovers active step + persona without parent intervention. Activity-end transitions to a friendly "all done" state. End of this step closes the v1 Phase A loop: trigger → suggestion → approve → child runs activity → completion. Adult-only smoke test before Phase B starts. See issue #10 for component file list and SFX format spec.
 - **Type:** code
 - **Issue:** #10
-- **Flags:** --reviewers full --start-cmd "uv run python -m toybox.main" --url "http://localhost:3000/child" --ui
+- **Flags:** --reviewers full --start-cmd "uv run python -m toybox.main" --url "http://localhost:4000/child" --ui
 - **Status:** DONE (2026-05-02)
 
 **End of Phase A = v1 — COMPLETE (2026-05-02).** All 10 steps DONE. 286 backend pytest + 99 frontend vitest + 2 Playwright specs passing. Adult-only smoke test now; Phase B (audio capture + STT) follows.
@@ -1176,7 +1176,7 @@ What to look for:
 | 12 | faster-whisper integration | `--reviewers code` | GPU autodetect; first-run model download to `data/models/`; bundled WAV transcribes within edit-distance tolerance; CPU fallback works; `confidence` populated; `transcribe` runs in `asyncio.to_thread` so mic loop is not blocked |
 | 13 | Transcript pipeline + persistence + ws | `--reviewers code` | Synthetic transcript stream produces correct triggers; `transcripts` table populates; live ws topic emits with envelope shape; transcripts below confidence floor are stored but skip trigger evaluation |
 | 14 | Mode-aware Claude escalation + rate-limit handling | `--reviewers code` | Each mode produces correct call counts under synthetic input; min-interval throttle enforced; 429 opens breaker; malformed Claude output falls back to offline path |
-| 14b | E2E pipeline test (synthetic audio → child UI) | `--reviewers full --start-cmd "<see step 1>" --url "http://localhost:3000/parent" --ui` | `python -m toybox.main --smoke` plays `tests/fixtures/audio/lets_play_unicorns.wav` → STT → trigger → suggestion fires; Playwright drives parent approve → child UI renders step 1; marked `@pytest.mark.slow`, runs in CI nightly |
+| 14b | E2E pipeline test (synthetic audio → child UI) | `--reviewers full --start-cmd "<see step 1>" --url "http://localhost:4000/parent" --ui` | `python -m toybox.main --smoke` plays `tests/fixtures/audio/lets_play_unicorns.wav` → STT → trigger → suggestion fires; Playwright drives parent approve → child UI renders step 1; marked `@pytest.mark.slow`, runs in CI nightly |
 
 #### Manual M2 — Mic hardware test (after step 11)
 
@@ -1326,7 +1326,7 @@ mic (sounddevice)
 | Key | Default | Notes |
 |-----|---------|-------|
 | `TOYBOX_HOST` | `127.0.0.1` | bind address. Default loopback-only. To bind LAN (`0.0.0.0` or specific IP), the parent PIN must be set first — startup guard refuses non-loopback bind without PIN. |
-| `TOYBOX_LAN_IP` | unset | optional; when set, added to the `Origin` allow-list as `http://<value>:3000`. Set this to the home machine's LAN IP after the PIN is configured (Phase D). |
+| `TOYBOX_LAN_IP` | unset | optional; when set, added to the `Origin` allow-list as `http://<value>:4000`. Set this to the home machine's LAN IP after the PIN is configured (Phase D). |
 | `TOYBOX_PORT` | 8000 | backend |
 | `TOYBOX_DATA_DIR` | `./data` | |
 | `TOYBOX_OAUTH_PATH` | `~/.toybox/secrets.json` | Windows: `%USERPROFILE%\.toybox\secrets.json` |
@@ -1445,7 +1445,7 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 3000,
+    port: 4000,
     strictPort: true,
     host: true,
     proxy: {
@@ -1521,7 +1521,7 @@ export default defineConfig({
   fullyParallel: false,           // backend has shared mic state
   retries: 1,
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: 'http://localhost:4000',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     trace: 'on-first-retry',
@@ -1537,8 +1537,8 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
     },
     {
-      command: 'npm run dev -- --port 3000',
-      port: 3000,
+      command: 'npm run dev -- --port 4000',
+      port: 4000,
       reuseExistingServer: !process.env.CI,
     },
   ],
