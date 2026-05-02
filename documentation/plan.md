@@ -1142,6 +1142,7 @@ Goal: parent clicks "trigger demo," sees suggestion, approves, child app runs ac
 - **Type:** code
 - **Issue:** #10
 - **Flags:** --reviewers full --start-cmd "uv run python -m toybox.main" --url "http://localhost:3000/child" --ui
+- **Status:** DONE (2026-05-02)
 
 **End of Phase A = v1.** Adult-only smoke test, then move to Phase B.
 

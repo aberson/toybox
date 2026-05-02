@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { JSX } from "react";
 
-import { ApiClient, isAbortError, withConflictHandler } from "./api";
+import {
+  ApiClient,
+  isAbortError,
+  retryWithBackoff,
+  withConflictHandler,
+} from "./api";
 import type { Activity } from "./api";
 import { ActivityPanel } from "./components/ActivityPanel";
 import { CapabilityBanner } from "./components/CapabilityBanner";
@@ -54,7 +59,12 @@ export function App(): JSX.Element {
     let mounted = true;
     const boot = async (): Promise<void> => {
       try {
-        const tokenResp = await api.issueParentToken({ signal: aborter.signal });
+        // Retry-with-backoff on transient 5xx + network errors so a
+        // flapping /api/auth/parent (e.g. the iter-1 SQLite cross-thread
+        // bug) doesn't strand the parent UI without a token.
+        const tokenResp = await retryWithBackoff(() =>
+          api.issueParentToken({ signal: aborter.signal }),
+        );
         if (!mounted) return;
         useParentStore.getState().setToken(tokenResp);
         try {
@@ -90,14 +100,26 @@ export function App(): JSX.Element {
               .getActivity(cur.id, { signal: aborter.signal })
               .then((fresh) => {
                 if (!mounted) return;
-                useParentStore.getState().setActivity(fresh);
+                // Route through the version guard so an in-flight
+                // GET can't regress past a fresher ws envelope.
+                useParentStore.getState().applyReconnectResync(fresh);
               })
               .catch((err: unknown) => {
                 if (isAbortError(err)) return;
-                // Keep what we have; the ws stream will catch us up.
+                const message =
+                  err instanceof Error ? err.message : "reconnect refetch failed";
+                useParentStore
+                  .getState()
+                  .pushToast("warning", `reconnect: ${message}`);
               });
           },
         });
+        // StrictMode double-mount can fire cleanup before this point;
+        // if so, abandon this ws so we don't leak a live socket.
+        if (!mounted) {
+          ws.stop();
+          return;
+        }
         wsRef.current = ws;
         ws.start();
       } catch (err) {
@@ -172,7 +194,9 @@ export function App(): JSX.Element {
         hour: now.getHours(),
         seed,
       });
-      useParentStore.getState().setActivity(activity);
+      // Version-guarded set so a same-id ws envelope can't be regressed
+      // by a slow propose response landing late.
+      useParentStore.getState().applyMutationResult(activity);
     } catch (err) {
       const message = err instanceof Error ? err.message : "trigger failed";
       useParentStore.getState().pushToast("error", `trigger: ${message}`);
@@ -193,7 +217,7 @@ export function App(): JSX.Element {
           },
         });
         if (result !== null) {
-          useParentStore.getState().setActivity(result);
+          useParentStore.getState().applyMutationResult(result);
         }
       }),
     [activity, api, refetchActivity, runGuarded],
@@ -211,7 +235,7 @@ export function App(): JSX.Element {
           },
         });
         if (result !== null) {
-          useParentStore.getState().setActivity(result);
+          useParentStore.getState().applyMutationResult(result);
         }
       }),
     [activity, api, refetchActivity, runGuarded],
@@ -247,7 +271,7 @@ export function App(): JSX.Element {
           },
         });
         if (result !== null) {
-          useParentStore.getState().setActivity(result);
+          useParentStore.getState().applyMutationResult(result);
         }
       }),
     [activity, api, refetchActivity, runGuarded],
@@ -265,7 +289,7 @@ export function App(): JSX.Element {
           },
         });
         if (result !== null) {
-          useParentStore.getState().setActivity(result);
+          useParentStore.getState().applyMutationResult(result);
         }
       }),
     [activity, api, refetchActivity, runGuarded],
@@ -284,7 +308,7 @@ export function App(): JSX.Element {
           },
         });
         if (result !== null) {
-          useParentStore.getState().setActivity(result);
+          useParentStore.getState().applyMutationResult(result);
         }
       }),
     [activity, api, refetchActivity, runGuarded],

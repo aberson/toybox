@@ -53,7 +53,10 @@ def app(db_path: Path, pubsub: PubSub) -> Iterator[FastAPI]:
     application = create_app()
 
     def _override_db() -> Iterator[sqlite3.Connection]:
-        conn = connect(db_path)
+        # Match the production deps: FastAPI's threadpool may schedule
+        # generator setup, the handler body, and teardown on different
+        # worker threads, so the connection must allow cross-thread use.
+        conn = connect(db_path, check_same_thread=False)
         try:
             yield conn
         finally:

@@ -3,7 +3,7 @@ import type { JSX } from "react";
 import { createRoot } from "react-dom/client";
 
 import { App as ParentApp } from "./parent/App";
-import { Child } from "./child/Child";
+import { App as ChildApp } from "./child/App";
 
 // Phase A: simple path-based routing. Step 9/10 may swap in react-router
 // once nested routing is needed; for the skeleton, a plain switch on
@@ -11,7 +11,7 @@ import { Child } from "./child/Child";
 function App(): JSX.Element {
   const path = window.location.pathname;
   if (path.startsWith("/child")) {
-    return <Child />;
+    return <ChildApp />;
   }
   if (path.startsWith("/parent")) {
     return <ParentApp />;

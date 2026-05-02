@@ -30,6 +30,39 @@ def test_post_parent_returns_token(client: TestClient) -> None:
     assert body["expires_at"] > time.time()
 
 
+def test_post_parent_survives_repeated_requests(client: TestClient) -> None:
+    """Regression: ``POST /api/auth/parent`` must not 500 on repeated calls.
+
+    Iter-1 cached its SQLite connection without ``check_same_thread=False``,
+    which tripped ``sqlite3.ProgrammingError: SQLite objects created in a
+    thread can only be used in that same thread`` once FastAPI's threadpool
+    moved the sync generator's teardown to a different worker than the
+    setup. Five sequential calls is enough to exercise that flip in
+    practice; we also stress it with a thread pool below.
+    """
+    for _ in range(5):
+        response = client.post("/api/auth/parent")
+        assert response.status_code == 200, response.text
+
+
+def test_post_parent_concurrent_requests_all_succeed(client: TestClient) -> None:
+    """Regression: concurrent calls from a real ``ThreadPoolExecutor``.
+
+    Each request goes through a different FastAPI threadpool worker so
+    we cover the cross-thread close path (the iter-1 bug shape) more
+    robustly than the sequential test alone.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _hit() -> int:
+        return client.post("/api/auth/parent").status_code
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        statuses = list(pool.map(lambda _i: _hit(), range(16)))
+
+    assert all(status == 200 for status in statuses), statuses
+
+
 def test_post_pair_requires_existing_child(
     client: TestClient,
     parent_headers: dict[str, str],

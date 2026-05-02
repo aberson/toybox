@@ -180,6 +180,36 @@ export function applyRejectedTopics(
   );
 }
 
+// Reconnect-resync helper: only adopt the REST refetch if it isn't a
+// stale read (e.g. the ws envelope already applied a newer version
+// while the GET was in flight). Mirrors the kiosk version guard.
+export function applyReconnectResync(
+  state: ParentState,
+  fresh: Activity | null,
+): ParentState {
+  if (fresh === null) return state;
+  const cur = state.activity;
+  if (cur !== null && cur.id === fresh.id && fresh.version < cur.version) {
+    return state;
+  }
+  return { ...state, activity: fresh };
+}
+
+// Mutation-result helper: drop the response when a newer envelope has
+// already arrived for the same activity. Mirrors the kiosk version
+// guard so an in-flight mutation can't regress in-memory state when
+// the ws stream pushes a fresher version mid-round-trip.
+export function applyMutationResult(
+  state: ParentState,
+  fresh: Activity,
+): ParentState {
+  const cur = state.activity;
+  if (cur !== null && cur.id === fresh.id && fresh.version < cur.version) {
+    return state;
+  }
+  return { ...state, activity: fresh };
+}
+
 export interface ParentStore extends ParentState {
   setToken: (resp: ParentTokenResponse) => void;
   setHealth: (h: HealthResponse) => void;
@@ -192,6 +222,8 @@ export interface ParentStore extends ParentState {
     fresh: Activity | null,
   ) => void;
   applyRejectedTopics: (rejected: string[]) => void;
+  applyReconnectResync: (fresh: Activity | null) => void;
+  applyMutationResult: (fresh: Activity) => void;
   pushToast: (kind: Toast["kind"], message: string) => void;
   dismissToast: (id: number) => void;
 }
@@ -209,6 +241,10 @@ export function createParentStore(initial: ParentState = INITIAL_STATE) {
       set((s) => applyVersionConflict(s, conflict, fresh)),
     applyRejectedTopics: (rejected) =>
       set((s) => applyRejectedTopics(s, rejected)),
+    applyReconnectResync: (fresh) =>
+      set((s) => applyReconnectResync(s, fresh)),
+    applyMutationResult: (fresh) =>
+      set((s) => applyMutationResult(s, fresh)),
     pushToast: (kind, message) => set((s) => pushToast(s, kind, message)),
     dismissToast: (id) => set((s) => dismissToast(s, id)),
   }));

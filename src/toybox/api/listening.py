@@ -26,8 +26,15 @@ router = APIRouter(prefix="/api/listening", tags=["listening"])
 
 
 def get_db() -> Iterator[sqlite3.Connection]:
-    """FastAPI dependency: open a SQLite connection, yield, close."""
-    conn = connect(resolve_db_path())
+    """FastAPI dependency: open a SQLite connection, yield, close.
+
+    ``check_same_thread=False`` because FastAPI dispatches sync
+    generator setup, the handler body, and teardown via
+    ``run_in_threadpool``; anyio may pick a different worker for each
+    leg, which would otherwise trip
+    ``sqlite3.ProgrammingError`` in ``conn.close()``.
+    """
+    conn = connect(resolve_db_path(), check_same_thread=False)
     try:
         yield conn
     finally:

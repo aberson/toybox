@@ -24,8 +24,18 @@ from ..db import connect, resolve_db_path
 
 
 def get_auth_db() -> Iterator[sqlite3.Connection]:
-    """FastAPI dependency: yield an auth-scoped SQLite connection."""
-    conn = connect(resolve_db_path())
+    """FastAPI dependency: yield an auth-scoped SQLite connection.
+
+    ``check_same_thread=False`` is required because FastAPI dispatches the
+    sync generator setup, the sync handler body, and the teardown via
+    ``run_in_threadpool``; the underlying anyio threadpool may pick a
+    different worker thread for each leg, even though the connection is
+    only used within a single request. Without this flag the close in
+    the ``finally`` block raises
+    ``sqlite3.ProgrammingError: SQLite objects created in a thread can
+    only be used in that same thread`` on the second-or-later request.
+    """
+    conn = connect(resolve_db_path(), check_same_thread=False)
     try:
         yield conn
     finally:

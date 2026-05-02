@@ -73,8 +73,15 @@ def _now_iso() -> str:
 
 
 def get_activities_db() -> Iterator[sqlite3.Connection]:
-    """FastAPI dependency: yield an activities-scoped SQLite connection."""
-    conn = connect(resolve_db_path())
+    """FastAPI dependency: yield an activities-scoped SQLite connection.
+
+    ``check_same_thread=False`` because FastAPI dispatches sync
+    generator setup, the handler body, and teardown via
+    ``run_in_threadpool``; anyio may pick a different worker for each
+    leg, which would otherwise trip
+    ``sqlite3.ProgrammingError`` in ``conn.close()``.
+    """
+    conn = connect(resolve_db_path(), check_same_thread=False)
     try:
         yield conn
     finally:

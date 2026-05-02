@@ -1,6 +1,14 @@
-// Parent UI REST client. Injects X-Toybox-Token, serializes
-// If-Match-Version, and normalizes 409 (version_conflict) into a typed
-// error. All routes hit /api/* (vite dev proxy forwards to :8000).
+// Child kiosk REST client. Mirrors the parent `api.ts` shape: injects
+// X-Toybox-Token, serializes If-Match-Version, normalizes 409 into a
+// typed VersionConflictError, and exposes withConflictHandler so the
+// next-step button can refetch + toast without blind retry.
+//
+// Phase A note: the kiosk authenticates with a parent-scope token
+// (POST /api/auth/parent). A dedicated child/kiosk pairing flow
+// arrives in Phase D Step 20. The endpoint surface used here
+// (advance/getActivity/issueParentToken) is the minimal set the kiosk
+// needs to drive an approved activity to completion.
+//
 // Shapes mirror src/toybox/api/activities.py and core/version_check.py.
 
 export type ActivityState =
@@ -42,25 +50,10 @@ export interface VersionConflictBody {
   current_state: string;
 }
 
-export interface HealthResponse {
-  ok: boolean;
-  capability_reason: string | null;
-}
-
 export interface ParentTokenResponse {
   token: string;
   expires_at: number;
   subject: { kind: "parent" };
-}
-
-export interface ProposePayload {
-  intent: string;
-  slot?: string | null;
-  hour: number;
-  seed: number;
-  persona_id?: string | null;
-  session_id?: string | null;
-  context?: Record<string, unknown> | null;
 }
 
 export class ApiError extends Error {
@@ -91,9 +84,6 @@ export interface ApiClientOptions {
   getToken?: () => string | null;
 }
 
-// Per-call options threaded through public methods. signal lets the
-// caller bind a request to a component lifecycle (AbortController on
-// unmount), so an in-flight mutation can't reach into a dead store.
 export interface RequestOptions {
   signal?: AbortSignal;
 }
@@ -119,7 +109,6 @@ function unwrapConflict(body: unknown): VersionConflictBody {
     const candidate = "detail" in rec ? rec["detail"] : rec;
     return candidate as VersionConflictBody;
   }
-  // Defensive — the type guard already verified the shape.
   throw new Error("not a conflict body");
 }
 
@@ -178,13 +167,6 @@ export class ApiClient {
     return body as T;
   }
 
-  async getHealth(opts: RequestOptions = {}): Promise<HealthResponse> {
-    return this.request<HealthResponse>("/api/health", {
-      method: "GET",
-      signal: opts.signal,
-    });
-  }
-
   async issueParentToken(
     opts: RequestOptions = {},
   ): Promise<ParentTokenResponse> {
@@ -201,86 +183,22 @@ export class ApiClient {
     });
   }
 
-  async propose(
-    payload: ProposePayload,
-    opts: RequestOptions = {},
-  ): Promise<Activity> {
-    return this.request<Activity>("/api/activities/propose", {
-      method: "POST",
-      body: JSON.stringify(payload),
-      signal: opts.signal,
-    });
-  }
-
-  async approve(
-    id: string,
-    version: number,
-    childIds?: string[],
-    opts: RequestOptions = {},
-  ): Promise<Activity> {
-    return this.request<Activity>(`/api/activities/${encodeURIComponent(id)}/approve`, {
-      method: "POST",
-      body: JSON.stringify({ child_ids: childIds ?? null }),
-      ifMatchVersion: version,
-      signal: opts.signal,
-    });
-  }
-
-  async dismiss(
+  async advance(
     id: string,
     version: number,
     opts: RequestOptions = {},
   ): Promise<Activity> {
-    return this.request<Activity>(`/api/activities/${encodeURIComponent(id)}/dismiss`, {
-      method: "POST",
-      ifMatchVersion: version,
-      signal: opts.signal,
-    });
-  }
-
-  async regenerate(
-    id: string,
-    version: number,
-    opts: RequestOptions = {},
-  ): Promise<Activity> {
-    return this.request<Activity>(`/api/activities/${encodeURIComponent(id)}/regenerate`, {
-      method: "POST",
-      body: JSON.stringify({}),
-      ifMatchVersion: version,
-      signal: opts.signal,
-    });
-  }
-
-  async end(
-    id: string,
-    version: number,
-    opts: RequestOptions = {},
-  ): Promise<Activity> {
-    return this.request<Activity>(`/api/activities/${encodeURIComponent(id)}/end`, {
-      method: "POST",
-      ifMatchVersion: version,
-      signal: opts.signal,
-    });
-  }
-
-  async didntWork(
-    id: string,
-    version: number,
-    reason?: string,
-    opts: RequestOptions = {},
-  ): Promise<Activity> {
-    return this.request<Activity>(`/api/activities/${encodeURIComponent(id)}/didnt-work`, {
-      method: "POST",
-      body: JSON.stringify({ reason: reason ?? null }),
-      ifMatchVersion: version,
-      signal: opts.signal,
-    });
+    return this.request<Activity>(
+      `/api/activities/${encodeURIComponent(id)}/advance`,
+      {
+        method: "POST",
+        ifMatchVersion: version,
+        signal: opts.signal,
+      },
+    );
   }
 }
 
-// Returns true for AbortError thrown by fetch when a signal aborts.
-// fetch in browsers throws DOMException with name === "AbortError"; in
-// node 18+/undici the same. Being lenient for test fakes too.
 export function isAbortError(err: unknown): boolean {
   if (err === null || typeof err !== "object") return false;
   const name = (err as { name?: unknown }).name;
@@ -288,13 +206,19 @@ export function isAbortError(err: unknown): boolean {
 }
 
 // True for transient failures that warrant a retry-with-backoff during
-// bootstrap: network glitches and 5xx server errors. 4xx and
-// AbortError are NOT retryable.
+// bootstrap: network glitches (TypeError from fetch with no response)
+// and 5xx server errors (e.g. the iter-1 SQLite cross-thread regression
+// in /api/auth/parent). 4xx and AbortError are NOT retryable: 4xx is
+// the server actively rejecting and AbortError means the caller asked
+// us to stop.
 export function isTransientError(err: unknown): boolean {
   if (isAbortError(err)) return false;
   if (err instanceof ApiError) {
     return err.status >= 500 && err.status < 600;
   }
+  // Native fetch raises TypeError on network errors (DNS, conn refused,
+  // CORS preflight failure). Treat any non-Api Error as a network blip
+  // so we retry once during bootstrap rather than freezing the kiosk.
   return err instanceof Error;
 }
 
@@ -302,8 +226,13 @@ export interface RetryOptions {
   attempts?: number;
   baseDelayMs?: number;
   maxDelayMs?: number;
+  // Test seam: deterministic sleep + jitter. Defaults to setTimeout +
+  // Math.random when omitted.
   sleep?: (ms: number) => Promise<void>;
   jitter?: () => number;
+  // Test seam: classifier for retryable errors (defaults to
+  // isTransientError). Lets unit tests force the retry / no-retry path
+  // without monkey-patching the module-level function.
   shouldRetry?: (err: unknown) => boolean;
 }
 
@@ -312,8 +241,10 @@ const DEFAULT_RETRY_BASE_MS = 1_000;
 const DEFAULT_RETRY_MAX_MS = 8_000;
 
 // Run ``op`` with exponential backoff on transient errors (5xx +
-// network). Mirrors the child kiosk helper so a flapping
-// /api/auth/parent doesn't freeze the parent UI either.
+// network). Re-throws on non-transient errors immediately and on the
+// final attempt. Used by App.tsx bootstrap so an intermittent
+// /api/auth/parent failure (the iter-1 SQLite cross-thread bug) doesn't
+// freeze the kiosk into the idle screen forever.
 export async function retryWithBackoff<T>(
   op: () => Promise<T>,
   opts: RetryOptions = {},
@@ -336,16 +267,20 @@ export async function retryWithBackoff<T>(
       if (!shouldRetry(err) || i === attempts - 1) throw err;
       const exp = baseDelayMs * 2 ** i;
       const capped = Math.min(exp, maxDelayMs);
+      // jitter in [0.5, 1.5) so adjacent kiosks don't lock-step their
+      // retries against the same backend.
       const jittered = capped * (0.5 + jitter());
       await sleep(jittered);
     }
   }
+  // Defensive: the loop returns or throws, but TS wants an explicit
+  // throw at the bottom.
   throw lastErr;
 }
 
-// 409 handler: wrap a mutation; on version_conflict, refetch the
-// activity, fire a toast, and return null without retrying. Callers
-// that need a value back use the activity refetched from `onRefetch`.
+// 409 handler for the kiosk advance flow: wrap the mutation; on
+// version_conflict, refetch the activity, fire a toast, and return
+// null without retrying.
 export interface ConflictHandlerArgs<T> {
   mutation: () => Promise<T>;
   onConflict: (conflict: VersionConflictBody, fresh: Activity | null) => void;
