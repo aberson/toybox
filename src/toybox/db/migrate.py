@@ -8,23 +8,15 @@ to a non-zero exit with a traceback.
 
 from __future__ import annotations
 
-import os
 import sys
-from pathlib import Path
 
+from . import resolve_db_path
 from .connection import connect
 from .migrations import current_version, run_migrations
 
-DEFAULT_DB_PATH = Path("data") / "toybox.db"
-
-
-def _resolve_db_path() -> Path:
-    raw = os.environ.get("TOYBOX_DB_PATH")
-    return Path(raw) if raw else DEFAULT_DB_PATH
-
 
 def main() -> int:
-    db_path = _resolve_db_path()
+    db_path = resolve_db_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
     conn = connect(db_path)

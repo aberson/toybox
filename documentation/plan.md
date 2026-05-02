@@ -1094,6 +1094,7 @@ Goal: parent clicks "trigger demo," sees suggestion, approves, child app runs ac
 - **Type:** code
 - **Issue:** #4
 - **Flags:** --reviewers code
+- **Status:** DONE (2026-05-01)
 
 #### Step 5: Claude OAuth client + capability gate + circuit breaker
 
