@@ -1,0 +1,32 @@
+# Pre-commit hooks for toybox.
+#
+# Phase A Step 1 deliverable: this file exists and declares the codegen +
+# lint hooks. Installing pre-commit globally is NOT a step-1 requirement
+# (operators install it on demand). CI invokes the same commands directly.
+#
+# To use locally:
+#     pip install pre-commit && pre-commit install
+
+repos:
+  - repo: local
+    hooks:
+      - id: toybox-gen-types
+        name: regenerate frontend type sync
+        entry: python tools/gen_types_ts.py
+        language: system
+        pass_filenames: false
+        files: ^(src/toybox/core/errors\.py|tools/gen_.*\.py)$
+
+      - id: toybox-ruff-format
+        name: ruff format (check)
+        entry: uv run ruff format --check .
+        language: system
+        pass_filenames: false
+        files: \.py$
+
+      - id: toybox-ruff-check
+        name: ruff lint
+        entry: uv run ruff check .
+        language: system
+        pass_filenames: false
+        files: \.py$

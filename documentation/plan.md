@@ -1070,6 +1070,7 @@ Goal: parent clicks "trigger demo," sees suggestion, approves, child app runs ac
 - **Type:** code
 - **Issue:** #1
 - **Flags:** --reviewers full --start-cmd "uv run python -m toybox.main" --url "http://localhost:8000/api/health"
+- **Status:** DONE (2026-05-01)
 
 #### Step 2: SQLite schema + migrations
 
