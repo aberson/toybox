@@ -17,6 +17,7 @@ is stored in ``activity_steps.body``; the response uses the same
 from __future__ import annotations
 
 import json
+import secrets
 import sqlite3
 import uuid
 from collections.abc import Iterator
@@ -529,14 +530,16 @@ def post_regenerate(
     _emit_state(pubsub, _row_to_response(conn, dismissed_row))
 
     intent = body.intent or str(row["intent_source"]) or "boredom"
-    seed = body.seed if body.seed is not None else (current_version + 1) * 31 + 7
+    # Random seed when caller doesn't supply one — the seed feeds both
+    # the template-pick rng AND the deterministic UUID hash, so a fixed
+    # fallback meant every regenerate produced the same suggestion (and
+    # collided on activities.id the second time around). Tests that
+    # need determinism still pass an explicit seed.
+    seed = body.seed if body.seed is not None else secrets.randbits(31)
     hour = body.hour if body.hour is not None else datetime.now(UTC).hour
     persona_id = body.persona_id or row["persona_id"]
-    # Fold the source activity id + pre-dismiss version into the
-    # deterministic UUID hash so each regenerate produces a fresh id.
-    # Without this, every regenerate from a v=2 activity in the same
-    # hour with the same intent collapses to the same target UUID and
-    # the second attempt hits a UNIQUE constraint on activities.id.
+    # Fold source identity into the UUID hash too — defense in depth so
+    # that even an unlikely seed collision doesn't surface as a 500.
     context = dict(body.context) if body.context is not None else {}
     context.setdefault("regen_source", activity_id)
     context.setdefault("regen_source_version", current_version)
