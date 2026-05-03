@@ -65,7 +65,7 @@ export function ActivityPanel(props: ActivityPanelProps): JSX.Element {
             void onRegenerate();
           }}
         >
-          {busy.regenerate ? "regenerating..." : "regenerate from here"}
+          {busy.regenerate ? "skipping..." : "skip & try another"}
         </button>
         <button
           type="button"

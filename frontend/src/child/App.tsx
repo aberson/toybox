@@ -259,9 +259,7 @@ export function App(): JSX.Element {
     }
   }, [activity, api, busyAdvance, refetchActivity]);
 
-  const showAllDone =
-    activity !== null &&
-    (activity.state === "completed" || activity.state === "ended");
+  const showAllDone = activity !== null && isTerminalState(activity.state);
   const showActive =
     activity !== null &&
     !showAllDone &&

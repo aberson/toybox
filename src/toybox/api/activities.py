@@ -59,8 +59,10 @@ STATE_DIDNT_WORK = "didnt_work"
 # Valid transition map: source state -> set of target states.
 _VALID_TRANSITIONS: dict[str, frozenset[str]] = {
     STATE_PROPOSED: frozenset({STATE_APPROVED, STATE_DISMISSED}),
-    STATE_APPROVED: frozenset({STATE_RUNNING, STATE_ENDED}),
-    STATE_RUNNING: frozenset({STATE_RUNNING, STATE_COMPLETED, STATE_ENDED, STATE_DIDNT_WORK}),
+    STATE_APPROVED: frozenset({STATE_RUNNING, STATE_ENDED, STATE_DISMISSED}),
+    STATE_RUNNING: frozenset(
+        {STATE_RUNNING, STATE_COMPLETED, STATE_ENDED, STATE_DIDNT_WORK, STATE_DISMISSED}
+    ),
     STATE_COMPLETED: frozenset({STATE_DIDNT_WORK}),
     STATE_ENDED: frozenset({STATE_DIDNT_WORK}),
     STATE_DISMISSED: frozenset(),

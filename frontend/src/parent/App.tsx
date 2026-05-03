@@ -309,6 +309,12 @@ export function App(): JSX.Element {
         });
         if (result !== null) {
           useParentStore.getState().applyMutationResult(result);
+          // The panel hides on `didnt_work` (not in PANEL_STATES), so without
+          // a toast the action looks like it did nothing. Confirm the
+          // feedback was recorded.
+          useParentStore
+            .getState()
+            .pushToast("info", "feedback recorded — thanks");
         }
       }),
     [activity, api, refetchActivity, runGuarded],
