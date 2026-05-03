@@ -1178,6 +1178,7 @@ What to look for:
 - **Type:** code
 - **Issue:** #15
 - **Flags:** --reviewers code
+- **Status:** DONE (2026-05-03)
 
 #### Step 12: faster-whisper integration
 

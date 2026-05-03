@@ -10,6 +10,9 @@ dependencies = [
     "pydantic>=2.6",
     "pydantic-to-typescript>=2.0",
     "python-slugify>=8.0",
+    "sounddevice>=0.5.5",
+    "numpy>=2.4.4",
+    "onnxruntime>=1.25.1",
 ]
 
 [dependency-groups]
@@ -41,6 +44,10 @@ select = ["E", "F", "W", "I", "B", "UP"]
 strict = true
 python_version = "3.12"
 files = ["src", "tests"]
+
+[[tool.mypy.overrides]]
+module = ["sounddevice", "onnxruntime"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
