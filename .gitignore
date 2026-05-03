@@ -21,9 +21,14 @@ frontend/tsconfig.tsbuildinfo
 *.log
 npm-debug.log*
 
-# Toybox runtime data
-data/
+# Toybox runtime data (gitignore everything in data/ except the
+# directory placeholders so the model-cache layout is shipped in git
+# but the binaries themselves stay out of the repo).
+data/*
 !data/.gitkeep
+!data/models/
+data/models/*
+!data/models/.gitkeep
 
 # Secrets / OAuth
 secrets.json

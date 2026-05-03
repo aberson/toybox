@@ -1186,6 +1186,7 @@ What to look for:
 - **Type:** code
 - **Issue:** #16
 - **Flags:** --reviewers code
+- **Status:** DONE (2026-05-03)
 
 #### Step 13: Transcript pipeline + persistence + ws
 
