@@ -58,10 +58,16 @@ from typing import Any, Final
 
 from pydantic import ValidationError
 
-from ..activities.generator import FALLBACK_INTENT, generate
+from ..activities.generator import FALLBACK_INTENT, build_generator_context, generate
 from ..activities.models import Activity
 from ..ai.breaker import BreakerState, CircuitBreaker
 from ..ai.client import AIClient, AIMessage, text_model
+from ..ai.labeled_events import (
+    GENERATOR_PATH_CLAUDE,
+    GENERATOR_PATH_OFFLINE,
+    GeneratorContext,
+    schedule_judge_sample,
+)
 from ..audio.stt import Transcript
 from ..core.capability import CapabilityReason
 from ..core.listening import ListeningMode, Publisher
@@ -95,6 +101,25 @@ CapabilityCheck = Callable[[], Awaitable[tuple[bool, CapabilityReason | None]]]
 # tests can substitute a deterministic stub that records calls
 # without touching the real templates dir.
 OfflineGenerator = Callable[..., Activity]
+
+# Type alias for the labeled_events recorder injected into the
+# dispatcher. Production wires
+# :func:`toybox.ai.labeled_events.record_generation` partial'd with a
+# DB connection; tests pass a recording stub. The recorder is
+# best-effort — failures inside it MUST NOT propagate (the dispatcher
+# wraps invocations in try/except). It returns the new labeled_events
+# row id (or 0 on failure) so the dispatcher can pass it to the judge
+# sampler.
+LabeledEventRecorder = Callable[[Activity, GeneratorContext, str], int]
+
+# Type alias for the judge-call factory injected into the dispatcher.
+# Production wires :func:`toybox.ai.judge.judge_and_persist` partial'd
+# with an :class:`AIClient` + ``db_path_resolver``. The dispatcher
+# passes this through to
+# :func:`toybox.ai.labeled_events.schedule_judge_sample` after each
+# successful ``record`` call. ``None`` disables judge sampling
+# entirely (tests + smoke).
+JudgeCallFactory = Callable[..., Awaitable[Any]]
 
 
 def _env_float(name: str, default: float) -> float:
@@ -275,6 +300,8 @@ class EscalationDispatcher:
         publisher: Publisher | None = None,
         spontaneous_interval_sec: float | None = None,
         clock: Callable[[], float] | None = None,
+        labeled_event_recorder: LabeledEventRecorder | None = None,
+        judge_call_factory: JudgeCallFactory | None = None,
     ) -> None:
         self._ai_client = ai_client
         self._breaker = breaker
@@ -290,6 +317,17 @@ class EscalationDispatcher:
             else spontaneous_interval_from_env()
         )
         self._clock = clock if clock is not None else time.time
+        # ``labeled_event_recorder`` is the Phase C step 15 hook that
+        # writes the labeled_events row. Optional so existing tests + the
+        # smoke harness can construct the dispatcher without a DB;
+        # production wires it in the daemon startup.
+        self._labeled_event_recorder = labeled_event_recorder
+        # ``judge_call_factory`` is the awaitable factory the judge
+        # sampler invokes when a row is in-sample. Production wires
+        # :func:`toybox.ai.judge.judge_and_persist` partial'd with an
+        # :class:`AIClient` + ``db_path_resolver``. ``None`` disables
+        # judge sampling — the row still records, just without scores.
+        self._judge_call_factory = judge_call_factory
 
     # ------------------------------------------------------------------
     # Public API
@@ -317,7 +355,15 @@ class EscalationDispatcher:
             if not intents:
                 return None
             primary = intents[0]
-            return self._offline_activity(primary.name, primary.slot)
+            activity = self._offline_activity(primary.name, primary.slot)
+            self._record(
+                activity=activity,
+                intent=primary.name,
+                slot=primary.slot,
+                transcript_text=transcript.text,
+                generator_path=GENERATOR_PATH_OFFLINE,
+            )
+            return activity
 
         if mode is ListeningMode.DEFAULT or mode is ListeningMode.HIGH:
             # Mode 3 + mode 4 (transcript-driven path): curated trigger
@@ -399,6 +445,17 @@ class EscalationDispatcher:
         return an offline Activity so the caller always gets something
         playable.
         """
+        def _offline_with_record() -> Activity:
+            activity = self._offline_activity(intent, slot)
+            self._record(
+                activity=activity,
+                intent=intent,
+                slot=slot,
+                transcript_text=transcript_text,
+                generator_path=GENERATOR_PATH_OFFLINE,
+            )
+            return activity
+
         try:
             capable, reason = await self._capability_check()
         except asyncio.CancelledError:
@@ -415,7 +472,7 @@ class EscalationDispatcher:
                 "claude gate closed (capability=False reason=%s); offline path",
                 reason.value if reason is not None else "<none>",
             )
-            return self._offline_activity(intent, slot)
+            return _offline_with_record()
 
         # Reading state advances open→half_open if the cooldown elapsed.
         # The breaker's documented single-flight contract is via
@@ -426,27 +483,34 @@ class EscalationDispatcher:
         breaker_state = self._breaker.state
         if breaker_state is BreakerState.open:
             _logger.info("claude gate closed (breaker open); offline path")
-            return self._offline_activity(intent, slot)
+            return _offline_with_record()
         if breaker_state is BreakerState.half_open and not self._breaker.try_half_open():
             _logger.info(
                 "claude gate closed (half_open probe slot already taken); offline path"
             )
-            return self._offline_activity(intent, slot)
+            return _offline_with_record()
 
         if not self._throttle.try_acquire():
             _logger.info(
                 "claude gate closed (throttled, %.2fs remaining); offline path",
                 self._throttle.time_until_next(),
             )
-            return self._offline_activity(intent, slot)
+            return _offline_with_record()
 
         # All gates passed → call Claude. Any failure routes to offline.
         claude_activity = await self._try_claude(
             intent=intent, slot=slot, transcript_text=transcript_text
         )
         if claude_activity is not None:
+            self._record(
+                activity=claude_activity,
+                intent=intent,
+                slot=slot,
+                transcript_text=transcript_text,
+                generator_path=GENERATOR_PATH_CLAUDE,
+            )
             return claude_activity
-        return self._offline_activity(intent, slot)
+        return _offline_with_record()
 
     async def _try_claude(
         self,
@@ -542,6 +606,63 @@ class EscalationDispatcher:
     # Offline path
     # ------------------------------------------------------------------
 
+    def _record(
+        self,
+        *,
+        activity: Activity,
+        intent: str,
+        slot: str | None,
+        transcript_text: str | None,
+        generator_path: str,
+    ) -> None:
+        """Best-effort labeled_events write + judge schedule.
+
+        The recorder is optional (None in tests + the smoke harness),
+        so this is a no-op when not wired. Production failures
+        (sqlite IO, judge scheduling) MUST NOT propagate to the
+        caller — the kid-facing path is unchanged whether the recorder
+        succeeds or fails. After the row lands we hand its ``row_id``
+        to :func:`toybox.ai.labeled_events.schedule_judge_sample`; the
+        judge runs detached on the event loop and never blocks dispatch.
+        """
+        if self._labeled_event_recorder is None:
+            return
+        ctx: GeneratorContext | None = None
+        row_id: int | None = None
+        try:
+            ctx = build_generator_context(
+                intent=intent,
+                slot=slot,
+                transcript_window=transcript_text,
+                persona_id=activity.persona_id,
+            )
+            row_id = self._labeled_event_recorder(activity, ctx, generator_path)
+        except Exception as exc:  # noqa: BLE001 -- eval scaffold must never break dispatch
+            _logger.warning(
+                "labeled_events recorder failed for activity %s (%s: %s); skipping",
+                activity.id,
+                type(exc).__name__,
+                exc,
+            )
+            return
+
+        if row_id is None or row_id <= 0 or ctx is None:
+            return
+        try:
+            schedule_judge_sample(
+                row_id=row_id,
+                activity=activity,
+                ctx=ctx,
+                judge_call=self._judge_call_factory,
+            )
+        except Exception as exc:  # noqa: BLE001 -- judge scheduling must never break dispatch
+            _logger.warning(
+                "judge sample scheduling failed for activity %s (%s: %s); continuing",
+                activity.id,
+                type(exc).__name__,
+                exc,
+            )
+
     def _offline_activity(self, intent: str, slot: str | None) -> Activity:
         """Generate a deterministic offline :class:`Activity`.
 
@@ -594,6 +715,8 @@ __all__ = [
     "DEFAULT_SPONTANEOUS_INTERVAL_SEC",
     "EscalationDispatcher",
     "INVALID_PREVIEW_LIMIT",
+    "JudgeCallFactory",
+    "LabeledEventRecorder",
     "SPONTANEOUS_INTENT",
     "SPONTANEOUS_INTERVAL_SEC_ENV",
     "spontaneous_interval_from_env",

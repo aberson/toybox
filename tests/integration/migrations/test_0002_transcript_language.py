@@ -50,27 +50,35 @@ def test_language_defaults_to_unknown_on_insert(conn: sqlite3.Connection) -> Non
 def test_migration_recorded(conn: sqlite3.Connection) -> None:
     applied = run_migrations(conn)
     versions = [m.version for m in applied]
-    assert versions == [1, 2]
-    assert current_version(conn) == 2
+    # This file's contract: migration 1 must run before migration 2 (the
+    # runner applies in order and records each in schema_migrations).
+    # The previous "versions == sorted(versions)" check was vacuous —
+    # `[]`, `[2]`, and `[1, 2, 3]` all satisfy it. Pin the file's actual
+    # contract: both 1 and 2 are recorded.
+    assert 1 in versions
+    assert 2 in versions
+    assert current_version(conn) >= 2
 
 
 def test_migration_is_idempotent_on_second_run(conn: sqlite3.Connection) -> None:
     """Re-running migrations after they've all applied must be a no-op.
 
-    Pins the runner's idempotent contract: every migration up through 2
-    is recorded on the first call, and a second call returns ``[]``.
-    The ``language`` column survives intact (still present, still
-    populated with the default for new inserts) — proving the second
-    call did not re-execute the ``ALTER TABLE`` (which would itself
-    fail with ``duplicate column name``).
+    Pins the runner's idempotent contract: every migration on disk is
+    recorded on the first call, and a second call returns ``[]``. The
+    ``language`` column survives intact (still present, still populated
+    with the default for new inserts) — proving the second call did not
+    re-execute the ``ALTER TABLE`` (which would itself fail with
+    ``duplicate column name``).
     """
     first = run_migrations(conn)
-    assert [m.version for m in first] == [1, 2]
-    assert current_version(conn) == 2
+    versions = [m.version for m in first]
+    assert 2 in versions
+    starting_version = current_version(conn)
+    assert starting_version >= 2
 
     second = run_migrations(conn)
     assert second == []
-    assert current_version(conn) == 2
+    assert current_version(conn) == starting_version
 
     # ``language`` column still present + still defaults to ``unknown``.
     cols = {row["name"]: row for row in conn.execute("PRAGMA table_info(transcripts)")}

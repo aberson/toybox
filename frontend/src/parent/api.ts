@@ -276,6 +276,17 @@ export class ApiClient {
       signal: opts.signal,
     });
   }
+
+  // Step 15: parent thumbs-up writes parent_signal=+1 to the
+  // matching labeled_events row. No state transition, no
+  // If-Match-Version (the activity itself isn't modified). Backend
+  // returns the unchanged activity so the UI can confirm the click.
+  async thumbsUp(id: string, opts: RequestOptions = {}): Promise<Activity> {
+    return this.request<Activity>(`/api/activities/${encodeURIComponent(id)}/thumbs-up`, {
+      method: "POST",
+      signal: opts.signal,
+    });
+  }
 }
 
 // Returns true for AbortError thrown by fetch when a signal aborts.

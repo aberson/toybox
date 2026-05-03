@@ -1244,6 +1244,13 @@ What to look for:
 
 **Issues:** Phase C umbrella #22 · step 15 → #23 · steps 16–19 → TBD (file when work begins)
 
+#### Step 15: Activity-quality telemetry & eval scaffold
+
+- **Problem:** Add a new `labeled_events` table that records every activity generation (offline OR Claude) with structured ChatML inputs, the generated `activity_json`, the `generator_path` (`claude`/`offline`/`local`), `parent_signal` (-1 / -0.5 / 0 / +1, nullable), `ended_at_step` (nullable), and `judge_scores_json` (nullable). Generator inputs are emitted as ChatML system + user messages so the same record format flows into Phase E SFT iterations without a shape change. Build a 6-dimension rubric (`schema`, `age_appropriateness`, `doability`, `persona_fidelity`, `coherence`, `safety`) in `src/toybox/ai/rubric.py` with 1-5 anchors per `documentation/eval-fixtures.md`; safety = 1 auto-fails the activity. Wire a Claude-as-judge async caller (`src/toybox/ai/judge.py`) sampled at 1-in-N (default N=5, env-tunable via `TOYBOX_EVAL_JUDGE_RATE`); the judge call is fully async and never blocks the kid-facing path — failures (timeout, 429, malformed output) log WARNING and leave `judge_scores_json` NULL. Ship 20 fixtures under `tests/fixtures/eval/prompts.jsonl` covering the documented age × persona × trigger × room × edge-case matrix; pin 5 IDs in `holdout.json` for CI regression. Provide `uv run python -m toybox.ai.eval_dump --since <ISO>` (ChatML JSONL export of `labeled_events`) and `uv run python -m toybox.ai.eval_run` (fixture batch + judge + baseline regen / CI regression check). Wire parent thumbs-up button (parent_signal=+1), dismiss-before-start (parent_signal=-1), and end-early (parent_signal=-0.5 with `ended_at_step`) to update the matching `labeled_events` row by `activity_id`. **Critical:** judge is a cost-saving proxy, NOT ground truth — `parent_signal` is the only real label and remains queryable independently from `judge_scores_json`. The schema supports the Phase E SFT export query (`safety>=4 AND mean_quality>=3.5 AND parent_signal != -1`) without further migration.
+- **Type:** code
+- **Issue:** #23
+- **Flags:** --reviewers code
+
 #### Manual M3 — Real play session (after Phase C)
 
 ```powershell

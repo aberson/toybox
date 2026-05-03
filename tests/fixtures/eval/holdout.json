@@ -1,0 +1,4 @@
+{
+  "comment": "Held-out fixtures used by CI regression. Per documentation/eval-fixtures.md these change ONLY when a fresh fixture is added or rotated in deliberately - never to make a build pass. The set spans the highest-risk axes: hardest groundedness (f002), edge case + persona/age mismatch (f005), anti-signal (f003), excitement at toddler age (f004), and a sparse-inventory older-kid case (f013).",
+  "ids": ["f002", "f003", "f004", "f005", "f013"]
+}

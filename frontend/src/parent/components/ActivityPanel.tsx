@@ -6,6 +6,7 @@ export interface ActivityPanelBusy {
   regenerate: boolean;
   end: boolean;
   didntWork: boolean;
+  thumbsUp: boolean;
 }
 
 export interface ActivityPanelProps {
@@ -13,17 +14,21 @@ export interface ActivityPanelProps {
   onRegenerate: () => Promise<void>;
   onEnd: () => Promise<void>;
   onDidntWork: () => Promise<void>;
+  // Step 15: thumbs-up writes parent_signal=+1 to the labeled_events row.
+  // Optional so older callers compile; when absent the button is hidden.
+  onThumbsUp?: () => Promise<void>;
   // Optional in-flight flags. Same idea as SuggestionCard's busy: keep
   // a rapid second click from racing the first with the same version.
   busy?: ActivityPanelBusy;
 }
 
 export function ActivityPanel(props: ActivityPanelProps): JSX.Element {
-  const { activity, onRegenerate, onEnd, onDidntWork } = props;
+  const { activity, onRegenerate, onEnd, onDidntWork, onThumbsUp } = props;
   const busy: ActivityPanelBusy = props.busy ?? {
     regenerate: false,
     end: false,
     didntWork: false,
+    thumbsUp: false,
   };
   const title = activity.title ?? activity.summary ?? "Activity";
   const personaMeta = (activity.metadata as Record<string, unknown>)["persona"];
@@ -72,6 +77,19 @@ export function ActivityPanel(props: ActivityPanelProps): JSX.Element {
         </ol>
       )}
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        {onThumbsUp !== undefined && (
+          <button
+            type="button"
+            data-testid="thumbs-up-button"
+            aria-label="thumbs up"
+            disabled={busy.thumbsUp}
+            onClick={() => {
+              void onThumbsUp();
+            }}
+          >
+            {busy.thumbsUp ? "..." : "thumbs up"}
+          </button>
+        )}
         <button
           type="button"
           data-testid="regenerate-button"

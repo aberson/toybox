@@ -95,6 +95,22 @@ describe("ApiClient", () => {
     expect(JSON.parse(init?.body as string)).toEqual({ child_ids: null });
   });
 
+  it("thumbsUp POSTs to /api/activities/<id>/thumbs-up with no body or version", async () => {
+    // Step 15: thumbs-up writes parent_signal=+1 to labeled_events.
+    // No If-Match-Version (no state transition); no JSON body required.
+    const fetchImpl = vi
+      .fn<Parameters<FetchLike>, ReturnType<FetchLike>>()
+      .mockResolvedValue(jsonResponse(200, fakeActivity()));
+    const client = new ApiClient({ fetchImpl, getToken: () => "t" });
+    await client.thumbsUp("act-1");
+    const [url, init] = fetchImpl.mock.calls[0]!;
+    expect(url).toBe("/api/activities/act-1/thumbs-up");
+    expect(init?.method).toBe("POST");
+    expect(init?.body).toBeUndefined();
+    const headers = new Headers(init?.headers);
+    expect(headers.get("If-Match-Version")).toBeNull();
+  });
+
   it("turns 409 with version_conflict body into VersionConflictError", async () => {
     const conflict: VersionConflictBody = {
       code: "version_conflict",

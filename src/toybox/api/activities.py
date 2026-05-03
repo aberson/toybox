@@ -16,7 +16,9 @@ is stored in ``activity_steps.body``; the response uses the same
 
 from __future__ import annotations
 
+import functools
 import json
+import logging
 import secrets
 import sqlite3
 import uuid
@@ -27,7 +29,17 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..activities.generator import generate
+from ..activities.generator import build_generator_context, generate
+from ..ai.judge import judge_and_persist
+from ..ai.labeled_events import (
+    GENERATOR_PATH_OFFLINE,
+    PARENT_SIGNAL_DISMISS,
+    PARENT_SIGNAL_END_EARLY,
+    PARENT_SIGNAL_THUMBS_UP,
+    record_generation,
+    schedule_judge_sample,
+    update_parent_signal,
+)
 from ..core.auth import TokenScope
 from ..core.pubsub import PubSub
 from ..core.queue import (
@@ -46,7 +58,15 @@ from ..ws.server import get_pubsub
 from ..ws.topics import Topic
 from .auth_dep import RequireScope
 
+_logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/activities", tags=["activities"])
+
+# Type alias for the FastAPI-injected judge call. ``None`` means the
+# judge is not configured (no OAuth token) and the recorder skips
+# scheduling. Production wires this via :func:`get_judge_call`; tests
+# override the dependency with either ``None`` or a recording stub.
+JudgeCall = Any
 
 # Activity state literals (pinned by tests + frontend).
 STATE_PROPOSED = "proposed"
@@ -89,6 +109,40 @@ def get_activities_db() -> Iterator[sqlite3.Connection]:
         yield conn
     finally:
         conn.close()
+
+
+def get_judge_call() -> JudgeCall:
+    """FastAPI dependency: return the judge_call partial (or ``None``).
+
+    Production: when an OAuth token is on disk, build a
+    :class:`~toybox.ai.client.AnthropicClient` and partial it into
+    :func:`toybox.ai.judge.judge_and_persist` plus the DB-path resolver.
+    The result is the callable
+    :func:`toybox.ai.labeled_events.schedule_judge_sample` invokes when
+    a row is in-sample. When no token is available we return ``None``
+    so the sampler skips silently — the recorder still writes the row,
+    just without judge scores.
+
+    Tests override this dependency to inject a deterministic stub.
+    The token is resolved per-call (not cached) so a fresh login is
+    picked up on the next request without a process restart; this is
+    cheap because :func:`toybox.ai.oauth.load_token` is just a JSON
+    read.
+    """
+    # Late imports keep the import surface tight and avoid pulling
+    # AnthropicClient (which lazy-imports the SDK) on every module load.
+    from ..ai.client import AnthropicClient  # noqa: PLC0415
+    from ..ai.oauth import load_token  # noqa: PLC0415
+
+    token = load_token()
+    if token is None:
+        return None
+    ai_client = AnthropicClient(token)
+    return functools.partial(
+        judge_and_persist,
+        ai_client=ai_client,
+        db_path_resolver=resolve_db_path,
+    )
 
 
 class ActivityStepResponse(BaseModel):
@@ -188,6 +242,46 @@ def _resolve_only_child(conn: sqlite3.Connection) -> list[str]:
     if len(rows) == 1:
         return [str(rows[0]["id"])]
     return []
+
+
+def _safe_update_parent_signal(
+    conn: sqlite3.Connection,
+    *,
+    activity_id: str,
+    signal: float,
+    ended_at_step: int | None = None,
+) -> None:
+    """Wrap ``update_parent_signal`` so a labeled_events failure can't 500.
+
+    The signal write is observability — losing it must not break the
+    state-transition that the parent just clicked. Logs WARNING on any
+    sqlite/IO error.
+    """
+    try:
+        update_parent_signal(
+            conn,
+            activity_id=activity_id,
+            signal=signal,
+            ended_at_step=ended_at_step,
+        )
+    except Exception:  # noqa: BLE001 -- eval scaffold must never break the lifecycle
+        _logger.warning(
+            "labeled_events parent_signal=%s failed for activity %s; skipping",
+            signal,
+            activity_id,
+            exc_info=True,
+        )
+
+
+def _current_step_seq(conn: sqlite3.Connection, activity_id: str) -> int | None:
+    """Return the seq of the currently-active step, or None if none."""
+    row = conn.execute(
+        "SELECT seq FROM activity_steps WHERE activity_id = ? AND current = 1 LIMIT 1",
+        (activity_id,),
+    ).fetchone()
+    if row is None:
+        return None
+    return int(row["seq"])
 
 
 def _fetch_activity_row(conn: sqlite3.Connection, activity_id: str) -> sqlite3.Row:
@@ -394,11 +488,19 @@ def _do_propose(
     body: ProposeRequest,
     conn: sqlite3.Connection,
     pubsub: PubSub,
+    judge_call: JudgeCall = None,
 ) -> ActivityResponse:
     """Shared propose-and-persist helper.
 
     Carries no auth — both ``post_propose`` and ``post_regenerate``
     funnel through here and keep the auth check on the route handler.
+
+    ``judge_call`` is the FastAPI-injected judge factory (see
+    :func:`get_judge_call`). When non-``None`` and the new
+    ``labeled_events`` row is in-sample, an async judge task is fired
+    via :func:`toybox.ai.labeled_events.schedule_judge_sample` to fill
+    in ``judge_scores_json``. The task runs detached; the kid-facing
+    HTTP response returns immediately.
     """
     # Caller-pinned persona wins; otherwise pick a fresh library one
     # so the kiosk avatar varies across propose calls. Falls through to
@@ -466,6 +568,55 @@ def _do_propose(
         state=PROPOSED_STATE,
     )
 
+    # Phase C step 15: write a labeled_events row BEFORE returning the
+    # activity. The recorder is best-effort — a failure here must NOT
+    # break the propose flow (the activity is already persisted; the
+    # eval scaffold is observability, not load-bearing). Failures log
+    # WARNING and we proceed to emit + return. When the row lands and
+    # the sampler picks it, we also fire the async judge task — the
+    # judge call itself is non-blocking and best-effort.
+    ctx: Any = None
+    row_id: int | None = None
+    try:
+        ctx = build_generator_context(
+            intent=body.intent,
+            slot=body.slot,
+            persona_id=activity.persona_id,
+            extra={"hour": body.hour, "seed": body.seed} if body.context is None
+            else {"hour": body.hour, "seed": body.seed, "caller_context": body.context},
+        )
+        row_id = record_generation(
+            conn,
+            activity=activity,
+            ctx=ctx,
+            generator_path=GENERATOR_PATH_OFFLINE,
+        )
+    except Exception:  # noqa: BLE001 -- eval scaffold must never break propose
+        _logger.warning(
+            "labeled_events record failed for activity %s; skipping",
+            activity.id,
+            exc_info=True,
+        )
+
+    # Schedule the async judge sample. Wrapped in its own try/except so
+    # a sampler bug (no event loop, judge_call raises while building the
+    # coroutine, etc.) cannot break propose. The sampler itself short-
+    # circuits cleanly when ``judge_call`` is None.
+    if row_id is not None and ctx is not None:
+        try:
+            schedule_judge_sample(
+                row_id=row_id,
+                activity=activity,
+                ctx=ctx,
+                judge_call=judge_call,
+            )
+        except Exception:  # noqa: BLE001 -- judge scheduling must never break propose
+            _logger.warning(
+                "judge sample scheduling failed for activity %s; continuing",
+                activity.id,
+                exc_info=True,
+            )
+
     row = _fetch_activity_row(conn, activity.id)
     response = _row_to_response(conn, row)
     _emit_state(pubsub, response)
@@ -477,10 +628,18 @@ def post_propose(
     body: ProposeRequest,
     conn: Annotated[sqlite3.Connection, Depends(get_activities_db)],
     pubsub: Annotated[PubSub, Depends(get_pubsub)],
+    judge_call: Annotated[JudgeCall, Depends(get_judge_call)],
     _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
 ) -> ActivityResponse:
-    """Generate a new activity at ``proposed``. Drops oldest if cap reached."""
-    return _do_propose(body, conn, pubsub)
+    """Generate a new activity at ``proposed``. Drops oldest if cap reached.
+
+    Sync handler: SQLite work runs on the FastAPI threadpool worker.
+    The judge sample is scheduled by :func:`_do_propose` via
+    :func:`toybox.ai.labeled_events.schedule_judge_sample`, which spins
+    up a short-lived daemon thread to host an event loop for the
+    detached coroutine (the kid-facing path stays sync).
+    """
+    return _do_propose(body, conn, pubsub, judge_call=judge_call)
 
 
 @router.post("/{activity_id}/approve", response_model=ActivityResponse)
@@ -524,7 +683,12 @@ def post_dismiss(
     expected_version: Annotated[int, Depends(if_match_version_dependency)],
     _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
 ) -> ActivityResponse:
-    """proposed → dismissed."""
+    """proposed → dismissed.
+
+    Step 15: dismiss-before-start writes ``parent_signal = -1`` to the
+    matching ``labeled_events`` row. Best-effort — if the row doesn't
+    exist (activity predates step 15) we silently no-op.
+    """
     row = _fetch_activity_row(conn, activity_id)
     current_state = str(row["state"])
     current_version = int(row["version"])
@@ -539,6 +703,9 @@ def post_dismiss(
     )
     if not ok:
         raise VersionConflictError(int(row["version"]), str(row["state"]))
+    _safe_update_parent_signal(
+        conn, activity_id=activity_id, signal=PARENT_SIGNAL_DISMISS
+    )
     response = _row_to_response(conn, row)
     _emit_state(pubsub, response)
     return response
@@ -550,6 +717,7 @@ def post_regenerate(
     body: RegenerateRequest,
     conn: Annotated[sqlite3.Connection, Depends(get_activities_db)],
     pubsub: Annotated[PubSub, Depends(get_pubsub)],
+    judge_call: Annotated[JudgeCall, Depends(get_judge_call)],
     expected_version: Annotated[int, Depends(if_match_version_dependency)],
     _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
 ) -> ActivityResponse:
@@ -628,6 +796,7 @@ def post_regenerate(
         ),
         conn,
         pubsub,
+        judge_call=judge_call,
     )
 
 
@@ -730,13 +899,23 @@ def post_end(
     expected_version: Annotated[int, Depends(if_match_version_dependency)],
     _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
 ) -> ActivityResponse:
-    """approved/running → ended."""
+    """approved/running → ended.
+
+    Step 15: end-early writes ``parent_signal = -0.5`` and the seq of
+    the step that was current at the moment of end (``ended_at_step``)
+    to the matching labeled_events row. The current-step lookup runs
+    before the row's ``current`` flag is touched downstream.
+    """
     row = _fetch_activity_row(conn, activity_id)
     current_state = str(row["state"])
     current_version = int(row["version"])
     _enforce_transition(current_state, STATE_ENDED)
     if current_version != expected_version:
         raise VersionConflictError(current_version, current_state)
+    # Capture the in-progress step seq BEFORE we transition — the
+    # transition itself doesn't clear the current flag, but we want the
+    # value at end-time even if a future change does.
+    ended_at_step = _current_step_seq(conn, activity_id)
     ok, row = _attempt_transition(
         conn,
         activity_id=activity_id,
@@ -746,6 +925,39 @@ def post_end(
     )
     if not ok:
         raise VersionConflictError(int(row["version"]), str(row["state"]))
+    _safe_update_parent_signal(
+        conn,
+        activity_id=activity_id,
+        signal=PARENT_SIGNAL_END_EARLY,
+        ended_at_step=ended_at_step,
+    )
+    response = _row_to_response(conn, row)
+    _emit_state(pubsub, response)
+    return response
+
+
+@router.post("/{activity_id}/thumbs-up", response_model=ActivityResponse)
+def post_thumbs_up(
+    activity_id: str,
+    conn: Annotated[sqlite3.Connection, Depends(get_activities_db)],
+    pubsub: Annotated[PubSub, Depends(get_pubsub)],
+    _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
+) -> ActivityResponse:
+    """Parent thumbs-up: write ``parent_signal = +1`` to labeled_events.
+
+    No state transition — thumbs-up is a feedback signal independent of
+    the activity lifecycle. Returns the current activity unchanged so
+    the parent UI can confirm the click landed. Idempotent: a second
+    click overwrites the same row with the same value.
+
+    No ``If-Match-Version`` is required: thumbs-up doesn't modify the
+    activity itself, so a concurrent state transition can't conflict
+    with it.
+    """
+    row = _fetch_activity_row(conn, activity_id)
+    _safe_update_parent_signal(
+        conn, activity_id=activity_id, signal=PARENT_SIGNAL_THUMBS_UP
+    )
     response = _row_to_response(conn, row)
     _emit_state(pubsub, response)
     return response
@@ -814,5 +1026,6 @@ __all__ = [
     "STATE_PROPOSED",
     "STATE_RUNNING",
     "get_activities_db",
+    "get_judge_call",
     "router",
 ]

@@ -170,6 +170,7 @@ export function App(): JSX.Element {
     regenerate: false,
     end: false,
     didntWork: false,
+    thumbsUp: false,
   });
 
   type BusyKey = keyof typeof busy;
@@ -320,6 +321,26 @@ export function App(): JSX.Element {
     [activity, api, refetchActivity, runGuarded],
   );
 
+  const handleThumbsUp = useCallback(
+    () =>
+      runGuarded("thumbsUp", async () => {
+        if (activity === null) return;
+        try {
+          await api.thumbsUp(activity.id);
+          useParentStore
+            .getState()
+            .pushToast("info", "thanks — feedback recorded");
+        } catch (err) {
+          const message =
+            err instanceof Error ? err.message : "thumbs-up failed";
+          useParentStore
+            .getState()
+            .pushToast("error", `thumbs-up: ${message}`);
+        }
+      }),
+    [activity, api, runGuarded],
+  );
+
   const handleDidntWork = useCallback(
     () =>
       runGuarded("didntWork", async () => {
@@ -381,10 +402,12 @@ export function App(): JSX.Element {
             onRegenerate={handleRegenerate}
             onEnd={handleEnd}
             onDidntWork={handleDidntWork}
+            onThumbsUp={handleThumbsUp}
             busy={{
               regenerate: busy.regenerate,
               end: busy.end,
               didntWork: busy.didntWork,
+              thumbsUp: busy.thumbsUp,
             }}
           />
         )}

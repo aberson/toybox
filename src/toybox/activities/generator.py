@@ -453,12 +453,56 @@ def clear_template_cache() -> None:
     _SCHEMA_VALIDATOR_CACHE.clear()
 
 
+def build_generator_context(
+    *,
+    intent: str,
+    slot: str | None = None,
+    persona_id: str | None = None,
+    persona_card: str | None = None,
+    available_toys: tuple[str, ...] = (),
+    available_rooms: tuple[str, ...] = (),
+    child_profile: dict[str, Any] | None = None,
+    transcript_window: str | None = None,
+    listening_mode: int | None = None,
+    time_of_day: str | None = None,
+    extra: dict[str, Any] | None = None,
+) -> Any:
+    """Build a ``GeneratorContext`` for the labeled_events recorder.
+
+    Centralised here so call sites (api/activities, core/escalation)
+    don't need to import :mod:`toybox.ai.labeled_events` directly — they
+    just call ``generator.build_generator_context(...)``. The return
+    type is intentionally ``Any`` to avoid a circular import at the
+    module-load layer (``ai.labeled_events`` imports
+    ``activities.models`` which imports lightly enough to be safe in
+    practice; the wrapper keeps the dependency direction clean even so).
+    """
+    # Late import to keep ``activities.generator`` importable in
+    # contexts that haven't loaded the ``ai`` package yet.
+    from ..ai.labeled_events import GeneratorContext
+
+    return GeneratorContext(
+        intent=intent,
+        slot=slot,
+        persona_id=persona_id,
+        persona_card=persona_card,
+        available_toys=available_toys,
+        available_rooms=available_rooms,
+        child_profile=child_profile,
+        transcript_window=transcript_window,
+        listening_mode=listening_mode,
+        time_of_day=time_of_day,
+        extra=extra if extra is not None else {},
+    )
+
+
 __all__ = [
     "DEFAULT_SLOT_FILLER",
     "DEFAULT_TOY_NAME",
     "FALLBACK_INTENT",
     "SUPPORTED_INTENTS",
     "TEMPLATES_DIR",
+    "build_generator_context",
     "clear_template_cache",
     "generate",
 ]
