@@ -8,9 +8,9 @@ Runs entirely on home hardware. Internet is optional — Claude is reached over 
 
 ## Build status
 
-**Phase A complete (10/10) — v1 ship point reached.** Issues #1–#10 closed. 286 backend pytest + 99 frontend vitest + 2 Playwright specs passing. 0 type errors, 0 lint violations, 0 format violations.
+**Phase A complete (10/10) + smoke-test polish — v1.1.** Issues #1–#10 closed; 7 polish commits landed from the first adult smoke pass (port move 3000→4000, regenerate UUID + content-variety fix, ended/completed → regenerate path, random library persona on propose, persona name on parent UI, kiosk terminal-state coverage). 288 backend pytest + 99 frontend vitest + 2 Playwright specs passing. 0 type errors, 0 lint violations, 0 format violations.
 
-Backend modules live: `core/`, `db/`, `personas/`, `ai/`, `triggers/`, `activities/`, `api/{listening,activities,auth,auth_dep}`, `ws/{server,heartbeat}`, plus `core/{auth,version_check,queue,pubsub}`. Frontend ships both routes: `/parent` (suggestion + activity panel + trigger button) and `/child` (full-bleed kiosk with persona avatar, step card, advance button, "all done" terminal state). Adult-only smoke testing now; Phase B (audio capture + STT) follows.
+Backend modules live: `core/`, `db/`, `personas/`, `ai/`, `triggers/`, `activities/`, `api/{listening,activities,auth,auth_dep}`, `ws/{server,heartbeat}`, plus `core/{auth,version_check,queue,pubsub}`. Frontend ships both routes: `/parent` (suggestion + activity panel + trigger button, persona name visible) and `/child` (full-bleed kiosk with persona avatar, step card, advance button, "all done" terminal state). Phase B (audio capture + STT) issues #15–#19 are filed and ready.
 
 ## Stack
 
