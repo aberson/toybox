@@ -26,6 +26,13 @@ export function ActivityPanel(props: ActivityPanelProps): JSX.Element {
     didntWork: false,
   };
   const title = activity.title ?? activity.summary ?? "Activity";
+  const personaMeta = (activity.metadata as Record<string, unknown>)["persona"];
+  const personaName =
+    typeof personaMeta === "object" &&
+    personaMeta !== null &&
+    typeof (personaMeta as Record<string, unknown>)["display_name"] === "string"
+      ? ((personaMeta as Record<string, unknown>)["display_name"] as string)
+      : null;
   return (
     <section
       data-testid="activity-panel"
@@ -40,6 +47,14 @@ export function ActivityPanel(props: ActivityPanelProps): JSX.Element {
       }}
     >
       <h2 style={{ margin: "0 0 8px 0", fontSize: 17 }}>{title}</h2>
+      {personaName !== null && (
+        <p
+          data-testid="activity-persona"
+          style={{ margin: "0 0 4px 0", color: "#1769aa", fontSize: 13 }}
+        >
+          persona: {personaName}
+        </p>
+      )}
       <p style={{ margin: "0 0 8px 0", color: "#555", fontSize: 13 }}>
         state: {activity.state} · v{activity.version}
       </p>

@@ -32,6 +32,13 @@ export function SuggestionCard(props: SuggestionCardProps): JSX.Element {
   };
   const [whyOpen, setWhyOpen] = useState(false);
   const title = activity.title ?? activity.summary ?? "Untitled activity";
+  const personaMeta = (activity.metadata as Record<string, unknown>)["persona"];
+  const personaName =
+    typeof personaMeta === "object" &&
+    personaMeta !== null &&
+    typeof (personaMeta as Record<string, unknown>)["display_name"] === "string"
+      ? ((personaMeta as Record<string, unknown>)["display_name"] as string)
+      : null;
   return (
     <section
       data-testid="suggestion-card"
@@ -45,6 +52,14 @@ export function SuggestionCard(props: SuggestionCardProps): JSX.Element {
       }}
     >
       <h2 style={{ margin: "0 0 8px 0", fontSize: 17 }}>{title}</h2>
+      {personaName !== null && (
+        <p
+          data-testid="suggestion-persona"
+          style={{ margin: "0 0 4px 0", color: "#1769aa", fontSize: 13 }}
+        >
+          persona: {personaName}
+        </p>
+      )}
       <p style={{ margin: "0 0 8px 0", color: "#555", fontSize: 13 }}>
         v{activity.version} · {activity.state}
       </p>
