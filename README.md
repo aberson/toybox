@@ -8,9 +8,11 @@ Runs entirely on home hardware. Internet is optional — Claude is reached over 
 
 ## Build status
 
-**Phase A complete (10/10) + smoke-test polish — v1.1.** Issues #1–#10 closed; 7 polish commits landed from the first adult smoke pass (port move 3000→4000, regenerate UUID + content-variety fix, ended/completed → regenerate path, random library persona on propose, persona name on parent UI, kiosk terminal-state coverage). 288 backend pytest + 99 frontend vitest + 2 Playwright specs passing. 0 type errors, 0 lint violations, 0 format violations.
+**Phase B steps 11–14 complete.** Issues #15–#18 closed. Audio capture daemon + silero-VAD gate, faster-whisper STT (GPU autodetect, CPU fallback, asyncio-serialized), transcript pipeline with persistence + `Topic.transcript` ws emission + confidence-floor-gated trigger evaluation, and mode-aware Claude escalation (5 modes, min-interval throttle, half-open-aware breaker integration, malformed-output → offline + `system` ws warning) all wired with stub-driven tests (no real mic, no real ONNX/Whisper model, no live Claude calls in CI). 505 backend pytest + 99 frontend vitest + 2 Playwright specs passing. 0 type errors, 0 lint violations.
 
-Backend modules live: `core/`, `db/`, `personas/`, `ai/`, `triggers/`, `activities/`, `api/{listening,activities,auth,auth_dep}`, `ws/{server,heartbeat}`, plus `core/{auth,version_check,queue,pubsub}`. Frontend ships both routes: `/parent` (suggestion + activity panel + trigger button, persona name visible) and `/child` (full-bleed kiosk with persona avatar, step card, advance button, "all done" terminal state). Phase B (audio capture + STT) issues #15–#19 are filed and ready.
+**Phase B remaining:** Step 14b (E2E synthetic-audio smoke via Playwright, issue #19) and the manual M1/M2 hardware checks.
+
+Backend modules live: `audio/{capture,vad,ring_buffer,devices,stt,pipeline}`, `core/{escalation,throttle}` (Phase B); plus prior `core/`, `db/`, `personas/`, `ai/`, `triggers/`, `activities/`, `api/{listening,activities,auth,auth_dep,transcripts}`, `ws/{server,heartbeat}`. Frontend unchanged from v1.1: `/parent` (suggestion + activity panel + trigger button, persona name visible) and `/child` (full-bleed kiosk with persona avatar, step card, advance button, "all done" terminal state).
 
 ## Stack
 

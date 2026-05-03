@@ -578,15 +578,18 @@ FastAPI entrypoint. Mounts the React build for production; in dev, frontend runs
 - `personas.py` — REST: list/create/edit/delete (delete blocked for `source=library`).
 - `house.py` — REST: rooms + features + bulk photo upload.
 - `children.py` — REST: CRUD.
-- `transcripts.py` — REST: list/search/delete/wipe.
+- `transcripts.py` — REST: list (cursor-paginated) + search (Phase B Step 13). Delete-one + wipe-all are Phase D Step 21.
 - `settings.py` — REST: mode get/set; PIN setup; Claude OAuth status; mic mute toggle.
 - `metrics.py` — REST `/api/metrics` + in-memory counter aggregation.
-- `ws.py` — WebSocket router with topic subscription; envelope shape; topics: `transcripts.live`, `activity.state`, `mode`, `system`, `metrics`.
+- `ws.py` — WebSocket router with topic subscription; envelope shape; topics: `transcript`, `activity.state`, `activity`, `listening.mode`, `system`, `triggers.invalidate`. (`metrics` topic is Phase D Step 23.)
 
 ### `src/toybox/audio/`
-- `capture.py` — sounddevice mic loop, ring buffer (~2 min, 16 kHz mono int16). PortAudio invokes the mic callback in its own native thread; the callback drops samples into a thread-safe `queue.Queue(maxsize=TOYBOX_MIC_QUEUE_BOUND)` (default 100). On overflow, drop-oldest with a metrics event (`code=mic_queue_overflow`). An asyncio task (`loop.run_in_executor(None, q.get)` in a polling loop) pumps samples to the async pipeline. Cooperative shutdown via an `asyncio.Event`; mic stream stops then queue drains.
-- `vad.py` — silero-vad ONNX gate; only emits chunks containing sustained speech (≥`vad_min_speech_ms`). Inference is fast (<1 ms), runs on the asyncio thread.
-- `stt.py` — faster-whisper wrapper, GPU autodetect, model load on startup, `transcribe(chunk) → text + confidence + timestamps`. Runs in `asyncio.to_thread`.
+- `capture.py` — sounddevice mic loop. PortAudio invokes the mic callback on its own native thread; the callback bridges to asyncio via `loop.call_soon_threadsafe(self._handle_frame, frame)`. Frames land in a bounded asyncio queue (configurable via constructor + `TOYBOX_AUDIO_SPEECH_QUEUE_MAXSIZE`, default 64); overflow drops OLDEST and logs `mic queue overflow` printf-style. `--test 5` operator script captures 5s and prints device + peak dB.
+- `ring_buffer.py` — thread-safe int16 ring (~2 min, 16 kHz mono; `TOYBOX_AUDIO_RING_SECONDS`, default 120). Snapshot-by-seconds API for STT context.
+- `vad.py` — silero-vad ONNX gate with injectable predictor (real `SileroVadPredictor` lazy-loads `data/models/silero_vad.onnx`; tests use stubs). Threshold via `TOYBOX_VAD_THRESHOLD` (default 0.5); hangover frames trim trailing silence; `reset_state()` called per closed segment so LSTM state doesn't bleed across utterances.
+- `devices.py` — device enumeration; `resolve_device(env)` honors `TOYBOX_MIC_DEVICE_INDEX` (default = system default).
+- `stt.py` — faster-whisper wrapper. `WhisperTranscriber.transcribe(audio)` async via `asyncio.to_thread` + `asyncio.Lock` (CTranslate2 is not thread-safe for concurrent calls). GPU autodetect (CUDA→CPU on init failure with `exc_info`), model selection via `TOYBOX_WHISPER_MODEL` (default `small`), cache at `data/models/`. `Transcript` Pydantic model with `text`, `confidence` (`exp(mean_logprob)` clamped), `language` (`UNKNOWN_LANGUAGE` sentinel for empty audio), `duration_ms`. Operator: `--download` pre-fetches model.
+- `pipeline.py` — `TranscriptPipeline` orchestrator (capture → STT → persist → emit on `Topic.transcript` → confidence-floor-gated trigger evaluation). Per-collaborator try/except so a single failure never kills the consumer loop. Confidence floor via `TOYBOX_TRANSCRIPT_CONFIDENCE_FLOOR` (default 0.55). Whitespace-only decodes dropped at the gate.
 
 ### `src/toybox/nlp/`
 - `triggers.py` — loads `triggers.json`, exposes `match(text) → list[Intent]`. Subscribes to `core/state.py` topic `triggers.invalidate` and rebuilds compiled patterns when toys/personas change. No polling.
@@ -612,7 +615,9 @@ FastAPI entrypoint. Mounts the React build for production; in dev, frontend runs
 
   Internal topic for cross-module signals: `triggers.invalidate` — published by `api/toys.py` on toy add/archive; subscribed by `nlp/triggers.py` to rebuild compiled patterns. Subscriber rebuilds asynchronously; if rebuild is in progress when a second invalidate arrives, the queued event coalesces (deduped) so a burst of toy uploads triggers at most one extra rebuild.
 - `feedback.py` — anti-signal storage and lookup for the activity generator.
-- `errors.py` — central registry. `class ErrorCode(StrEnum)` lists every code referenced in the plan (`upload_too_large`, `upload_bad_mime`, `duplicate_image`, `invalid_display_name`, `version_conflict`, `ws_backpressure_drop`, `mic_queue_overflow`, `pin_locked`, `token_invalid`, …). The `pydantic-to-typescript` codegen also emits `frontend/src/shared/errors.ts` from this enum so server and client share one source of truth.
+- `errors.py` — central registry. `class ErrorCode(StrEnum)` lists every code referenced in the plan (`upload_too_large`, `upload_bad_mime`, `duplicate_image`, `invalid_display_name`, `version_conflict`, `ws_backpressure_drop`, `mic_queue_overflow`, `pin_locked`, `token_invalid`, `claude_output_invalid`, …). The `pydantic-to-typescript` codegen also emits `frontend/src/shared/errors.ts` from this enum so server and client share one source of truth.
+- `throttle.py` — `MinIntervalThrottle` (Phase B Step 14): bounds Claude call frequency. `TOYBOX_CLAUDE_MIN_INTERVAL_SEC` (default 30s). Injectable clock for tests; thread-safe via `threading.Lock`.
+- `escalation.py` — `EscalationDispatcher` (Phase B Step 14): per-mode dispatch table for the 5 listening modes. Gate ordering capability → breaker (state-aware: open → offline; half_open → claim probe slot via `try_half_open()`; closed → proceed) → throttle, so closed gates don't burn the throttle ticket. Cancellation-safe (`except asyncio.CancelledError: raise` then narrow `except Exception`). 429 detection by duck-typing on `status_code == 429` plus class-name fallback (`RateLimitError`/`APIStatusError`, only when `status_code` is None or 429). Honors `Retry-After`. Malformed Claude output → offline + `Topic.system` envelope `code=claude_output_invalid`. `TOYBOX_SPONTANEOUS_INTERVAL_SEC` (default 180s) for mode 4.
 
 ### `src/toybox/db/`
 - `connection.py` — connection factory, transaction context manager.
@@ -682,9 +687,10 @@ Child app — kiosk mode: persona avatar, current step card, sfx player, "next s
 | POST | `/api/activities/{id}/regenerate` | regenerate from current step | header: `If-Match-Version: N` | `Activity` (409 on mismatch) |
 | POST | `/api/activities/{id}/end` | end (with confirm) | header: `If-Match-Version: N`; body `{confirmed: true}` | `Activity` (409 on mismatch) |
 | POST | `/api/activities/{id}/feedback` | "didn't work" / "loved it" | `{kind, step_seq?, reason?}` | `{ok}` |
-| GET | `/api/transcripts` | list | `?since=&intent=` | `[Transcript]` |
-| DELETE | `/api/transcripts/{id}` | delete one | — | `{ok}` |
-| DELETE | `/api/transcripts` | wipe all (PIN-gated) | — | `{deleted: int}` |
+| GET | `/api/transcripts` | list (recent first; ISO `before` cursor) | `?limit=50&before=<iso>` | `TranscriptListResponse{items: [TranscriptRow], next_before?}` |
+| GET | `/api/transcripts/search` | case-insensitive substring search (parameterized LIKE) | `?q=<str>&limit=50` | `TranscriptListResponse` |
+| DELETE | `/api/transcripts/{id}` | delete one (Phase D Step 21) | — | `{ok}` |
+| DELETE | `/api/transcripts` | wipe all (PIN-gated, Phase D Step 21) | — | `{deleted: int}` |
 | WS | `/ws` | bidirectional topics | subscribe by topic | streamed events |
 
 ### WebSocket envelope
@@ -713,7 +719,7 @@ Topics by scope:
 
 | Topic | Required scope |
 |-------|---------------|
-| `transcripts.live` | parent |
+| `transcript` | parent |
 | `activity.state` | parent OR matching-session child |
 | `mode` | parent OR child |
 | `system` | parent (warns + errors) / child (errors only) |
@@ -739,7 +745,7 @@ The backend refuses to bind any non-loopback host unless `settings.parent_pin_ha
 
 ```json
 { "action": "subscribe", "topics": ["activity.state", "mode", "system"] }
-{ "action": "unsubscribe", "topics": ["transcripts.live"] }
+{ "action": "unsubscribe", "topics": ["transcript"] }
 ```
 
 Server rejects subscriptions to out-of-scope topics with a `system` error message and disconnects after 3 violations.
@@ -752,7 +758,7 @@ Each subscriber has a single bounded outbound queue (default 100 messages **tota
 
 | Topic | Payload shape |
 |-------|---------------|
-| `transcripts.live` | `{transcript_id, session_id, text, confidence, started_at, ended_at, triggered_intent?}` |
+| `transcript` | `{id, text, confidence, started_at, ended_at, language}` (per-transcript envelope, schema_version=1) |
 | `activity.state` | full `Activity` DTO including `version` |
 | `mode` | `{mode: 1-5}` |
 | `system` | `{level: "error"\|"warn"\|"info", code, message, dismissable, capability_reason?}` |
@@ -918,7 +924,7 @@ Manual type sync between Pydantic models and `frontend/src/shared/types.ts` drif
 
 | Item | Risk | Mitigation |
 |------|------|------------|
-| faster-whisper accuracy on kid speech | Garbled transcripts → bad triggers | Default `small` is fine on adult speech (initial testing); evaluate `medium`/`large-v3` when kids start using; `TOYBOX_STT_CONFIDENCE_FLOOR` blocks low-confidence transcripts from firing triggers |
+| faster-whisper accuracy on kid speech | Garbled transcripts → bad triggers | Default `small` is fine on adult speech (initial testing); evaluate `medium`/`large-v3` when kids start using; `TOYBOX_TRANSCRIPT_CONFIDENCE_FLOOR` blocks low-confidence transcripts from firing triggers |
 | Claude OAuth token refresh failures | Silent offline mid-session | Background refresh task; `capability_reason` enum distinguishes config vs token vs network; parent UI banner per reason |
 | Curated NLP coverage of toddler-ese | False negatives | Trigger registry editable in `data/triggers.json`; transcript log lets parent see what was heard but didn't fire; user edits survive package upgrades |
 | Single mic in busy household | Multiple kids, parent voices, TV → noisy triggers | VAD gate + confidence threshold + parent has final approval; multi-mic schema in v1.5 |
@@ -1294,6 +1300,60 @@ What to look for table is "if X happens, run Y"; the operator doc holds the full
 | Image storage runaway | Stop backend; archive unwanted toys via parent UI; periodic cron at v1.5 will delete orphan files (manual: `python -m toybox.tools.gc_images`) |
 | "Factory reset" | Stop backend; remove `data/`; restart (re-runs migrations + first-run setup; all photos, transcripts, profiles, custom personas lost) |
 
+---
+
+## Phase B steps 11–14 — Hearing (audio capture → STT → escalation)
+
+**Issues #15–#18 closed. 505/505 backend tests passing. Zero type errors. Zero lint violations.**
+
+Step 14b (E2E synthetic-audio Playwright smoke, issue #19) and the manual M1/M2 hardware checks remain — Phase B stays "open" until 14b lands.
+
+### What was built
+
+- **Audio capture daemon (#15):** `src/toybox/audio/{capture,vad,ring_buffer,devices}.py`. `MicCapture` bridges sounddevice's PortAudio thread → asyncio via `loop.call_soon_threadsafe` with bounded frame + speech queues (drop-oldest + structured `mic_queue_overflow` log). `VadGate` runs silero-vad with an injectable predictor (real `SileroVadPredictor` lazy-loads `data/models/silero_vad.onnx`; tests use stubs). `RingBuffer` keeps ~2 min of recent int16 audio for STT context. Async iterator yields VAD-gated speech chunks. Operator: `uv run python -m toybox.audio.capture --test 5`.
+- **faster-whisper STT (#16):** `src/toybox/audio/stt.py`. `WhisperTranscriber` wraps `WhisperModel` with `asyncio.to_thread` + `asyncio.Lock` serialization (CTranslate2 isn't thread-safe for concurrent calls). GPU autodetect with CPU fallback, env-driven model selection, lifecycle `close()`, int16→float32 normalization with clip. `Transcript` Pydantic model carries `text`, `confidence` (`exp(mean_logprob)` clamped), `language` (`UNKNOWN_LANGUAGE` sentinel), `duration_ms`. Operator: `uv run python -m toybox.audio.stt --download`.
+- **Transcript pipeline + persistence + ws (#17):** `src/toybox/audio/pipeline.py` orchestrator (capture → STT → persist → emit on `Topic.transcript` → confidence-floor-gated trigger evaluation). Per-collaborator try/except so a single failure (transcribe / db / publisher / matcher / on_intent) never kills the consumer loop. `src/toybox/api/transcripts.py` ships read-only `GET /api/transcripts` (paginated, ISO `before` cursor with `fromisoformat` validation) and `GET /api/transcripts/search?q=` (case-insensitive, parameterized LIKE). Migration 0002 adds `language TEXT NOT NULL DEFAULT 'unknown'` to the `transcripts` table.
+- **Mode-aware Claude escalation (#18):** `src/toybox/core/{escalation,throttle}.py`. `EscalationDispatcher` implements the per-mode dispatch table (offline-only, curated-only, curated→Claude, mode-3+spontaneous, always-on). Gate ordering is **capability → breaker (state-aware: open → offline; half_open → claim probe slot via `try_half_open()`; closed → proceed) → throttle**, so closed gates don't burn the throttle ticket. Cancellation-safe: explicit `except asyncio.CancelledError: raise` then narrow `except Exception`. 429 detection by duck-typing on `status_code == 429` plus class-name fallback (`RateLimitError`/`APIStatusError`, only when `status_code` is None or 429 — prevents 5xx APIStatusError from being mis-classified). Honors `Retry-After`. Malformed Claude output → offline fallback + `Topic.system` envelope `{code: "claude_output_invalid", model, preview}`. Stable offline seed via `zlib.crc32`.
+
+### Files changed
+
+| File | Change |
+|---|---|
+| `src/toybox/audio/{__init__,capture,vad,ring_buffer,devices}.py` | NEW — audio capture pipeline (#15) |
+| `src/toybox/audio/stt.py` | NEW — `WhisperTranscriber` (#16) |
+| `src/toybox/audio/pipeline.py` | NEW — `TranscriptPipeline` orchestrator (#17) |
+| `src/toybox/api/transcripts.py` | NEW — read-only transcripts REST routes (#17) |
+| `src/toybox/db/migrations/0002_transcript_language.sql` | NEW — adds `language` column |
+| `src/toybox/core/{escalation,throttle}.py` | NEW — mode dispatcher + min-interval throttle (#18) |
+| `src/toybox/app.py` | MODIFIED — wires the transcripts router |
+| `pyproject.toml` + `uv.lock` | new deps: `sounddevice`, `numpy`, `onnxruntime`, `faster-whisper`, `python-Levenshtein` (dev) |
+| `.gitignore` | switched `data/` → `data/*` with `!data/.gitkeep`, `!data/models/`, `!data/models/.gitkeep` re-includes |
+| `data/.gitkeep`, `data/models/.gitkeep` | NEW — cache directory placeholders |
+| `tests/unit/audio/{test_capture,test_vad,test_ring_buffer,test_stt}.py` | NEW — 116 unit tests |
+| `tests/unit/test_throttle.py` | NEW — 14 throttle tests |
+| `tests/integration/test_transcript_pipeline.py` | NEW — pipeline integration (16 tests) |
+| `tests/integration/test_transcripts_api.py` | NEW — REST integration (28 tests) |
+| `tests/integration/migrations/test_0002_transcript_language.py` | NEW — migration tests (4) |
+| `tests/integration/test_escalation_modes.py` | NEW — per-mode call-count assertions (29 tests) |
+| `tests/integration/test_breaker_429_escalation.py` | NEW — 429 → breaker → offline (5 tests) |
+| `tests/integration/test_claude_output_invalid.py` | NEW — malformed-output fallback (6 tests) |
+| `tests/integration/migrations/test_0001_initial.py`, `tests/integration/test_schema.py` | MODIFIED — relaxed assertions to accommodate added migration |
+
+### Fresh context notes for Phase B
+
+| Issue | Detail |
+|---|---|
+| Audio module is testable without hardware | Tests inject synthetic int16 buffers into `MicCapture._handle_frame` and stub the silero-vad predictor; never opens a real PortAudio stream. The `_FakeStream` factory pattern is the test seam. |
+| STT module never downloads in CI | Tests inject a `_FakeWhisperModel` via `model_factory`. The real model only downloads via the operator's `--download` command or first live `transcribe()` call. |
+| `data/models/` ships in repo via gitignore re-includes | `.gitignore` was changed from `data/` to `data/*` so cache directory placeholders can ship. Model binaries themselves remain untracked. |
+| Transcript table has `triggered_intent` column from 0001 | Pipeline doesn't currently populate it (matched intents are dispatched to the `on_intent` callback, not stored alongside the transcript row). Future step can wire this if needed. |
+| Live pipeline is NOT wired into app startup | `TranscriptPipeline` is constructible but Step 14b (E2E smoke) is what boots the daemon. `app.py` only mounts the transcripts API router. |
+| `EscalationDispatcher` consumes capability via async callable | Pass `is_capable_from_state(...)` or a curried `is_capable(...)` so the dispatcher doesn't depend on the capability module's full signature. |
+| Mode-5 with no triggers synthesizes `intent="boredom"` | The `boredom.json` template pool exists, so the offline fallback always lands somewhere. |
+| Min-interval throttle is global, not per-mode | One `MinIntervalThrottle` instance per dispatcher. The throttle ticket is consumed only after capability + breaker pass — closed gates don't burn it. |
+| `_is_rate_limit_error` excludes non-429 `APIStatusError` | The class-name fallback was tightened in iter-2 polish: `APIStatusError` with `status_code=500` (server error) is no longer mis-classified as a rate limit. |
+| 4 build-step iterations had pre-existing flaky `test_ws_heartbeat::test_server_pings_periodically` | Passes in isolation and on re-run. Not introduced by Phase B. Worth investigating in v1.5 polish. |
+
 ## Appendix
 
 ### Persona JSON shape
@@ -1368,16 +1428,21 @@ mic (sounddevice)
 | `TOYBOX_VAD_AGGRESSIVENESS` | 2 | silero-vad threshold, 0 (permissive) – 3 (strict) |
 | `TOYBOX_VAD_MIN_SPEECH_MS` | 300 | minimum sustained speech to trigger STT |
 | `TOYBOX_MIC_DEVICE_INDEX` | unset (default device) | sounddevice device index; see `python -m sounddevice` |
-| `TOYBOX_AUDIO_CHUNK_SEC` | 3 | STT chunk size after VAD gating |
+| `TOYBOX_AUDIO_RING_SECONDS` | 120 | ring buffer of recent audio for STT context (16 kHz mono int16) |
+| `TOYBOX_AUDIO_SPEECH_QUEUE_MAXSIZE` | 64 | bounded asyncio queue for VAD-gated speech chunks; drop-oldest on overflow with `mic queue overflow` log |
+| `TOYBOX_VAD_THRESHOLD` | 0.5 | silero-vad probability threshold (0.0–1.0); higher = stricter |
+| `TOYBOX_VAD_MODEL_PATH` | `data/models/silero_vad.onnx` | override path for the silero ONNX model |
+| `TOYBOX_WHISPER_MODEL` | `small` | faster-whisper model id; `tiny`/`base`/`small`/`medium`/`large-v3` |
+| `TOYBOX_TRANSCRIPT_CONFIDENCE_FLOOR` | 0.55 | `exp(mean_logprob)`-based threshold (0.0–1.0); transcripts below this persist + emit but skip trigger evaluation |
 | `TOYBOX_DEFAULT_MODE` | 3 | 1–5 |
 | `TOYBOX_CLAUDE_TEXT_MODEL` | `claude-sonnet-4-6` | activity generation, vision-free reasoning. Sonnet 4.6 is the cost/quality default; bump to Opus 4.7 for richer activities once cost is understood. |
 | `TOYBOX_CLAUDE_VISION_MODEL` | `claude-haiku-4-5-20251001` | toy + room photo understanding. Haiku is fast and cheap for one-shot vision; sufficient for "name the toy / list room features." |
-| `TOYBOX_CLAUDE_MIN_INTERVAL_SEC` | 30 | mode 5 throttle |
-| `TOYBOX_CLAUDE_SPONTANEOUS_INTERVAL_SEC` | 300 | mode 4 |
+| `TOYBOX_CLAUDE_MIN_INTERVAL_SEC` | 30 | global Claude min-interval throttle (all modes) |
+| `TOYBOX_SPONTANEOUS_INTERVAL_SEC` | 180 | mode 4 spontaneous-Claude-call cadence when no triggers matched recently |
+| `TOYBOX_CLAUDE_BREAKER_COOLDOWN_SEC` | 60 | breaker default cooldown when 429 carries no `Retry-After` |
+| `TOYBOX_CLAUDE_BREAKER_THRESHOLD` | 3 | consecutive non-429 failures before the breaker opens |
 | `TOYBOX_WS_PING_INTERVAL_SEC` | 20 | server-side ping cadence |
 | `TOYBOX_WS_PING_TIMEOUT_SEC` | 30 | close if no pong within this window |
-| `TOYBOX_STT_CONFIDENCE_FLOOR` | -0.7 | faster-whisper `avg_logprob`; range -1.0 (worst) to 0.0 (best); transcripts below this skip trigger evaluation but still persist for parent review |
-| `TOYBOX_MIC_QUEUE_BOUND` | 100 | thread-safe queue between sounddevice callback and asyncio pump; ~6 sec at 64 ms/chunk; drop-oldest on overflow with a `metrics` event |
 | `TOYBOX_LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`; logs to stdout, structured JSON when not a TTY |
 | `TOYBOX_TIME_OF_DAY_AWARE` | `true` | inject local hour into activity generator context |
 | `TOYBOX_PIN_MAX_ATTEMPTS` | 5 | failed PIN attempts before lockout |
