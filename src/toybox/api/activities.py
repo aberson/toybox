@@ -29,6 +29,11 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
+from ..activities.feedback import (
+    KIND_DIDNT_WORK,
+    KIND_DISMISSED_PRE_APPROVAL,
+    KIND_LOVED_IT,
+)
 from ..activities.generator import build_generator_context, generate
 from ..ai.judge import judge_and_persist
 from ..ai.labeled_events import (
@@ -242,6 +247,85 @@ def _resolve_only_child(conn: sqlite3.Connection) -> list[str]:
     if len(rows) == 1:
         return [str(rows[0]["id"])]
     return []
+
+
+def _activity_signature(conn: sqlite3.Connection, activity_id: str) -> str | None:
+    """Read the signature from the persisted ``activities.summary`` JSON.
+
+    Returns ``None`` if the row is missing, the JSON is malformed, or
+    ``metadata.signature`` is absent (rows persisted before Phase D
+    step 20). Callers MUST treat ``None`` as "skip the feedback write"
+    rather than substituting an empty string — empty signatures don't
+    match any candidate's hash and would just be dead rows.
+    """
+    row = conn.execute(
+        "SELECT summary FROM activities WHERE id = ?",
+        (activity_id,),
+    ).fetchone()
+    if row is None or not row["summary"]:
+        return None
+    try:
+        payload = json.loads(row["summary"])
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    metadata = payload.get("metadata")
+    if not isinstance(metadata, dict):
+        return None
+    sig = metadata.get("signature")
+    if isinstance(sig, str) and sig:
+        return sig
+    return None
+
+
+def _write_feedback(
+    conn: sqlite3.Connection,
+    *,
+    activity_id: str,
+    kind: str,
+    reason: str | None = None,
+    step_seq: int | None = None,
+) -> None:
+    """Insert a ``feedback`` row keyed by the activity's stored signature.
+
+    Best-effort wrapper. If the activity row has no usable signature
+    (pre-Phase-D-step-20 row, malformed summary, etc.) this no-ops so
+    a parent's button click can't surface as a 500. Sqlite errors
+    likewise log WARNING and swallow — feedback writes are an input
+    to a *future* generator pick, not a load-bearing UX path.
+    """
+    signature = _activity_signature(conn, activity_id)
+    if signature is None:
+        _logger.info(
+            "skipping feedback write for activity %s (kind=%s): no signature on row",
+            activity_id,
+            kind,
+        )
+        return
+    try:
+        with conn:
+            conn.execute(
+                "INSERT INTO feedback "
+                "(id, activity_id, step_seq, kind, signature, reason, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    str(uuid.uuid4()),
+                    activity_id,
+                    step_seq,
+                    kind,
+                    signature,
+                    reason,
+                    _now_iso(),
+                ),
+            )
+    except sqlite3.Error:
+        _logger.warning(
+            "feedback write failed for activity %s (kind=%s); skipping",
+            activity_id,
+            kind,
+            exc_info=True,
+        )
 
 
 def _safe_update_parent_signal(
@@ -513,6 +597,11 @@ def _do_propose(
         if picked is not None:
             effective_persona_id = picked["id"]
             persona_meta = picked
+    # Pass ``conn`` so the picker consults the ``feedback`` table —
+    # past parent ``didnt_work``/``loved_it``/``dismissed_pre_approval``
+    # entries adjust candidate ranking per Phase D step 20. The
+    # consultation is best-effort (sqlite errors degrade to uniform
+    # pick) so this can't break propose.
     activity = generate(
         intent=body.intent,
         slot=body.slot,
@@ -520,6 +609,7 @@ def _do_propose(
         hour=body.hour,
         seed=body.seed,
         persona_id=effective_persona_id,
+        conn=conn,
     )
     session_id = _ensure_session(conn, body.session_id)
 
@@ -706,6 +796,15 @@ def post_dismiss(
     _safe_update_parent_signal(
         conn, activity_id=activity_id, signal=PARENT_SIGNAL_DISMISS
     )
+    # Phase D step 20: dismiss-before-approval is a soft anti-signal.
+    # Only write the feedback row when the activity was still in the
+    # ``proposed`` state at the moment of dismiss — a parent who
+    # dismisses an *approved* (or running) activity already has the
+    # ``end-early`` / ``didnt-work`` paths available for harder signals.
+    if current_state == PROPOSED_STATE:
+        _write_feedback(
+            conn, activity_id=activity_id, kind=KIND_DISMISSED_PRE_APPROVAL
+        )
     response = _row_to_response(conn, row)
     _emit_state(pubsub, response)
     return response
@@ -958,6 +1057,12 @@ def post_thumbs_up(
     _safe_update_parent_signal(
         conn, activity_id=activity_id, signal=PARENT_SIGNAL_THUMBS_UP
     )
+    # Phase D step 20: thumbs-up boosts future picks of the same
+    # signature. Idempotent at the parent's level (clicking twice
+    # writes two rows; the consultation stacks weights, so a
+    # double-click counts as extra love — small but acceptable side
+    # effect, less surprising than de-duping behind the parent's back).
+    _write_feedback(conn, activity_id=activity_id, kind=KIND_LOVED_IT)
     response = _row_to_response(conn, row)
     _emit_state(pubsub, response)
     return response
@@ -987,14 +1092,17 @@ def post_didnt_work(
     )
     if not ok:
         raise VersionConflictError(int(row["version"]), str(row["state"]))
-    if body.reason:
-        with conn:
-            conn.execute(
-                "INSERT INTO feedback "
-                "(id, activity_id, step_seq, kind, signature, reason, created_at) "
-                "VALUES (?, ?, NULL, 'didnt_work', '', ?, ?)",
-                (str(uuid.uuid4()), activity_id, body.reason, _now_iso()),
-            )
+    # Phase D step 20: ``didnt_work`` is the hard veto. Always write
+    # the row (with the signature from the persisted activity) — the
+    # previous behaviour only wrote when ``reason`` was supplied, so
+    # silent button presses produced zero anti-signal. Reason is
+    # carried through when present.
+    _write_feedback(
+        conn,
+        activity_id=activity_id,
+        kind=KIND_DIDNT_WORK,
+        reason=body.reason,
+    )
     response = _row_to_response(conn, row)
     _emit_state(pubsub, response)
     return response

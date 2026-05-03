@@ -1285,6 +1285,13 @@ What to look for:
 
 **Issues:** Phase D umbrella #24 · step 20 → #25 · step 21 → #26 · step 22 → #27 · step 23 → #28 · step 24 → #29
 
+#### Step 20: Anti-signal feedback in generator
+
+- **Problem:** Generator computes `signature = sha256("{template_id}:{sorted slot k=v}")` for every candidate template (lives in `src/toybox/activities/feedback.py`). Selection consults the `feedback` table by signature: `kind='didnt_work'` is a hard veto (re-pick from siblings; degrade to uniform pick only when every candidate is blocked); `kind='loved_it'` adds a positive weight; `kind='dismissed_pre_approval'` adds a smaller negative weight (soft anti-signal). Decay is by weight multiplier (not time window) — single source of truth, no clock dependency. The signature is emitted on `Activity.metadata["signature"]` and persisted in the activity's `summary` JSON. Parent UI feedback paths (`POST /dismiss` while proposed, `POST /thumbs-up`, `POST /didnt-work`) write `feedback` rows keyed by that signature so the loop closes end-to-end. Best-effort throughout: a sqlite blip during consultation degrades to a uniform pick and a logged WARNING; missing signatures on legacy activity rows skip the feedback write rather than 500. See issue #25.
+- **Type:** code
+- **Issue:** #25
+- **Flags:** --reviewers code
+
 #### Manual M4 — Sound effect sourcing (any time before Phase A step 10 final review)
 
 | Asset | Purpose | Source |

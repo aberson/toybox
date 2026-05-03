@@ -60,6 +60,7 @@ import hashlib
 import json
 import logging
 import random
+import sqlite3
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -68,6 +69,7 @@ from typing import Any, Final
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
+from .feedback import Candidate, compute_signature, consult_and_select
 from .models import Activity, ActivityStep
 from .time_of_day import ALWAYS_BUCKET, hour_bucket, is_eligible
 
@@ -213,21 +215,88 @@ def _filter_always(templates: list[_Template]) -> list[_Template]:
     return [t for t in templates if ALWAYS_BUCKET in t.buckets]
 
 
+def _preview_slot_values(template: _Template, *, slot: str | None) -> tuple[str, ...]:
+    """Compute the slot values a template would substitute, without
+    actually substituting.
+
+    Returns the same tuple shape as ``Activity.metadata["slot_values"]``
+    so the signature is stable: ``(slot,)`` if at least one of the
+    template's title or step texts contains ``{slot}`` and ``slot`` is
+    non-empty, else ``()``. This MUST track ``_substitute`` exactly —
+    if substitution semantics drift, the generator's emitted signature
+    will diverge from what consultation predicted, and feedback rows
+    will silently stop matching. The covering test
+    ``test_preview_matches_post_substitution`` pins the equivalence.
+    """
+    if slot is None or not slot.strip():
+        return ()
+    haystacks: list[str] = [template.title]
+    haystacks.extend(s.text for s in template.steps)
+    has_slot = any("{slot}" in h for h in haystacks)
+    return (slot,) if has_slot else ()
+
+
+def _build_candidates(
+    templates: list[_Template], *, slot: str | None
+) -> list[Candidate]:
+    """Build :class:`Candidate` rows for feedback consultation."""
+    out: list[Candidate] = []
+    for t in templates:
+        sv = _preview_slot_values(t, slot=slot)
+        out.append(
+            Candidate(
+                template_id=t.id,
+                signature=compute_signature(t.id, sv),
+                slot_values=sv,
+            )
+        )
+    return out
+
+
+def _pick_with_consultation(
+    templates: list[_Template],
+    *,
+    slot: str | None,
+    rng: random.Random,
+    conn: sqlite3.Connection | None,
+) -> _Template:
+    """Apply feedback consultation if ``conn`` is set, else uniform pick.
+
+    Centralising the conn-vs-rng branch here keeps ``_select_template``
+    readable and makes the fallback paths share the same behaviour.
+    """
+    templates_by_id = {t.id: t for t in templates}
+    candidates = _build_candidates(templates, slot=slot)
+    chosen = consult_and_select(candidates, conn, rng)
+    return templates_by_id[chosen.template_id]
+
+
 def _select_template(
     intent: str,
     hour: int,
     rng: random.Random,
+    *,
+    slot: str | None,
+    conn: sqlite3.Connection | None,
 ) -> tuple[_Template, str]:
     """Pick one template. Returns ``(template, source_intent)``.
 
     ``source_intent`` is the intent whose template pool was actually
     used — usually equal to ``intent``, but distinct after a fallback.
+
+    When ``conn`` is provided, the picker consults the ``feedback``
+    table per :mod:`toybox.activities.feedback` — ``didnt_work``
+    vetoes a candidate (re-pick), ``loved_it`` boosts it,
+    ``dismissed_pre_approval`` softly penalises it. Each fallback
+    pool also gets the consultation, so a parent who has
+    ``didnt_work``-flagged the only eligible primary template still
+    benefits from anti-signal boosting in the always-fallback pool.
     """
     primary = _load_intent_templates(intent)
     eligible = _filter_eligible(primary, hour)
     if eligible:
         eligible.sort(key=lambda t: t.id)
-        return rng.choice(eligible), intent
+        return _pick_with_consultation(eligible, slot=slot, rng=rng, conn=conn), intent
 
     # Fallback 1: any "always" template within the requested intent.
     always_primary = _filter_always(primary)
@@ -238,7 +307,10 @@ def _select_template(
             intent,
             hour,
         )
-        return rng.choice(always_primary), intent
+        return (
+            _pick_with_consultation(always_primary, slot=slot, rng=rng, conn=conn),
+            intent,
+        )
 
     # Fallback 2: boredom intent's always pool (final safety net).
     if intent != FALLBACK_INTENT:
@@ -250,7 +322,10 @@ def _select_template(
                 "no templates for intent=%s; falling back to boredom always pool",
                 intent,
             )
-            return rng.choice(always_boredom), FALLBACK_INTENT
+            return (
+                _pick_with_consultation(always_boredom, slot=slot, rng=rng, conn=conn),
+                FALLBACK_INTENT,
+            )
 
     raise RuntimeError(
         f"no offline templates available for intent={intent!r} hour={hour} "
@@ -352,6 +427,7 @@ def generate(
     seed: int,
     *,
     persona_id: str | None = None,
+    conn: sqlite3.Connection | None = None,
 ) -> Activity:
     """Generate a deterministic 5-step :class:`Activity`.
 
@@ -374,8 +450,18 @@ def generate(
             via :func:`toybox.activities.time_of_day.is_eligible`.
         seed: Integer seed for the internal :class:`random.Random`.
             Same ``(intent, slot, context, hour, seed)`` MUST produce
-            byte-identical output.
+            byte-identical output ASSUMING ``conn`` is ``None`` or the
+            ``feedback`` table holds the same rows. Past parent
+            feedback is part of the selection input by design — same
+            seed + different feedback = potentially different pick.
         persona_id: Optional persona id to record on the activity.
+        conn: Optional SQLite connection. When provided, the picker
+            consults the ``feedback`` table to apply parent
+            anti-signal feedback (``didnt_work`` re-pick,
+            ``loved_it`` boost, ``dismissed_pre_approval`` soft
+            penalty) per :mod:`toybox.activities.feedback`. When
+            ``None`` (test path / non-DB callers), behaves exactly
+            like the Phase A picker.
 
     Returns:
         An immutable :class:`Activity` with exactly five
@@ -391,7 +477,7 @@ def generate(
     """
     rng = random.Random(seed)
 
-    template, _source_intent = _select_template(intent, hour, rng)
+    template, _source_intent = _select_template(intent, hour, rng, slot=slot, conn=conn)
 
     # Substitute placeholders in title and steps.
     title_text, title_slots = _substitute(template.title, slot=slot, toy=DEFAULT_TOY_NAME)
@@ -419,14 +505,24 @@ def generate(
         template_id=template.id,
     )
 
+    slot_values_tuple = tuple(sorted(set(used_slots)))
     metadata: dict[str, Any] = {
         # Sorted + deduped to keep determinism: callers depend on this
         # ordering for the Phase D signature. We use a tuple (not a
         # list) so the value is immutable — Pydantic respects tuples
         # as-is, and callers who try to ``.append`` will get an error
         # rather than silently corrupting a future signature.
-        "slot_values": tuple(sorted(set(used_slots))),
+        "slot_values": slot_values_tuple,
         "hour_bucket": hour_bucket(hour).value,
+        # Phase D step 20: anti-signal signature for feedback matching.
+        # ``compute_signature`` takes the actual (post-substitution)
+        # slot values, so the emitted signature is the canonical one
+        # for THIS activity instance — feedback rows written for it
+        # by the parent later (``didnt_work``/``loved_it``/
+        # ``dismissed_pre_approval``) will key off the same hash, and
+        # future ``generate()`` calls that produce the same template +
+        # slot fills will match it.
+        "signature": compute_signature(template.id, slot_values_tuple),
     }
 
     return Activity(

@@ -13,6 +13,7 @@ one JSON file per intent, validated at load time against
 
 from __future__ import annotations
 
+from .feedback import compute_signature
 from .generator import generate
 from .models import Activity, ActivityStep
 from .time_of_day import HourBucket, hour_bucket, is_eligible
@@ -21,6 +22,7 @@ __all__ = [
     "Activity",
     "ActivityStep",
     "HourBucket",
+    "compute_signature",
     "generate",
     "hour_bucket",
     "is_eligible",
