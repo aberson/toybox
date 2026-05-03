@@ -58,6 +58,7 @@ import json
 import logging
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import urllib.error
@@ -124,6 +125,156 @@ def _playwright_available() -> bool:
 
 def _npm_available() -> bool:
     return shutil.which("npm") is not None
+
+
+def _port_in_use(host: str, port: int) -> bool:
+    """Return True if any process is listening on ``(host, port)``.
+
+    Uses :func:`socket.create_connection` (which goes through
+    ``getaddrinfo``) so IPv6-only services are caught — Vite on Windows
+    binds ``::1`` only by default, and a bare ``127.0.0.1`` probe would
+    miss it (see dev/ memory ``feedback_vite_ipv6_only_on_windows``).
+    """
+    try:
+        with socket.create_connection((host, port), timeout=0.2):
+            return True
+    except OSError:
+        return False
+
+
+def _describe_port_owner(port: int) -> str | None:
+    """Best-effort PID + command-line for the process holding ``port``.
+
+    Returns ``None`` when the OS query fails for any reason; callers
+    should treat that as "owner unknown" rather than "port free". The
+    pre-flight already established the port IS bound before invoking
+    this, so a None return just degrades the diagnostic.
+    """
+    if sys.platform == "win32":
+        # ``netstat -ano`` (without ``-p TCP``) returns BOTH IPv4 and
+        # IPv6 listening sockets — ``-p TCP`` silently filters out the
+        # IPv6 entries on Windows even though their proto column reads
+        # ``TCP``. Vite on Windows binds ``[::1]`` only by default
+        # (see ``feedback_vite_ipv6_only_on_windows``), so the filter
+        # would mask the most common frontend collision.
+        try:
+            netstat = subprocess.run(
+                ["netstat", "-ano"],
+                capture_output=True,
+                text=True,
+                timeout=2.0,
+                check=False,
+            )
+        except (subprocess.SubprocessError, OSError):
+            return None
+        token = f":{port}"
+        pid: str | None = None
+        for line in netstat.stdout.splitlines():
+            parts = line.split()
+            if (
+                len(parts) >= 5
+                and parts[3] == "LISTENING"
+                and parts[1].endswith(token)
+            ):
+                pid = parts[4]
+                break
+        if pid is None:
+            return None
+        try:
+            ps_out = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-Command",
+                    f"(Get-CimInstance Win32_Process -Filter 'ProcessId={pid}').CommandLine",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=2.0,
+                check=False,
+            )
+        except (subprocess.SubprocessError, OSError):
+            return f"PID {pid}"
+        cmd = ps_out.stdout.strip()
+        return f'PID {pid} ("{cmd}")' if cmd else f"PID {pid}"
+    # POSIX: try lsof first (most informative), fall back to fuser.
+    for tool, args in (
+        ("lsof", ["-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-Fpc"]),
+        ("fuser", [f"{port}/tcp"]),
+    ):
+        if shutil.which(tool) is None:
+            continue
+        try:
+            result = subprocess.run(
+                [tool, *args],
+                capture_output=True,
+                text=True,
+                timeout=2.0,
+                check=False,
+            )
+        except (subprocess.SubprocessError, OSError):
+            continue
+        if result.returncode != 0 or not result.stdout.strip():
+            continue
+        if tool == "lsof":
+            # ``-Fpc`` emits one field per line: ``p<pid>``, ``c<command>``.
+            lsof_pid: str | None = None
+            lsof_cmd: str | None = None
+            for line in result.stdout.splitlines():
+                if line.startswith("p"):
+                    lsof_pid = line[1:]
+                elif line.startswith("c"):
+                    lsof_cmd = line[1:]
+            if lsof_pid is None:
+                continue
+            return (
+                f'PID {lsof_pid} ("{lsof_cmd}")' if lsof_cmd else f"PID {lsof_pid}"
+            )
+        # ``fuser <port>/tcp`` prints PIDs whitespace-separated after the
+        # ``port/tcp:`` header on stderr; some distros emit only on
+        # stdout. Take the last whitespace-token of stdout as a PID.
+        return f"PID {result.stdout.strip().split()[-1]}"
+    return None
+
+
+def _smoke_preflight() -> None:
+    """Fail fast if a port the harness needs is already bound.
+
+    The slow E2E owns the lifetime of its own backend + frontend; if
+    either port is already in use (a developer's running ``python -m
+    toybox.main`` + ``npm run dev`` dev session, or a leftover process
+    from a prior crashed run), the new subprocess silently bind-errors
+    and the test's readiness probe answers from the lingering server,
+    producing flaky or incorrect results.
+
+    Calls ``pytest.fail`` (no traceback) with a diagnostic identifying
+    the offending PID + command line (when discoverable) so the operator
+    can stop the colliding process before re-running.
+    """
+    collisions: list[str] = []
+    for label, host, port in (
+        ("backend", BACKEND_HOST, BACKEND_PORT),
+        ("frontend", FRONTEND_HOST, FRONTEND_PORT),
+    ):
+        if _port_in_use(host, port):
+            owner = _describe_port_owner(port) or "an unknown process"
+            collisions.append(f"  {label} port {host}:{port} -- bound by {owner}")
+    if not collisions:
+        return
+    kill_hint = (
+        "  Stop-Process -Id <PID> -Force"
+        if sys.platform == "win32"
+        else "  kill <PID>"
+    )
+    pytest.fail(
+        "smoke pre-flight: required port(s) already in use:\n"
+        + "\n".join(collisions)
+        + "\n\nFree the listed processes before re-running the slow E2E. "
+        "The most common cause is a normal toybox dev session running on "
+        "the same machine; stop it from the shell that started it, or:\n"
+        + kill_hint,
+        pytrace=False,
+    )
 
 
 pytestmark = [
@@ -291,6 +442,13 @@ async def test_smoke_synthetic_audio_full_loop(tmp_path: Path) -> None:
         pytest.skip(
             "smoke artifacts missing: " + ", ".join(str(p.relative_to(REPO_ROOT)) for p in missing)
         )
+
+    # Bail loudly if a developer's local toybox dev session (or a
+    # crashed prior run) is already holding the ports we need. Without
+    # this guard, the harness's readiness probe would silently answer
+    # from the lingering server while OUR backend bind-errors out, and
+    # the test would race on stale DB state.
+    _smoke_preflight()
 
     # Lazy import: keeps the module importable on hosts without
     # playwright (the skipif guard already handles those, but a defensive
