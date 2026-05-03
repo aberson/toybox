@@ -47,6 +47,15 @@ const FULL_BLEED_STYLE: CSSProperties = {
 
 function avatarLetter(activity: Activity | null): string {
   if (activity === null) return "?";
+  // Prefer the persona's display_name first char (e.g. "M" for
+  // Marvelous, "P" for Princess Lyra) so the avatar varies as personas
+  // do. Falls back to persona_id, then title, then "?".
+  const meta = activity.metadata as Record<string, unknown>;
+  const persona = meta["persona"];
+  if (typeof persona === "object" && persona !== null) {
+    const dn = (persona as Record<string, unknown>)["display_name"];
+    if (typeof dn === "string" && dn.length > 0) return dn[0]!;
+  }
   if (activity.persona_id !== null && activity.persona_id.length > 0) {
     return activity.persona_id[0]!;
   }

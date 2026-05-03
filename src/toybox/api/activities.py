@@ -367,6 +367,29 @@ def _enforce_transition(current_state: str, target: str) -> None:
         )
 
 
+def _pick_random_library_persona(conn: sqlite3.Connection) -> dict[str, Any] | None:
+    """Pick a random ``source='library'`` persona for variety on propose.
+
+    Returns a small dict (id, display_name, archetype, avatar_image_path)
+    or ``None`` when the personas table has no library rows (e.g. fresh
+    DB before the loader ran). Used to drive avatar variety on the
+    kiosk; activity content is still template-driven.
+    """
+    row = conn.execute(
+        "SELECT id, display_name, archetype, avatar_image_path "
+        "FROM personas WHERE source = 'library' "
+        "ORDER BY RANDOM() LIMIT 1"
+    ).fetchone()
+    if row is None:
+        return None
+    return {
+        "id": str(row["id"]),
+        "display_name": str(row["display_name"]),
+        "archetype": row["archetype"],
+        "avatar_image_path": row["avatar_image_path"],
+    }
+
+
 def _do_propose(
     body: ProposeRequest,
     conn: sqlite3.Connection,
@@ -377,13 +400,24 @@ def _do_propose(
     Carries no auth — both ``post_propose`` and ``post_regenerate``
     funnel through here and keep the auth check on the route handler.
     """
+    # Caller-pinned persona wins; otherwise pick a fresh library one
+    # so the kiosk avatar varies across propose calls. Falls through to
+    # no persona when the library is empty (kiosk fallback letter
+    # handles that case).
+    effective_persona_id = body.persona_id
+    persona_meta: dict[str, Any] | None = None
+    if effective_persona_id is None:
+        picked = _pick_random_library_persona(conn)
+        if picked is not None:
+            effective_persona_id = picked["id"]
+            persona_meta = picked
     activity = generate(
         intent=body.intent,
         slot=body.slot,
         context=body.context,
         hour=body.hour,
         seed=body.seed,
-        persona_id=body.persona_id,
+        persona_id=effective_persona_id,
     )
     session_id = _ensure_session(conn, body.session_id)
 
@@ -399,9 +433,16 @@ def _do_propose(
     # but invisible to schema readers. A future migration may split
     # this into dedicated ``title``/``metadata_json`` columns; until
     # then ``_row_to_response`` parses the same envelope.
+    # Splice persona metadata into the activity's metadata envelope so
+    # the kiosk can render the persona's display name + avatar path
+    # without an extra round-trip. ``activity.metadata`` is a frozen
+    # dict, so build a fresh copy.
+    metadata = dict(activity.metadata)
+    if persona_meta is not None:
+        metadata["persona"] = persona_meta
     summary_payload = {
         "title": activity.title,
-        "metadata": activity.metadata,
+        "metadata": metadata,
         "template_id": activity.template_id,
     }
     steps = [
@@ -537,7 +578,10 @@ def post_regenerate(
     # need determinism still pass an explicit seed.
     seed = body.seed if body.seed is not None else secrets.randbits(31)
     hour = body.hour if body.hour is not None else datetime.now(UTC).hour
-    persona_id = body.persona_id or row["persona_id"]
+    # Don't inherit the source's persona — let _do_propose pick a fresh
+    # library persona so each "skip & try another" gives the kiosk a
+    # different character. Caller can pin a persona via body.persona_id.
+    persona_id = body.persona_id
     # Fold source identity into the UUID hash too — defense in depth so
     # that even an unlikely seed collision doesn't surface as a 500.
     context = dict(body.context) if body.context is not None else {}
