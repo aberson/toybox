@@ -1202,6 +1202,7 @@ What to look for:
 - **Type:** code
 - **Issue:** #18
 - **Flags:** --reviewers code
+- **Status:** DONE (2026-05-03)
 
 #### Step 14b: E2E pipeline test (synthetic audio → child UI)
 
