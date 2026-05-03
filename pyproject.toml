@@ -48,9 +48,20 @@ python_version = "3.12"
 files = ["src", "tests"]
 
 [[tool.mypy.overrides]]
-module = ["sounddevice", "onnxruntime", "faster_whisper", "Levenshtein"]
+module = ["sounddevice", "onnxruntime", "faster_whisper", "Levenshtein", "playwright", "playwright.async_api"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# Slow tests (synthetic-audio E2E in tests/e2e/test_smoke_pipeline.py)
+# are marked ``@pytest.mark.slow`` and self-skip when artifacts are
+# missing, so a default ``uv run pytest`` collects them but skips the
+# heavy work. Invocation matrix:
+#   - ``uv run pytest``                           -> all tests; slow self-skips if no artifacts
+#   - ``uv run pytest -m "not slow"``             -> fast subset only
+#   - ``uv run pytest -m slow tests/e2e/...``     -> smoke only (orchestrator/CI)
+# An ``addopts = "-m 'not slow'"`` setting was removed in 14b iter-3:
+# it collided with explicit ``-m slow`` on the CLI (pytest applies
+# addopts first, then CLI; behaviour depended on the pytest version).
+markers = ["slow: marks tests as slow (deselect with -m 'not slow')"]
