@@ -148,6 +148,7 @@ class RegenerateRequest(BaseModel):
     hour: int | None = Field(default=None, ge=0, le=23)
     seed: int | None = Field(default=None, ge=0)
     persona_id: str | None = None
+    context: dict[str, Any] | None = None
 
 
 class DidntWorkRequest(BaseModel):
@@ -531,6 +532,14 @@ def post_regenerate(
     seed = body.seed if body.seed is not None else (current_version + 1) * 31 + 7
     hour = body.hour if body.hour is not None else datetime.now(UTC).hour
     persona_id = body.persona_id or row["persona_id"]
+    # Fold the source activity id + pre-dismiss version into the
+    # deterministic UUID hash so each regenerate produces a fresh id.
+    # Without this, every regenerate from a v=2 activity in the same
+    # hour with the same intent collapses to the same target UUID and
+    # the second attempt hits a UNIQUE constraint on activities.id.
+    context = dict(body.context) if body.context is not None else {}
+    context.setdefault("regen_source", activity_id)
+    context.setdefault("regen_source_version", current_version)
     return _do_propose(
         ProposeRequest(
             intent=intent,
@@ -539,6 +548,7 @@ def post_regenerate(
             seed=seed,
             persona_id=persona_id,
             session_id=str(row["session_id"]),
+            context=context,
         ),
         conn,
         pubsub,

@@ -145,6 +145,52 @@ def test_regenerate_dismisses_old_returns_new(
     assert old["state"] == "dismissed"
 
 
+def test_regenerate_running_succeeds_repeatedly(
+    client: TestClient,
+    parent_headers: dict[str, str],
+) -> None:
+    """Two consecutive regenerate cycles from a running activity must
+    each produce a distinct new activity id. Originally regressed
+    because the regenerate path used a deterministic seed
+    ``(version+1)*31+7`` with no source-id mixed into the hash, so the
+    second cycle collapsed to the same UUID and tripped a UNIQUE
+    constraint on activities.id.
+    """
+    seen_ids: set[str] = set()
+    for cycle in range(2):
+        propose = client.post(
+            "/api/activities/propose",
+            json={**PROPOSE_BODY, "seed": 1000 + cycle},
+            headers=parent_headers,
+        )
+        assert propose.status_code == 201, propose.text
+        aid = propose.json()["id"]
+        approve = client.post(
+            f"/api/activities/{aid}/approve",
+            json={},
+            headers={**parent_headers, "If-Match-Version": "1"},
+        )
+        assert approve.status_code == 200, approve.text
+        advance = client.post(
+            f"/api/activities/{aid}/advance",
+            headers={**parent_headers, "If-Match-Version": "2"},
+        )
+        assert advance.status_code == 200, advance.text
+        regen = client.post(
+            f"/api/activities/{aid}/regenerate",
+            json={},
+            headers={
+                **parent_headers,
+                "If-Match-Version": str(advance.json()["version"]),
+            },
+        )
+        assert regen.status_code == 200, regen.text
+        new = regen.json()
+        assert new["state"] == "proposed"
+        assert new["id"] not in seen_ids
+        seen_ids.add(new["id"])
+
+
 def test_end_running(
     client: TestClient,
     parent_headers: dict[str, str],
