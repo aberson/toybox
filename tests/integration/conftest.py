@@ -21,6 +21,7 @@ from fastapi.testclient import TestClient
 from toybox.api.activities import get_activities_db
 from toybox.api.auth_dep import get_auth_db
 from toybox.api.listening import get_db as get_listening_db
+from toybox.api.transcripts import get_transcripts_db
 from toybox.app import create_app
 from toybox.core.auth import TokenScope, issue_token
 from toybox.core.pubsub import PubSub
@@ -73,6 +74,7 @@ def app(db_path: Path, pubsub: PubSub) -> Iterator[FastAPI]:
         get_listening_db,
         get_auth_db,
         get_activities_db,
+        get_transcripts_db,
     ):
         application.dependency_overrides[dep] = _override_db
     application.dependency_overrides[get_ws_db] = _override_ws_db

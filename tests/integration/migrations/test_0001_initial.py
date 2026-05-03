@@ -51,8 +51,12 @@ def conn(db_path: Path) -> Iterator[sqlite3.Connection]:
 def test_runner_creates_all_expected_tables(conn: sqlite3.Connection) -> None:
     applied = run_migrations(conn)
 
-    assert [m.filename for m in applied] == ["0001_initial.sql"]
-    assert current_version(conn) == 1
+    # 0001 is the v1 schema; later migrations stack on top. This test
+    # pins that 0001 is *first* and produces every expected table
+    # without depending on the latest version count (which grows as
+    # we add migrations).
+    assert [m.filename for m in applied][0] == "0001_initial.sql"
+    assert current_version(conn) >= 1
 
     rows = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
     names = {r["name"] for r in rows if not r["name"].startswith("sqlite_")}
@@ -62,9 +66,9 @@ def test_runner_creates_all_expected_tables(conn: sqlite3.Connection) -> None:
 def test_runner_is_idempotent(conn: sqlite3.Connection) -> None:
     first = run_migrations(conn)
     second = run_migrations(conn)
-    assert len(first) == 1
+    assert len(first) >= 1
     assert second == []
-    assert current_version(conn) == 1
+    assert current_version(conn) == max(m.version for m in first)
 
 
 def test_runner_records_filename_and_applied_at(conn: sqlite3.Connection) -> None:

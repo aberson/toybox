@@ -222,10 +222,14 @@ def test_round_trip_auth_tokens(db: sqlite3.Connection) -> None:
 
 
 def test_round_trip_schema_migrations(db: sqlite3.Connection) -> None:
-    rows = list(db.execute("SELECT version, filename FROM schema_migrations"))
-    assert len(rows) == 1
+    rows = list(
+        db.execute("SELECT version, filename FROM schema_migrations ORDER BY version")
+    )
+    # 0001 is the v1 schema and must always be the first applied row;
+    # subsequent migrations may stack on top.
     assert rows[0]["version"] == 1
     assert rows[0]["filename"] == "0001_initial.sql"
+    assert len(rows) >= 1
 
 
 def test_feedback_cascade_on_activity_delete(db: sqlite3.Connection) -> None:
