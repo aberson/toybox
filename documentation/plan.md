@@ -1216,6 +1216,7 @@ What to look for:
 - **Type:** code
 - **Issue:** #19
 - **Flags:** --reviewers full --start-cmd "uv run python -m toybox.main" --url "http://localhost:4000/parent" --ui
+- **Status:** DONE (2026-05-03, commits `b523a67` + `7977378`)
 
 #### Manual M2 — Mic hardware test (after step 11)
 
@@ -1364,11 +1365,11 @@ What to look for:
 
 ---
 
-## Phase B steps 11–14 — Hearing (audio capture → STT → escalation)
+## Phase B steps 11–14b — Hearing (audio capture → STT → escalation → E2E smoke)
 
-**Issues #15–#18 closed. 505/505 backend tests passing. Zero type errors. Zero lint violations.**
+**Issues #15–#19 closed. 610 backend pytest passing (1 slow E2E excluded from default `pytest`). Zero type errors. Zero lint violations.**
 
-Step 14b (E2E synthetic-audio Playwright smoke, issue #19) and the manual M1/M2 hardware checks remain — Phase B stays "open" until 14b lands.
+Phase B code-complete (2026-05-03). Manual M1 (Claude OAuth setup) DONE via Claude-CLI-creds bridge; Manual M2 (mic hardware test) DONE on the M2 chassis. The slow E2E `tests/e2e/test_smoke_pipeline.py::test_smoke_synthetic_audio_full_loop` is the regression defense — it runs `uv run --with playwright pytest -m slow tests/e2e/test_smoke_pipeline.py` end-to-end in ~10 s with a port-collision pre-flight that bails fast (~1 s) when an operator's local dev session is bound to `:8000` or `:4000`.
 
 ### What was built
 
