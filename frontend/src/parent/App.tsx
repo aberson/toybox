@@ -19,10 +19,12 @@ import { ParentWsClient } from "./ws";
 
 // Phase A active-suggestion vs. running-activity split: the
 // SuggestionCard renders for `proposed` rows; the ActivityPanel
-// renders once the row is `approved`/`running`/`completed`/`ended`.
-// `dismissed` and `didnt_work` clear the panel.
+// renders once the row is `approved`/`running`/`completed`.
+// `dismissed`, `didnt_work`, and `ended` clear the panel — `end`
+// signals the parent is done with this activity, so the surface
+// closes and the parent can trigger a new one.
 const SUGGESTION_STATES = new Set(["proposed"]);
-const PANEL_STATES = new Set(["approved", "running", "completed", "ended"]);
+const PANEL_STATES = new Set(["approved", "running", "completed"]);
 
 function deriveWsUrl(): string {
   // The vite proxy forwards /ws to the backend during dev. In prod
@@ -281,15 +283,38 @@ export function App(): JSX.Element {
     () =>
       runGuarded("end", async () => {
         if (activity === null) return;
-        const result = await withConflictHandler({
-          mutation: () => api.end(activity.id, activity.version),
-          refetch: () => refetchActivity(activity.id),
-          onConflict: (conflict, fresh) => {
-            useParentStore.getState().applyVersionConflict(conflict, fresh);
-          },
-        });
-        if (result !== null) {
-          useParentStore.getState().applyMutationResult(result);
+        // ``ended`` is only reachable from approved/running per the
+        // backend's _VALID_TRANSITIONS. From a terminal state (most
+        // commonly ``completed`` after the kiosk advanced through the
+        // last step) the server returns 409 invalid_transition and the
+        // panel sits there looking broken. Treat End as "dismiss this
+        // panel" locally for terminal states — the activity record is
+        // already finalized server-side, no API call needed.
+        if (activity.state === "completed" || activity.state === "ended") {
+          useParentStore.getState().setActivity(null);
+          useParentStore.getState().pushToast("info", "activity ended");
+          return;
+        }
+        try {
+          const result = await withConflictHandler({
+            mutation: () => api.end(activity.id, activity.version),
+            refetch: () => refetchActivity(activity.id),
+            onConflict: (conflict, fresh) => {
+              useParentStore.getState().applyVersionConflict(conflict, fresh);
+            },
+          });
+          if (result !== null) {
+            useParentStore.getState().applyMutationResult(result);
+            // The panel hides on `ended` (not in PANEL_STATES), so confirm
+            // the action took effect — without a toast it looks like the
+            // button did nothing.
+            useParentStore.getState().pushToast("info", "activity ended");
+          }
+        } catch (err) {
+          // Non-version-conflict errors (e.g. invalid_transition, network)
+          // would otherwise surface as a silent unhandled rejection.
+          const message = err instanceof Error ? err.message : "end failed";
+          useParentStore.getState().pushToast("error", `end: ${message}`);
         }
       }),
     [activity, api, refetchActivity, runGuarded],
