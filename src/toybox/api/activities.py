@@ -553,22 +553,51 @@ def post_regenerate(
     expected_version: Annotated[int, Depends(if_match_version_dependency)],
     _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
 ) -> ActivityResponse:
-    """Mark the existing activity ``dismissed`` and propose a fresh one."""
+    """Propose a fresh activity. Source's fate depends on its state:
+
+    - ``proposed``/``approved``/``running``: dismiss the source (it was
+      live or pending; the user is abandoning it).
+    - ``completed``/``ended``: leave the source in its terminal state
+      (the activity already finished; no need to overwrite history with
+      ``dismissed``). Just propose a new one — same UX from the user's
+      seat (suggestion card replaces the panel) without losing the
+      "kid finished all 5 steps" / "parent ended early" signal.
+    - ``dismissed``/``didnt_work``: 409 — already abandoned, the
+      panel/card shouldn't be visible to even offer this action.
+    """
     row = _fetch_activity_row(conn, activity_id)
     current_state = str(row["state"])
     current_version = int(row["version"])
-    _enforce_transition(current_state, DISMISSED_STATE)
     if current_version != expected_version:
         raise VersionConflictError(current_version, current_state)
-    ok, dismissed_row = _attempt_transition(
-        conn,
-        activity_id=activity_id,
-        expected_version=expected_version,
-        new_state=DISMISSED_STATE,
-    )
-    if not ok:
-        raise VersionConflictError(int(dismissed_row["version"]), str(dismissed_row["state"]))
-    _emit_state(pubsub, _row_to_response(conn, dismissed_row))
+
+    pre_dismiss_states = {PROPOSED_STATE, STATE_APPROVED, STATE_RUNNING}
+    skip_states = {STATE_COMPLETED, STATE_ENDED}
+    if current_state in pre_dismiss_states:
+        ok, dismissed_row = _attempt_transition(
+            conn,
+            activity_id=activity_id,
+            expected_version=expected_version,
+            new_state=DISMISSED_STATE,
+        )
+        if not ok:
+            raise VersionConflictError(
+                int(dismissed_row["version"]), str(dismissed_row["state"])
+            )
+        _emit_state(pubsub, _row_to_response(conn, dismissed_row))
+    elif current_state in skip_states:
+        # Source already terminal — no transition. Fall through to propose.
+        pass
+    else:
+        # dismissed / didnt_work — already abandoned.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "invalid_transition",
+                "current_state": current_state,
+                "target_state": "regenerate",
+            },
+        )
 
     intent = body.intent or str(row["intent_source"]) or "boredom"
     # Random seed when caller doesn't supply one — the seed feeds both

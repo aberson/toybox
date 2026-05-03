@@ -191,6 +191,52 @@ def test_regenerate_running_succeeds_repeatedly(
         seen_ids.add(new["id"])
 
 
+def test_regenerate_after_end_proposes_without_modifying_source(
+    client: TestClient,
+    parent_headers: dict[str, str],
+) -> None:
+    """After ``end``, "skip & try another" should still produce a fresh
+    proposed activity. The source ended-state must be preserved (not
+    overwritten with dismissed) so analytics keep the parent-ended-early
+    signal. Originally regressed because ``ended → dismissed`` is not
+    allowed by the state machine and post_regenerate unconditionally
+    tried that transition, returning 409 invalid_transition.
+    """
+    propose = client.post(
+        "/api/activities/propose",
+        json={**PROPOSE_BODY, "seed": 4242},
+        headers=parent_headers,
+    )
+    aid = propose.json()["id"]
+    approve = client.post(
+        f"/api/activities/{aid}/approve",
+        json={},
+        headers={**parent_headers, "If-Match-Version": "1"},
+    )
+    end = client.post(
+        f"/api/activities/{aid}/end",
+        headers={**parent_headers, "If-Match-Version": str(approve.json()["version"])},
+    )
+    assert end.status_code == 200
+    assert end.json()["state"] == "ended"
+    end_version = end.json()["version"]
+
+    regen = client.post(
+        f"/api/activities/{aid}/regenerate",
+        json={},
+        headers={**parent_headers, "If-Match-Version": str(end_version)},
+    )
+    assert regen.status_code == 200, regen.text
+    new = regen.json()
+    assert new["state"] == "proposed"
+    assert new["id"] != aid
+
+    # Source preserved its ended state (NOT overwritten with dismissed).
+    source = client.get(f"/api/activities/{aid}", headers=parent_headers).json()
+    assert source["state"] == "ended"
+    assert source["version"] == end_version  # no further version bump
+
+
 def test_end_running(
     client: TestClient,
     parent_headers: dict[str, str],
