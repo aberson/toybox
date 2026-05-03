@@ -352,7 +352,7 @@ Privacy posture for a passively-listening home device used around children.
 
 **Mode 1 guarantee:** when `listening_mode=1`, no outbound network calls except OAuth refresh (which can also be disabled by removing `secrets.json`). Pure local operation.
 
-**LAN exposure:** the backend defaults to `127.0.0.1` (loopback-only) so v1 — which has no PIN — is not reachable from the LAN at all. The child kiosk tablet path requires the parent PIN to be set (Phase D step 20); only then does the LAN-binding guard allow `TOYBOX_HOST=0.0.0.0`. See "LAN binding guard" under WebSocket auth.
+**LAN exposure:** the backend defaults to `127.0.0.1` (loopback-only) so v1 — which has no PIN — is not reachable from the LAN at all. The child kiosk tablet path requires the parent PIN to be set (Phase D step 21); only then does the LAN-binding guard allow `TOYBOX_HOST=0.0.0.0`. See "LAN binding guard" under WebSocket auth.
 
 ## Claude OAuth Lifecycle
 
@@ -578,10 +578,10 @@ FastAPI entrypoint. Mounts the React build for production; in dev, frontend runs
 - `personas.py` — REST: list/create/edit/delete (delete blocked for `source=library`).
 - `house.py` — REST: rooms + features + bulk photo upload.
 - `children.py` — REST: CRUD.
-- `transcripts.py` — REST: list (cursor-paginated) + search (Phase B Step 13). Delete-one + wipe-all are Phase D Step 21.
+- `transcripts.py` — REST: list (cursor-paginated) + search (Phase B Step 13). Delete-one + wipe-all are Phase D Step 22.
 - `settings.py` — REST: mode get/set; PIN setup; Claude OAuth status; mic mute toggle.
 - `metrics.py` — REST `/api/metrics` + in-memory counter aggregation.
-- `ws.py` — WebSocket router with topic subscription; envelope shape; topics: `transcript`, `activity.state`, `activity`, `listening.mode`, `system`, `triggers.invalidate`. (`metrics` topic is Phase D Step 23.)
+- `ws.py` — WebSocket router with topic subscription; envelope shape; topics: `transcript`, `activity.state`, `activity`, `listening.mode`, `system`, `triggers.invalidate`. (`metrics` topic is Phase D Step 24.)
 
 ### `src/toybox/audio/`
 - `capture.py` — sounddevice mic loop. PortAudio invokes the mic callback on its own native thread; the callback bridges to asyncio via `loop.call_soon_threadsafe(self._handle_frame, frame)`. Frames land in a bounded asyncio queue (configurable via constructor + `TOYBOX_AUDIO_SPEECH_QUEUE_MAXSIZE`, default 64); overflow drops OLDEST and logs `mic queue overflow` printf-style. `--test 5` operator script captures 5s and prints device + peak dB.
@@ -649,7 +649,7 @@ Child app — kiosk mode: persona avatar, current step card, sfx player, "next s
 
 ## API Route Contract
 
-**Token transport:** all gated endpoints expect `Authorization: Bearer <token>`. No cookies (sidesteps CSRF on a LAN device). Pre-Phase-D, `/api/auth/parent` returns a token without PIN check — **don't expose toybox to a guest network or untrusted houseguests until Phase D step 20 lands**. The pre-Phase-D auth path is a transitional convenience, not a security boundary.
+**Token transport:** all gated endpoints expect `Authorization: Bearer <token>`. No cookies (sidesteps CSRF on a LAN device). Pre-Phase-D, `/api/auth/parent` returns a token without PIN check — **don't expose toybox to a guest network or untrusted houseguests until Phase D step 21 lands**. The pre-Phase-D auth path is a transitional convenience, not a security boundary.
 
 | Method | Route | Purpose | Body / Query | Response |
 |--------|-------|---------|--------------|----------|
@@ -689,8 +689,8 @@ Child app — kiosk mode: persona avatar, current step card, sfx player, "next s
 | POST | `/api/activities/{id}/feedback` | "didn't work" / "loved it" | `{kind, step_seq?, reason?}` | `{ok}` |
 | GET | `/api/transcripts` | list (recent first; ISO `before` cursor) | `?limit=50&before=<iso>` | `TranscriptListResponse{items: [TranscriptRow], next_before?}` |
 | GET | `/api/transcripts/search` | case-insensitive substring search (parameterized LIKE) | `?q=<str>&limit=50` | `TranscriptListResponse` |
-| DELETE | `/api/transcripts/{id}` | delete one (Phase D Step 21) | — | `{ok}` |
-| DELETE | `/api/transcripts` | wipe all (PIN-gated, Phase D Step 21) | — | `{deleted: int}` |
+| DELETE | `/api/transcripts/{id}` | delete one (Phase D Step 22) | — | `{ok}` |
+| DELETE | `/api/transcripts` | wipe all (PIN-gated, Phase D Step 22) | — | `{deleted: int}` |
 | WS | `/ws` | bidirectional topics | subscribe by topic | streamed events |
 
 ### WebSocket envelope
@@ -725,7 +725,7 @@ Topics by scope:
 | `system` | parent (warns + errors) / child (errors only) |
 | `metrics` | parent |
 
-Tokens are random 32-byte hex strings; revocation is tracked via `auth_tokens.revoked_at` (single source of truth — no separate `revoked_tokens` table). Lifespan startup deletes rows past `expires_at`; capability check rejects rows with `revoked_at IS NOT NULL`. Pre-Phase D (no PIN), the auth endpoints accept any request and return a token — the gate exists structurally so Phase D step 20 only needs to add PIN verification, not retrofit auth. **For v1, this means the backend must bind loopback-only — see "LAN binding guard" below.**
+Tokens are random 32-byte hex strings; revocation is tracked via `auth_tokens.revoked_at` (single source of truth — no separate `revoked_tokens` table). Lifespan startup deletes rows past `expires_at`; capability check rejects rows with `revoked_at IS NOT NULL`. Pre-Phase D (no PIN), the auth endpoints accept any request and return a token — the gate exists structurally so Phase D step 21 only needs to add PIN verification, not retrofit auth. **For v1, this means the backend must bind loopback-only — see "LAN binding guard" below.**
 
 #### Origin header check (defense-in-depth)
 
@@ -941,7 +941,7 @@ Manual type sync between Pydantic models and `frontend/src/shared/types.ts` drif
 | Pydantic ↔ TypeScript type drift | API contract decays silently | `pydantic-to-typescript` codegen wired into pre-commit / CI; drift is a check failure |
 | Photo-upload path traversal | Arbitrary file write via filename | Server-generated UUID filenames; user filename discarded; static serving whitelisted to `data/images/{toys,personas,rooms}/` |
 | First-run model download on no-internet machine | Setup blocked | Documented in How to Run; `--download` script is explicit; offline-clean once cached |
-| Family Wi-Fi exposure | Backend on `0.0.0.0` reachable to anyone on the LAN | Default `TOYBOX_HOST=127.0.0.1` (loopback-only); LAN-binding startup guard refuses `0.0.0.0` until parent PIN is set (Phase D step 20); Origin header allow-list enforced on `/ws` + state-changing REST |
+| Family Wi-Fi exposure | Backend on `0.0.0.0` reachable to anyone on the LAN | Default `TOYBOX_HOST=127.0.0.1` (loopback-only); LAN-binding startup guard refuses `0.0.0.0` until parent PIN is set (Phase D step 21); Origin header allow-list enforced on `/ws` + state-changing REST |
 | Migration apply failure on startup | DB locked in partial state | Forward-only for v1; abort + preserve DB; operator/recovery.md walks through manual restore from backup |
 
 ## How to Run
@@ -1004,7 +1004,7 @@ cd frontend; npm run dev
 
 ### Run dev — child tablet on LAN (Phase D and later only)
 
-After Phase D step 20 sets a parent PIN, LAN binding is unlocked:
+After Phase D step 21 sets a parent PIN, LAN binding is unlocked:
 
 ```powershell
 # Find the home machine's LAN IP
@@ -1120,7 +1120,7 @@ Goal: parent clicks "trigger demo," sees suggestion, approves, child app runs ac
 
 #### Step 7: Offline activity generator
 
-- **Problem:** Given (intent, slot, context, hour-of-day) return a 5-step linear `Activity`. Deterministic given a seed (same inputs + seed → identical output). Time-of-day routing affects template selection (`morning`, `afternoon`, `evening`, `wind_down`; e.g., `wind_down` excluded outside 19:00–21:00). Output Activity carries `template_id` + sorted slot values for `signature` computation in Phase D step 19 (anti-signal feedback). For Phase A use placeholder content (toys = `["Mr. Unicorn"]`); banned-themes filtering and real toys/rooms wire in Phase C step 18. Linear scripts only — no tree branching. This is the path for modes 1, 3 (when Claude not capable), and the fallback for 4–5 when breaker is open. See issue #7 for activity output shape.
+- **Problem:** Given (intent, slot, context, hour-of-day) return a 5-step linear `Activity`. Deterministic given a seed (same inputs + seed → identical output). Time-of-day routing affects template selection (`morning`, `afternoon`, `evening`, `wind_down`; e.g., `wind_down` excluded outside 19:00–21:00). Output Activity carries `template_id` + sorted slot values for `signature` computation in Phase D step 20 (anti-signal feedback). For Phase A use placeholder content (toys = `["Mr. Unicorn"]`); banned-themes filtering and real toys/rooms wire in Phase C step 19. Linear scripts only — no tree branching. This is the path for modes 1, 3 (when Claude not capable), and the fallback for 4–5 when breaker is open. See issue #7 for activity output shape.
 - **Type:** code
 - **Issue:** #7
 - **Flags:** --reviewers code
@@ -1136,7 +1136,7 @@ Goal: parent clicks "trigger demo," sees suggestion, approves, child app runs ac
 
 #### Step 9: Parent UI — suggestion + activity panel + mic-hot indicator
 
-- **Problem:** Build the parent route (`/parent`) in React + TypeScript + Vite + Zustand: mic-hot indicator (green = capturing, red = error, grey = paused) in header, mic mute toggle, manual trigger button (replaces real mic until Phase B), suggestion card with approve/skip/dismiss, activity panel with regenerate-from-here / end / "didn't work," capability banner that surfaces `capability_reason` when offline. ws auto-reconnect with exponential backoff (1s → 2s → 4s → 8s → 16s → cap at 30s, jitter ±25%) and state resync via REST on reconnect. 409 handling refetches activity and surfaces a toast (no blind retry). Suggestion card "why this?" expandable panel ships in Phase D step 22 — leave a stub. See issue #9 for component file list.
+- **Problem:** Build the parent route (`/parent`) in React + TypeScript + Vite + Zustand: mic-hot indicator (green = capturing, red = error, grey = paused) in header, mic mute toggle, manual trigger button (replaces real mic until Phase B), suggestion card with approve/skip/dismiss, activity panel with regenerate-from-here / end / "didn't work," capability banner that surfaces `capability_reason` when offline. ws auto-reconnect with exponential backoff (1s → 2s → 4s → 8s → 16s → cap at 30s, jitter ±25%) and state resync via REST on reconnect. 409 handling refetches activity and surfaces a toast (no blind retry). Suggestion card "why this?" expandable panel ships in Phase D step 23 — leave a stub. See issue #9 for component file list.
 - **Type:** code
 - **Issue:** #9
 - **Flags:** --reviewers full --start-cmd "uv run python -m toybox.main" --url "http://localhost:4000/parent" --ui
@@ -1236,10 +1236,13 @@ What to look for:
 
 | # | Step | Reviewers | Done-when |
 |---|------|-----------|-----------|
-| 15 | Toy ingest (vision + UI) | `--reviewers full --ui` | All upload validation rules enforced (size, MIME-sniff, dimensions, UUID-rename, atomic staging); SHA-256 dedup returns existing toy on collision; vision → suggested fields → parent confirms → row inserted with `image_hash`; offline path skips vision; mention_toy registry refreshes |
-| 16 | Room ingest bulk (vision + UI) | `--reviewers full --ui` | Bulk-cap of 50 enforced; per-file validation per Upload validation rules; per-photo vision → tabbed review UI → rooms + features inserted; dedup applied |
-| 17 | Child profile editor | `--reviewers full --ui` | Full CRUD; banned-themes flow into activity generator (offline filter + Claude prompt); reading_level affects step text complexity |
-| 18 | Activity generator uses real content | `--reviewers code` | Real toys/rooms appear in generated steps; tests use fixture catalog; banned-themes filtering tested; anti-signal feedback consulted |
+| 15 | Activity-quality telemetry & eval scaffold | `--reviewers code` | New `labeled_events` table records every generation (Claude or offline) with structured `inputs_json`, `activity_json`, `generator_path` (`claude`/`offline`), `parent_signal` (nullable, filled when known), `judge_scores` (nullable). Generator I/O refactored so `inputs` are emitted as ChatML messages — same record format usable as SFT input later. Six-dimension rubric (`schema`, `age_appropriateness`, `doability`, `persona_fidelity`, `coherence`, `safety`) lives in `src/toybox/ai/rubric.py`; safety score 1 auto-fails the activity. Held-out fixture set (≥5 cases covering ages × personas × edge cases per `documentation/eval-fixtures.md`) under `tests/fixtures/eval/`. Claude-as-judge runs async on 1-in-N live generations (default N=5, env-tunable via `TOYBOX_EVAL_JUDGE_RATE`); never blocks the kid-facing path. CI regression run on the held-out set fails the build if mean dimension score drops >0.5 from baseline OR any safety auto-fail appears. CLI `uv run python -m toybox.ai.eval_dump --since <ISO>` exports labeled events as ChatML JSONL (the SFT input format for Phase E). Parent-signal capture wires existing actions: thumbs-up = +1, dismiss-before-start = -1, end-early = -0.5 (with `ended_at_step`); thumbs-up button is added to live activity panel if not present. **Critical:** judge is a cost-saving proxy, not ground truth — parent_signal is the only real label and must be queryable independently. |
+| 16 | Toy ingest (vision + UI) | `--reviewers full --ui` | All upload validation rules enforced (size, MIME-sniff, dimensions, UUID-rename, atomic staging); SHA-256 dedup returns existing toy on collision; vision → suggested fields → parent confirms → row inserted with `image_hash`; offline path skips vision; mention_toy registry refreshes |
+| 17 | Room ingest bulk (vision + UI) | `--reviewers full --ui` | Bulk-cap of 50 enforced; per-file validation per Upload validation rules; per-photo vision → tabbed review UI → rooms + features inserted; dedup applied |
+| 18 | Child profile editor | `--reviewers full --ui` | Full CRUD; banned-themes flow into activity generator (offline filter + Claude prompt); reading_level affects step text complexity |
+| 19 | Activity generator uses real content | `--reviewers code` | Real toys/rooms appear in generated steps; tests use fixture catalog; banned-themes filtering tested; anti-signal feedback consulted; every generation continues to write a `labeled_events` row per step 15 |
+
+**Issues:** Phase C umbrella #22 · step 15 → #23 · steps 16–19 → TBD (file when work begins)
 
 #### Manual M3 — Real play session (after Phase C)
 
@@ -1261,17 +1264,19 @@ What to look for:
 | No mic dropouts | backend log | no `mic_queue_overflow` events |
 | Claude calls fire on curated triggers only | backend log (`grep "claude call"`) | mode 3: zero spontaneous calls; one call per matched trigger |
 
-> **Note:** M3 runs before Phase D step 23 ships the metrics dashboard, so all observability above is via DB queries + backend log grep. The dashboard makes this nicer in v1.5.
+> **Note:** M3 runs before Phase D step 24 ships the metrics dashboard, so all observability above is via DB queries + backend log grep. The dashboard makes this nicer in v1.5.
 
 ### Phase D — Polish
 
 | # | Step | Reviewers | Done-when |
 |---|------|-----------|-----------|
-| 19 | Anti-signal feedback in generator | `--reviewers code` | Generator computes `signature = sha256("{template_id}:{sorted slot k=v}")` for every candidate; `feedback.signature` matches with `kind='didnt_work'` cause re-pick; `kind='loved_it'` boosts ranking; dismissed-pre-approval is soft anti-signal; tests cover the matching logic |
-| 20 | Parent PIN gate (argon2id + rate-limit) | `--reviewers full --ui` | First-run flow sets PIN; argon2id with `m=65536,t=3,p=4`; `/api/auth/parent` validates PIN against stored hash; rate-limit: 5 wrong attempts in 5 min locks PIN entry for 15 min; failed attempts logged at WARNING with count only; PIN reset path documented in operator/recovery.md; gated routes 403 without token; settings/wipe/persona-edit screens require parent token |
-| 21 | Transcript management UI | `--reviewers full --ui` | List + search + delete one + wipe all (PIN-gated); confirmation dialog on wipe |
-| 22 | Live activity polish + suggestion "why this?" | `--reviewers full --ui` | Pause/resume idempotent; regenerate-from-here replaces remaining steps with version bump; end requires confirm dialog; suggestion card has expandable "why this?" panel showing trigger phrase + persona match reasoning |
-| 23 | Metrics endpoint + ws topic + parent operator dashboard | `--reviewers full --ui` | `/api/metrics` returns counters + averages + breaker state + mic device + queue depth; `metrics` ws topic snapshots every 30 sec; in-memory counters survive ws reconnects; parent UI "Operator" tab renders all metrics with auto-refresh |
+| 20 | Anti-signal feedback in generator | `--reviewers code` | Generator computes `signature = sha256("{template_id}:{sorted slot k=v}")` for every candidate; `feedback.signature` matches with `kind='didnt_work'` cause re-pick; `kind='loved_it'` boosts ranking; dismissed-pre-approval is soft anti-signal; tests cover the matching logic |
+| 21 | Parent PIN gate (argon2id + rate-limit) | `--reviewers full --ui` | First-run flow sets PIN; argon2id with `m=65536,t=3,p=4`; `/api/auth/parent` validates PIN against stored hash; rate-limit: 5 wrong attempts in 5 min locks PIN entry for 15 min; failed attempts logged at WARNING with count only; PIN reset path documented in operator/recovery.md; gated routes 403 without token; settings/wipe/persona-edit screens require parent token |
+| 22 | Transcript management UI | `--reviewers full --ui` | List + search + delete one + wipe all (PIN-gated); confirmation dialog on wipe |
+| 23 | Live activity polish + suggestion "why this?" | `--reviewers full --ui` | Pause/resume idempotent; regenerate-from-here replaces remaining steps with version bump; end requires confirm dialog; suggestion card has expandable "why this?" panel showing trigger phrase + persona match reasoning |
+| 24 | Metrics endpoint + ws topic + parent operator dashboard | `--reviewers full --ui` | `/api/metrics` returns counters + averages + breaker state + mic device + queue depth; `metrics` ws topic snapshots every 30 sec; in-memory counters survive ws reconnects; parent UI "Operator" tab renders all metrics with auto-refresh; eval-judge metrics surfaced (mean dimension scores over last 24h, judge-vs-parent agreement on overlap) |
+
+**Issues:** Phase D umbrella #24 · step 20 → #25 · step 21 → #26 · step 22 → #27 · step 23 → #28 · step 24 → #29
 
 #### Manual M4 — Sound effect sourcing (any time before Phase A step 10 final review)
 
@@ -1299,6 +1304,49 @@ What to look for table is "if X happens, run Y"; the operator doc holds the full
 | Mic dropouts / wrong device | Set `TOYBOX_MIC_DEVICE_INDEX=N` per `python -m sounddevice` device list output; restart |
 | Image storage runaway | Stop backend; archive unwanted toys via parent UI; periodic cron at v1.5 will delete orphan files (manual: `python -m toybox.tools.gc_images`) |
 | "Factory reset" | Stop backend; remove `data/`; restart (re-runs migrations + first-run setup; all photos, transcripts, profiles, custom personas lost) |
+
+### Phase E — Local model + tool-loop + non-linear gameplay (post-v1)
+
+**Goal:** swap the Claude-OAuth path for a locally-hosted, supervised-fine-tuned open-weight model so nothing leaves the house, then refactor the activity generator into a step-by-step tool-using loop that enables responsive non-linear gameplay. Runs after v1 has produced real-use data via the Phase C step 15 eval scaffold.
+
+**Prerequisite:** ≥1 month of v1 real-use telemetry, ideally ≥200 `(inputs, activity, parent_signal)` tuples accumulated in `labeled_events`.
+
+**Sequencing rationale:** the cheap reality-check (E1: hardware) runs first because the entire phase's thesis depends on adequate local inference TPS. If the home GPU can't run Qwen2.5-7B Q4_K_M at ≥30 TPS with ≤2s first-token latency, the design pivots to 3B or to cloud inference, before any architectural cost is paid in E4. The tool-loop refactor (E4) is the load-bearing architectural change and is deliberately ordered after SFT (E3) because (a) E3's SFT data shape is simpler with single-shot generation, (b) E4 adds latency from multiple round-trips that should not stack on top of an unproven model, (c) Claude doesn't benefit much from tool-loop given its prompt-cache wins.
+
+| # | Step | Reviewers | Done-when |
+|---|------|-----------|-----------|
+| 25 | E1 — Hardware reality check | `--reviewers code` | llama.cpp CUDA build installed on home machine (no WSL required); Qwen2.5-7B-Instruct Q4_K_M GGUF and Qwen2.5-3B-Instruct Q5_K_M GGUF both downloaded via Ollama or LM Studio; benchmark script (`uv run python -m toybox.ai.local --benchmark`) measures TPS, first-token latency, VRAM headroom across a fixed 10-prompt set drawn from the eval fixtures; `documentation/local-model-decision.md` records the decision (7B vs 3B vs cloud-burst) with measured numbers; runtime choice (Ollama / LM Studio / raw llama.cpp server) recorded with rationale |
+| 26 | E2 — Constrained-decoding pilot vs Claude baseline | `--reviewers code` | New `LocalActivityGenerator` adapter (`src/toybox/ai/local.py`) implements activity generation behind the same interface as the Claude path; uses Outlines or llama.cpp GBNF grammars for schema-bound output (NOT raw JSON-mode prompting); held-out eval fixtures from step 15 run against both Claude and local model; judge scores stored side-by-side in `labeled_events`; A/B report (`uv run python -m toybox.ai.eval_compare`) shows per-dimension delta with confidence intervals; decision documented: ship local in mode 2 only / mode 2+3 / not ready |
+| 27 | E3 — First SFT iteration | `--reviewers code` | Unsloth installed on Windows native (via `uv pip install unsloth --torch-backend=auto` per upstream docs); LoRA training script (`scripts/train_lora.py`) consumes `labeled_events` exported as ChatML JSONL filtered to `safety_score>=4 ∧ mean_quality>=3.5 ∧ parent_signal!=-1`; trained adapter merged to GGUF via Unsloth's `save_pretrained_gguf`; deployed to local runtime alongside base; same eval suite re-run; per-dimension delta vs base reported; judge-vs-parent agreement re-checked to detect judge drift on the new model. Llama-Factory documented as fallback if Unsloth's Triton-Windows install breaks. RunPod documented as cloud burst for any run that won't fit on the home GPU. Trained adapters live under `data/models/lora/<timestamp>/` (gitignored); registry doc tracks active version |
+| 28 | E4 — Tool-loop refactor | `--reviewers code` | Generator interface accepts a tool registry (`get_persona`, `get_room`, `get_inventory`, `get_recent_transcript`, `get_prior_steps`, `get_anti_signal`); both Claude and local adapters implement the loop; single-shot path retained behind `TOYBOX_GENERATOR_MODE=single|loop` flag for fallback; tool-call telemetry captured per turn into `labeled_events` (one row per generation, tool calls in a sub-array); eval suite re-run, regressions flagged; latency budget documented (loop generation must complete within Nx single-shot, N tunable); prompt cache strategy documented (which tool results are cacheable, which aren't) |
+| 29 | E5 — Non-linear gameplay | `--reviewers full --ui` | Activity schema gains `is_complete: bool` per step; activities no longer have a fixed step count (replaces v1's hardcoded 5); generator emits one step at a time, observes parent's pause/regenerate-from-here/end signals + a transcript reaction window (default 30s) before producing the next step; child UI handles dynamic step count with a "..." indicator while next step generates; max-step cap enforced (default 8) to prevent runaway; offline template path remains 5-step (linear), still serves as floor for breaker-open / model-down; eval rubric updated: `coherence` now scores arc across actually-emitted steps |
+| 30 | E6 — Preference-pair RL (optional / gated) | `--reviewers code` | Only proceeds if E3-E5 leave a measurable gap to Claude that SFT alone has not closed (criterion: mean-dimension-score delta >0.5 on held-out set after two SFT iterations). DPO or GRPO loop over parent-signal preference pairs (`(input, preferred_activity, rejected_activity)` from `labeled_events`); decision documented in `documentation/rl-decision.md` whether to proceed before any training begins. If skipped, document why |
+
+#### Manual M6 — Local model TPS check (during E1)
+
+```powershell
+uv run python -m toybox.ai.local --benchmark --prompts tests/fixtures/eval/prompts.jsonl
+```
+
+What to look for:
+
+| Check | Expected (7B Q4_K_M) | Expected (3B Q5_K_M) |
+|-------|----------------------|----------------------|
+| Cold start (model load) | <30 sec | <15 sec |
+| Warm first-token latency | <2 sec | <1 sec |
+| Throughput (steady state) | ≥30 TPS | ≥60 TPS |
+| VRAM peak at 4K context | <11 GB | <7 GB |
+| Schema-bound JSON validity | 100% (constrained decoding enforces) | 100% |
+
+**Decision gate:** if 7B fails the latency or VRAM bar on real hardware, fall back to 3B. If 3B also fails, fall back to cloud-burst (RunPod) for inference and reassess Phase E scope — at that point the privacy thesis ("nothing leaves the house") is in tension with the compute reality and is a discussion, not a default.
+
+#### Phase E open risks
+
+- **Triton-on-Windows fragility for Unsloth.** Pinned to specific PyTorch + CUDA combos; breaks on RTX 50-series and on PyTorch bumps. Mitigation: snapshot the venv after a working install; Llama-Factory as documented fallback.
+- **Constrained decoding vs creative writing tension.** Strict GBNF schema + persona-driven step text often conflict at the 3B-7B scale. Mitigation: A/B raw-prompted JSON vs constrained on a 100-prompt eval set during E2 before committing.
+- **Judge-as-target risk in SFT.** Optimizing toward judge preferences instead of parent preferences is the failure mode. Mitigation: parent signal weighted higher in SFT label composition; periodic judge-vs-parent agreement audit on the overlap.
+- **Tool-loop latency stack.** Multi-turn generation + tool resolution on a 7B model on consumer hardware can stack to 10s+ per activity. Mitigation: prompt cache aggressively in E4; max-step cap; "regenerate from here" remains the parent escape hatch.
+- **VRAM ceiling at 7B with KV cache.** Quoted ~5GB weight is misleading; working set creeps toward 7-8GB at 4K context. Mitigation: documented in E1 decision doc; 3B fallback is real, not theoretical.
 
 ---
 
