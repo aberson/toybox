@@ -23,6 +23,11 @@ class Topic(StrEnum):
     activity = "activity"
     activity_state = "activity.state"
     transcript = "transcript"
+    # Step 24: operator metrics dashboard. The publisher snapshots every
+    # 30 s; the parent UI's Operator tab subscribes for ws-pushed
+    # updates and falls back to polling /api/metrics if the socket is
+    # unavailable.
+    metrics = "metrics"
 
 
 __all__ = ["Topic"]

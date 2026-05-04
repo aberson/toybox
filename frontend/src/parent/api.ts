@@ -272,6 +272,78 @@ export interface RoomInUseDetail {
   feature_count: number;
 }
 
+// Step 24: operator dashboard wire shapes. Mirror the dataclasses in
+// src/toybox/metrics/__init__.py. The same shape is delivered both as
+// the body of GET /api/metrics and as the payload of a ``metrics`` ws
+// envelope.
+export interface MetricsActivityCounts {
+  // ``*_current`` fields are point-in-time counts of rows currently in
+  // each state. ``running_current`` for example dropped to zero once the
+  // sole running activity transitioned to ``completed``. The 24h
+  // breakdown is rows whose ``created_at`` lies in the last 24h, keyed
+  // by the row's CURRENT state.
+  proposed_current: number;
+  approved_current: number;
+  running_current: number;
+  completed_current: number;
+  ended_current: number;
+  dismissed_current: number;
+  didnt_work_current: number;
+  last_24h: Record<string, number>;
+}
+
+export interface MetricsTranscriptCounts {
+  total: number;
+  last_24h: number;
+}
+
+export interface MetricsAudioStatus {
+  mic_device: string | null;
+  queue_depth: number;
+  // Process-lifetime counter, not a 24h window. Resets to zero on
+  // restart; surfacing it lets the operator spot a mic stall.
+  buffer_overruns_total: number;
+}
+
+export interface MetricsAIStatus {
+  breaker_state: "closed" | "open" | "half_open";
+  breaker_retry_after_iso: string | null;
+  claude_capable: boolean;
+  claude_capability_reason: string | null;
+  listening_mode: number;
+  min_interval_throttle_seconds: number;
+}
+
+export interface MetricsJudgeParentAgreement {
+  overlap_count: number;
+  agreement_rate: number | null;
+  metric_name: string;
+}
+
+export interface MetricsActivityQuality {
+  last_24h_mean_scores: Record<string, number | null>;
+  judge_parent_agreement: MetricsJudgeParentAgreement;
+  safety_autofails_last_24h: number;
+}
+
+export interface MetricsEvalGateStatus {
+  last_run_at: string | null;
+  mean_dimension_scores: Record<string, number> | null;
+  regressions_detected: number;
+  placeholder_baseline: boolean;
+}
+
+export interface MetricsSnapshot {
+  generated_at: string;
+  ws_subscribers: number;
+  activities: MetricsActivityCounts;
+  transcripts: MetricsTranscriptCounts;
+  audio: MetricsAudioStatus;
+  ai: MetricsAIStatus;
+  activity_quality: MetricsActivityQuality;
+  eval_gate: MetricsEvalGateStatus;
+}
+
 export class ApiError extends Error {
   readonly status: number;
   readonly body: unknown;
@@ -720,6 +792,17 @@ export class ApiClient {
   async deleteRoom(id: string, opts: RequestOptions = {}): Promise<void> {
     await this.request<unknown>(`/api/rooms/${encodeURIComponent(id)}`, {
       method: "DELETE",
+      signal: opts.signal,
+    });
+  }
+
+  // Step 24: operator metrics dashboard. Fetches the same snapshot
+  // shape that the ``metrics`` ws topic publishes every 30s — used by
+  // OperatorTab as the first-render value before the ws snapshot
+  // arrives, and as the fallback when the ws connection is down.
+  async getMetrics(opts: RequestOptions = {}): Promise<MetricsSnapshot> {
+    return this.request<MetricsSnapshot>("/api/metrics", {
+      method: "GET",
       signal: opts.signal,
     });
   }

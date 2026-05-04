@@ -1330,6 +1330,14 @@ What to look for:
 - **Issue:** #25
 - **Flags:** --reviewers code
 
+#### Step 24: Metrics endpoint + ws topic + parent operator dashboard
+
+- **Problem:** Add `/api/metrics` (parent-token GET) and a `metrics` ws topic (30 s snapshot publisher) so an operator can see system + activity-quality + breaker + audio-pipeline state at a glance. Snapshot shape includes activities counts (totals + last-24h breakdown), transcripts counts, audio pipeline (mic device, queue depth, buffer-overruns over the last 24h), AI status (breaker state + retry-after, Claude capability check + reason, listening mode, min-interval throttle), activity-quality (per-dimension judge means over the last 24h, judge-vs-parent agreement on the overlap, safety auto-fail count), and eval-gate status (last run timestamp, mean baseline scores, regressions count, placeholder flag). Parent UI gains an "Operator" toggle that renders the snapshot; the tab subscribes to the `metrics` ws topic for push updates and falls back to a 30 s REST poll when ws is unavailable. Counter persistence: load-bearing counters come from DB COUNT(*) so they survive process restart; only the buffer-overrun counter is process-local (acceptable noise floor). Judge-parent agreement metric is the simpler `sign_agreement_rate` (sign of `parent_signal` vs sign of `mean(judge_scores) - 3.0`); Cohen's kappa was deferred as out of scope for v1.
+- **Type:** code
+- **Issue:** #29
+- **Flags:** --reviewers full --ui
+- **Status:** DONE (2026-05-03, commit `<pending>`)
+
 #### Manual M4 — Sound effect sourcing (any time before Phase A step 10 final review)
 
 | Asset | Purpose | Source |

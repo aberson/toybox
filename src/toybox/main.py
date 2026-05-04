@@ -40,6 +40,7 @@ from fastapi import FastAPI
 from .activities.models import Activity
 from .ai.breaker import CircuitBreaker
 from .ai.client import AIClient, StubClient
+from .api.metrics import get_metrics_breaker
 from .app import create_app
 from .audio.capture import MicCapture
 from .audio.pipeline import TranscriptPipeline
@@ -53,6 +54,12 @@ from .core.queue import PROPOSED_QUEUE_CAP, PROPOSED_STATE, evict_oldest_for_cap
 from .core.throttle import MinIntervalThrottle
 from .db import connect, resolve_db_path
 from .db.migrations import run_migrations
+from .metrics import (
+    PublisherDeps,
+    SnapshotInputs,
+    default_conn_factory,
+    start_metrics_publisher,
+)
 from .triggers.registry import Intent
 from .ws.envelope import build_envelope
 from .ws.server import get_pubsub
@@ -331,8 +338,7 @@ def _build_smoke_lifespan(
         purged = _purge_active_smoke_activities(db_path, session_id=SMOKE_SESSION_ID)
         if purged:
             _logger.info(
-                "smoke startup deleted stale active activity rows "
-                "(count=%d, session_id=%s, db=%s)",
+                "smoke startup deleted stale active activity rows (count=%d, session_id=%s, db=%s)",
                 purged,
                 SMOKE_SESSION_ID,
                 db_path,
@@ -494,9 +500,32 @@ def _build_smoke_lifespan(
             wav_path,
             SMOKE_SESSION_ID,
         )
+
+        # Step 24: start the metrics publisher inside the smoke
+        # lifespan too so the dashboard's ws snapshots flow during
+        # smoke E2E runs (lets the operator-tab assertions exercise
+        # the same ws path the production lifespan uses).
+        metrics_breaker = get_metrics_breaker()
+        metrics_mic_holder: dict[str, MicCapture | None] = {"mic": mic}
+        metrics_deps = PublisherDeps(
+            conn_factory=default_conn_factory(),
+            inputs_factory=_build_metrics_inputs_factory(
+                breaker=metrics_breaker,
+                mic_holder=metrics_mic_holder,
+            ),
+        )
+        metrics_task = start_metrics_publisher(pubsub, metrics_deps)
+
         try:
             yield
         finally:
+            # Cancel the metrics publisher first — it has no I/O
+            # dependencies on mic/pipeline/transcriber, but we want
+            # it down before the rest tears down so a final pre-close
+            # snapshot doesn't observe a half-stopped mic.
+            metrics_task.cancel()
+            with contextlib.suppress(BaseException):
+                await asyncio.gather(metrics_task, return_exceptions=True)
             # Sequential cleanup: each stop() in its own suppressed
             # block so a failure in one component doesn't strand the
             # others. Order is reverse-of-start: pipeline first (so it
@@ -511,6 +540,95 @@ def _build_smoke_lifespan(
             _logger.info("smoke pipeline stopped")
 
     return _lifespan
+
+
+# ----------------------------------------------------------------------
+# Metrics publisher wiring (Step 24)
+# ----------------------------------------------------------------------
+
+
+def _build_metrics_inputs_factory(
+    *,
+    breaker: CircuitBreaker,
+    mic_holder: dict[str, MicCapture | None],
+) -> Any:
+    """Return an ``inputs_factory`` that reads live mic + breaker state.
+
+    ``mic_holder`` is a single-key dict the lifespan mutates after
+    ``MicCapture.start()`` succeeds — using a holder rather than a
+    direct reference lets the smoke lifespan defer mic-handle wiring
+    until it's actually built without re-creating the inputs_factory.
+    """
+
+    def _factory() -> SnapshotInputs:
+        mic = mic_holder.get("mic")
+        device_name = None
+        queue_depth = 0
+        if mic is not None:
+            try:
+                device_name = mic.vad.__class__.__name__  # placeholder; see note below
+            except Exception:  # noqa: BLE001 -- defensive
+                device_name = None
+            # Live values from the capture instance.
+            frame_queue = mic._frame_queue  # noqa: SLF001 -- intentional read of internal
+            if frame_queue is not None:
+                try:
+                    queue_depth = frame_queue.qsize()
+                except Exception:  # noqa: BLE001 -- defensive
+                    queue_depth = 0
+            # Resolve the configured device name. The mic holds a
+            # ``_device_index`` (int|None); resolve via the same helper
+            # the audio test CLI uses so we surface a human-readable
+            # name. Lazy-import to keep the import surface tight.
+            try:
+                from .audio.devices import device_name as _device_name  # noqa: PLC0415
+
+                device_name = _device_name(mic._device_index)  # noqa: SLF001
+            except Exception:  # noqa: BLE001 -- defensive (no PortAudio in CI)
+                device_name = None
+        # Capability is async; the per-tick factory is sync, so we
+        # leave ``capability_check_result=None`` here and let the
+        # publisher resolve it inline. Wiring it through the factory
+        # would require an async-callable contract that complicates
+        # the unit tests.
+        return SnapshotInputs(
+            breaker=breaker,
+            mic_device=device_name,
+            mic_queue_depth=queue_depth,
+            ws_subscribers=get_pubsub().subscriber_count,
+        )
+
+    return _factory
+
+
+@contextlib.asynccontextmanager
+async def _metrics_lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Lifespan that only starts the metrics publisher.
+
+    Used in the non-smoke path where the audio pipeline isn't started
+    in-process (the operator runs ``audio.capture`` separately or runs
+    in a stripped-down API mode for tests). The smoke lifespan composes
+    its own publisher start/stop on top of the audio pump.
+    """
+    breaker = get_metrics_breaker()
+    mic_holder: dict[str, MicCapture | None] = {"mic": None}
+    deps = PublisherDeps(
+        conn_factory=default_conn_factory(),
+        inputs_factory=_build_metrics_inputs_factory(
+            breaker=breaker,
+            mic_holder=mic_holder,
+        ),
+    )
+    pubsub = get_pubsub()
+    task = start_metrics_publisher(pubsub, deps)
+    try:
+        yield
+    finally:
+        task.cancel()
+        # Mirror the ws server's pattern: gather with
+        # ``return_exceptions=True`` so a CancelledError doesn't escape
+        # and produce ``Task exception was never retrieved``.
+        await asyncio.gather(task, return_exceptions=True)
 
 
 def _synthetic_transcript_for(intent: Intent) -> Any:
@@ -567,6 +685,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         app.router.lifespan_context = lifespan
     else:
         app = create_app()
+        # Step 24: the non-smoke lifespan only starts the metrics
+        # publisher. Without it, ws subscribers to the ``metrics``
+        # topic would never receive a snapshot until the next operator
+        # action triggered one.
+        app.router.lifespan_context = _metrics_lifespan
 
     if args.check:
         print(f"toybox: --check ok (host={args.host} port={args.port} smoke={args.smoke})")

@@ -12,6 +12,7 @@ import { ActivityPanel } from "./components/ActivityPanel";
 import { CapabilityBanner } from "./components/CapabilityBanner";
 import { ChildProfileEditor } from "./components/ChildProfileEditor";
 import { Header } from "./components/Header";
+import { OperatorTab } from "./components/OperatorTab";
 import { RoomIngestBulk } from "./components/RoomIngestBulk";
 import { SuggestionCard } from "./components/SuggestionCard";
 import { ToyIngest } from "./components/ToyIngest";
@@ -45,8 +46,23 @@ export function App(): JSX.Element {
   const [showChildEditor, setShowChildEditor] = useState(false);
   const [showToyIngest, setShowToyIngest] = useState(false);
   const [showRoomIngest, setShowRoomIngest] = useState(false);
+  const [showOperator, setShowOperator] = useState(false);
   const apiRef = useRef<ApiClient | null>(null);
   const wsRef = useRef<ParentWsClient | null>(null);
+  // Step 24: registry of metrics-envelope listeners. The ws onEnvelope
+  // callback fans every metrics envelope out to every listener; the
+  // OperatorTab subscribes via a callback returned from
+  // ``subscribeToMetrics``. Built as a Set so unsubscribe is O(1).
+  const metricsListenersRef = useRef<Set<(env: Envelope) => void>>(new Set());
+  const subscribeToMetrics = useCallback(
+    (handler: (env: Envelope) => void): (() => void) => {
+      metricsListenersRef.current.add(handler);
+      return () => {
+        metricsListenersRef.current.delete(handler);
+      };
+    },
+    [],
+  );
 
   // Lazily build the api client once. getToken pulls from the store on
   // every call so token rotation surfaces immediately.
@@ -92,6 +108,19 @@ export function App(): JSX.Element {
           getToken: () => useParentStore.getState().token,
           onEnvelope: (env: Envelope) => {
             useParentStore.getState().applyEnvelope(env);
+            // Step 24: fan metrics envelopes out to OperatorTab
+            // listeners. Other topics flow through the store (the
+            // existing applyEnvelope reducer); metrics is dashboard-
+            // only so it doesn't need a store slot.
+            if (env.topic === "metrics") {
+              for (const listener of metricsListenersRef.current) {
+                try {
+                  listener(env);
+                } catch {
+                  // listener bugs must not crash the ws callback.
+                }
+              }
+            }
           },
           onState: (s) => {
             useParentStore.getState().setWsState(s);
@@ -412,10 +441,21 @@ export function App(): JSX.Element {
           >
             {showRoomIngest ? "hide rooms" : "rooms"}
           </button>
+          <button
+            type="button"
+            data-testid="toggle-operator"
+            aria-pressed={showOperator}
+            onClick={() => setShowOperator((prev) => !prev)}
+          >
+            {showOperator ? "hide operator" : "operator"}
+          </button>
         </div>
         {showChildEditor && <ChildProfileEditor api={api} /> }
         {showToyIngest && <ToyIngest api={api} />}
         {showRoomIngest && <RoomIngestBulk api={api} />}
+        {showOperator && (
+          <OperatorTab api={api} subscribeToMetrics={subscribeToMetrics} />
+        )}
         {showSuggestion && activity !== null && (
           <SuggestionCard
             activity={activity}

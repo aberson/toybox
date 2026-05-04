@@ -60,6 +60,8 @@ _PARENT_TOPICS = frozenset(
         Topic.system,
         Topic.triggers_invalidate,
         Topic.transcript,
+        # Step 24: operator dashboard pushes snapshots to parents only.
+        Topic.metrics,
     }
 )
 _CHILD_TOPICS = frozenset(

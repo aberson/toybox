@@ -22,6 +22,7 @@ from toybox.api.activities import get_activities_db
 from toybox.api.auth_dep import get_auth_db
 from toybox.api.children import get_children_db
 from toybox.api.listening import get_db as get_listening_db
+from toybox.api.metrics import get_metrics_breaker, get_metrics_db
 from toybox.api.rooms import get_rooms_db
 from toybox.api.toys import get_toys_db
 from toybox.api.transcripts import get_transcripts_db
@@ -81,10 +82,17 @@ def app(db_path: Path, pubsub: PubSub) -> Iterator[FastAPI]:
         get_toys_db,
         get_rooms_db,
         get_transcripts_db,
+        get_metrics_db,
     ):
         application.dependency_overrides[dep] = _override_db
     application.dependency_overrides[get_ws_db] = _override_ws_db
     application.dependency_overrides[get_pubsub] = lambda: pubsub
+    # Step 24: per-test breaker so closed/open/half_open parametrize
+    # tests don't leak state across cases via the module singleton.
+    from toybox.ai.breaker import CircuitBreaker as _CB
+
+    test_breaker = _CB()
+    application.dependency_overrides[get_metrics_breaker] = lambda: test_breaker
     try:
         yield application
     finally:

@@ -478,6 +478,15 @@ class MicCapture:
         except asyncio.QueueEmpty:  # pragma: no cover -- race with reader
             pass
         self._overflow_count += 1
+        # Step 24: bump the process-local metrics counter so the
+        # operator dashboard surfaces "we're losing audio frames" without
+        # a log scrape. The recorder is thread-safe — this method runs
+        # on the asyncio loop side after ``call_soon_threadsafe``, but a
+        # threading.Lock is cheaper than re-architecting around an
+        # asyncio.Lock that the audio thread couldn't await anyway.
+        from ..metrics import record_buffer_overrun  # noqa: PLC0415 -- avoid import cycle
+
+        record_buffer_overrun()
         _logger.warning(
             "mic queue overflow; dropped 1 (overflow_count=%d, capacity=%d)",
             self._overflow_count,

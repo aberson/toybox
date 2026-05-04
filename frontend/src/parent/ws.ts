@@ -20,6 +20,10 @@ export const PARENT_TOPICS: readonly string[] = [
   "listening.mode",
   "triggers.invalidate",
   "transcript",
+  // Step 24: operator dashboard subscribes to the metrics topic for
+  // 30s snapshot pushes; OperatorTab still falls back to REST polling
+  // when the ws connection is unavailable.
+  "metrics",
 ];
 
 // Step 9 keeps these strings local rather than extending the codegen
