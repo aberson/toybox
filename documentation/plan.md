@@ -1261,6 +1261,7 @@ What to look for:
 - **Type:** full-stack
 - **Issue:** #30
 - **Flags:** --reviewers full --ui (canonical) — running autonomously this session as `--reviewers code` per operating mode note above
+- **Status:** DONE (2026-05-03, commit `<pending>`)
 
 #### Step 17: Room ingest bulk (vision + UI)
 

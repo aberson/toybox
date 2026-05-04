@@ -13,6 +13,7 @@ import { CapabilityBanner } from "./components/CapabilityBanner";
 import { ChildProfileEditor } from "./components/ChildProfileEditor";
 import { Header } from "./components/Header";
 import { SuggestionCard } from "./components/SuggestionCard";
+import { ToyIngest } from "./components/ToyIngest";
 import { TriggerButton } from "./components/TriggerButton";
 import { useParentStore } from "./store";
 import type { Envelope } from "./ws";
@@ -41,6 +42,7 @@ export function App(): JSX.Element {
   const state = useParentStore();
   const [muted, setMuted] = useState(false);
   const [showChildEditor, setShowChildEditor] = useState(false);
+  const [showToyIngest, setShowToyIngest] = useState(false);
   const apiRef = useRef<ApiClient | null>(null);
   const wsRef = useRef<ParentWsClient | null>(null);
 
@@ -392,8 +394,17 @@ export function App(): JSX.Element {
           >
             {showChildEditor ? "hide child profiles" : "child profiles"}
           </button>
+          <button
+            type="button"
+            data-testid="toggle-toy-ingest"
+            aria-pressed={showToyIngest}
+            onClick={() => setShowToyIngest((prev) => !prev)}
+          >
+            {showToyIngest ? "hide toys" : "toys"}
+          </button>
         </div>
         {showChildEditor && <ChildProfileEditor api={api} /> }
+        {showToyIngest && <ToyIngest api={api} />}
         {showSuggestion && activity !== null && (
           <SuggestionCard
             activity={activity}

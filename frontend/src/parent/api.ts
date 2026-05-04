@@ -110,6 +110,74 @@ export interface ChildInUseDetail {
   referring_activity_count: number;
 }
 
+// Step 16: toy ingest wire shapes. Mirror the Pydantic models in
+// src/toybox/api/toys.py.
+export interface Toy {
+  id: string;
+  display_name: string;
+  image_path: string;
+  image_hash: string;
+  tags: string[];
+  persona_id: string | null;
+  archived: boolean;
+  created_at: string;
+  last_used_at: string | null;
+}
+
+export interface ToyVisionSuggestion {
+  display_name: string;
+  tags: string[];
+  persona_match_id: string | null;
+}
+
+// Response from POST /api/toys/upload. ``suggested`` is null when
+// vision failed or was skipped (offline mode). When vision returned a
+// rate-limit / timeout / malformed-JSON, ``vision_error`` carries the
+// short reason string so the UI can surface it. ``vision_skipped`` is
+// true when Claude isn't capable (no token, breaker open, etc.) and
+// no vision call was attempted at all.
+export interface ToyUploadResponse {
+  staging_id: string;
+  image_hash: string;
+  suggested: ToyVisionSuggestion | null;
+  vision_error: string | null;
+  vision_skipped: boolean;
+  media_type: string;
+  width: number;
+  height: number;
+}
+
+// Body of the 409 returned by POST /api/toys/upload when the
+// SHA-256 hash matches an existing non-archived toy. The frontend
+// uses this to surface "this image already exists, view existing
+// toy" with a link.
+export interface ToyImageExistsDetail {
+  code: "image_already_exists";
+  existing_toy: Toy;
+}
+
+// Body for POST /api/toys (commit). ``staging_id`` comes from the
+// upload response.
+export interface ToyConfirmRequest {
+  staging_id: string;
+  display_name: string;
+  tags: string[];
+  persona_id?: string | null;
+}
+
+// Body for PATCH /api/toys/{id}. All fields optional; only fields
+// present in the body are written.
+export interface ToyUpdateRequest {
+  display_name?: string;
+  tags?: string[];
+  persona_id?: string | null;
+  archived?: boolean;
+}
+
+export interface ToyListResponse {
+  toys: Toy[];
+}
+
 export class ApiError extends Error {
   readonly status: number;
   readonly body: unknown;
@@ -383,6 +451,90 @@ export class ApiClient {
       signal: opts.signal,
     });
   }
+
+  // Step 16: toy ingest. The upload endpoint takes multipart form
+  // data, so we don't go through ``request<T>`` (which JSON-encodes).
+  // Auth + signal are still threaded the same way.
+  async uploadToyPhoto(
+    file: File,
+    opts: RequestOptions = {},
+  ): Promise<ToyUploadResponse> {
+    const headers = new Headers();
+    const token = this.getToken();
+    if (token !== null) {
+      headers.set("X-Toybox-Token", token);
+    }
+    // ``Content-Type: multipart/form-data; boundary=...`` is set by
+    // the browser when ``body`` is a ``FormData``; setting it manually
+    // would clobber the boundary token.
+    const form = new FormData();
+    form.append("file", file);
+    const resp = await this.fetchImpl(this.baseUrl + "/api/toys/upload", {
+      method: "POST",
+      headers,
+      body: form,
+      signal: opts.signal,
+    });
+    let body: unknown = null;
+    const text = await resp.text();
+    if (text.length > 0) {
+      try {
+        body = JSON.parse(text);
+      } catch {
+        body = text;
+      }
+    }
+    if (!resp.ok) {
+      throw new ApiError(resp.status, body);
+    }
+    return body as ToyUploadResponse;
+  }
+
+  async confirmToy(
+    body: ToyConfirmRequest,
+    opts: RequestOptions = {},
+  ): Promise<Toy> {
+    return this.request<Toy>("/api/toys", {
+      method: "POST",
+      body: JSON.stringify(body),
+      signal: opts.signal,
+    });
+  }
+
+  async listToys(opts: RequestOptions = {}): Promise<ToyListResponse> {
+    return this.request<ToyListResponse>("/api/toys", {
+      method: "GET",
+      signal: opts.signal,
+    });
+  }
+
+  async getToy(id: string, opts: RequestOptions = {}): Promise<Toy> {
+    return this.request<Toy>(`/api/toys/${encodeURIComponent(id)}`, {
+      method: "GET",
+      signal: opts.signal,
+    });
+  }
+
+  async updateToy(
+    id: string,
+    body: ToyUpdateRequest,
+    opts: RequestOptions = {},
+  ): Promise<Toy> {
+    return this.request<Toy>(`/api/toys/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+      signal: opts.signal,
+    });
+  }
+
+  // Soft delete on the backend (sets ``archived = 1``); we name the
+  // method ``archiveToy`` so the call site reads honestly.
+  async archiveToy(id: string, opts: RequestOptions = {}): Promise<void> {
+    await this.request<unknown>(`/api/toys/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      signal: opts.signal,
+    });
+  }
 }
 
 // Step 18: a single FastAPI validation error. The wire shape comes
@@ -442,6 +594,32 @@ export function extractChildInUseDetail(
       code: "child_in_use",
       child_id: c["child_id"],
       referring_activity_count: c["referring_activity_count"],
+    };
+  }
+  return null;
+}
+
+// Step 16: pull the image_already_exists detail off a 409 ApiError, or
+// null if the error isn't that shape. The toy ingest UI uses this to
+// render "this image already exists" with a link to the existing toy.
+export function extractToyImageExistsDetail(
+  err: unknown,
+): ToyImageExistsDetail | null {
+  if (!(err instanceof ApiError) || err.status !== 409) return null;
+  const body = err.body;
+  if (typeof body !== "object" || body === null) return null;
+  const rec = body as Record<string, unknown>;
+  const candidate = "detail" in rec ? rec["detail"] : rec;
+  if (typeof candidate !== "object" || candidate === null) return null;
+  const c = candidate as Record<string, unknown>;
+  if (
+    c["code"] === "image_already_exists" &&
+    typeof c["existing_toy"] === "object" &&
+    c["existing_toy"] !== null
+  ) {
+    return {
+      code: "image_already_exists",
+      existing_toy: c["existing_toy"] as Toy,
     };
   }
   return null;

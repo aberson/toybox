@@ -79,10 +79,31 @@ def load_toy_triggers(conn: sqlite3.Connection) -> list[ToyTrigger]:
     return triggers
 
 
+def refresh_mention_toys(conn: sqlite3.Connection) -> int:
+    """Re-read the dynamic toy-trigger list from the DB.
+
+    Step 6's dynamic source rebuilds on every :func:`match` call, so
+    there's no in-memory cache to invalidate today. This function
+    exists as the documented entry-point step 16's toy ingest
+    pipeline calls after committing a new toy: when step 15's
+    event-driven cache lands, this is the single hook to add the
+    cache-bust to. For now it just re-queries to confirm the new
+    toy is visible and logs the count at INFO.
+
+    Returns the number of active (non-archived) toy triggers after
+    the refresh — useful for the integration test that asserts the
+    new row is in scope.
+    """
+    triggers = load_toy_triggers(conn)
+    _logger.info("refresh_mention_toys: %d active toy trigger(s)", len(triggers))
+    return len(triggers)
+
+
 __all__ = [
     "MENTION_TOY_INTENT",
     "TOY_PATTERN_ID_PREFIX",
     "TOY_PATTERN_VERSION",
     "ToyTrigger",
     "load_toy_triggers",
+    "refresh_mention_toys",
 ]

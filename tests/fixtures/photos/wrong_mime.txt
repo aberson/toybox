@@ -1,0 +1,2 @@
+This is plain text masquerading as a JPEG via the .txt extension.
+The MIME-sniffer should reject it (no JPEG magic bytes at offset 0).
