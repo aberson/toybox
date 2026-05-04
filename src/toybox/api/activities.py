@@ -84,6 +84,7 @@ JudgeCall = Any
 STATE_PROPOSED = "proposed"
 STATE_APPROVED = "approved"
 STATE_RUNNING = "running"
+STATE_PAUSED = "paused"
 STATE_COMPLETED = "completed"
 STATE_ENDED = "ended"
 STATE_DISMISSED = "dismissed"
@@ -94,8 +95,16 @@ _VALID_TRANSITIONS: dict[str, frozenset[str]] = {
     STATE_PROPOSED: frozenset({STATE_APPROVED, STATE_DISMISSED}),
     STATE_APPROVED: frozenset({STATE_RUNNING, STATE_ENDED, STATE_DISMISSED}),
     STATE_RUNNING: frozenset(
-        {STATE_RUNNING, STATE_COMPLETED, STATE_ENDED, STATE_DIDNT_WORK, STATE_DISMISSED}
+        {
+            STATE_RUNNING,
+            STATE_PAUSED,
+            STATE_COMPLETED,
+            STATE_ENDED,
+            STATE_DIDNT_WORK,
+            STATE_DISMISSED,
+        }
     ),
+    STATE_PAUSED: frozenset({STATE_RUNNING, STATE_ENDED, STATE_DIDNT_WORK, STATE_DISMISSED}),
     STATE_COMPLETED: frozenset({STATE_DIDNT_WORK}),
     STATE_ENDED: frozenset({STATE_DIDNT_WORK}),
     STATE_DISMISSED: frozenset(),
@@ -187,6 +196,12 @@ class ActivityResponse(BaseModel):
     ended_at: str | None = None
     steps: list[ActivityStepResponse] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    # Step 23: "why this?" telemetry. Read from the persisted summary
+    # JSON envelope's ``metadata`` block on the way out. ``None`` when
+    # the activity row predates step 23 (no envelope key) or when the
+    # propose call didn't supply a trigger / persona rationale.
+    trigger_phrase: str | None = None
+    persona_reasoning: str | None = None
 
 
 class ProposeRequest(BaseModel):
@@ -199,6 +214,19 @@ class ProposeRequest(BaseModel):
     persona_id: str | None = None
     session_id: str | None = None
     context: dict[str, Any] | None = None
+    # Step 23: optional "why this?" telemetry surfaced on the suggestion
+    # card. ``trigger_phrase`` is the literal substring of the
+    # transcript that fired the trigger that led to this propose call;
+    # ``None`` when proposed manually (no trigger). ``persona_reasoning``
+    # is a short rationale for the chosen persona — when caller supplies
+    # one we persist it verbatim, otherwise we synthesise a default.
+    # Step 23 iter-2: cap at 512 chars BEFORE persistence — the trigger
+    # phrase is a literal substring of a child-spoken transcript, so an
+    # uncapped 10K-char input would inflate every activity row + every
+    # WS state envelope (and is a trivial abuse vector). 512 is well
+    # north of any realistic spoken phrase.
+    trigger_phrase: str | None = Field(default=None, max_length=512)
+    persona_reasoning: str | None = Field(default=None, max_length=512)
 
 
 class ApproveRequest(BaseModel):
@@ -216,6 +244,12 @@ class RegenerateRequest(BaseModel):
     seed: int | None = Field(default=None, ge=0)
     persona_id: str | None = None
     context: dict[str, Any] | None = None
+    # Step 23: regenerate may inherit the source's "why this?" telemetry.
+    # ``None`` falls through to the source row's value so the freshly-
+    # proposed activity still has rationale to render. Same 512-char cap
+    # as ``ProposeRequest`` (see comment above).
+    trigger_phrase: str | None = Field(default=None, max_length=512)
+    persona_reasoning: str | None = Field(default=None, max_length=512)
 
 
 class DidntWorkRequest(BaseModel):
@@ -460,6 +494,22 @@ def _row_to_response(
     else:
         child_ids = []
 
+    # Step 23: surface trigger_phrase + persona_reasoning at the top
+    # level of the response so the parent UI's "why this?" panel can
+    # render them without re-parsing ``metadata``. Both live inside the
+    # summary envelope's ``metadata`` block for storage (no schema
+    # migration); we surface them at the top level IN ADDITION TO
+    # keeping them in metadata. The duplication is intentional — the
+    # top-level fields are the wire contract, the metadata copy is the
+    # source of truth on read-back from the persisted row.
+    trigger_phrase: str | None = None
+    persona_reasoning: str | None = None
+    raw_trigger = metadata.get("trigger_phrase")
+    if isinstance(raw_trigger, str) and raw_trigger:
+        trigger_phrase = raw_trigger
+    raw_reasoning = metadata.get("persona_reasoning")
+    if isinstance(raw_reasoning, str) and raw_reasoning:
+        persona_reasoning = raw_reasoning
     return ActivityResponse(
         id=activity_id,
         state=str(row["state"]),
@@ -474,14 +524,30 @@ def _row_to_response(
         ended_at=row["ended_at"],
         steps=_fetch_steps(conn, activity_id),
         metadata=metadata,
+        trigger_phrase=trigger_phrase,
+        persona_reasoning=persona_reasoning,
     )
 
 
 def _emit_state(pubsub: PubSub, response: ActivityResponse) -> None:
+    """Publish the activity-state envelope, stripping parent-only fields.
+
+    Step 23 iter-2 (M1): the ``activity.state`` topic is in the child
+    kiosk's allow-list (see ``toybox.ws.server._CHILD_TOPICS``), so the
+    envelope payload crosses a privacy boundary. ``trigger_phrase`` is a
+    literal substring of a child-spoken transcript (PII) and
+    ``persona_reasoning`` is a parent-facing rationale string; neither
+    belongs on the kid panel even though the kid UI never renders them.
+    We strip both from the WS payload while leaving them on the REST
+    response (the GET path is parent-only, so unaffected).
+    """
+    payload = response.model_dump(mode="json")
+    payload.pop("trigger_phrase", None)
+    payload.pop("persona_reasoning", None)
     pubsub.publish(
         build_envelope(
             topic=Topic.activity_state,
-            payload=response.model_dump(mode="json"),
+            payload=payload,
         )
     )
 
@@ -571,6 +637,36 @@ def _enforce_transition(current_state: str, target: str) -> None:
                 "target_state": target,
             },
         )
+
+
+def _build_persona_reasoning(
+    *,
+    caller_supplied: str | None,
+    intent: str,
+    persona_meta: dict[str, Any] | None,
+) -> str:
+    """Compose a short rationale for the chosen persona.
+
+    Step 23 contract: the suggestion card's "why this?" panel needs a
+    non-empty rationale string. Priority order:
+
+    1. Caller-supplied ``persona_reasoning`` (e.g. listening passes a
+       string explaining the match) — wins verbatim, after stripping.
+    2. Synthesised default of the form
+       ``"<persona display_name> picked for <intent>"`` when a library
+       persona was selected.
+    3. Final fallback ``"matched on intent"`` so callers without a
+       persona still see something — better than an empty panel.
+    """
+    if caller_supplied is not None:
+        stripped = caller_supplied.strip()
+        if stripped:
+            return stripped
+    if persona_meta is not None:
+        display_name = persona_meta.get("display_name")
+        if isinstance(display_name, str) and display_name:
+            return f"{display_name} picked for {intent}"
+    return "matched on intent"
 
 
 def _pick_random_library_persona(conn: sqlite3.Connection) -> dict[str, Any] | None:
@@ -681,6 +777,22 @@ def _do_propose(
     metadata = dict(activity.metadata)
     if persona_meta is not None:
         metadata["persona"] = persona_meta
+    # Step 23: "why this?" telemetry. ``trigger_phrase`` is recorded
+    # verbatim when the caller (listening pipeline) supplies the
+    # transcript substring that fired the trigger; pre-step-23 callers
+    # leave it ``None`` and the field stays absent from the envelope so
+    # ``_row_to_response`` surfaces ``trigger_phrase=None``. The
+    # ``persona_reasoning`` defaults to a synthesised string built from
+    # the intent + persona (or ``"matched on intent"`` when no persona)
+    # so the UI panel always has something to show — empty fields hurt
+    # parent trust more than a generic rationale.
+    if body.trigger_phrase is not None and body.trigger_phrase.strip():
+        metadata["trigger_phrase"] = body.trigger_phrase.strip()
+    metadata["persona_reasoning"] = _build_persona_reasoning(
+        caller_supplied=body.persona_reasoning,
+        intent=body.intent,
+        persona_meta=persona_meta,
+    )
     summary_payload = {
         "title": activity.title,
         "metadata": metadata,
@@ -945,6 +1057,19 @@ def post_regenerate(
     context = dict(body.context) if body.context is not None else {}
     context.setdefault("regen_source", activity_id)
     context.setdefault("regen_source_version", current_version)
+    # Step 23: inherit the "why this?" telemetry from the source row
+    # when the caller doesn't override. This keeps the suggestion card's
+    # panel coherent across "skip & try another" — the trigger phrase
+    # that started the original suggestion is still the why for the
+    # follow-up, and re-using it avoids a sudden empty panel.
+    inherited_trigger = body.trigger_phrase
+    inherited_reasoning = body.persona_reasoning
+    if inherited_trigger is None or inherited_reasoning is None:
+        source_response = _row_to_response(conn, row)
+        if inherited_trigger is None:
+            inherited_trigger = source_response.trigger_phrase
+        if inherited_reasoning is None:
+            inherited_reasoning = source_response.persona_reasoning
     return _do_propose(
         ProposeRequest(
             intent=intent,
@@ -954,6 +1079,8 @@ def post_regenerate(
             persona_id=persona_id,
             session_id=str(row["session_id"]),
             context=context,
+            trigger_phrase=inherited_trigger,
+            persona_reasoning=inherited_reasoning,
         ),
         conn,
         pubsub,
@@ -1047,6 +1174,95 @@ def post_advance(
             "UPDATE activity_steps SET current = 1 WHERE activity_id = ? AND seq = ?",
             (activity_id, target_seq),
         )
+    response = _row_to_response(conn, row)
+    _emit_state(pubsub, response)
+    return response
+
+
+@router.post("/{activity_id}/pause", response_model=ActivityResponse)
+def post_pause(
+    activity_id: str,
+    conn: Annotated[sqlite3.Connection, Depends(get_activities_db)],
+    pubsub: Annotated[PubSub, Depends(get_pubsub)],
+    expected_version: Annotated[int, Depends(if_match_version_dependency)],
+    _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
+) -> ActivityResponse:
+    """running → paused (idempotent).
+
+    Step 23: a parent who clicks "pause" twice gets two 200s back with
+    the SAME version both times — pausing an already-paused activity is
+    a no-op rather than a 409. Same idea on the resume side. The
+    second click MUST NOT bump the version, otherwise the optimistic
+    concurrency check on every other mutation would race the panel's
+    cached version on the next click.
+
+    Step 23 iter-2 (L2): the idempotent-state check fires BEFORE the
+    version check. A concurrent same-version double-tap (both racers
+    saw version V; the first wins and bumps to V+1; the second arrives
+    with stale-V) MUST still 200 because the target state is already
+    reached. Reordering keeps the docstring's idempotency promise true
+    even under that race.
+    """
+    row = _fetch_activity_row(conn, activity_id)
+    current_state = str(row["state"])
+    current_version = int(row["version"])
+    if current_state == STATE_PAUSED:
+        # Idempotent no-op: return the row unchanged. We deliberately
+        # skip ``_emit_state`` here so quiescent panels don't get a
+        # spurious envelope when nothing changed. The version check is
+        # bypassed on purpose — a stale ``If-Match-Version`` arriving
+        # AFTER the row already reached the target state is still a
+        # successful idempotent outcome from the parent's POV.
+        return _row_to_response(conn, row)
+    if current_version != expected_version:
+        raise VersionConflictError(current_version, current_state)
+    _enforce_transition(current_state, STATE_PAUSED)
+    ok, row = _attempt_transition(
+        conn,
+        activity_id=activity_id,
+        expected_version=expected_version,
+        new_state=STATE_PAUSED,
+    )
+    if not ok:
+        raise VersionConflictError(int(row["version"]), str(row["state"]))
+    response = _row_to_response(conn, row)
+    _emit_state(pubsub, response)
+    return response
+
+
+@router.post("/{activity_id}/resume", response_model=ActivityResponse)
+def post_resume(
+    activity_id: str,
+    conn: Annotated[sqlite3.Connection, Depends(get_activities_db)],
+    pubsub: Annotated[PubSub, Depends(get_pubsub)],
+    expected_version: Annotated[int, Depends(if_match_version_dependency)],
+    _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
+) -> ActivityResponse:
+    """paused → running (idempotent).
+
+    Mirror of :func:`post_pause` — calling resume on an already-running
+    activity returns 200 with the same version, no envelope emit. See
+    that function's docstring for the rationale (incl. the iter-2 L2
+    reordering: state check fires before version check, so a stale
+    ``If-Match-Version`` from a concurrent double-tap still 200s).
+    """
+    row = _fetch_activity_row(conn, activity_id)
+    current_state = str(row["state"])
+    current_version = int(row["version"])
+    if current_state == STATE_RUNNING:
+        # Idempotent no-op (see post_pause).
+        return _row_to_response(conn, row)
+    if current_version != expected_version:
+        raise VersionConflictError(current_version, current_state)
+    _enforce_transition(current_state, STATE_RUNNING)
+    ok, row = _attempt_transition(
+        conn,
+        activity_id=activity_id,
+        expected_version=expected_version,
+        new_state=STATE_RUNNING,
+    )
+    if not ok:
+        raise VersionConflictError(int(row["version"]), str(row["state"]))
     response = _row_to_response(conn, row)
     _emit_state(pubsub, response)
     return response
@@ -1191,6 +1407,7 @@ __all__ = [
     "STATE_DIDNT_WORK",
     "STATE_DISMISSED",
     "STATE_ENDED",
+    "STATE_PAUSED",
     "STATE_PROPOSED",
     "STATE_RUNNING",
     "get_activities_db",

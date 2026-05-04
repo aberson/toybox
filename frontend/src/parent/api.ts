@@ -7,6 +7,7 @@ export type ActivityState =
   | "proposed"
   | "approved"
   | "running"
+  | "paused"
   | "completed"
   | "ended"
   | "dismissed"
@@ -34,6 +35,14 @@ export interface Activity {
   ended_at: string | null;
   steps: ActivityStep[];
   metadata: Record<string, unknown>;
+  // Step 23: "why this?" telemetry surfaced on the suggestion card.
+  // ``trigger_phrase`` is the literal substring of the transcript that
+  // fired the trigger; null when manually proposed. ``persona_reasoning``
+  // is a short rationale for the chosen persona — the backend
+  // synthesises a default when the propose call didn't supply one, so
+  // the field is null only on pre-step-23 activities.
+  trigger_phrase: string | null;
+  persona_reasoning: string | null;
 }
 
 export interface VersionConflictBody {
@@ -99,6 +108,9 @@ export interface ProposePayload {
   persona_id?: string | null;
   session_id?: string | null;
   context?: Record<string, unknown> | null;
+  // Step 23: optional "why this?" telemetry (see Activity).
+  trigger_phrase?: string | null;
+  persona_reasoning?: string | null;
 }
 
 // Step 18: child-profile editor wire shapes. Mirror the Pydantic
@@ -647,6 +659,35 @@ export class ApiClient {
     opts: RequestOptions = {},
   ): Promise<Activity> {
     return this.request<Activity>(`/api/activities/${encodeURIComponent(id)}/end`, {
+      method: "POST",
+      ifMatchVersion: version,
+      signal: opts.signal,
+    });
+  }
+
+  // Step 23: pause/resume the live activity. Both are idempotent on
+  // the backend — pausing an already-paused activity returns 200 with
+  // the same version, no envelope emit. The version supplied here MUST
+  // match the activity's current version, even on the no-op branch,
+  // because every other mutation uses optimistic concurrency.
+  async pause(
+    id: string,
+    version: number,
+    opts: RequestOptions = {},
+  ): Promise<Activity> {
+    return this.request<Activity>(`/api/activities/${encodeURIComponent(id)}/pause`, {
+      method: "POST",
+      ifMatchVersion: version,
+      signal: opts.signal,
+    });
+  }
+
+  async resume(
+    id: string,
+    version: number,
+    opts: RequestOptions = {},
+  ): Promise<Activity> {
+    return this.request<Activity>(`/api/activities/${encodeURIComponent(id)}/resume`, {
       method: "POST",
       ifMatchVersion: version,
       signal: opts.signal,

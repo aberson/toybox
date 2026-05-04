@@ -22,6 +22,8 @@ export interface ActivityPanelProps {
   busy?: ActivityPanelBusy;
 }
 
+const END_CONFIRM_MESSAGE = "End the activity?";
+
 export function ActivityPanel(props: ActivityPanelProps): JSX.Element {
   const { activity, onRegenerate, onEnd, onDidntWork, onThumbsUp } = props;
   const busy: ActivityPanelBusy = props.busy ?? {
@@ -38,6 +40,21 @@ export function ActivityPanel(props: ActivityPanelProps): JSX.Element {
     typeof (personaMeta as Record<string, unknown>)["display_name"] === "string"
       ? ((personaMeta as Record<string, unknown>)["display_name"] as string)
       : null;
+
+  // Step 23: confirm dialog for the End button. ``window.confirm``
+  // matches the ChildProfileEditor / TranscriptsManager sibling
+  // pattern — synchronous, blocking, mockable via
+  // ``vi.spyOn(window, "confirm")`` in tests. The handler is wrapped
+  // here (not in the parent) so the panel owns the UX contract:
+  // clicking End ALWAYS prompts; the parent just gets the confirmed
+  // call.
+  const handleEndClick = (): void => {
+    if (!window.confirm(END_CONFIRM_MESSAGE)) {
+      return;
+    }
+    void onEnd();
+  };
+
   return (
     <section
       data-testid="activity-panel"
@@ -104,9 +121,7 @@ export function ActivityPanel(props: ActivityPanelProps): JSX.Element {
           type="button"
           data-testid="end-button"
           disabled={busy.end}
-          onClick={() => {
-            void onEnd();
-          }}
+          onClick={handleEndClick}
         >
           {busy.end ? "ending..." : "end"}
         </button>

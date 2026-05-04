@@ -26,12 +26,18 @@ import { ParentWsClient } from "./ws";
 
 // Phase A active-suggestion vs. running-activity split: the
 // SuggestionCard renders for `proposed` rows; the ActivityPanel
-// renders once the row is `approved`/`running`/`completed`.
+// renders once the row is `approved`/`running`/`paused`/`completed`.
 // `dismissed`, `didnt_work`, and `ended` clear the panel — `end`
 // signals the parent is done with this activity, so the surface
 // closes and the parent can trigger a new one.
+//
+// Step 23 iter-2 (L1): `paused` is included so a paused activity
+// keeps the panel visible. Pause/resume are backend-only for v1 (the
+// idempotency contract is wired but the explicit Pause/Resume buttons
+// are deferred). Without `paused` in this set, a paused row would
+// silently disappear from the parent UI.
 const SUGGESTION_STATES = new Set(["proposed"]);
-const PANEL_STATES = new Set(["approved", "running", "completed"]);
+const PANEL_STATES = new Set(["approved", "running", "paused", "completed"]);
 
 function deriveWsUrl(): string {
   // The vite proxy forwards /ws to the backend during dev. In prod

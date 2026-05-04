@@ -19,10 +19,11 @@ export interface SuggestionCardProps {
   busy?: SuggestionCardBusy;
 }
 
-// Phase A scope: the "why this?" panel below is a STUB. Full
-// implementation lands in Phase D Step 22 (signal weights + persona
-// rationale). We render a non-clickable placeholder so the surface
-// area exists for the future swap.
+// Step 23: the "why this?" panel renders the trigger phrase that fired
+// the suggestion plus the persona-match rationale. Both are pulled off
+// the activity wire shape (``trigger_phrase``, ``persona_reasoning``).
+// The intent (``intent_source``) is also surfaced as a third row when
+// available, since the slot/intent drove the template selection.
 export function SuggestionCard(props: SuggestionCardProps): JSX.Element {
   const { activity, onApprove, onSkip, onDismiss } = props;
   const busy: SuggestionCardBusy = props.busy ?? {
@@ -39,6 +40,11 @@ export function SuggestionCard(props: SuggestionCardProps): JSX.Element {
     typeof (personaMeta as Record<string, unknown>)["display_name"] === "string"
       ? ((personaMeta as Record<string, unknown>)["display_name"] as string)
       : null;
+
+  const triggerPhrase = activity.trigger_phrase;
+  const personaReasoning = activity.persona_reasoning;
+  const intentSource = activity.intent_source;
+
   return (
     <section
       data-testid="suggestion-card"
@@ -107,6 +113,7 @@ export function SuggestionCard(props: SuggestionCardProps): JSX.Element {
         <button
           type="button"
           data-testid="why-toggle"
+          aria-expanded={whyOpen}
           onClick={() => setWhyOpen((prev) => !prev)}
         >
           why this?
@@ -122,10 +129,30 @@ export function SuggestionCard(props: SuggestionCardProps): JSX.Element {
             fontSize: 13,
           }}
         >
-          {/* TODO(phase-d-step-22): replace with signal weights + persona
-              rationale. Phase A ships only this stub so the affordance
-              exists for users and tests. */}
-          (stub) full rationale ships in Phase D Step 22.
+          {/* Step 23: render trigger phrase, persona rationale, and the
+              intent that drove template selection. ``trigger_phrase`` is
+              null when the activity was proposed manually (no transcript
+              match); we show a soft "no trigger" line in that case so
+              parents don't see an empty section. ``persona_reasoning``
+              is always populated by the backend (synthesised default
+              when the propose call didn't supply one). */}
+          <div data-testid="why-trigger" style={{ marginBottom: 4 }}>
+            <strong>trigger:</strong>{" "}
+            {triggerPhrase !== null && triggerPhrase !== ""
+              ? `"${triggerPhrase}"`
+              : "(no trigger — proposed manually)"}
+          </div>
+          <div data-testid="why-persona" style={{ marginBottom: 4 }}>
+            <strong>persona:</strong>{" "}
+            {personaReasoning !== null && personaReasoning !== ""
+              ? personaReasoning
+              : "matched on intent"}
+          </div>
+          {intentSource !== null && intentSource !== "" && (
+            <div data-testid="why-intent">
+              <strong>intent:</strong> {intentSource}
+            </div>
+          )}
         </div>
       )}
     </section>

@@ -36,6 +36,8 @@ function fakeActivity(overrides: Partial<Activity> = {}): Activity {
     ended_at: null,
     steps: [],
     metadata: {},
+    trigger_phrase: null,
+    persona_reasoning: null,
     ...overrides,
   };
 }
