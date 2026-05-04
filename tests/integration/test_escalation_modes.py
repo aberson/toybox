@@ -77,6 +77,7 @@ class _RecordingOfflineGenerator:
         seed: int,
         *,
         persona_id: str | None = None,
+        **_kwargs: Any,  # Step 19: accept available_toys/rooms/resolved_children
     ) -> Activity:
         self.calls.append((intent, slot))
         return _make_activity(intent=intent, slot=slot, source="offline")

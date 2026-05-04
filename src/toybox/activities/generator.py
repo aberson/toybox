@@ -62,6 +62,7 @@ import logging
 import random
 import sqlite3
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
@@ -69,6 +70,14 @@ from typing import Any, Final
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
+from .content_resolver import (
+    SAFE_DEFAULT_TEMPLATE,
+    ResolvedChildren,
+    ResolvedRoom,
+    ResolvedToy,
+    SafeDefaultTemplate,
+    apply_banned_themes_filter,
+)
 from .feedback import Candidate, compute_signature, consult_and_select
 from .models import Activity, ActivityStep
 from .time_of_day import ALWAYS_BUCKET, hour_bucket, is_eligible
@@ -215,34 +224,47 @@ def _filter_always(templates: list[_Template]) -> list[_Template]:
     return [t for t in templates if ALWAYS_BUCKET in t.buckets]
 
 
-def _preview_slot_values(template: _Template, *, slot: str | None) -> tuple[str, ...]:
+def _preview_slot_values(
+    template: _Template,
+    *,
+    slot: str | None,
+    toy: str,
+) -> tuple[str, ...]:
     """Compute the slot values a template would substitute, without
     actually substituting.
 
     Returns the same tuple shape as ``Activity.metadata["slot_values"]``
-    so the signature is stable: ``(slot,)`` if at least one of the
+    so the signature is stable: includes ``slot`` if any of the
     template's title or step texts contains ``{slot}`` and ``slot`` is
-    non-empty, else ``()``. This MUST track ``_substitute`` exactly —
-    if substitution semantics drift, the generator's emitted signature
-    will diverge from what consultation predicted, and feedback rows
-    will silently stop matching. The covering test
+    non-empty, AND includes ``toy`` if the template uses ``{toy}`` and
+    ``toy`` is non-default (i.e. the resolver provided a real catalog
+    name, not the legacy :data:`DEFAULT_TOY_NAME` placeholder). This
+    MUST track ``_substitute`` exactly — if substitution semantics
+    drift, the generator's emitted signature will diverge from what
+    consultation predicted, and feedback rows will silently stop
+    matching. The covering test
     ``test_preview_matches_post_substitution`` pins the equivalence.
     """
-    if slot is None or not slot.strip():
-        return ()
     haystacks: list[str] = [template.title]
     haystacks.extend(s.text for s in template.steps)
-    has_slot = any("{slot}" in h for h in haystacks)
-    return (slot,) if has_slot else ()
+    out: list[str] = []
+    if slot is not None and slot.strip() and any("{slot}" in h for h in haystacks):
+        out.append(slot)
+    if toy != DEFAULT_TOY_NAME and any("{toy}" in h for h in haystacks):
+        out.append(toy)
+    return tuple(out)
 
 
 def _build_candidates(
-    templates: list[_Template], *, slot: str | None
+    templates: list[_Template],
+    *,
+    slot: str | None,
+    toy: str,
 ) -> list[Candidate]:
     """Build :class:`Candidate` rows for feedback consultation."""
     out: list[Candidate] = []
     for t in templates:
-        sv = _preview_slot_values(t, slot=slot)
+        sv = _preview_slot_values(t, slot=slot, toy=toy)
         out.append(
             Candidate(
                 template_id=t.id,
@@ -257,6 +279,7 @@ def _pick_with_consultation(
     templates: list[_Template],
     *,
     slot: str | None,
+    toy: str,
     rng: random.Random,
     conn: sqlite3.Connection | None,
 ) -> _Template:
@@ -266,9 +289,59 @@ def _pick_with_consultation(
     readable and makes the fallback paths share the same behaviour.
     """
     templates_by_id = {t.id: t for t in templates}
-    candidates = _build_candidates(templates, slot=slot)
+    candidates = _build_candidates(templates, slot=slot, toy=toy)
     chosen = consult_and_select(candidates, conn, rng)
     return templates_by_id[chosen.template_id]
+
+
+def _safe_default_to_template() -> _Template:
+    """Convert :data:`SAFE_DEFAULT_TEMPLATE` to the generator's internal shape.
+
+    The content_resolver module ships a tag-free safe-default. The
+    offline picker works with :class:`_Template` instances, so we
+    materialise the dataclass once (pure function, no I/O).
+    """
+    steps_tuple: tuple[_StepTemplate, ...] = tuple(
+        _StepTemplate(
+            text=str(step["text"]),
+            sfx=step.get("sfx"),
+            expected_action=step.get("expected_action"),
+        )
+        for step in SAFE_DEFAULT_TEMPLATE.steps
+    )
+    return _Template(
+        id=SAFE_DEFAULT_TEMPLATE.id,
+        title=SAFE_DEFAULT_TEMPLATE.title,
+        buckets=SAFE_DEFAULT_TEMPLATE.buckets,
+        steps=steps_tuple,
+    )
+
+
+def _apply_banned_themes(
+    templates: list[_Template],
+    banned_themes: Sequence[str],
+) -> list[_Template]:
+    """Filter ``templates`` through the content_resolver banned-themes gate.
+
+    When ALL templates filter out, the gate substitutes the safe-default
+    template. The substitution comes back from
+    :func:`apply_banned_themes_filter` as a single-element list
+    containing :class:`SafeDefaultTemplate`; we convert it to the
+    internal :class:`_Template` so the rest of the picker doesn't need
+    to special-case the type.
+    """
+    if not banned_themes:
+        return templates
+    filtered = apply_banned_themes_filter(templates, banned_themes)
+    converted: list[_Template] = []
+    for tpl in filtered:
+        if isinstance(tpl, SafeDefaultTemplate):
+            converted.append(_safe_default_to_template())
+        elif isinstance(tpl, _Template):
+            converted.append(tpl)
+        # Other types: ignore — defensive against future safe-default
+        # impls that don't match our dataclass.
+    return converted
 
 
 def _select_template(
@@ -277,7 +350,9 @@ def _select_template(
     rng: random.Random,
     *,
     slot: str | None,
+    toy: str,
     conn: sqlite3.Connection | None,
+    banned_themes: Sequence[str] = (),
 ) -> tuple[_Template, str]:
     """Pick one template. Returns ``(template, source_intent)``.
 
@@ -291,15 +366,23 @@ def _select_template(
     pool also gets the consultation, so a parent who has
     ``didnt_work``-flagged the only eligible primary template still
     benefits from anti-signal boosting in the always-fallback pool.
+
+    ``toy`` is the toy name that will be substituted into ``{toy}``
+    placeholders. It's threaded through to candidate-signature
+    computation so the consultation veto matches the eventual
+    activity signature byte-for-byte.
     """
     primary = _load_intent_templates(intent)
-    eligible = _filter_eligible(primary, hour)
+    eligible = _apply_banned_themes(_filter_eligible(primary, hour), banned_themes)
     if eligible:
         eligible.sort(key=lambda t: t.id)
-        return _pick_with_consultation(eligible, slot=slot, rng=rng, conn=conn), intent
+        return (
+            _pick_with_consultation(eligible, slot=slot, toy=toy, rng=rng, conn=conn),
+            intent,
+        )
 
     # Fallback 1: any "always" template within the requested intent.
-    always_primary = _filter_always(primary)
+    always_primary = _apply_banned_themes(_filter_always(primary), banned_themes)
     if always_primary:
         always_primary.sort(key=lambda t: t.id)
         _logger.info(
@@ -308,14 +391,14 @@ def _select_template(
             hour,
         )
         return (
-            _pick_with_consultation(always_primary, slot=slot, rng=rng, conn=conn),
+            _pick_with_consultation(always_primary, slot=slot, toy=toy, rng=rng, conn=conn),
             intent,
         )
 
     # Fallback 2: boredom intent's always pool (final safety net).
     if intent != FALLBACK_INTENT:
         boredom = _load_intent_templates(FALLBACK_INTENT)
-        always_boredom = _filter_always(boredom)
+        always_boredom = _apply_banned_themes(_filter_always(boredom), banned_themes)
         if always_boredom:
             always_boredom.sort(key=lambda t: t.id)
             _logger.info(
@@ -323,9 +406,22 @@ def _select_template(
                 intent,
             )
             return (
-                _pick_with_consultation(always_boredom, slot=slot, rng=rng, conn=conn),
+                _pick_with_consultation(always_boredom, slot=slot, toy=toy, rng=rng, conn=conn),
                 FALLBACK_INTENT,
             )
+
+    # Final escape hatch: every pool was either empty or wiped by the
+    # banned-themes filter. The content_resolver's safe-default IS
+    # tag-free, so this path is reached only when there are also zero
+    # shipped templates — a packaging error. We still surface a usable
+    # activity rather than crashing on a child waiting for one.
+    if banned_themes:
+        _logger.warning(
+            "all template pools wiped by banned_themes filter for intent=%s; "
+            "returning safe-default",
+            intent,
+        )
+        return _safe_default_to_template(), FALLBACK_INTENT
 
     raise RuntimeError(
         f"no offline templates available for intent={intent!r} hour={hour} "
@@ -338,9 +434,18 @@ def _substitute(text: str, *, slot: str | None, toy: str) -> tuple[str, list[str
 
     Returns ``(substituted_text, used_slots)`` where ``used_slots`` is
     the list of NON-DEFAULT slot values that were materially injected
-    into the text. The ``{toy}`` placeholder uses the Phase A literal
-    and does NOT contribute to ``used_slots`` — toys are tracked
-    separately via ``activities.toy_ids`` in Phase C.
+    into the text. Step 19 contract: the picked toy NAME contributes to
+    ``used_slots`` whenever the template actually used ``{toy}`` AND
+    the toy is non-default (i.e. came from the resolved catalog, not
+    the legacy :data:`DEFAULT_TOY_NAME` placeholder).
+
+    Including the toy name makes the Phase D step 20 signature
+    sensitive to the picked toy: a parent's ``didnt_work`` on
+    "Bluey + boredom_quiet" no longer also vetoes
+    "Buzz Lightyear + boredom_quiet", so feedback is per-(template,
+    slot, toy) and not per-(template, slot). Pre-step-19 feedback rows
+    (with empty toy) simply won't match any new signature — that's the
+    documented noise floor; they don't crash anything.
     """
     used: list[str] = []
     out = text
@@ -354,6 +459,8 @@ def _substitute(text: str, *, slot: str | None, toy: str) -> tuple[str, list[str
 
     if "{toy}" in out:
         out = out.replace("{toy}", toy)
+        if toy != DEFAULT_TOY_NAME:
+            used.append(toy)
 
     return out, used
 
@@ -419,6 +526,26 @@ def _derive_uuid(
     return str(uuid.UUID(bytes=bytes(raw)))
 
 
+def _pick_toy_name(
+    available_toys: Sequence[ResolvedToy],
+    rng: random.Random,
+) -> str:
+    """Deterministically pick a toy display name from ``available_toys``.
+
+    Falls back to :data:`DEFAULT_TOY_NAME` when the input is empty so
+    the Phase A placeholder behaviour holds for empty-catalog tests.
+    """
+    if not available_toys:
+        return DEFAULT_TOY_NAME
+    names = [entry.display_name for entry in available_toys]
+    if not names:
+        return DEFAULT_TOY_NAME
+    # Sort for determinism — caller's ordering is already stable but
+    # belt-and-braces here so a future caller can pass an unsorted list.
+    names_sorted = sorted(names)
+    return rng.choice(names_sorted)
+
+
 def generate(
     intent: str,
     slot: str | None,
@@ -428,6 +555,9 @@ def generate(
     *,
     persona_id: str | None = None,
     conn: sqlite3.Connection | None = None,
+    available_toys: Sequence[ResolvedToy] = (),
+    available_rooms: Sequence[ResolvedRoom] = (),
+    resolved_children: ResolvedChildren | None = None,
 ) -> Activity:
     """Generate a deterministic 5-step :class:`Activity`.
 
@@ -441,11 +571,10 @@ def generate(
         context: Optional caller-supplied context dict. Currently only
             used as part of the determinism key (so two calls with
             different contexts produce different UUIDs even if all
-            other inputs match). Phase C step 18 will grow this to
-            carry real toys, rooms, banned themes. Values MUST be
-            JSON-serialisable (``None``, ``bool``, ``int``, ``float``,
-            ``str``, ``list``, ``dict``) — otherwise :class:`TypeError`
-            is raised with the offending key.
+            other inputs match). Values MUST be JSON-serialisable
+            (``None``, ``bool``, ``int``, ``float``, ``str``, ``list``,
+            ``dict``) — otherwise :class:`TypeError` is raised with the
+            offending key.
         hour: Current local hour (0..23). Drives template eligibility
             via :func:`toybox.activities.time_of_day.is_eligible`.
         seed: Integer seed for the internal :class:`random.Random`.
@@ -462,6 +591,21 @@ def generate(
             penalty) per :mod:`toybox.activities.feedback`. When
             ``None`` (test path / non-DB callers), behaves exactly
             like the Phase A picker.
+        available_toys: Resolved toys from
+            :func:`toybox.activities.content_resolver.resolve_toys`.
+            When non-empty, the ``{toy}`` placeholder is substituted
+            with one toy's ``display_name``, picked deterministically
+            from the seeded RNG. When empty, falls back to
+            :data:`DEFAULT_TOY_NAME` (the Phase A placeholder).
+        available_rooms: Resolved rooms — currently informational. The
+            shipped templates don't reference ``{room}``; rooms are
+            carried into the labeled_events ChatML so Phase E SFT
+            sees them, and the Claude path picks them up via the
+            system prompt.
+        resolved_children: Aggregated child constraints from
+            :func:`toybox.activities.content_resolver.resolve_child_profiles`.
+            Drives the offline banned-themes filter — Claude-only
+            reading-level guidance is appended at the call site.
 
     Returns:
         An immutable :class:`Activity` with exactly five
@@ -477,15 +621,39 @@ def generate(
     """
     rng = random.Random(seed)
 
-    template, _source_intent = _select_template(intent, hour, rng, slot=slot, conn=conn)
+    banned_themes: tuple[str, ...] = ()
+    if resolved_children is not None:
+        banned_themes = tuple(resolved_children.banned_themes)
+
+    # Pick the toy name BEFORE template selection so candidate
+    # signatures (used by the feedback consultation) match the
+    # post-substitution signature byte-for-byte. ``rng`` consumption
+    # order matters here — pre-step-19 picks consumed rng for template
+    # selection first, then the toy. Step 19 reverses this so the
+    # toy is in scope when computing each candidate's signature.
+    # Same seed + same available_toys → same toy → same template
+    # (since the template pick is deterministic given the consumed
+    # rng state); the change is invisible to a fixed-seed test as
+    # long as the test seeds the toy list consistently.
+    toy_name = _pick_toy_name(available_toys, rng)
+
+    template, _source_intent = _select_template(
+        intent,
+        hour,
+        rng,
+        slot=slot,
+        toy=toy_name,
+        conn=conn,
+        banned_themes=banned_themes,
+    )
 
     # Substitute placeholders in title and steps.
-    title_text, title_slots = _substitute(template.title, slot=slot, toy=DEFAULT_TOY_NAME)
+    title_text, title_slots = _substitute(template.title, slot=slot, toy=toy_name)
 
     steps: list[ActivityStep] = []
     used_slots: list[str] = list(title_slots)
     for idx, step_tpl in enumerate(template.steps):
-        body, step_slots = _substitute(step_tpl.text, slot=slot, toy=DEFAULT_TOY_NAME)
+        body, step_slots = _substitute(step_tpl.text, slot=slot, toy=toy_name)
         used_slots.extend(step_slots)
         steps.append(
             ActivityStep(

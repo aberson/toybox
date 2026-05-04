@@ -50,6 +50,7 @@ import asyncio
 import json
 import logging
 import os
+import sqlite3
 import time
 import zlib
 from collections.abc import Awaitable, Callable
@@ -58,6 +59,15 @@ from typing import Any, Final
 
 from pydantic import ValidationError
 
+from ..activities.content_resolver import (
+    ResolvedChildren,
+    ResolvedRoom,
+    ResolvedToy,
+    build_claude_directive,
+    resolve_child_profiles,
+    resolve_rooms,
+    resolve_toys,
+)
 from ..activities.generator import FALLBACK_INTENT, build_generator_context, generate
 from ..activities.models import Activity
 from ..ai.breaker import BreakerState, CircuitBreaker
@@ -120,6 +130,17 @@ LabeledEventRecorder = Callable[[Activity, GeneratorContext, str], int]
 # successful ``record`` call. ``None`` disables judge sampling
 # entirely (tests + smoke).
 JudgeCallFactory = Callable[..., Awaitable[Any]]
+
+# Type alias for the SQLite connection factory injected into the
+# dispatcher so it can resolve real catalog content (toys, rooms,
+# child profiles) per-event. Production wires a partial that opens a
+# fresh connection at the resolved DB path; tests pass a small lambda
+# returning an in-memory test DB. The dispatcher takes ownership of
+# the connection it receives — it closes it after each resolve. When
+# ``None`` (existing tests + the smoke harness pre-step-19), the
+# dispatcher skips resolution and falls back to the Phase A
+# placeholders, which is the documented degraded mode.
+ConnectionFactory = Callable[[], sqlite3.Connection]
 
 
 def _env_float(name: str, default: float) -> float:
@@ -228,9 +249,47 @@ def _claude_user_prompt(
     return "\n".join(parts)
 
 
-def _claude_system_prompt() -> str:
-    """The system prompt asking Claude to emit a strict :class:`Activity` JSON."""
-    return (
+class ResolvedContent:
+    """Per-dispatch catalog snapshot.
+
+    Holds the toys, rooms, and aggregated child constraints resolved
+    for a SINGLE escalation dispatch. Both the offline path and the
+    Claude directive path read from the same instance so a parent edit
+    that lands mid-dispatch can't surface a different banned-themes
+    set to the offline fallback vs. the Claude prompt.
+
+    The empty instance (zero toys, rooms, default ResolvedChildren) is
+    the documented degraded mode when the connection_factory is None
+    or the resolver raised — both call sites tolerate empty inputs and
+    surface Phase A placeholders.
+    """
+
+    __slots__ = ("toys", "rooms", "children")
+
+    def __init__(
+        self,
+        *,
+        toys: tuple[ResolvedToy, ...] = (),
+        rooms: tuple[ResolvedRoom, ...] = (),
+        children: ResolvedChildren | None = None,
+    ) -> None:
+        self.toys = toys
+        self.rooms = rooms
+        self.children = children if children is not None else ResolvedChildren()
+
+
+def _claude_system_prompt(directive: str | None = None) -> str:
+    """The system prompt asking Claude to emit a strict :class:`Activity` JSON.
+
+    Args:
+        directive: Optional banned-themes + reading-level guidance from
+            :func:`toybox.activities.content_resolver.build_claude_directive`.
+            Appended verbatim to the bottom of the system prompt when
+            non-empty. The empty string and ``None`` are both treated
+            as "no extra guidance" so the call site can build the
+            directive unconditionally.
+    """
+    base = (
         "You generate short play activities for a child's interactive toy. "
         "Reply with EXACTLY one JSON object matching this schema and nothing else "
         "(no prose, no code fences):\n"
@@ -248,6 +307,9 @@ def _claude_system_prompt() -> str:
         "Each `text` is a single sentence the toy speaks aloud. "
         "Do not include trailing commentary."
     )
+    if directive:
+        return base + "\n" + directive
+    return base
 
 
 class EscalationDispatcher:
@@ -302,6 +364,7 @@ class EscalationDispatcher:
         clock: Callable[[], float] | None = None,
         labeled_event_recorder: LabeledEventRecorder | None = None,
         judge_call_factory: JudgeCallFactory | None = None,
+        connection_factory: ConnectionFactory | None = None,
     ) -> None:
         self._ai_client = ai_client
         self._breaker = breaker
@@ -328,6 +391,15 @@ class EscalationDispatcher:
         # :class:`AIClient` + ``db_path_resolver``. ``None`` disables
         # judge sampling — the row still records, just without scores.
         self._judge_call_factory = judge_call_factory
+        # ``connection_factory`` is the Step 19 hook that lets the
+        # dispatcher resolve real catalog content (toys, rooms, child
+        # profiles) for both the offline AND Claude paths. ``None``
+        # disables resolution — the dispatcher falls back to the Phase A
+        # placeholders + an empty Claude directive, which keeps existing
+        # tests working without a DB and matches the smoke-harness
+        # behaviour (smoke is offline-only and resolves in its own
+        # persist hook).
+        self._connection_factory = connection_factory
 
     # ------------------------------------------------------------------
     # Public API
@@ -355,13 +427,15 @@ class EscalationDispatcher:
             if not intents:
                 return None
             primary = intents[0]
-            activity = self._offline_activity(primary.name, primary.slot)
+            content = self._resolve_content()
+            activity = self._offline_activity(primary.name, primary.slot, content)
             self._record(
                 activity=activity,
                 intent=primary.name,
                 slot=primary.slot,
                 transcript_text=transcript.text,
                 generator_path=GENERATOR_PATH_OFFLINE,
+                content=content,
             )
             return activity
 
@@ -445,14 +519,23 @@ class EscalationDispatcher:
         return an offline Activity so the caller always gets something
         playable.
         """
+        # Resolve real catalog content ONCE per dispatch. Both the
+        # offline path and the Claude directive share the same
+        # ``ResolvedContent`` so a single dispatch can't surface
+        # different toy/room/child constraints to the offline fallback
+        # vs. Claude (race-free w.r.t. parent edits during a single
+        # dispatch).
+        content = self._resolve_content()
+
         def _offline_with_record() -> Activity:
-            activity = self._offline_activity(intent, slot)
+            activity = self._offline_activity(intent, slot, content)
             self._record(
                 activity=activity,
                 intent=intent,
                 slot=slot,
                 transcript_text=transcript_text,
                 generator_path=GENERATOR_PATH_OFFLINE,
+                content=content,
             )
             return activity
 
@@ -485,9 +568,7 @@ class EscalationDispatcher:
             _logger.info("claude gate closed (breaker open); offline path")
             return _offline_with_record()
         if breaker_state is BreakerState.half_open and not self._breaker.try_half_open():
-            _logger.info(
-                "claude gate closed (half_open probe slot already taken); offline path"
-            )
+            _logger.info("claude gate closed (half_open probe slot already taken); offline path")
             return _offline_with_record()
 
         if not self._throttle.try_acquire():
@@ -499,7 +580,10 @@ class EscalationDispatcher:
 
         # All gates passed → call Claude. Any failure routes to offline.
         claude_activity = await self._try_claude(
-            intent=intent, slot=slot, transcript_text=transcript_text
+            intent=intent,
+            slot=slot,
+            transcript_text=transcript_text,
+            content=content,
         )
         if claude_activity is not None:
             self._record(
@@ -508,6 +592,7 @@ class EscalationDispatcher:
                 slot=slot,
                 transcript_text=transcript_text,
                 generator_path=GENERATOR_PATH_CLAUDE,
+                content=content,
             )
             return claude_activity
         return _offline_with_record()
@@ -518,6 +603,7 @@ class EscalationDispatcher:
         intent: str,
         slot: str | None,
         transcript_text: str | None,
+        content: ResolvedContent,
     ) -> Activity | None:
         """Single Claude call; returns the parsed Activity or None on failure.
 
@@ -526,8 +612,19 @@ class EscalationDispatcher:
         On 429: ``breaker.record_429(retry_after)``, return None.
         On malformed output: emit ``Topic.system`` warning, return None.
         On success: ``breaker.record_success()``, return the Activity.
+
+        Step 19 wires the banned-themes + reading-level directive into
+        the system prompt: when ``content.children`` carries any
+        constraints, :func:`build_claude_directive` produces the
+        ``"Do NOT include any of: ..."`` plus reading-level guidance
+        and we append it to the schema-shape system prompt. Empty
+        constraints produce an empty directive (no prompt change).
         """
-        system = _claude_system_prompt()
+        directive = build_claude_directive(
+            content.children.banned_themes,
+            content.children.reading_level,
+        )
+        system = _claude_system_prompt(directive=directive)
         user = _claude_user_prompt(intent=intent, slot=slot, transcript_text=transcript_text)
         try:
             response = await self._ai_client.complete_text(
@@ -614,6 +711,7 @@ class EscalationDispatcher:
         slot: str | None,
         transcript_text: str | None,
         generator_path: str,
+        content: ResolvedContent | None = None,
     ) -> None:
         """Best-effort labeled_events write + judge schedule.
 
@@ -624,17 +722,37 @@ class EscalationDispatcher:
         succeeds or fails. After the row lands we hand its ``row_id``
         to :func:`toybox.ai.labeled_events.schedule_judge_sample`; the
         judge runs detached on the event loop and never blocks dispatch.
+
+        ``content`` carries the resolved toys/rooms/child constraints
+        for this dispatch (Step 19) so they show up in the labeled_events
+        ``inputs_chatml_json`` payload and Phase E SFT exports see real
+        catalog data, not the empty placeholders pre-step-19 rows
+        carried.
         """
         if self._labeled_event_recorder is None:
             return
         ctx: GeneratorContext | None = None
         row_id: int | None = None
         try:
+            toy_names: tuple[str, ...] = ()
+            room_names: tuple[str, ...] = ()
+            child_profile_payload: dict[str, Any] | None = None
+            if content is not None:
+                toy_names = tuple(t.display_name for t in content.toys)
+                room_names = tuple(r.display_name for r in content.rooms)
+                if content.children.banned_themes or content.children.reading_level:
+                    child_profile_payload = {
+                        "banned_themes": list(content.children.banned_themes),
+                        "reading_level": content.children.reading_level,
+                    }
             ctx = build_generator_context(
                 intent=intent,
                 slot=slot,
                 transcript_window=transcript_text,
                 persona_id=activity.persona_id,
+                available_toys=toy_names,
+                available_rooms=room_names,
+                child_profile=child_profile_payload,
             )
             row_id = self._labeled_event_recorder(activity, ctx, generator_path)
         except Exception as exc:  # noqa: BLE001 -- eval scaffold must never break dispatch
@@ -663,7 +781,12 @@ class EscalationDispatcher:
                 exc,
             )
 
-    def _offline_activity(self, intent: str, slot: str | None) -> Activity:
+    def _offline_activity(
+        self,
+        intent: str,
+        slot: str | None,
+        content: ResolvedContent,
+    ) -> Activity:
         """Generate a deterministic offline :class:`Activity`.
 
         Maps unknown intent names (e.g. ``mention_toy``) to the
@@ -678,6 +801,12 @@ class EscalationDispatcher:
         repeated dispatches in the same hour for the same intent stay
         deterministic across process restarts (Python's built-in
         ``hash()`` is randomized per-process via PYTHONHASHSEED).
+
+        ``content`` carries Step 19 resolved catalog data — passing it
+        through the generator means trigger-driven offline activities
+        substitute real toy names (instead of the legacy
+        ``Mr. Unicorn`` placeholder) AND apply the banned-themes
+        filter to template selection.
         """
         hour = datetime.fromtimestamp(self._clock()).hour
         seed = zlib.crc32(repr((intent, slot, hour)).encode("utf-8"))
@@ -685,9 +814,12 @@ class EscalationDispatcher:
             return self._offline_generator(
                 intent,
                 slot,
-                None,  # context — Phase C step 18 wires real toys/rooms
+                None,  # context — generator's UUID input; not the resolver
                 hour,
                 seed,
+                available_toys=content.toys,
+                available_rooms=content.rooms,
+                resolved_children=content.children,
             )
         except Exception as exc:  # noqa: BLE001 -- last-ditch fallback
             # The offline generator should never fail for a shipped
@@ -708,15 +840,78 @@ class EscalationDispatcher:
                 None,
                 hour,
                 seed,
+                available_toys=content.toys,
+                available_rooms=content.rooms,
+                resolved_children=content.children,
             )
+
+    def _resolve_content(self) -> ResolvedContent:
+        """Resolve real catalog content for the next dispatch.
+
+        Returns an empty :class:`ResolvedContent` when no
+        ``connection_factory`` is wired (existing tests + smoke
+        harness path) — the generator + Claude directive both tolerate
+        empty inputs and degrade to Phase A placeholders.
+
+        Resolver failures (sqlite errors, missing tables) log WARNING
+        and degrade to the same empty content rather than 500'ing a
+        kid-facing dispatch.
+
+        Multi-child policy: trigger-driven activities have no explicit
+        child_ids (no API caller specified them), so we resolve ALL
+        children in the table. Aggregated constraints follow the
+        most-restrictive-wins rule from
+        :func:`toybox.activities.content_resolver.aggregate_child_constraints`
+        (banned_themes UNION; reading_level MIN). The ``children``
+        table doesn't have an ``archived`` column today, so "all
+        children" is literal — a future migration that adds archive
+        semantics will need to filter here too.
+        """
+        if self._connection_factory is None:
+            return ResolvedContent()
+        try:
+            conn = self._connection_factory()
+        except Exception as exc:  # noqa: BLE001 -- defensive
+            _logger.warning(
+                "connection_factory raised (%s: %s); resolver disabled for this dispatch",
+                type(exc).__name__,
+                exc,
+            )
+            return ResolvedContent()
+        try:
+            try:
+                toys = tuple(resolve_toys(conn))
+                rooms = tuple(resolve_rooms(conn))
+                child_id_rows = conn.execute("SELECT id FROM children").fetchall()
+                child_ids = [str(row["id"]) for row in child_id_rows]
+                children = resolve_child_profiles(conn, child_ids)
+            except sqlite3.Error as exc:
+                _logger.warning(
+                    "content_resolver query failed in dispatcher (%s); "
+                    "falling back to placeholders",
+                    exc,
+                )
+                return ResolvedContent()
+            return ResolvedContent(toys=toys, rooms=rooms, children=children)
+        finally:
+            try:
+                conn.close()
+            except Exception as exc:  # noqa: BLE001 -- never leak a close error
+                _logger.warning(
+                    "resolver connection close failed (%s: %s)",
+                    type(exc).__name__,
+                    exc,
+                )
 
 
 __all__ = [
     "DEFAULT_SPONTANEOUS_INTERVAL_SEC",
+    "ConnectionFactory",
     "EscalationDispatcher",
     "INVALID_PREVIEW_LIMIT",
     "JudgeCallFactory",
     "LabeledEventRecorder",
+    "ResolvedContent",
     "SPONTANEOUS_INTENT",
     "SPONTANEOUS_INTERVAL_SEC_ENV",
     "spontaneous_interval_from_env",

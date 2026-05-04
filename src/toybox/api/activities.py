@@ -29,6 +29,13 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
+from ..activities.content_resolver import (
+    ResolvedRoom,
+    ResolvedToy,
+    resolve_child_profiles,
+    resolve_rooms,
+    resolve_toys,
+)
 from ..activities.feedback import (
     KIND_DIDNT_WORK,
     KIND_DISMISSED_PRE_APPROVAL,
@@ -247,6 +254,27 @@ def _resolve_only_child(conn: sqlite3.Connection) -> list[str]:
     if len(rows) == 1:
         return [str(rows[0]["id"])]
     return []
+
+
+def _resolve_propose_child_ids(
+    conn: sqlite3.Connection,
+    context: dict[str, Any] | None,
+) -> list[str]:
+    """Pick the child_ids the propose flow should aggregate constraints from.
+
+    Caller-supplied ``context["child_ids"]`` wins (multi-child propose
+    can pass an explicit list); otherwise we fall through to the
+    "singleton child" auto-detect which is what the v1 kiosk uses.
+    Empty list means no per-child constraints (no banned-themes, no
+    reading-level guidance) — that's the legitimate fresh-DB case.
+    """
+    if context is not None:
+        raw = context.get("child_ids")
+        if isinstance(raw, list):
+            cleaned = [str(c) for c in raw if isinstance(c, str) and c]
+            if cleaned:
+                return cleaned
+    return _resolve_only_child(conn)
 
 
 def _activity_signature(conn: sqlite3.Connection, activity_id: str) -> str | None:
@@ -597,6 +625,24 @@ def _do_propose(
         if picked is not None:
             effective_persona_id = picked["id"]
             persona_meta = picked
+    # Step 19: resolve real catalog content (toys, rooms, children)
+    # BEFORE generating. The resolver is best-effort — sqlite errors
+    # log WARNING and degrade to empty inputs (placeholder vocabulary)
+    # so propose can never 500 on a missing/corrupt catalog row.
+    resolved_toys: list[ResolvedToy] = []
+    resolved_rooms: list[ResolvedRoom] = []
+    resolved_children = None
+    try:
+        resolved_toys = resolve_toys(conn)
+        resolved_rooms = resolve_rooms(conn)
+        propose_child_ids = _resolve_propose_child_ids(conn, body.context)
+        resolved_children = resolve_child_profiles(conn, propose_child_ids)
+    except sqlite3.Error:
+        _logger.warning(
+            "content_resolver query failed on propose; falling back to placeholders",
+            exc_info=True,
+        )
+
     # Pass ``conn`` so the picker consults the ``feedback`` table —
     # past parent ``didnt_work``/``loved_it``/``dismissed_pre_approval``
     # entries adjust candidate ranking per Phase D step 20. The
@@ -610,6 +656,9 @@ def _do_propose(
         seed=body.seed,
         persona_id=effective_persona_id,
         conn=conn,
+        available_toys=resolved_toys,
+        available_rooms=resolved_rooms,
+        resolved_children=resolved_children,
     )
     session_id = _ensure_session(conn, body.session_id)
 
@@ -668,11 +717,30 @@ def _do_propose(
     ctx: Any = None
     row_id: int | None = None
     try:
+        # Step 19: surface real toys/rooms/profile in inputs_chatml_json
+        # so Phase E SFT exports see catalog content — not the empty
+        # placeholders that pre-step-19 rows carried. ``available_toys``
+        # is materialised as the toy display names; rooms include their
+        # features for richer system-prompt context.
+        toy_names: tuple[str, ...] = tuple(t.display_name for t in resolved_toys)
+        room_names: tuple[str, ...] = tuple(r.display_name for r in resolved_rooms)
+        child_profile_payload: dict[str, Any] | None = None
+        if resolved_children is not None and (
+            resolved_children.banned_themes or resolved_children.reading_level
+        ):
+            child_profile_payload = {
+                "banned_themes": list(resolved_children.banned_themes),
+                "reading_level": resolved_children.reading_level,
+            }
         ctx = build_generator_context(
             intent=body.intent,
             slot=body.slot,
             persona_id=activity.persona_id,
-            extra={"hour": body.hour, "seed": body.seed} if body.context is None
+            available_toys=toy_names,
+            available_rooms=room_names,
+            child_profile=child_profile_payload,
+            extra={"hour": body.hour, "seed": body.seed}
+            if body.context is None
             else {"hour": body.hour, "seed": body.seed, "caller_context": body.context},
         )
         row_id = record_generation(
@@ -793,18 +861,14 @@ def post_dismiss(
     )
     if not ok:
         raise VersionConflictError(int(row["version"]), str(row["state"]))
-    _safe_update_parent_signal(
-        conn, activity_id=activity_id, signal=PARENT_SIGNAL_DISMISS
-    )
+    _safe_update_parent_signal(conn, activity_id=activity_id, signal=PARENT_SIGNAL_DISMISS)
     # Phase D step 20: dismiss-before-approval is a soft anti-signal.
     # Only write the feedback row when the activity was still in the
     # ``proposed`` state at the moment of dismiss — a parent who
     # dismisses an *approved* (or running) activity already has the
     # ``end-early`` / ``didnt-work`` paths available for harder signals.
     if current_state == PROPOSED_STATE:
-        _write_feedback(
-            conn, activity_id=activity_id, kind=KIND_DISMISSED_PRE_APPROVAL
-        )
+        _write_feedback(conn, activity_id=activity_id, kind=KIND_DISMISSED_PRE_APPROVAL)
     response = _row_to_response(conn, row)
     _emit_state(pubsub, response)
     return response
@@ -848,9 +912,7 @@ def post_regenerate(
             new_state=DISMISSED_STATE,
         )
         if not ok:
-            raise VersionConflictError(
-                int(dismissed_row["version"]), str(dismissed_row["state"])
-            )
+            raise VersionConflictError(int(dismissed_row["version"]), str(dismissed_row["state"]))
         _emit_state(pubsub, _row_to_response(conn, dismissed_row))
     elif current_state in skip_states:
         # Source already terminal — no transition. Fall through to propose.
@@ -1054,9 +1116,7 @@ def post_thumbs_up(
     with it.
     """
     row = _fetch_activity_row(conn, activity_id)
-    _safe_update_parent_signal(
-        conn, activity_id=activity_id, signal=PARENT_SIGNAL_THUMBS_UP
-    )
+    _safe_update_parent_signal(conn, activity_id=activity_id, signal=PARENT_SIGNAL_THUMBS_UP)
     # Phase D step 20: thumbs-up boosts future picks of the same
     # signature. Idempotent at the parent's level (clicking twice
     # writes two rows; the consultation stacks weights, so a

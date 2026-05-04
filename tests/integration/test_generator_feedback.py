@@ -207,7 +207,12 @@ def test_preview_matches_post_substitution() -> None:
         assert chosen is not None, (
             f"could not locate template {a.template_id!r} for intent={intent!r}"
         )
-        predicted_sv = _preview_slot_values(chosen, slot=slot)
+        # No available_toys passed to generate(...) above → toy =
+        # DEFAULT_TOY_NAME, which means {toy} is NOT included in the
+        # signature (preview matches the empty-catalog substitution).
+        from toybox.activities.generator import DEFAULT_TOY_NAME  # noqa: PLC0415
+
+        predicted_sv = _preview_slot_values(chosen, slot=slot, toy=DEFAULT_TOY_NAME)
         predicted_sig = compute_signature(a.template_id, predicted_sv)
         assert predicted_sig == a.metadata["signature"], (
             f"signature drift for intent={intent!r} slot={slot!r} seed={seed}: "
@@ -396,9 +401,7 @@ def test_generate_with_conn_respects_didnt_work(db: sqlite3.Connection) -> None:
     # Across many seeds, the emitted signature must never be the vetoed one.
     for seed in range(40):
         a = generate(intent, slot, None, hour, seed, conn=db)
-        assert a.metadata["signature"] != vetoed, (
-            f"seed={seed}: generator picked vetoed signature"
-        )
+        assert a.metadata["signature"] != vetoed, f"seed={seed}: generator picked vetoed signature"
 
 
 def test_generate_without_conn_unaffected_by_feedback(db: sqlite3.Connection) -> None:

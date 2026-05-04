@@ -1287,6 +1287,7 @@ What to look for:
 - **Issue:** #33
 - **Flags:** --reviewers code
 - **Depends on:** Steps 16, 17, 18 (consumes their data); also re-validates step 20 still works
+- **Status:** DONE (2026-05-03, commit `<hash>`)
 
 #### Manual M3 — Real play session (after Phase C)
 
