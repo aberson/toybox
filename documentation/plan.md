@@ -1261,7 +1261,7 @@ What to look for:
 - **Type:** full-stack
 - **Issue:** #30
 - **Flags:** --reviewers full --ui (canonical) — running autonomously this session as `--reviewers code` per operating mode note above
-- **Status:** DONE (2026-05-03, commit `<pending>`)
+- **Status:** DONE (2026-05-03, commit `1dc55ac`) — visual UI verification pending bundled test pass after steps 17, 19 land. Notable: HEIC narrowed to heic/heix only (HEVC video brands rejected); MIME sniffer is custom magic-byte detector (python-magic unreliable on Windows); `_staging_extensions` in-memory registry ages entries on the same TTL as on-disk janitor.
 
 #### Step 17: Room ingest bulk (vision + UI)
 
