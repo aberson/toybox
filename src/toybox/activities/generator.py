@@ -60,6 +60,7 @@ import hashlib
 import json
 import logging
 import random
+import re
 import sqlite3
 import uuid
 from collections.abc import Sequence
@@ -80,6 +81,7 @@ from .content_resolver import (
 )
 from .feedback import Candidate, compute_signature, consult_and_select
 from .models import Activity, ActivityStep
+from .slots import SIGNATURE_CONTRIBUTING_SLOTS, SlotRegistry
 from .time_of_day import ALWAYS_BUCKET, hour_bucket, is_eligible
 
 _logger = logging.getLogger(__name__)
@@ -429,39 +431,93 @@ def _select_template(
     )
 
 
-def _substitute(text: str, *, slot: str | None, toy: str) -> tuple[str, list[str]]:
-    """Substitute ``{slot}`` and ``{toy}`` placeholders.
+# Match ``{name}`` placeholders. Slot names are lower-snake-case;
+# anything outside that alphabet (numbers, hyphens, etc.) is left
+# unmatched so JSON-y braces in step text wouldn't accidentally trip
+# the substitutor.
+_SLOT_PATTERN: Final[re.Pattern[str]] = re.compile(r"\{([a-z_][a-z_]*)\}")
 
-    Returns ``(substituted_text, used_slots)`` where ``used_slots`` is
-    the list of NON-DEFAULT slot values that were materially injected
-    into the text. Step 19 contract: the picked toy NAME contributes to
-    ``used_slots`` whenever the template actually used ``{toy}`` AND
-    the toy is non-default (i.e. came from the resolved catalog, not
-    the legacy :data:`DEFAULT_TOY_NAME` placeholder).
 
-    Including the toy name makes the Phase D step 20 signature
-    sensitive to the picked toy: a parent's ``didnt_work`` on
-    "Bluey + boredom_quiet" no longer also vetoes
-    "Buzz Lightyear + boredom_quiet", so feedback is per-(template,
-    slot, toy) and not per-(template, slot). Pre-step-19 feedback rows
-    (with empty toy) simply won't match any new signature — that's the
-    documented noise floor; they don't crash anything.
+def _resolve_template_slots(
+    template: _Template,
+    *,
+    slot: str | None,
+    toy: str,
+    registry: SlotRegistry,
+    rng: random.Random,
+) -> dict[str, str]:
+    """Resolve every placeholder in a template ONCE, in deterministic order.
+
+    Walks ``template.title`` and every step's text, collects unique
+    placeholder names in order of first occurrence, and resolves each
+    one. Resolving once per template (vs once per step) is what makes
+    ``{action_verb}`` consistent across the title and all steps —
+    otherwise step 1 would say "stomp" and step 3 would say "spin"
+    and the activity would feel incoherent.
+
+    The first-occurrence ordering is what determines RNG consumption
+    order. It's stable per template-id, so the same seed always
+    produces the same fills.
+
+    ``{toy}`` and ``{slot}`` are resolved without consuming RNG
+    (they're already-decided inputs); registry-backed slots consume
+    RNG via ``registry.fill``.
+    """
+    haystack = template.title + " " + " ".join(s.text for s in template.steps)
+    seen: set[str] = set()
+    order: list[str] = []
+    for match in _SLOT_PATTERN.finditer(haystack):
+        name = match.group(1)
+        if name not in seen:
+            seen.add(name)
+            order.append(name)
+
+    resolved: dict[str, str] = {}
+    for name in order:
+        if name == "slot":
+            if slot is not None and slot.strip():
+                resolved[name] = slot
+            else:
+                resolved[name] = DEFAULT_SLOT_FILLER
+        elif name == "toy":
+            resolved[name] = toy
+        else:
+            resolved[name] = registry.fill(name, rng)
+    return resolved
+
+
+def _substitute(
+    text: str,
+    slot_values: dict[str, str],
+) -> tuple[str, list[str]]:
+    """Apply pre-resolved slot values to ``text``.
+
+    Returns ``(substituted_text, signature_slot_values)``. The second
+    element is the subset of slot values that should contribute to
+    the activity's feedback signature — see
+    :data:`toybox.activities.slots.SIGNATURE_CONTRIBUTING_SLOTS` for
+    the rationale (catalog-backed and caller-supplied slots are
+    semantic; word-list fills are surface variety and share signature
+    so feedback aggregates).
+
+    Default toy / slot values are excluded from the signature
+    contribution so a Phase A empty-catalog test doesn't pollute the
+    signature space with placeholder strings.
     """
     used: list[str] = []
     out = text
-
-    if "{slot}" in out:
-        if slot is not None and slot.strip():
-            out = out.replace("{slot}", slot)
-            used.append(slot)
-        else:
-            out = out.replace("{slot}", DEFAULT_SLOT_FILLER)
-
-    if "{toy}" in out:
-        out = out.replace("{toy}", toy)
-        if toy != DEFAULT_TOY_NAME:
-            used.append(toy)
-
+    for name, value in slot_values.items():
+        placeholder = f"{{{name}}}"
+        if placeholder not in out:
+            continue
+        out = out.replace(placeholder, value)
+        if name not in SIGNATURE_CONTRIBUTING_SLOTS:
+            continue
+        if name == "toy" and value == DEFAULT_TOY_NAME:
+            continue
+        if name == "slot" and value == DEFAULT_SLOT_FILLER:
+            continue
+        used.append(value)
     return out, used
 
 
@@ -647,13 +703,26 @@ def generate(
         banned_themes=banned_themes,
     )
 
+    # Resolve every parametric slot (``{room}``, ``{action_verb}``,
+    # ``{adjective}``, etc.) once per template so the title and all
+    # steps share the same fills — without this, step 1 might say
+    # "stomp" and step 3 "spin" and the activity reads incoherently.
+    registry = SlotRegistry.from_resolved(available_rooms)
+    slot_values = _resolve_template_slots(
+        template,
+        slot=slot,
+        toy=toy_name,
+        registry=registry,
+        rng=rng,
+    )
+
     # Substitute placeholders in title and steps.
-    title_text, title_slots = _substitute(template.title, slot=slot, toy=toy_name)
+    title_text, title_slots = _substitute(template.title, slot_values)
 
     steps: list[ActivityStep] = []
     used_slots: list[str] = list(title_slots)
     for idx, step_tpl in enumerate(template.steps):
-        body, step_slots = _substitute(step_tpl.text, slot=slot, toy=toy_name)
+        body, step_slots = _substitute(step_tpl.text, slot_values)
         used_slots.extend(step_slots)
         steps.append(
             ActivityStep(

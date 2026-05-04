@@ -317,6 +317,83 @@ def test_generate_with_none_slot_still_works() -> None:
     assert a.metadata["slot_values"] == ()
 
 
+def test_parametric_template_yields_variety_across_seeds() -> None:
+    """Same parametric template + different seeds = different surface text.
+
+    Pin the system end-to-end: when the picker lands on a parametric
+    template (one that uses ``{action_verb}`` / ``{adjective}`` /
+    ``{prop}`` / etc.), filling the same template at different seeds
+    must produce visibly different titles. This is the property that
+    makes "few templates × parametric slots = nearly infinite outputs"
+    real, and a regression here would silently collapse offline
+    variety back to the pre-step-21 lock-in feel.
+    """
+    from toybox.activities.content_resolver import ResolvedRoom, ResolvedToy
+
+    toys = (
+        ResolvedToy(
+            id="t1", display_name="Bluey", tags=("dog",), last_used_at=None,
+        ),
+    )
+    rooms = (
+        ResolvedRoom(id="r1", display_name="Living Room", features=()),
+    )
+
+    # Force the parametric template by filtering activities to it. The
+    # picker is weighted-random across eligible templates, so we
+    # sample widely and keep the parametric ones.
+    target_template = "play_anytime_silly_walk"
+    titles: set[str] = set()
+    for seed in range(200):
+        a = generate(
+            "request_play", "freeplay", None, 22, seed,
+            available_toys=toys, available_rooms=rooms,
+        )
+        if a.template_id == target_template:
+            titles.add(a.title)
+        if len(titles) >= 5:
+            break
+    # At least 3 distinct titles for the same template across seeds —
+    # proves slot fills actually vary.
+    assert len(titles) >= 3, sorted(titles)
+
+
+def test_parametric_template_signature_is_stable_across_word_fills() -> None:
+    """``{action_verb}`` / ``{adjective}`` / etc. must NOT contribute to
+    the activity signature.
+
+    Surface variety should aggregate under one signature so feedback
+    accumulates per (template, slot, toy) regardless of which silly
+    word the picker happened to use this time. Pin the contract end-
+    to-end.
+    """
+    from toybox.activities.content_resolver import ResolvedRoom, ResolvedToy
+
+    toys = (
+        ResolvedToy(
+            id="t1", display_name="Bluey", tags=("dog",), last_used_at=None,
+        ),
+    )
+    rooms = (
+        ResolvedRoom(id="r1", display_name="Living Room", features=()),
+    )
+    target_template = "play_anytime_silly_walk"
+    sigs: set[str] = set()
+    titles_seen: set[str] = set()
+    for seed in range(200):
+        a = generate(
+            "request_play", "freeplay", None, 22, seed,
+            available_toys=toys, available_rooms=rooms,
+        )
+        if a.template_id == target_template:
+            sigs.add(a.metadata["signature"])
+            titles_seen.add(a.title)
+    # Multiple distinct titles (real variety), but exactly ONE
+    # signature (word fills don't fragment feedback).
+    assert len(titles_seen) >= 3, sorted(titles_seen)
+    assert len(sigs) == 1, sigs
+
+
 # ---------------------------------------------------------------------------
 # 10 sample inputs that must produce coherent activities
 # ---------------------------------------------------------------------------

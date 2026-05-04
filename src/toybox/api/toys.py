@@ -60,6 +60,7 @@ from ..storage.images import (
     downscale_for_vision,
     find_dedup,
     max_upload_bytes,
+    on_disk_image_path,
     relative_committed_path,
     stage,
     sweep_stale_staging,
@@ -726,6 +727,121 @@ def patch_toy(
             refresh_mention_toys(conn)
         except Exception:  # noqa: BLE001
             _logger.warning("refresh_mention_toys failed after patch", exc_info=True)
+    row = _fetch_toy_row(conn, toy_id)
+    return _row_to_response(row)
+
+
+@router.post("/{toy_id}/image", response_model=ToyResponse)
+async def post_replace_image(
+    toy_id: str,
+    file: Annotated[UploadFile, File()],
+    conn: Annotated[sqlite3.Connection, Depends(get_toys_db)],
+    _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
+) -> ToyResponse:
+    """Replace the toy's image with an uploaded file.
+
+    Mirrors the validate-then-stage-then-commit flow of ``/upload`` +
+    ``POST /api/toys`` but in a single step: there's no vision
+    suggestion phase (the parent already named the toy on first
+    create). Re-uploading the toy's *current* image is a no-op
+    success — the dedup check excludes the row we're editing so the
+    parent doesn't get a 409 against themselves.
+    """
+    existing = _fetch_toy_row(conn, toy_id)
+
+    cap = max_upload_bytes()
+    try:
+        raw = await _read_upload_bytes(file, cap)
+    except UploadValidationError as exc:
+        raise HTTPException(
+            status_code=exc.http_status,
+            detail={"code": exc.code, **exc.detail},
+        ) from exc
+
+    try:
+        validated = validate_upload(raw, file.content_type)
+    except UploadValidationError as exc:
+        raise HTTPException(
+            status_code=exc.http_status,
+            detail={"code": exc.code, **exc.detail},
+        ) from exc
+
+    new_hash = compute_hash(raw)
+
+    # No-op: client re-picked the same image. Skip the disk churn.
+    if new_hash == str(existing["image_hash"]):
+        return _row_to_response(existing)
+
+    # Dedup against OTHER non-archived toys. Allow self because the
+    # ``new_hash == existing hash`` path already short-circuited above.
+    dup = find_dedup(conn, "toys", new_hash)
+    if dup is not None and str(dup["id"]) != toy_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "image_already_exists",
+                "existing_toy": _row_to_response(dup).model_dump(),
+            },
+        )
+
+    handle = stage(raw, validated)
+    try:
+        committed = commit_staging(handle, target_subdir="toys")
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"code": "stage_lost"},
+        ) from exc
+    except StagingLockedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"code": "staging_locked"},
+        ) from exc
+
+    new_image_path = relative_committed_path("toys", handle.filename)
+    new_image_hash = compute_hash(committed.read_bytes())
+    old_image_path = str(existing["image_path"])
+
+    try:
+        with conn:
+            conn.execute(
+                "UPDATE toys SET image_path = ?, image_hash = ? WHERE id = ?",
+                (new_image_path, new_image_hash, toy_id),
+            )
+    except sqlite3.IntegrityError as exc:
+        # Concurrent insert raced us to the same hash. Roll back the
+        # just-committed file so the FS doesn't accumulate orphans.
+        try:
+            committed.unlink()
+        except OSError:
+            _logger.warning("replace rollback: could not unlink %s", committed)
+        race_dup = find_dedup(conn, "toys", new_image_hash)
+        if race_dup is not None and str(race_dup["id"]) != toy_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "image_already_exists",
+                    "existing_toy": _row_to_response(race_dup).model_dump(),
+                },
+            ) from exc
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "db_constraint_violation"},
+        ) from exc
+
+    # Best-effort old-file cleanup. Failure here is non-fatal — the
+    # row already points at the new file, the old one just lingers
+    # for the future janitor.
+    if old_image_path and old_image_path != new_image_path:
+        try:
+            old_disk = on_disk_image_path(old_image_path)
+            old_disk.unlink(missing_ok=True)
+        except (ValueError, OSError):
+            _logger.warning(
+                "replace: failed to unlink old image %s", old_image_path,
+                exc_info=True,
+            )
+
     row = _fetch_toy_row(conn, toy_id)
     return _row_to_response(row)
 

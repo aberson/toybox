@@ -100,6 +100,7 @@ from ..storage.images import (
     downscale_for_vision,
     find_dedup,
     max_upload_bytes,
+    on_disk_image_path,
     relative_committed_path,
     stage,
     staging_path,
@@ -1108,41 +1109,137 @@ def patch_room(
     return _row_to_room(row)
 
 
+@router.post("/{room_id}/image", response_model=RoomResponse)
+async def post_replace_room_image(
+    room_id: str,
+    file: Annotated[UploadFile, File()],
+    conn: Annotated[sqlite3.Connection, Depends(get_rooms_db)],
+    _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
+) -> RoomResponse:
+    """Replace the room's primary image with an uploaded file.
+
+    Single-file flow (vs the bulk ingest endpoint) — the room already
+    exists, we're just swapping its canonical ``image_path``. Re-
+    uploading the room's *current* image is a no-op success: dedup
+    excludes the room being edited so the parent doesn't 409 against
+    themselves. Mirrors the toy image-replace endpoint's shape.
+    """
+    existing = _fetch_room_row(conn, room_id)
+
+    cap = max_upload_bytes()
+    try:
+        raw = await _read_upload_bytes(file, cap)
+    except UploadValidationError as exc:
+        raise HTTPException(
+            status_code=exc.http_status,
+            detail={"code": exc.code, **exc.detail},
+        ) from exc
+
+    try:
+        validated = validate_upload(raw, file.content_type)
+    except UploadValidationError as exc:
+        raise HTTPException(
+            status_code=exc.http_status,
+            detail={"code": exc.code, **exc.detail},
+        ) from exc
+
+    new_hash = compute_hash(raw)
+
+    existing_hash = existing["image_hash"]
+    if existing_hash is not None and new_hash == str(existing_hash):
+        return _row_to_room(existing)
+
+    dup = find_dedup(conn, "rooms", new_hash)
+    if dup is not None and str(dup["id"]) != room_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "image_already_exists",
+                "existing_room": _row_to_room(dup).model_dump(),
+            },
+        )
+
+    handle = stage(raw, validated)
+    try:
+        committed = commit_staging(handle, target_subdir="rooms")
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"code": "stage_lost"},
+        ) from exc
+    except StagingLockedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"code": "staging_locked"},
+        ) from exc
+
+    new_image_path = relative_committed_path("rooms", handle.filename)
+    new_image_hash = compute_hash(committed.read_bytes())
+    old_image_path = existing["image_path"]
+
+    try:
+        with conn:
+            conn.execute(
+                "UPDATE rooms SET image_path = ?, image_hash = ? WHERE id = ?",
+                (new_image_path, new_image_hash, room_id),
+            )
+    except sqlite3.IntegrityError as exc:
+        try:
+            committed.unlink()
+        except OSError:
+            _logger.warning("replace rollback: could not unlink %s", committed)
+        race_dup = find_dedup(conn, "rooms", new_image_hash)
+        if race_dup is not None and str(race_dup["id"]) != room_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "image_already_exists",
+                    "existing_room": _row_to_room(race_dup).model_dump(),
+                },
+            ) from exc
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "db_constraint_violation"},
+        ) from exc
+
+    if old_image_path and str(old_image_path) != new_image_path:
+        try:
+            old_disk = on_disk_image_path(str(old_image_path))
+            old_disk.unlink(missing_ok=True)
+        except (ValueError, OSError):
+            _logger.warning(
+                "replace: failed to unlink old image %s",
+                old_image_path,
+                exc_info=True,
+            )
+
+    row = _fetch_room_row(conn, room_id)
+    return _row_to_room(row)
+
+
 @router.delete("/{room_id}", response_model=DeleteResponse)
 def delete_room(
     room_id: str,
     conn: Annotated[sqlite3.Connection, Depends(get_rooms_db)],
     _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
 ) -> DeleteResponse:
-    """Hard-delete a room, refusing if any features still reference it.
+    """Hard-delete a room, cascading its features.
 
-    Rooms have no ``archived`` column in the v1 schema, so DELETE is a
-    real DELETE. The FK on ``room_features.room_id`` is RESTRICT, so
-    we count refs first and surface a 409 with the count rather than
-    let the DB raise an opaque IntegrityError.
+    Features (the ``room_features`` chips like "couch", "rug") are
+    conceptually owned by the room — nothing else joins them in. The
+    initial spec made the FK ``RESTRICT`` and surfaced a 409
+    ``room_in_use`` to the parent, but that left the parent unable to
+    delete an auto-suggested room that vision had populated with even
+    one feature, with no cascade affordance. The FK stays RESTRICT at
+    the schema level (defence against unintended code paths that
+    delete rooms without going through this handler) and we cascade
+    explicitly inside one transaction: features first, then the row.
+    The image file is left on disk for the future janitor — same
+    behaviour as before, same as toy archive.
     """
     _fetch_room_row(conn, room_id)
-    feature_count = conn.execute(
-        "SELECT COUNT(*) AS n FROM room_features WHERE room_id = ?",
-        (room_id,),
-    ).fetchone()
-    n = int(feature_count["n"]) if feature_count is not None else 0
-    if n > 0:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={
-                "code": "room_in_use",
-                "room_id": room_id,
-                "feature_count": n,
-            },
-        )
-    # L6: symmetry with toys — keep the file. Toys soft-archive (file
-    # retained); rooms hard-delete the row but leave the image bytes
-    # in ``data/images/rooms/`` for a future janitor to sweep when
-    # they're no longer referenced. The file is harmless until v1.5
-    # introduces an orphan-image cleanup task (issue tracked
-    # alongside L8's rollback symmetry note).
     with conn:
+        conn.execute("DELETE FROM room_features WHERE room_id = ?", (room_id,))
         conn.execute("DELETE FROM rooms WHERE id = ?", (room_id,))
     return DeleteResponse(ok=True)
 

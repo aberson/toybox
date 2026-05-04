@@ -282,12 +282,22 @@ def _ensure_session(conn: sqlite3.Connection, session_id: str | None) -> str:
     return new_id
 
 
-def _resolve_only_child(conn: sqlite3.Connection) -> list[str]:
-    """If exactly one child profile exists, return it; else empty."""
-    rows = conn.execute("SELECT id FROM children LIMIT 2").fetchall()
-    if len(rows) == 1:
-        return [str(rows[0]["id"])]
-    return []
+def _resolve_default_child_ids(conn: sqlite3.Connection) -> list[str]:
+    """Default child_ids when no caller-pinned set was passed.
+
+    Returns every non-archived child profile in the household. The
+    earlier "singleton only" heuristic returned ``[]`` whenever the
+    household had more than one child — which silently dropped all
+    per-child constraints (banned_themes, reading_level) for any
+    family with siblings, and left every activity row's ``child_ids``
+    as NULL so the "delete child while referenced" 409 could never
+    fire. Multi-child UNION/MINIMUM aggregation is already supported
+    by :func:`aggregate_child_constraints`, so attaching every child
+    is the correct multi-child default; specific-child propose still
+    works by passing ``context["child_ids"]``.
+    """
+    rows = conn.execute("SELECT id FROM children ORDER BY rowid").fetchall()
+    return [str(r["id"]) for r in rows]
 
 
 def _resolve_propose_child_ids(
@@ -297,10 +307,9 @@ def _resolve_propose_child_ids(
     """Pick the child_ids the propose flow should aggregate constraints from.
 
     Caller-supplied ``context["child_ids"]`` wins (multi-child propose
-    can pass an explicit list); otherwise we fall through to the
-    "singleton child" auto-detect which is what the v1 kiosk uses.
-    Empty list means no per-child constraints (no banned-themes, no
-    reading-level guidance) — that's the legitimate fresh-DB case.
+    can pass an explicit list); otherwise we fall back to every child
+    in the household so the resolver sees the union of constraints.
+    Empty list (legitimately empty DB) means no per-child constraints.
     """
     if context is not None:
         raw = context.get("child_ids")
@@ -308,7 +317,7 @@ def _resolve_propose_child_ids(
             cleaned = [str(c) for c in raw if isinstance(c, str) and c]
             if cleaned:
                 return cleaned
-    return _resolve_only_child(conn)
+    return _resolve_default_child_ids(conn)
 
 
 def _activity_signature(conn: sqlite3.Connection, activity_id: str) -> str | None:
@@ -929,7 +938,7 @@ def post_approve(
     if current_version != expected_version:
         raise VersionConflictError(current_version, current_state)
 
-    child_ids = body.child_ids or _resolve_only_child(conn)
+    child_ids = body.child_ids or _resolve_default_child_ids(conn)
     encoded_children = json.dumps(child_ids) if child_ids else None
     ok, row = _attempt_transition(
         conn,

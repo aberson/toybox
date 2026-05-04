@@ -526,11 +526,20 @@ def test_patch_room_updates_display_name(
     assert body["notes"] == "freshly painted"
 
 
-def test_delete_room_with_features_409(
+def test_delete_room_cascades_features(
     vc_client: TestClient,
     parent_headers: dict[str, str],
     db_path: Path,
 ) -> None:
+    """DELETE removes the room and its features in one transaction.
+
+    The earlier behaviour was a 409 ``room_in_use`` whenever any
+    feature still pointed at the room — but features are owned by the
+    room (nothing else joins them in), so the parent had no way to
+    delete an auto-suggested room that vision had populated. The
+    handler now cascades; the FK is still RESTRICT at the schema
+    level, so non-handler code paths are still protected.
+    """
     conn = connect(db_path)
     try:
         with conn:
@@ -549,10 +558,20 @@ def test_delete_room_with_features_409(
     finally:
         conn.close()
     resp = vc_client.delete("/api/rooms/r1", headers=parent_headers)
-    assert resp.status_code == 409
-    detail = resp.json()["detail"]
-    assert detail["code"] == "room_in_use"
-    assert detail["feature_count"] == 2
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == {"ok": True}
+    conn = connect(db_path)
+    try:
+        room_count = conn.execute(
+            "SELECT COUNT(*) FROM rooms WHERE id = 'r1'"
+        ).fetchone()[0]
+        feature_count = conn.execute(
+            "SELECT COUNT(*) FROM room_features WHERE room_id = 'r1'"
+        ).fetchone()[0]
+    finally:
+        conn.close()
+    assert room_count == 0
+    assert feature_count == 0
 
 
 def test_delete_room_without_features_succeeds(

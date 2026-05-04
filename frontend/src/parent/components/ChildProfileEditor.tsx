@@ -148,21 +148,21 @@ export function ChildProfileEditor(
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [rowError, setRowError] = useState<string | null>(null);
 
-  // Single AbortController spanning the editor's lifetime. The initial
-  // list fetch and every create/update/delete/refetch mutation share its
-  // signal, so unmount aborts whatever is in flight rather than letting
-  // a late response call setState after teardown. Mirrors the bootstrap
-  // aborter in `App.tsx`.
+  // AbortController spanning one mount of the editor. Recreated on each
+  // mount inside the useEffect below — under React 18 StrictMode the
+  // mount→cleanup→remount cycle would otherwise leave us with a
+  // permanently-aborted signal and every fetch would silently reject
+  // with AbortError. Callbacks read `aborterRef.current?.signal` at
+  // call time so they always see the live controller, not one captured
+  // from a stale render.
   const aborterRef = useRef<AbortController | null>(null);
-  if (aborterRef.current === null) {
-    aborterRef.current = new AbortController();
-  }
-  const aborter = aborterRef.current;
 
   const refetch = useCallback(async (): Promise<void> => {
     setLoading(true);
     try {
-      const resp = await api.listChildren({ signal: aborter.signal });
+      const resp = await api.listChildren({
+        signal: aborterRef.current?.signal,
+      });
       setChildren(resp.children);
       setListError(null);
     } catch (err) {
@@ -172,14 +172,19 @@ export function ChildProfileEditor(
     } finally {
       setLoading(false);
     }
-  }, [api, aborter]);
+  }, [api]);
 
   useEffect(() => {
+    const aborter = new AbortController();
+    aborterRef.current = aborter;
     void refetch();
     return () => {
       aborter.abort();
+      if (aborterRef.current === aborter) {
+        aborterRef.current = null;
+      }
     };
-  }, [aborter, refetch]);
+  }, [refetch]);
 
   const openNew = useCallback((): void => {
     setEditing("new");
@@ -208,10 +213,9 @@ export function ChildProfileEditor(
     setFormError(null);
     setFieldErrors({});
     try {
+      const signal = aborterRef.current?.signal;
       if (editing === "new") {
-        await api.createChild(formToCreatePayload(form), {
-          signal: aborter.signal,
-        });
+        await api.createChild(formToCreatePayload(form), { signal });
       } else {
         const payload = diffToUpdatePayload(editing, form);
         if (Object.keys(payload).length === 0) {
@@ -219,7 +223,7 @@ export function ChildProfileEditor(
           cancel();
           return;
         }
-        await api.updateChild(editing.id, payload, { signal: aborter.signal });
+        await api.updateChild(editing.id, payload, { signal });
       }
       await refetch();
       cancel();
@@ -241,7 +245,7 @@ export function ChildProfileEditor(
     } finally {
       setSubmitting(false);
     }
-  }, [aborter, api, cancel, editing, form, refetch]);
+  }, [api, cancel, editing, form, refetch]);
 
   const deleteRow = useCallback(
     async (profile: ChildProfile): Promise<void> => {
@@ -253,7 +257,9 @@ export function ChildProfileEditor(
       setDeletingId(profile.id);
       setRowError(null);
       try {
-        await api.deleteChild(profile.id, { signal: aborter.signal });
+        await api.deleteChild(profile.id, {
+          signal: aborterRef.current?.signal,
+        });
         await refetch();
       } catch (err) {
         if (isAbortError(err)) return;
@@ -273,7 +279,7 @@ export function ChildProfileEditor(
         setDeletingId(null);
       }
     },
-    [aborter, api, deletingId, refetch],
+    [api, deletingId, refetch],
   );
 
   const updateField = useCallback(
@@ -359,32 +365,80 @@ export function ChildProfileEditor(
               data-child-id={c.id}
               style={{
                 display: "flex",
-                alignItems: "center",
+                alignItems: "flex-start",
                 justifyContent: "space-between",
-                padding: "8px 0",
+                gap: 8,
+                padding: "10px 0",
                 borderBottom: "1px solid #eee",
               }}
             >
-              <div>
-                <button
-                  type="button"
-                  data-testid="edit-child-button"
-                  onClick={() => openEdit(c)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    padding: 0,
-                    color: "#1769aa",
-                    cursor: "pointer",
-                    fontSize: 14,
-                  }}
-                >
-                  {c.display_name}
-                </button>
-                {c.pronouns !== null && (
-                  <span style={{ marginLeft: 8, color: "#777", fontSize: 12 }}>
-                    ({c.pronouns})
-                  </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div>
+                  <button
+                    type="button"
+                    data-testid="edit-child-button"
+                    onClick={() => openEdit(c)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      padding: 0,
+                      color: "#1769aa",
+                      cursor: "pointer",
+                      fontSize: 14,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {c.display_name}
+                  </button>
+                  {c.pronouns !== null && (
+                    <span style={{ marginLeft: 8, color: "#777", fontSize: 12 }}>
+                      ({c.pronouns})
+                    </span>
+                  )}
+                  {c.birthdate !== null && (
+                    <span style={{ marginLeft: 8, color: "#777", fontSize: 12 }}>
+                      • {c.birthdate}
+                    </span>
+                  )}
+                  {c.reading_level !== null && (
+                    <span style={{ marginLeft: 8, color: "#777", fontSize: 12 }}>
+                      • {c.reading_level}
+                    </span>
+                  )}
+                </div>
+                {c.interests !== null && (
+                  <div
+                    data-testid="child-row-interests"
+                    style={{ fontSize: 12, color: "#555", marginTop: 4 }}
+                  >
+                    <span style={{ color: "#888" }}>interests:</span>{" "}
+                    {c.interests}
+                  </div>
+                )}
+                {c.comfort !== null && (
+                  <div
+                    data-testid="child-row-comfort"
+                    style={{ fontSize: 12, color: "#555", marginTop: 2 }}
+                  >
+                    <span style={{ color: "#888" }}>comfort:</span> {c.comfort}
+                  </div>
+                )}
+                {c.banned_themes !== null && (
+                  <div
+                    data-testid="child-row-banned"
+                    style={{ fontSize: 12, color: "#b85c00", marginTop: 2 }}
+                  >
+                    <span style={{ color: "#888" }}>banned:</span>{" "}
+                    {c.banned_themes}
+                  </div>
+                )}
+                {c.notes !== null && (
+                  <div
+                    data-testid="child-row-notes"
+                    style={{ fontSize: 12, color: "#555", marginTop: 2 }}
+                  >
+                    <span style={{ color: "#888" }}>notes:</span> {c.notes}
+                  </div>
                 )}
               </div>
               <button
@@ -516,9 +570,21 @@ export function ChildProfileEditor(
             >
               Interests
             </label>
+            <p
+              id="child-interests-help"
+              style={{
+                margin: "0 0 4px",
+                color: "#777",
+                fontSize: 12,
+              }}
+            >
+              Things they're into — e.g. dinosaurs, princesses, building,
+              music.
+            </p>
             <textarea
               id="child-interests"
               data-testid="field-interests"
+              aria-describedby="child-interests-help"
               maxLength={1000}
               rows={2}
               value={form.interests}
@@ -533,9 +599,21 @@ export function ChildProfileEditor(
             >
               Comfort
             </label>
+            <p
+              id="child-comfort-help"
+              style={{
+                margin: "0 0 4px",
+                color: "#777",
+                fontSize: 12,
+              }}
+            >
+              How they do with loud/intense play — e.g. loud_ok,
+              prefers_quiet, mixed, or your own notes.
+            </p>
             <textarea
               id="child-comfort"
               data-testid="field-comfort"
+              aria-describedby="child-comfort-help"
               maxLength={1000}
               rows={2}
               value={form.comfort}

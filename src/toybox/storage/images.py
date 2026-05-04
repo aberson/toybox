@@ -174,6 +174,16 @@ def _data_root() -> Path:
     return Path(raw) if raw else DEFAULT_DATA_ROOT
 
 
+def images_root() -> Path:
+    """Public accessor for ``<data_root>/images``.
+
+    Used by the FastAPI app factory to mount the directory as a
+    StaticFiles route. Kept separate from :func:`committed_dir` so
+    callers that just need the parent dir don't need a subdir name.
+    """
+    return _data_root() / _IMAGES_SUBDIR
+
+
 def staging_dir() -> Path:
     """Return ``data/images/.staging`` (creating it if missing)."""
     path = _data_root() / _IMAGES_SUBDIR / _STAGING_SUBDIR
@@ -202,6 +212,27 @@ def relative_committed_path(subdir: str, filename: str) -> str:
     DB-portability across Windows / Linux dev machines.
     """
     return f"data/{_IMAGES_SUBDIR}/{subdir}/{filename}"
+
+
+def on_disk_image_path(stored: str) -> Path:
+    """Resolve a DB ``image_path`` to its on-disk :class:`Path`.
+
+    DB rows store ``data/images/<subdir>/<filename>`` literally for
+    portability — but the actual data root may live elsewhere when
+    ``TOYBOX_DATA_DIR`` is set (tests, custom installs). This helper
+    centralises the prefix-stripping + root-rebinding so callers don't
+    open-code the conversion (and accidentally bypass the env override).
+    Raises :class:`ValueError` if the stored path doesn't match the
+    expected ``data/<images-subdir>/`` shape.
+    """
+    expected_prefix = f"data/{_IMAGES_SUBDIR}/"
+    normalized = stored.replace("\\", "/")
+    if not normalized.startswith(expected_prefix):
+        raise ValueError(
+            f"image_path {stored!r} does not start with {expected_prefix!r}",
+        )
+    relative = normalized[len(expected_prefix) :]
+    return images_root() / relative
 
 
 # ---------------------------------------------------------------------
@@ -613,7 +644,9 @@ __all__ = [
     "discard_staging",
     "downscale_for_vision",
     "find_dedup",
+    "images_root",
     "max_upload_bytes",
+    "on_disk_image_path",
     "relative_committed_path",
     "stage",
     "staging_dir",

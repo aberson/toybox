@@ -69,6 +69,15 @@ WEIGHT_LOVED_IT: Final[float] = 0.5
 WEIGHT_DISMISSED: Final[float] = -0.3
 WEIGHT_DIDNT_WORK: Final[float] = -1.0  # informational; veto handled separately
 
+# Floor for the post-baseline weight in :func:`consult_and_select`. Each
+# candidate gets ``1.0 + weight()`` as its weighted-random probability;
+# heavily dismissed candidates can drive that below zero, which would
+# either crash ``rng.choices`` (negative weights are rejected) or
+# silently lock those candidates out. The floor keeps every unblocked
+# candidate eligible — small chance, but never zero — which mirrors
+# how ``didnt_work`` (the actual veto) is the only complete blocker.
+MIN_PICK_WEIGHT: Final[float] = 0.05
+
 
 @dataclass(frozen=True, slots=True)
 class FeedbackCounts:
@@ -280,12 +289,21 @@ def consult_and_select(
         )
         return rng.choice(sorted_candidates)
 
-    # Pick from the top-weight tier. Equal-weight ties are broken by
-    # ``template_id`` already (the ranked list inherits the sort), so
-    # ``rng.choice`` over the tier is deterministic given the seed.
-    max_weight = max(w for _, w in unblocked)
-    top_tier = [c for c, w in unblocked if w == max_weight]
-    return rng.choice(top_tier)
+    # Weighted-random pick across the unblocked pool. Each candidate
+    # gets a baseline of 1.0 plus its accumulated soft weight (loved_it
+    # adds, dismissed subtracts), floored at ``MIN_PICK_WEIGHT`` so a
+    # heavily-dismissed-but-not-vetoed candidate still has a small
+    # chance to surface. The earlier "top tier only" ranking caused a
+    # lock-in: a single ``loved_it`` row gave that template the
+    # exclusive top weight and excluded every alternative entirely,
+    # so propose returned the same activity every time. Weighted
+    # random preserves "loved is favored" without "loved is the only
+    # option". Determinism is preserved — same seed + same DB rows
+    # produce the same pick because ``rng.choices`` uses the same
+    # underlying Random instance.
+    population = [c for c, _ in unblocked]
+    weights = [max(MIN_PICK_WEIGHT, 1.0 + w) for _, w in unblocked]
+    return rng.choices(population, weights=weights, k=1)[0]
 
 
 __all__ = [
@@ -293,6 +311,7 @@ __all__ = [
     "KIND_DIDNT_WORK",
     "KIND_DISMISSED_PRE_APPROVAL",
     "KIND_LOVED_IT",
+    "MIN_PICK_WEIGHT",
     "WEIGHT_DIDNT_WORK",
     "WEIGHT_DISMISSED",
     "WEIGHT_LOVED_IT",

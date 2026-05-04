@@ -60,6 +60,66 @@
         { "text": "Freeze like a statue when {toy} says STOP!", "expected_action": "child_freezes" },
         { "text": "Bow to {toy} and end the dance party with a giggle." }
       ]
+    },
+    {
+      "id": "play_anytime_invent",
+      "title": "{toy} the {slot} inventor",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "{toy} just had a brilliant idea for a brand-new {slot} invention." },
+        { "text": "Gather two everyday objects from nearby — they're the parts.", "expected_action": "child_gathers_parts" },
+        { "text": "Help {toy} build the invention by stacking, leaning, or arranging the parts." },
+        { "text": "Give the invention a name and tell {toy} what it does.", "expected_action": "child_names_invention" },
+        { "text": "Pretend to switch it on — what happens? Show {toy} the result!" }
+      ]
+    },
+    {
+      "id": "play_anytime_explore",
+      "title": "{toy} explores the {slot} world",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "{toy} wants to explore — pick the room you're in as the new {slot} world." },
+        { "text": "Find one thing tall, one thing soft, and one thing colorful.", "expected_action": "child_finds_three_things" },
+        { "text": "Walk {toy} on a tour past each thing and describe it out loud." },
+        { "text": "Pick the most surprising one and tell {toy} a quick story about it.", "expected_action": "child_tells_story" },
+        { "text": "Bring {toy} back to home base and write the discovery in the explorer's log (or just say it aloud)." }
+      ]
+    },
+    {
+      "id": "play_anytime_silly_walk",
+      "title": "{toy}'s {adjective} {action_verb} parade",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "{toy} wants to lead a {adjective} {action_verb} parade through {room}." },
+        { "text": "Show {toy} how to {action_verb} — first {action_verb} {count} times in place.", "expected_action": "child_demonstrates_action" },
+        { "text": "Now {action_verb} all the way across {room}, holding {toy} high.", "sfx": "footsteps_silly" },
+        { "text": "Turn around and {action_verb} back, this time wiggling your {body_part}.", "expected_action": "child_wiggles_body_part" },
+        { "text": "Bow to {toy} — the {adjective} parade is complete!" }
+      ]
+    },
+    {
+      "id": "play_anytime_treasure",
+      "title": "{toy} hunts the {adjective} {prop}",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "{toy} has heard there's a {adjective} {prop} hidden somewhere in {room}." },
+        { "text": "Search high and low — check {count} different spots while {toy} watches.", "expected_action": "child_searches" },
+        { "text": "When you find a {prop}, hold it up and let {toy} inspect it." },
+        { "text": "Decide together: is it the {adjective} one? Make {toy} nod yes or shake no.", "expected_action": "child_consults_toy" },
+        { "text": "Celebrate the discovery — give {toy} a victory wiggle of your {body_part}!" }
+      ]
+    },
+    {
+      "id": "play_anytime_show_and_tell",
+      "title": "{toy}'s {adjective} show and tell",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "{toy} is putting on a {adjective} show and tell in {room}." },
+        { "text": "Pick a {prop} — that's the first thing {toy} will introduce.", "expected_action": "child_picks_prop" },
+        { "text": "Have {toy} {action_verb} up to the audience (your {body_part} count as the audience)." },
+        { "text": "Announce three {adjective} facts about the {prop} — make them up if you have to!", "expected_action": "child_invents_facts" },
+        { "text": "Take a bow with {toy}. The {adjective} show was a hit!" }
+      ]
     }
   ]
 }

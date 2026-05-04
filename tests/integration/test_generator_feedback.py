@@ -284,13 +284,25 @@ def test_consult_select_didnt_work_vetoes(db: sqlite3.Connection) -> None:
 
 
 def test_consult_select_loved_it_boosts(db: sqlite3.Connection) -> None:
-    """A ``loved_it`` row makes that candidate the unique top-tier
-    pick — every seed selects it."""
+    """A ``loved_it`` row biases the picker toward that candidate.
+
+    The picker is weighted-random (post-bug-fix), not top-tier-only —
+    a loved candidate gets a higher pick probability but does NOT
+    lock out alternatives. Across many seeds: the loved candidate
+    must be the most-picked, AND every other candidate must still be
+    picked at least once (i.e., not locked out).
+    """
     cands = _make_candidates(3)
     _insert_feedback(db, signature="sig-2", kind=KIND_LOVED_IT)
-    for seed in range(20):
+    counts = {"t0": 0, "t1": 0, "t2": 0}
+    for seed in range(200):
         chosen = consult_and_select(cands, db, random.Random(seed))
-        assert chosen.template_id == "t2"
+        counts[chosen.template_id] += 1
+    assert counts["t2"] > counts["t0"], counts
+    assert counts["t2"] > counts["t1"], counts
+    # Non-loved candidates still appear — bias, not lock-in.
+    assert counts["t0"] > 0, counts
+    assert counts["t1"] > 0, counts
 
 
 def test_consult_select_dismissed_is_softer_than_didnt_work(db: sqlite3.Connection) -> None:
@@ -300,35 +312,48 @@ def test_consult_select_dismissed_is_softer_than_didnt_work(db: sqlite3.Connecti
     didnt_work. Across seeds:
       - t2 must NEVER be picked (didnt_work veto)
       - t1 CAN still be picked (soft signal, just lower weight) but
-        must lose to t0 in the top-tier comparison every time.
+        must be picked less often than t0 across many seeds.
     """
     cands = _make_candidates(3)
     _insert_feedback(db, signature="sig-1", kind=KIND_DISMISSED_PRE_APPROVAL)
     _insert_feedback(db, signature="sig-2", kind=KIND_DIDNT_WORK)
-    for seed in range(50):
+    counts = {"t0": 0, "t1": 0, "t2": 0}
+    for seed in range(200):
         chosen = consult_and_select(cands, db, random.Random(seed))
-        assert chosen.template_id == "t0"
+        counts[chosen.template_id] += 1
+    assert counts["t2"] == 0, counts  # didnt_work veto is absolute
+    assert counts["t1"] < counts["t0"], counts  # dismissed is softer
+    assert counts["t1"] > 0, counts  # but not locked out
 
 
 def test_consult_select_loved_it_beats_dismissed(db: sqlite3.Connection) -> None:
-    """``loved_it`` (positive) outranks ``dismissed_pre_approval`` (negative)."""
+    """``loved_it`` (positive) outranks ``dismissed_pre_approval`` (negative)
+    across many seeds, though weighted-random allows occasional
+    crossover."""
     cands = _make_candidates(2)
     _insert_feedback(db, signature="sig-0", kind=KIND_DISMISSED_PRE_APPROVAL)
     _insert_feedback(db, signature="sig-1", kind=KIND_LOVED_IT)
-    for seed in range(20):
+    counts = {"t0": 0, "t1": 0}
+    for seed in range(200):
         chosen = consult_and_select(cands, db, random.Random(seed))
-        assert chosen.template_id == "t1"
+        counts[chosen.template_id] += 1
+    assert counts["t1"] > counts["t0"], counts
 
 
 def test_consult_select_multiple_loved_it_stack(db: sqlite3.Connection) -> None:
-    """Two loved_it rows for sig-A outrank one loved_it for sig-B."""
+    """Two loved_it rows for sig-0 raise its weighted-pick probability
+    above one loved_it for sig-1 — both still appear, but sig-0 wins
+    more often."""
     cands = _make_candidates(2)
     _insert_feedback(db, signature="sig-0", kind=KIND_LOVED_IT)
     _insert_feedback(db, signature="sig-0", kind=KIND_LOVED_IT)
     _insert_feedback(db, signature="sig-1", kind=KIND_LOVED_IT)
-    for seed in range(20):
+    counts = {"t0": 0, "t1": 0}
+    for seed in range(200):
         chosen = consult_and_select(cands, db, random.Random(seed))
-        assert chosen.template_id == "t0"
+        counts[chosen.template_id] += 1
+    assert counts["t0"] > counts["t1"], counts
+    assert counts["t1"] > 0, counts
 
 
 def test_consult_select_all_blocked_degrades_gracefully(
@@ -432,19 +457,23 @@ def test_generate_with_conn_loved_it_attracts_pick(db: sqlite3.Connection) -> No
     target_template_id = baseline.template_id
     _insert_feedback(db, signature=target_sig, kind=KIND_LOVED_IT)
 
-    # All seeds must now select the loved candidate (it's the unique
-    # top-tier weight). Assert BOTH signature AND template_id parity:
-    # signatures alone could in principle collide across templates
-    # (impossible by design, but the dual assertion documents the
-    # invariant so a future regression is loudly caught).
-    chosen_sigs: set[str] = set()
-    chosen_template_ids: set[str] = set()
-    for seed in range(20):
+    # The loved candidate must be the most-picked template across many
+    # seeds, but the picker is weighted-random (post-bug-fix), so other
+    # eligible templates still appear. With one loved_it the boost is
+    # +0.5 on a 1.0 baseline, so the loved candidate gets 1.5/(1.5+N)
+    # of the pool — modal but not majority for N>=2.
+    template_counts: dict[str, int] = {}
+    for seed in range(200):
         a = generate(intent, slot, None, hour, seed, conn=db)
-        chosen_sigs.add(a.metadata["signature"])
-        chosen_template_ids.add(a.template_id)
-    assert chosen_sigs == {target_sig}
-    assert chosen_template_ids == {target_template_id}
+        template_counts[a.template_id] = template_counts.get(a.template_id, 0) + 1
+    # Loved template must be the modal pick.
+    most_picked = max(template_counts, key=lambda k: template_counts[k])
+    assert most_picked == target_template_id, template_counts
+    # And it must be picked more often than the uniform-baseline rate
+    # (1/N for N eligible templates) — i.e., the boost actually fired.
+    target_n = template_counts[target_template_id]
+    uniform_rate = 200 / len(template_counts)
+    assert target_n > uniform_rate, template_counts
 
 
 # ---------------------------------------------------------------------------

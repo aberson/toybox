@@ -63,7 +63,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 600,
-          "description": "Step text; may contain {slot} and {toy} placeholders."
+          "description": "Step text. Supports {slot} and {toy} placeholders plus the parametric slots filled by toybox.activities.slots.SlotRegistry: {room}, {action_verb}, {adjective}, {prop}, {body_part}, {count}. Unknown {placeholder} names are echoed back verbatim at substitution time so the typo surfaces visibly. The lint script (planned at tools/lint_templates) will enforce the whitelist."
         },
         "sfx": {
           "type": ["string", "null"],

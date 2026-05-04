@@ -3,7 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ApiError,
+  extractRoomInUseDetail,
   extractRoomNameCollisionDetail,
+  imageUrl,
   isAbortError,
 } from "../api";
 import type {
@@ -46,10 +48,19 @@ interface PhotoRow {
   staging_id: string;
   filename: string;
   image_hash: string;
-  // The label the parent currently has the photo assigned to. Starts
-  // out as the suggested label (or UNASSIGNED_TAB for failed/error
-  // photos). Editing the label dropdown moves the photo to a new tab.
+  // The label the parent currently has the photo assigned to. Edited
+  // freely as the parent types into the new-room input; the partition
+  // logic below intentionally does NOT key tabs off this — see
+  // ``assigned_tab`` for why.
   label: string;
+  // Sticky tab placement. Set once at row creation (vision suggestion
+  // or UNASSIGNED) and only mutated by an explicit parent action that
+  // is known not to need keyboard focus (the existing-room dropdown).
+  // Keying tabs off ``label`` would move the row to a new tab on every
+  // keystroke in the new-label input, the row would unmount from the
+  // current tabpanel, and the input would lose focus mid-typing —
+  // forcing the parent to re-click between every letter.
+  assigned_tab: string;
   // Per-photo feature chips. Always strings (the wire shape wraps each
   // in ``{name}``; we flatten on submit).
   features: string[];
@@ -69,6 +80,7 @@ function bulkPhotoToRow(photo: BulkPhoto): PhotoRow {
   // the parent sees them under Unassigned and can choose to ignore.
   const labelFromSuggestion = photo.suggested?.suggested_room_label ?? null;
   const fallbackLabel = labelFromSuggestion ?? UNASSIGNED_TAB;
+  const isUpstreamFailure = photo.error !== null || photo.vision_error !== null;
   const features =
     photo.suggested?.features.map((f) => f.name) ?? [];
   return {
@@ -76,6 +88,7 @@ function bulkPhotoToRow(photo: BulkPhoto): PhotoRow {
     filename: photo.filename,
     image_hash: photo.image_hash,
     label: fallbackLabel,
+    assigned_tab: isUpstreamFailure ? UNASSIGNED_TAB : fallbackLabel,
     features,
     use_existing_room_id: null,
     error: photo.error,
@@ -87,21 +100,9 @@ function bulkPhotoToRow(photo: BulkPhoto): PhotoRow {
 function partitionByTab(rows: PhotoRow[]): Map<string, PhotoRow[]> {
   const grouped = new Map<string, PhotoRow[]>();
   for (const row of rows) {
-    // L1: a photo with a ``vision_error`` (or upstream ``error``) starts
-    // life in UNASSIGNED_TAB, but as soon as the parent picks an
-    // existing room or types a new label the row should follow that
-    // assignment. ``use_existing_room_id`` non-null OR ``label`` set
-    // to anything other than UNASSIGNED_TAB both signal an explicit
-    // parent edit; either one moves the row to the assigned tab.
-    const parentAssigned =
-      row.use_existing_room_id !== null || row.label !== UNASSIGNED_TAB;
-    const isUpstreamFailure =
-      row.error !== null || row.vision_error !== null;
-    const tab =
-      isUpstreamFailure && !parentAssigned ? UNASSIGNED_TAB : row.label;
-    const list = grouped.get(tab) ?? [];
+    const list = grouped.get(row.assigned_tab) ?? [];
     list.push(row);
-    grouped.set(tab, list);
+    grouped.set(row.assigned_tab, list);
   }
   return grouped;
 }
@@ -155,16 +156,30 @@ export function RoomIngestBulk(props: RoomIngestBulkProps): JSX.Element {
   const [collision, setCollision] =
     useState<RoomNameCollisionDetail | null>(null);
 
+  // Inline edit state for an existing room in the list. Null = no row
+  // is being edited; otherwise the room id whose form is open.
+  const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
+  const [editRoomName, setEditRoomName] = useState<string>("");
+  const [editRoomNotes, setEditRoomNotes] = useState<string>("");
+  const [editRoomSubmitting, setEditRoomSubmitting] = useState<boolean>(false);
+  const [editRoomError, setEditRoomError] = useState<string | null>(null);
+  const [deletingRoomId, setDeletingRoomId] = useState<string | null>(null);
+  const [roomRowError, setRoomRowError] = useState<string | null>(null);
+
+  // AbortController spanning one mount of the editor. Recreated on each
+  // mount inside the useEffect below — under React 18 StrictMode the
+  // mount→cleanup→remount cycle would otherwise leave us with a
+  // permanently-aborted signal and every fetch would silently reject
+  // with AbortError. Callbacks read `aborterRef.current?.signal` at
+  // call time so they always see the live controller.
   const aborterRef = useRef<AbortController | null>(null);
-  if (aborterRef.current === null) {
-    aborterRef.current = new AbortController();
-  }
-  const aborter = aborterRef.current;
 
   const refetchRooms = useCallback(async (): Promise<void> => {
     setRoomsLoading(true);
     try {
-      const resp = await api.listRooms({ signal: aborter.signal });
+      const resp = await api.listRooms({
+        signal: aborterRef.current?.signal,
+      });
       setRooms(resp.rooms);
       setRoomsError(null);
     } catch (err) {
@@ -174,14 +189,19 @@ export function RoomIngestBulk(props: RoomIngestBulkProps): JSX.Element {
     } finally {
       setRoomsLoading(false);
     }
-  }, [api, aborter]);
+  }, [api]);
 
   useEffect(() => {
+    const aborter = new AbortController();
+    aborterRef.current = aborter;
     void refetchRooms();
     return () => {
       aborter.abort();
+      if (aborterRef.current === aborter) {
+        aborterRef.current = null;
+      }
     };
-  }, [aborter, refetchRooms]);
+  }, [refetchRooms]);
 
   const resetPhase = useCallback((): void => {
     setBatch(null);
@@ -208,7 +228,7 @@ export function RoomIngestBulk(props: RoomIngestBulkProps): JSX.Element {
       setUploading(true);
       try {
         const resp = await api.uploadRoomsBulk(files, {
-          signal: aborter.signal,
+          signal: aborterRef.current?.signal,
         });
         setBatch(resp);
         const rows = resp.photos.map(bulkPhotoToRow);
@@ -222,7 +242,7 @@ export function RoomIngestBulk(props: RoomIngestBulkProps): JSX.Element {
         setUploading(false);
       }
     },
-    [aborter, api, resetPhase],
+    [api, resetPhase],
   );
 
   const onFileInputChange = useCallback(
@@ -281,7 +301,9 @@ export function RoomIngestBulk(props: RoomIngestBulkProps): JSX.Element {
       assignments,
     };
     try {
-      await api.confirmRoomsBulk(body, { signal: aborter.signal });
+      await api.confirmRoomsBulk(body, {
+        signal: aborterRef.current?.signal,
+      });
       await refetchRooms();
       resetPhase();
     } catch (err) {
@@ -315,12 +337,117 @@ export function RoomIngestBulk(props: RoomIngestBulkProps): JSX.Element {
     } finally {
       setSubmitting(false);
     }
-  }, [aborter, api, batch, photoRows, refetchRooms, resetPhase, submitting]);
+  }, [api, batch, photoRows, refetchRooms, resetPhase, submitting]);
 
   // Group photos by tab. Memoised so the keyboard navigation across
   // tabs doesn't re-shuffle on every rerender.
   const grouped = useMemo(() => partitionByTab(photoRows), [photoRows]);
   const tabs = useMemo(() => Array.from(grouped.keys()), [grouped]);
+
+  const openRoomEdit = useCallback((room: Room): void => {
+    setEditingRoomId(room.id);
+    setEditRoomName(room.display_name);
+    setEditRoomNotes(room.notes ?? "");
+    setEditRoomError(null);
+  }, []);
+
+  const cancelRoomEdit = useCallback((): void => {
+    setEditingRoomId(null);
+    setEditRoomName("");
+    setEditRoomNotes("");
+    setEditRoomError(null);
+  }, []);
+
+  const replaceRoomPicture = useCallback(
+    async (roomId: string, file: File): Promise<void> => {
+      setEditRoomError(null);
+      setEditRoomSubmitting(true);
+      try {
+        await api.replaceRoomImage(roomId, file, {
+          signal: aborterRef.current?.signal,
+        });
+        await refetchRooms();
+      } catch (err) {
+        if (isAbortError(err)) return;
+        if (err instanceof ApiError) {
+          setEditRoomError(uploadErrorMessage(err));
+        } else if (err instanceof Error) {
+          setEditRoomError(`change picture failed: ${err.message}`);
+        } else {
+          setEditRoomError("change picture failed");
+        }
+      } finally {
+        setEditRoomSubmitting(false);
+      }
+    },
+    [api, refetchRooms],
+  );
+
+  const deleteRoomRow = useCallback(
+    async (room: Room): Promise<void> => {
+      if (deletingRoomId !== null) return;
+      const ok = window.confirm(
+        `Delete ${room.display_name}? This can't be undone.`,
+      );
+      if (!ok) return;
+      setDeletingRoomId(room.id);
+      setRoomRowError(null);
+      try {
+        await api.deleteRoom(room.id, {
+          signal: aborterRef.current?.signal,
+        });
+        await refetchRooms();
+        if (editingRoomId === room.id) cancelRoomEdit();
+      } catch (err) {
+        if (isAbortError(err)) return;
+        const inUse = extractRoomInUseDetail(err);
+        if (inUse !== null) {
+          setRoomRowError(
+            `Can't delete "${room.display_name}" — ${inUse.feature_count} ` +
+              `feature${inUse.feature_count === 1 ? "" : "s"} still ` +
+              `reference this room.`,
+          );
+        } else if (err instanceof Error) {
+          setRoomRowError(`delete failed: ${err.message}`);
+        } else {
+          setRoomRowError("delete failed");
+        }
+      } finally {
+        setDeletingRoomId(null);
+      }
+    },
+    [api, cancelRoomEdit, deletingRoomId, editingRoomId, refetchRooms],
+  );
+
+  const submitRoomEdit = useCallback(async (): Promise<void> => {
+    if (editingRoomId === null) return;
+    setEditRoomSubmitting(true);
+    setEditRoomError(null);
+    try {
+      const trimmedNotes = editRoomNotes.trim();
+      await api.updateRoom(
+        editingRoomId,
+        {
+          display_name: editRoomName,
+          notes: trimmedNotes.length === 0 ? null : trimmedNotes,
+        },
+        { signal: aborterRef.current?.signal },
+      );
+      await refetchRooms();
+      cancelRoomEdit();
+    } catch (err) {
+      if (isAbortError(err)) return;
+      if (err instanceof ApiError) {
+        setEditRoomError(`save failed: ${err.status}`);
+      } else if (err instanceof Error) {
+        setEditRoomError(`save failed: ${err.message}`);
+      } else {
+        setEditRoomError("save failed");
+      }
+    } finally {
+      setEditRoomSubmitting(false);
+    }
+  }, [api, cancelRoomEdit, editRoomName, editRoomNotes, editingRoomId, refetchRooms]);
 
   return (
     <section
@@ -531,10 +658,16 @@ export function RoomIngestBulk(props: RoomIngestBulkProps): JSX.Element {
                           if (value.startsWith("existing:")) {
                             const id = value.slice("existing:".length);
                             const room = rooms.find((r) => r.id === id);
+                            const nextLabel = room?.display_name ?? row.label;
                             updateRow(row.staging_id, {
                               use_existing_room_id: id,
-                              label: room?.display_name ?? row.label,
+                              label: nextLabel,
+                              assigned_tab: nextLabel,
                             });
+                            // Follow the row to its new tab so the
+                            // parent doesn't lose visual context after
+                            // assigning to an existing room.
+                            setActiveTab(nextLabel);
                           } else {
                             updateRow(row.staging_id, {
                               use_existing_room_id: null,
@@ -653,25 +786,226 @@ export function RoomIngestBulk(props: RoomIngestBulkProps): JSX.Element {
           No rooms yet. Add some above.
         </p>
       )}
+      {roomRowError !== null && (
+        <p
+          data-testid="room-row-error"
+          role="alert"
+          style={{
+            background: "#fdecea",
+            border: "1px solid #f5c2c0",
+            padding: 8,
+            borderRadius: 4,
+            fontSize: 13,
+            margin: "4px 0",
+          }}
+        >
+          {roomRowError}
+        </p>
+      )}
       {rooms.length > 0 && (
         <ul
           data-testid="rooms-list"
           style={{ listStyle: "none", padding: 0, margin: 0 }}
         >
-          {rooms.map((r) => (
-            <li
-              key={r.id}
-              data-testid="room-row"
-              data-room-id={r.id}
-              style={{
-                padding: "6px 0",
-                borderBottom: "1px solid #eee",
-                fontSize: 14,
-              }}
-            >
-              <strong>{r.display_name}</strong>
-            </li>
-          ))}
+          {rooms.map((r) => {
+            const isEditing = editingRoomId === r.id;
+            const thumb = imageUrl(r.image_path, r.image_hash);
+            return (
+              <li
+                key={r.id}
+                data-testid="room-row"
+                data-room-id={r.id}
+                style={{
+                  padding: "8px 0",
+                  borderBottom: "1px solid #eee",
+                  fontSize: 14,
+                }}
+              >
+                {!isEditing && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 8,
+                    }}
+                  >
+                    {thumb !== null && (
+                      <img
+                        data-testid="room-thumb"
+                        src={thumb}
+                        alt=""
+                        style={{
+                          width: 36,
+                          height: 36,
+                          objectFit: "cover",
+                          borderRadius: 4,
+                          border: "1px solid #eee",
+                          flexShrink: 0,
+                        }}
+                      />
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <strong>{r.display_name}</strong>
+                      {r.notes !== null && r.notes.length > 0 && (
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: "#666",
+                            marginTop: 2,
+                          }}
+                        >
+                          {r.notes}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        type="button"
+                        data-testid="edit-room-button"
+                        onClick={() => openRoomEdit(r)}
+                      >
+                        edit
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="delete-room-button"
+                        disabled={deletingRoomId === r.id}
+                        onClick={() => {
+                          void deleteRoomRow(r);
+                        }}
+                      >
+                        {deletingRoomId === r.id ? "deleting..." : "delete"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {isEditing && (
+                  <form
+                    data-testid="room-edit-form"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void submitRoomEdit();
+                    }}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr",
+                      gap: 6,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 8,
+                      }}
+                    >
+                      {thumb !== null && (
+                        <img
+                          data-testid="room-edit-thumb"
+                          src={thumb}
+                          alt=""
+                          style={{
+                            width: 64,
+                            height: 64,
+                            objectFit: "cover",
+                            borderRadius: 4,
+                            border: "1px solid #eee",
+                            flexShrink: 0,
+                          }}
+                        />
+                      )}
+                      <div>
+                        <label
+                          style={{
+                            display: "block",
+                            fontSize: 12,
+                            color: "#666",
+                          }}
+                        >
+                          Change picture
+                        </label>
+                        <input
+                          data-testid="room-edit-picture-input"
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          disabled={editRoomSubmitting}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0] ?? null;
+                            e.target.value = "";
+                            if (f !== null) {
+                              void replaceRoomPicture(r.id, f);
+                            }
+                          }}
+                          style={{ fontSize: 12 }}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: 12 }}>
+                        Name
+                      </label>
+                      <input
+                        data-testid="edit-room-name"
+                        type="text"
+                        required
+                        maxLength={40}
+                        value={editRoomName}
+                        onChange={(e) => setEditRoomName(e.target.value)}
+                        style={{ width: "100%", padding: 4 }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: 12 }}>
+                        Notes
+                      </label>
+                      <textarea
+                        data-testid="edit-room-notes"
+                        rows={2}
+                        maxLength={2000}
+                        value={editRoomNotes}
+                        onChange={(e) => setEditRoomNotes(e.target.value)}
+                        style={{ width: "100%", padding: 4 }}
+                      />
+                    </div>
+                    {editRoomError !== null && (
+                      <p
+                        data-testid="room-edit-error"
+                        role="alert"
+                        style={{
+                          background: "#fdecea",
+                          border: "1px solid #f5c2c0",
+                          padding: 6,
+                          borderRadius: 4,
+                          fontSize: 12,
+                          margin: 0,
+                        }}
+                      >
+                        {editRoomError}
+                      </p>
+                    )}
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        type="submit"
+                        data-testid="save-room-edit-button"
+                        disabled={editRoomSubmitting}
+                      >
+                        {editRoomSubmitting ? "saving..." : "save"}
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="cancel-room-edit-button"
+                        onClick={cancelRoomEdit}
+                        disabled={editRoomSubmitting}
+                      >
+                        cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>

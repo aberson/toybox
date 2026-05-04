@@ -7,6 +7,7 @@ running uvicorn or going through CLI parsing.
 from __future__ import annotations
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from .api.activities import router as activities_router
 from .api.auth import router as auth_router
@@ -17,6 +18,7 @@ from .api.metrics import router as metrics_router
 from .api.rooms import router as rooms_router
 from .api.toys import router as toys_router
 from .api.transcripts import router as transcripts_router
+from .storage.images import images_root
 from .ws.server import build_router as build_ws_router
 
 
@@ -33,6 +35,19 @@ def create_app() -> FastAPI:
     app.include_router(transcripts_router)
     app.include_router(metrics_router)
     app.include_router(build_ws_router())
+
+    # Static read-only mount for committed toy + room images so the
+    # parent UI can render thumbnails via plain ``<img src=...>`` tags
+    # (img elements can't carry custom auth headers, and this is a
+    # local-dev kiosk — no public exposure). Sits under ``/api`` so
+    # the vite dev proxy forwards it to the backend without extra
+    # config. ``check_dir=False`` keeps the app bootable on a fresh
+    # checkout before the first upload has created the directory.
+    app.mount(
+        "/api/static/images",
+        StaticFiles(directory=str(images_root()), check_dir=False),
+        name="images",
+    )
     return app
 
 

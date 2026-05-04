@@ -5,6 +5,7 @@ import {
   ApiError,
   extractToyImageExistsDetail,
   extractValidationErrors,
+  imageUrl,
   isAbortError,
 } from "../api";
 import type {
@@ -151,13 +152,24 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
   const [duplicate, setDuplicate] = useState<Toy | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  // Single AbortController spanning the editor's lifetime. Mirrors the
-  // pattern in ``ChildProfileEditor``.
+  // Inline edit state for an existing toy in the list. Null = no row
+  // is being edited; otherwise the row id whose form is open.
+  const [editingToyId, setEditingToyId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<FormState>(EMPTY_FORM);
+  const [editSubmitting, setEditSubmitting] = useState<boolean>(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editFieldErrors, setEditFieldErrors] = useState<
+    Record<string, string>
+  >({});
+  const [archivingId, setArchivingId] = useState<string | null>(null);
+
+  // AbortController spanning one mount of the editor. Recreated on each
+  // mount inside the useEffect below — under React 18 StrictMode the
+  // mount→cleanup→remount cycle would otherwise leave us with a
+  // permanently-aborted signal and every fetch would silently reject
+  // with AbortError. Callbacks read `aborterRef.current?.signal` at
+  // call time so they always see the live controller.
   const aborterRef = useRef<AbortController | null>(null);
-  if (aborterRef.current === null) {
-    aborterRef.current = new AbortController();
-  }
-  const aborter = aborterRef.current;
 
   // Track the preview URL so we can revoke it on phase-reset / unmount
   // (URL.createObjectURL leaks until revoked).
@@ -166,7 +178,7 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
   const refetchToys = useCallback(async (): Promise<void> => {
     setListLoading(true);
     try {
-      const resp = await api.listToys({ signal: aborter.signal });
+      const resp = await api.listToys({ signal: aborterRef.current?.signal });
       setToys(resp.toys);
       setListError(null);
     } catch (err) {
@@ -176,18 +188,23 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
     } finally {
       setListLoading(false);
     }
-  }, [api, aborter]);
+  }, [api]);
 
   useEffect(() => {
+    const aborter = new AbortController();
+    aborterRef.current = aborter;
     void refetchToys();
     return () => {
       aborter.abort();
+      if (aborterRef.current === aborter) {
+        aborterRef.current = null;
+      }
       if (previewRef.current !== null) {
         URL.revokeObjectURL(previewRef.current);
         previewRef.current = null;
       }
     };
-  }, [aborter, refetchToys]);
+  }, [refetchToys]);
 
   const resetPhase = useCallback((): void => {
     setUpload(null);
@@ -216,7 +233,9 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
       setPreviewUrl(objectUrl);
       let kept = false;
       try {
-        const resp = await api.uploadToyPhoto(file, { signal: aborter.signal });
+        const resp = await api.uploadToyPhoto(file, {
+          signal: aborterRef.current?.signal,
+        });
         setUpload(resp);
         setForm(suggestionToForm(resp.suggested));
         // Successful upload — phase B owns the preview now; don't
@@ -246,7 +265,7 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
         setUploading(false);
       }
     },
-    [aborter, api, resetPhase],
+    [api, resetPhase],
   );
 
   const onFileInputChange = useCallback(
@@ -274,7 +293,7 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
           tags: parseTags(form.tags),
           persona_id: null,
         },
-        { signal: aborter.signal },
+        { signal: aborterRef.current?.signal },
       );
       await refetchToys();
       resetPhase();
@@ -300,13 +319,128 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
     } finally {
       setSubmitting(false);
     }
-  }, [aborter, api, form, refetchToys, resetPhase, upload]);
+  }, [api, form, refetchToys, resetPhase, upload]);
 
   const updateField = useCallback(
     <K extends keyof FormState>(key: K, value: FormState[K]): void => {
       setForm((prev) => ({ ...prev, [key]: value }));
     },
     [],
+  );
+
+  const openToyEdit = useCallback((toy: Toy): void => {
+    setEditingToyId(toy.id);
+    setEditForm({
+      display_name: toy.display_name,
+      tags: toy.tags.join(", "),
+    });
+    setEditError(null);
+    setEditFieldErrors({});
+  }, []);
+
+  const cancelToyEdit = useCallback((): void => {
+    setEditingToyId(null);
+    setEditForm(EMPTY_FORM);
+    setEditError(null);
+    setEditFieldErrors({});
+  }, []);
+
+  const submitToyEdit = useCallback(async (): Promise<void> => {
+    if (editingToyId === null) return;
+    setEditSubmitting(true);
+    setEditError(null);
+    setEditFieldErrors({});
+    try {
+      await api.updateToy(
+        editingToyId,
+        {
+          display_name: editForm.display_name,
+          tags: parseTags(editForm.tags),
+        },
+        { signal: aborterRef.current?.signal },
+      );
+      await refetchToys();
+      cancelToyEdit();
+    } catch (err) {
+      if (isAbortError(err)) return;
+      const validation = extractValidationErrors(err);
+      if (validation !== null) {
+        setEditFieldErrors(fieldErrorMap(validation));
+        setEditError("Please fix the errors below.");
+      } else if (err instanceof ApiError) {
+        setEditError(`save failed: ${err.status}`);
+      } else if (err instanceof Error) {
+        setEditError(`save failed: ${err.message}`);
+      } else {
+        setEditError("save failed");
+      }
+    } finally {
+      setEditSubmitting(false);
+    }
+  }, [api, cancelToyEdit, editForm, editingToyId, refetchToys]);
+
+  const deleteToy = useCallback(
+    async (toy: Toy): Promise<void> => {
+      // ``archivingId`` keeps its name because the backend still does a
+      // soft archive (sets ``archived=1``, file kept on disk). The UI
+      // surfaces it as "delete" because from the parent's perspective
+      // the toy is gone — the soft-vs-hard distinction is internal.
+      if (archivingId !== null) return;
+      const ok = window.confirm(
+        `Delete ${toy.display_name}? It will no longer appear in the toy list.`,
+      );
+      if (!ok) return;
+      setArchivingId(toy.id);
+      try {
+        await api.archiveToy(toy.id, { signal: aborterRef.current?.signal });
+        await refetchToys();
+        if (editingToyId === toy.id) cancelToyEdit();
+      } catch (err) {
+        if (isAbortError(err)) return;
+        const message = err instanceof Error ? err.message : "delete failed";
+        setListError(message);
+      } finally {
+        setArchivingId(null);
+      }
+    },
+    [api, archivingId, cancelToyEdit, editingToyId, refetchToys],
+  );
+
+  const updateEditField = useCallback(
+    <K extends keyof FormState>(key: K, value: FormState[K]): void => {
+      setEditForm((prev) => ({ ...prev, [key]: value }));
+    },
+    [],
+  );
+
+  const replaceToyPicture = useCallback(
+    async (toyId: string, file: File): Promise<void> => {
+      setEditError(null);
+      setEditSubmitting(true);
+      try {
+        await api.replaceToyImage(toyId, file, {
+          signal: aborterRef.current?.signal,
+        });
+        await refetchToys();
+      } catch (err) {
+        if (isAbortError(err)) return;
+        const dup = extractToyImageExistsDetail(err);
+        if (dup !== null) {
+          setEditError(
+            `That image is already in your library as "${dup.existing_toy.display_name}". Pick a different photo.`,
+          );
+        } else if (err instanceof ApiError) {
+          setEditError(uploadErrorMessage(err));
+        } else if (err instanceof Error) {
+          setEditError(`change picture failed: ${err.message}`);
+        } else {
+          setEditError("change picture failed");
+        }
+      } finally {
+        setEditSubmitting(false);
+      }
+    },
+    [api, refetchToys],
   );
 
   return (
@@ -542,25 +676,234 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
           data-testid="toys-list"
           style={{ listStyle: "none", padding: 0, margin: 0 }}
         >
-          {toys.map((t) => (
-            <li
-              key={t.id}
-              data-testid="toy-row"
-              data-toy-id={t.id}
-              style={{
-                padding: "6px 0",
-                borderBottom: "1px solid #eee",
-                fontSize: 14,
-              }}
-            >
-              <strong>{t.display_name}</strong>
-              {t.tags.length > 0 && (
-                <span style={{ marginLeft: 8, color: "#777", fontSize: 12 }}>
-                  {t.tags.join(", ")}
-                </span>
-              )}
-            </li>
-          ))}
+          {toys.map((t) => {
+            const isEditing = editingToyId === t.id;
+            const thumb = imageUrl(t.image_path, t.image_hash);
+            return (
+              <li
+                key={t.id}
+                data-testid="toy-row"
+                data-toy-id={t.id}
+                style={{
+                  padding: "8px 0",
+                  borderBottom: "1px solid #eee",
+                  fontSize: 14,
+                }}
+              >
+                {!isEditing && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 8,
+                    }}
+                  >
+                    {thumb !== null && (
+                      <img
+                        data-testid="toy-thumb"
+                        src={thumb}
+                        alt=""
+                        style={{
+                          width: 36,
+                          height: 36,
+                          objectFit: "cover",
+                          borderRadius: 4,
+                          border: "1px solid #eee",
+                          flexShrink: 0,
+                        }}
+                      />
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <strong>{t.display_name}</strong>
+                      {t.tags.length > 0 && (
+                        <span
+                          style={{
+                            marginLeft: 8,
+                            color: "#777",
+                            fontSize: 12,
+                          }}
+                        >
+                          {t.tags.join(", ")}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        type="button"
+                        data-testid="edit-toy-button"
+                        onClick={() => openToyEdit(t)}
+                      >
+                        edit
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="delete-toy-button"
+                        disabled={archivingId === t.id}
+                        onClick={() => {
+                          void deleteToy(t);
+                        }}
+                      >
+                        {archivingId === t.id ? "deleting..." : "delete"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {isEditing && (
+                  <form
+                    data-testid="toy-edit-form"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void submitToyEdit();
+                    }}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr",
+                      gap: 6,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 8,
+                      }}
+                    >
+                      {thumb !== null && (
+                        <img
+                          data-testid="toy-edit-thumb"
+                          src={thumb}
+                          alt=""
+                          style={{
+                            width: 64,
+                            height: 64,
+                            objectFit: "cover",
+                            borderRadius: 4,
+                            border: "1px solid #eee",
+                            flexShrink: 0,
+                          }}
+                        />
+                      )}
+                      <div>
+                        <label
+                          style={{
+                            display: "block",
+                            fontSize: 12,
+                            color: "#666",
+                          }}
+                        >
+                          Change picture
+                        </label>
+                        <input
+                          data-testid="toy-edit-picture-input"
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          disabled={editSubmitting}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0] ?? null;
+                            e.target.value = "";
+                            if (f !== null) {
+                              void replaceToyPicture(t.id, f);
+                            }
+                          }}
+                          style={{ fontSize: 12 }}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label
+                        style={{ display: "block", fontSize: 12 }}
+                      >
+                        Name
+                      </label>
+                      <input
+                        data-testid="edit-field-display-name"
+                        type="text"
+                        required
+                        maxLength={40}
+                        value={editForm.display_name}
+                        onChange={(e) =>
+                          updateEditField("display_name", e.target.value)
+                        }
+                        style={{ width: "100%", padding: 4 }}
+                      />
+                      {editFieldErrors["display_name"] !== undefined && (
+                        <p
+                          role="alert"
+                          style={{
+                            color: "#b71c1c",
+                            fontSize: 12,
+                            margin: "2px 0 0",
+                          }}
+                        >
+                          {editFieldErrors["display_name"]}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <label
+                        style={{ display: "block", fontSize: 12 }}
+                      >
+                        Tags (comma-separated)
+                      </label>
+                      <input
+                        data-testid="edit-field-tags"
+                        type="text"
+                        value={editForm.tags}
+                        onChange={(e) => updateEditField("tags", e.target.value)}
+                        style={{ width: "100%", padding: 4 }}
+                      />
+                      {editFieldErrors["tags"] !== undefined && (
+                        <p
+                          role="alert"
+                          style={{
+                            color: "#b71c1c",
+                            fontSize: 12,
+                            margin: "2px 0 0",
+                          }}
+                        >
+                          {editFieldErrors["tags"]}
+                        </p>
+                      )}
+                    </div>
+                    {editError !== null && (
+                      <p
+                        data-testid="toy-edit-error"
+                        role="alert"
+                        style={{
+                          background: "#fdecea",
+                          border: "1px solid #f5c2c0",
+                          padding: 6,
+                          borderRadius: 4,
+                          fontSize: 12,
+                          margin: 0,
+                        }}
+                      >
+                        {editError}
+                      </p>
+                    )}
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        type="submit"
+                        data-testid="save-toy-edit-button"
+                        disabled={editSubmitting}
+                      >
+                        {editSubmitting ? "saving..." : "save"}
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="cancel-toy-edit-button"
+                        onClick={cancelToyEdit}
+                        disabled={editSubmitting}
+                      >
+                        cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>

@@ -843,6 +843,43 @@ export class ApiClient {
     });
   }
 
+  // Replace an existing toy's image with a freshly picked file.
+  // Server-side dedup excludes the toy being edited so re-uploading
+  // the current image is a no-op success. A 409 here means the new
+  // image collides with a *different* toy; the body's
+  // ``existing_toy`` is the colliding row (extracted via
+  // ``extractToyImageExistsDetail``).
+  async replaceToyImage(
+    id: string,
+    file: File,
+    opts: RequestOptions = {},
+  ): Promise<Toy> {
+    const headers = new Headers();
+    const token = this.getToken();
+    if (token !== null) {
+      headers.set("X-Toybox-Token", token);
+    }
+    const form = new FormData();
+    form.append("file", file);
+    const resp = await this.fetchImpl(
+      this.baseUrl + `/api/toys/${encodeURIComponent(id)}/image`,
+      { method: "POST", headers, body: form, signal: opts.signal },
+    );
+    let body: unknown = null;
+    const text = await resp.text();
+    if (text.length > 0) {
+      try {
+        body = JSON.parse(text);
+      } catch {
+        body = text;
+      }
+    }
+    if (!resp.ok) {
+      throw new ApiError(resp.status, body);
+    }
+    return body as Toy;
+  }
+
   // Soft delete on the backend (sets ``archived = 1``); we name the
   // method ``archiveToy`` so the call site reads honestly.
   async archiveToy(id: string, opts: RequestOptions = {}): Promise<void> {
@@ -946,6 +983,41 @@ export class ApiClient {
     });
   }
 
+  // Replace an existing room's primary image. Same dedup-against-
+  // others semantics as ``replaceToyImage`` — a 409 means the new
+  // image already belongs to a different room (body
+  // ``existing_room``).
+  async replaceRoomImage(
+    id: string,
+    file: File,
+    opts: RequestOptions = {},
+  ): Promise<Room> {
+    const headers = new Headers();
+    const token = this.getToken();
+    if (token !== null) {
+      headers.set("X-Toybox-Token", token);
+    }
+    const form = new FormData();
+    form.append("file", file);
+    const resp = await this.fetchImpl(
+      this.baseUrl + `/api/rooms/${encodeURIComponent(id)}/image`,
+      { method: "POST", headers, body: form, signal: opts.signal },
+    );
+    let body: unknown = null;
+    const text = await resp.text();
+    if (text.length > 0) {
+      try {
+        body = JSON.parse(text);
+      } catch {
+        body = text;
+      }
+    }
+    if (!resp.ok) {
+      throw new ApiError(resp.status, body);
+    }
+    return body as Room;
+  }
+
   // Step 24: operator metrics dashboard. Fetches the same snapshot
   // shape that the ``metrics`` ws topic publishes every 30s — used by
   // OperatorTab as the first-render value before the ws snapshot
@@ -1020,6 +1092,30 @@ export class ApiClient {
       signal: opts.signal,
     });
   }
+}
+
+// Convert a stored ``image_path`` (DB shape: ``data/images/<sub>/<f>``)
+// to the URL the parent UI's <img> tags use. The backend mounts
+// committed images under ``/api/static/images`` so we just swap the
+// ``data/`` prefix; falsy/empty/non-matching inputs return null so
+// callers can render a placeholder. Cache-buster (``?v=hash``) lets
+// "change picture" updates render immediately without service-worker
+// or CDN reuse.
+export function imageUrl(
+  imagePath: string | null,
+  cacheKey?: string | null,
+): string | null {
+  if (imagePath === null) return null;
+  const trimmed = imagePath.trim();
+  if (trimmed.length === 0) return null;
+  const normalized = trimmed.replace(/\\/g, "/");
+  const prefix = "data/images/";
+  if (!normalized.startsWith(prefix)) return null;
+  const url = "/api/static/" + normalized.slice("data/".length);
+  if (cacheKey === undefined || cacheKey === null || cacheKey.length === 0) {
+    return url;
+  }
+  return `${url}?v=${encodeURIComponent(cacheKey)}`;
 }
 
 // Step 18: a single FastAPI validation error. The wire shape comes
