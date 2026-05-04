@@ -1287,7 +1287,7 @@ What to look for:
 - **Issue:** #33
 - **Flags:** --reviewers code
 - **Depends on:** Steps 16, 17, 18 (consumes their data); also re-validates step 20 still works
-- **Status:** DONE (2026-05-03, commit `<hash>`)
+- **Status:** DONE (2026-05-03, commit `952be3f`) — kiosk REST critical path (`/api/activities/propose`) wired end-to-end. `EscalationDispatcher` extended with optional `connection_factory` injection so the trigger-driven offline path AND the Claude system-prompt directive both resolve real catalog when a factory is provided; smoke composition intentionally remains placeholder-only. Anti-signal signature now incorporates picked toy name (only when non-default), so pre-step-19 feedback rows simply don't match new richer signatures (acceptable noise floor). When the dispatcher graduates from smoke to a non-smoke listening loop, the composition root in `main.py` must pass a `connection_factory` to enable banned-themes + reading-level safety on the trigger path.
 
 #### Manual M3 — Real play session (after Phase C)
 
