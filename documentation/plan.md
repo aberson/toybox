@@ -1270,6 +1270,7 @@ What to look for:
 - **Issue:** #31
 - **Flags:** --reviewers full --ui (canonical) — running autonomously this session as `--reviewers code` per operating mode note above
 - **Depends on:** Step 16 (shared `storage/images.py` helper lands first)
+- **Status:** DONE (2026-05-03, commit `<hash>`) — visual UI verification pending bundled test pass after step 19 lands. Notable: `rooms.image_path` ambiguity for multi-photo same-room resolved as "first-committed wins" (subsequent photos committed but not surfaced in v1; gallery sibling on disk, dedup-protected). `confirm-bulk` is atomic — any failure rolls back via `shutil.move` of every committed file back to staging. Reused shared `storage/images.py` (no duplicated validate/dedup/stage/commit logic). Vision concurrency capped via `asyncio.Semaphore(TOYBOX_VISION_CONCURRENCY)` (default 4).
 
 #### Step 18: Child profile editor
 

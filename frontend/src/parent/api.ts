@@ -178,6 +178,100 @@ export interface ToyListResponse {
   toys: Toy[];
 }
 
+// Step 17: room ingest bulk wire shapes. Mirror the Pydantic models in
+// src/toybox/api/rooms.py.
+export interface Room {
+  id: string;
+  display_name: string;
+  image_path: string | null;
+  image_hash: string | null;
+  notes: string | null;
+}
+
+export interface RoomFeature {
+  id: string;
+  room_id: string;
+  name: string;
+}
+
+export interface FeatureSuggestion {
+  name: string;
+}
+
+export interface HouseVisionSuggestion {
+  suggested_room_label: string;
+  features: FeatureSuggestion[];
+}
+
+// One photo's status inside a bulk-upload response. The fields are
+// ordered by the parent UI's read priority: ``error`` first (validation
+// / dedup rejection), then ``vision_error`` (Claude failed for this
+// photo specifically — parent assigns from the Unassigned tab), then
+// ``suggested`` (vision succeeded — render in the matching room tab).
+export interface BulkPhoto {
+  staging_id: string;
+  image_hash: string;
+  filename: string;
+  suggested: HouseVisionSuggestion | null;
+  vision_error: string | null;
+  error: string | null;
+  existing_room: Room | null;
+}
+
+export interface RoomBulkUploadResponse {
+  batch_id: string;
+  photos: BulkPhoto[];
+  vision_skipped: boolean;
+}
+
+export interface RoomAssignment {
+  staging_id: string;
+  room_id: string | null;
+  new_room_label: string | null;
+  features: FeatureSuggestion[];
+}
+
+export interface RoomConfirmBulkRequest {
+  batch_id: string;
+  assignments: RoomAssignment[];
+}
+
+export interface RoomConfirmBulkResponse {
+  rooms: Room[];
+  features: RoomFeature[];
+}
+
+export interface RoomListResponse {
+  rooms: Room[];
+}
+
+export interface RoomFeatureListResponse {
+  features: RoomFeature[];
+}
+
+export interface RoomUpdateRequest {
+  display_name?: string;
+  notes?: string | null;
+}
+
+// Body of the 409 returned by POST /api/rooms/confirm-bulk when a
+// new_room_label collides (case-insensitive) with an existing room. The
+// parent UI uses ``existing_room`` to render a "use existing or rename?"
+// modal with the existing room's photo + label.
+export interface RoomNameCollisionDetail {
+  code: "room_label_collision";
+  label: string;
+  existing_room: Room;
+}
+
+// Body of the 409 returned by DELETE /api/rooms/{id} when any
+// room_features row still references the room.
+export interface RoomInUseDetail {
+  code: "room_in_use";
+  room_id: string;
+  feature_count: number;
+}
+
 export class ApiError extends Error {
   readonly status: number;
   readonly body: unknown;
@@ -535,6 +629,100 @@ export class ApiClient {
       signal: opts.signal,
     });
   }
+
+  // Step 17: bulk room ingest. The upload endpoint takes multipart
+  // form data (one ``files`` part per photo, ≤50). The browser sets
+  // the Content-Type boundary; we don't pass it through ``request<T>``.
+  async uploadRoomsBulk(
+    files: File[],
+    opts: RequestOptions = {},
+  ): Promise<RoomBulkUploadResponse> {
+    const headers = new Headers();
+    const token = this.getToken();
+    if (token !== null) {
+      headers.set("X-Toybox-Token", token);
+    }
+    const form = new FormData();
+    for (const file of files) {
+      form.append("files", file);
+    }
+    const resp = await this.fetchImpl(
+      this.baseUrl + "/api/rooms/upload-bulk",
+      {
+        method: "POST",
+        headers,
+        body: form,
+        signal: opts.signal,
+      },
+    );
+    let body: unknown = null;
+    const text = await resp.text();
+    if (text.length > 0) {
+      try {
+        body = JSON.parse(text);
+      } catch {
+        body = text;
+      }
+    }
+    if (!resp.ok) {
+      throw new ApiError(resp.status, body);
+    }
+    return body as RoomBulkUploadResponse;
+  }
+
+  async confirmRoomsBulk(
+    body: RoomConfirmBulkRequest,
+    opts: RequestOptions = {},
+  ): Promise<RoomConfirmBulkResponse> {
+    return this.request<RoomConfirmBulkResponse>("/api/rooms/confirm-bulk", {
+      method: "POST",
+      body: JSON.stringify(body),
+      signal: opts.signal,
+    });
+  }
+
+  async listRooms(opts: RequestOptions = {}): Promise<RoomListResponse> {
+    return this.request<RoomListResponse>("/api/rooms", {
+      method: "GET",
+      signal: opts.signal,
+    });
+  }
+
+  async getRoom(id: string, opts: RequestOptions = {}): Promise<Room> {
+    return this.request<Room>(`/api/rooms/${encodeURIComponent(id)}`, {
+      method: "GET",
+      signal: opts.signal,
+    });
+  }
+
+  async getRoomFeatures(
+    id: string,
+    opts: RequestOptions = {},
+  ): Promise<RoomFeatureListResponse> {
+    return this.request<RoomFeatureListResponse>(
+      `/api/rooms/${encodeURIComponent(id)}/features`,
+      { method: "GET", signal: opts.signal },
+    );
+  }
+
+  async updateRoom(
+    id: string,
+    body: RoomUpdateRequest,
+    opts: RequestOptions = {},
+  ): Promise<Room> {
+    return this.request<Room>(`/api/rooms/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+      signal: opts.signal,
+    });
+  }
+
+  async deleteRoom(id: string, opts: RequestOptions = {}): Promise<void> {
+    await this.request<unknown>(`/api/rooms/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      signal: opts.signal,
+    });
+  }
 }
 
 // Step 18: a single FastAPI validation error. The wire shape comes
@@ -620,6 +808,62 @@ export function extractToyImageExistsDetail(
     return {
       code: "image_already_exists",
       existing_toy: c["existing_toy"] as Toy,
+    };
+  }
+  return null;
+}
+
+// Step 17: pull the room_label_collision detail off a 409 ApiError, or
+// null if the error isn't that shape. The bulk ingest UI uses this to
+// surface a "Living Room already exists. Use existing or rename?"
+// modal with the existing room info.
+export function extractRoomNameCollisionDetail(
+  err: unknown,
+): RoomNameCollisionDetail | null {
+  if (!(err instanceof ApiError) || err.status !== 409) return null;
+  const body = err.body;
+  if (typeof body !== "object" || body === null) return null;
+  const rec = body as Record<string, unknown>;
+  const candidate = "detail" in rec ? rec["detail"] : rec;
+  if (typeof candidate !== "object" || candidate === null) return null;
+  const c = candidate as Record<string, unknown>;
+  if (
+    c["code"] === "room_label_collision" &&
+    typeof c["label"] === "string" &&
+    typeof c["existing_room"] === "object" &&
+    c["existing_room"] !== null
+  ) {
+    return {
+      code: "room_label_collision",
+      label: c["label"],
+      existing_room: c["existing_room"] as Room,
+    };
+  }
+  return null;
+}
+
+// Step 17: pull the room_in_use detail off a 409 ApiError. Used when
+// DELETE /api/rooms/{id} refuses because room_features rows reference
+// the room — the room editor renders the count.
+export function extractRoomInUseDetail(
+  err: unknown,
+): RoomInUseDetail | null {
+  if (!(err instanceof ApiError) || err.status !== 409) return null;
+  const body = err.body;
+  if (typeof body !== "object" || body === null) return null;
+  const rec = body as Record<string, unknown>;
+  const candidate = "detail" in rec ? rec["detail"] : rec;
+  if (typeof candidate !== "object" || candidate === null) return null;
+  const c = candidate as Record<string, unknown>;
+  if (
+    c["code"] === "room_in_use" &&
+    typeof c["room_id"] === "string" &&
+    typeof c["feature_count"] === "number"
+  ) {
+    return {
+      code: "room_in_use",
+      room_id: c["room_id"],
+      feature_count: c["feature_count"],
     };
   }
   return null;

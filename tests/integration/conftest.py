@@ -22,6 +22,7 @@ from toybox.api.activities import get_activities_db
 from toybox.api.auth_dep import get_auth_db
 from toybox.api.children import get_children_db
 from toybox.api.listening import get_db as get_listening_db
+from toybox.api.rooms import get_rooms_db
 from toybox.api.toys import get_toys_db
 from toybox.api.transcripts import get_transcripts_db
 from toybox.app import create_app
@@ -78,6 +79,7 @@ def app(db_path: Path, pubsub: PubSub) -> Iterator[FastAPI]:
         get_activities_db,
         get_children_db,
         get_toys_db,
+        get_rooms_db,
         get_transcripts_db,
     ):
         application.dependency_overrides[dep] = _override_db

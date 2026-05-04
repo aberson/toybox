@@ -12,6 +12,7 @@ import { ActivityPanel } from "./components/ActivityPanel";
 import { CapabilityBanner } from "./components/CapabilityBanner";
 import { ChildProfileEditor } from "./components/ChildProfileEditor";
 import { Header } from "./components/Header";
+import { RoomIngestBulk } from "./components/RoomIngestBulk";
 import { SuggestionCard } from "./components/SuggestionCard";
 import { ToyIngest } from "./components/ToyIngest";
 import { TriggerButton } from "./components/TriggerButton";
@@ -43,6 +44,7 @@ export function App(): JSX.Element {
   const [muted, setMuted] = useState(false);
   const [showChildEditor, setShowChildEditor] = useState(false);
   const [showToyIngest, setShowToyIngest] = useState(false);
+  const [showRoomIngest, setShowRoomIngest] = useState(false);
   const apiRef = useRef<ApiClient | null>(null);
   const wsRef = useRef<ParentWsClient | null>(null);
 
@@ -402,9 +404,18 @@ export function App(): JSX.Element {
           >
             {showToyIngest ? "hide toys" : "toys"}
           </button>
+          <button
+            type="button"
+            data-testid="toggle-room-ingest"
+            aria-pressed={showRoomIngest}
+            onClick={() => setShowRoomIngest((prev) => !prev)}
+          >
+            {showRoomIngest ? "hide rooms" : "rooms"}
+          </button>
         </div>
         {showChildEditor && <ChildProfileEditor api={api} /> }
         {showToyIngest && <ToyIngest api={api} />}
+        {showRoomIngest && <RoomIngestBulk api={api} />}
         {showSuggestion && activity !== null && (
           <SuggestionCard
             activity={activity}
