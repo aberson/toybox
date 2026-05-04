@@ -1336,7 +1336,7 @@ What to look for:
 - **Type:** code
 - **Issue:** #26
 - **Flags:** --reviewers full --ui
-- **Status:** DONE (2026-05-03, commit `<pending>`) — backend gate + frontend setup/login/countdown all green; visual UI verification of the gate-first bootstrap pending bundled handoff. Notable: rate-limit state is in-memory (resets on process restart, acceptable for v1 per spec); the `pin_is_set` helper is re-exported from `core.bind_guard` so `main.py`'s startup invariant reads as a one-liner. The kiosk's `issueParentToken` was updated to take a `{pin}` body for type-safety; production kiosks need a separate pairing flow (out of scope for Step 21). Lock takes precedence over PIN correctness — even a correct PIN returns 423 during lockout.
+- **Status:** DONE (2026-05-03, commit `72f530f`) — backend gate + frontend setup/login/countdown all green; visual UI verification of the gate-first bootstrap pending bundled handoff. Notable: PIN regex is `[0-9]+` (NOT `\d+`) to reject Unicode digits (Arabic-Indic / full-width / Devanagari) that would otherwise lock the parent out. Rate-limit state is in-memory (resets on process restart, acceptable for v1 per spec); `pin_is_set` re-exported from `core.bind_guard` so `main.py`'s startup invariant reads as a one-liner. AbortController is constructed inside each useEffect (not as a shared ref) so React 18 StrictMode's double-mount cycle creates a fresh controller per mount — without that fix the second mount silently reused an aborted controller and stranded the UI. Lock takes precedence over PIN correctness even with the right PIN. Kiosk `issueParentToken` takes `{pin}`; production kiosks still need a pairing flow (out of v1 scope).
 
 #### Step 24: Metrics endpoint + ws topic + parent operator dashboard
 
