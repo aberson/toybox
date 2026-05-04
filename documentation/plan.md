@@ -1336,7 +1336,7 @@ What to look for:
 - **Type:** code
 - **Issue:** #29
 - **Flags:** --reviewers full --ui
-- **Status:** DONE (2026-05-03, commit `<pending>`)
+- **Status:** DONE (2026-05-03, commit `d1bee35`) — visual UI verification of Operator tab pending bundled handoff. Notable: 24h-window queries use `datetime(col) >= datetime('now', '-1 day')` to avoid the production T-Z vs SQLite space-separator lexicographic-compare bug (centralized via `_LAST_24H_PREDICATE`). Activity counts surface CURRENT-state per-state (`*_current`), not cumulative — running/completed/didnt_work all visible. Buffer-overrun counter is process-lifetime (renamed from misleading `_last_24h`). WS publisher awaits `resolve_capability` per tick so REST and ws agree on `claude_capable`.
 
 #### Manual M4 — Sound effect sourcing (any time before Phase A step 10 final review)
 
