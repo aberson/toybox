@@ -63,6 +63,53 @@ export interface ProposePayload {
   context?: Record<string, unknown> | null;
 }
 
+// Step 18: child-profile editor wire shapes. Mirror the Pydantic
+// models in src/toybox/api/children.py.
+export type ReadingLevel = "pre-reader" | "early-reader" | "fluent";
+
+export interface ChildProfile {
+  id: string;
+  display_name: string;
+  birthdate: string | null;
+  pronouns: string | null;
+  reading_level: ReadingLevel | null;
+  interests: string | null;
+  comfort: string | null;
+  banned_themes: string | null;
+  notes: string | null;
+}
+
+// POST body. display_name is required; everything else is optional.
+// Send `null` to leave a column unset on creation.
+export interface ChildProfileCreate {
+  display_name: string;
+  birthdate?: string | null;
+  pronouns?: string | null;
+  reading_level?: ReadingLevel | null;
+  interests?: string | null;
+  comfort?: string | null;
+  banned_themes?: string | null;
+  notes?: string | null;
+}
+
+// PATCH body. All fields are optional; only fields present in the
+// object are written. Pass `null` for an optional field to clear it.
+export type ChildProfileUpdate = Partial<ChildProfileCreate>;
+
+export interface ChildProfileListResponse {
+  children: ChildProfile[];
+}
+
+// Body of the 409 returned by DELETE /api/children/{id} when an
+// activity still references the profile. The frontend reads
+// `referring_activity_count` to render the "can't delete — N activities
+// still reference this profile" message.
+export interface ChildInUseDetail {
+  code: "child_in_use";
+  child_id: string;
+  referring_activity_count: number;
+}
+
 export class ApiError extends Error {
   readonly status: number;
   readonly body: unknown;
@@ -287,6 +334,117 @@ export class ApiClient {
       signal: opts.signal,
     });
   }
+
+  // Step 18: child-profile CRUD. The 409 child_in_use surfaces as the
+  // generic ApiError (status 409, body has detail.code === "child_in_use");
+  // the editor reads referring_activity_count off body.detail.
+  async listChildren(
+    opts: RequestOptions = {},
+  ): Promise<ChildProfileListResponse> {
+    return this.request<ChildProfileListResponse>("/api/children", {
+      method: "GET",
+      signal: opts.signal,
+    });
+  }
+
+  async getChild(id: string, opts: RequestOptions = {}): Promise<ChildProfile> {
+    return this.request<ChildProfile>(`/api/children/${encodeURIComponent(id)}`, {
+      method: "GET",
+      signal: opts.signal,
+    });
+  }
+
+  async createChild(
+    body: ChildProfileCreate,
+    opts: RequestOptions = {},
+  ): Promise<ChildProfile> {
+    return this.request<ChildProfile>("/api/children", {
+      method: "POST",
+      body: JSON.stringify(body),
+      signal: opts.signal,
+    });
+  }
+
+  async updateChild(
+    id: string,
+    body: ChildProfileUpdate,
+    opts: RequestOptions = {},
+  ): Promise<ChildProfile> {
+    return this.request<ChildProfile>(`/api/children/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+      signal: opts.signal,
+    });
+  }
+
+  async deleteChild(id: string, opts: RequestOptions = {}): Promise<void> {
+    await this.request<unknown>(`/api/children/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      signal: opts.signal,
+    });
+  }
+}
+
+// Step 18: a single FastAPI validation error. The wire shape comes
+// from pydantic; we only need ``loc`` + ``msg`` for surfacing under the
+// offending field. The full detail array lives at ``body.detail``.
+export interface ValidationFieldError {
+  loc: (string | number)[];
+  msg: string;
+  type?: string;
+}
+
+// Pull pydantic's ``detail`` array off a 422 ApiError. Returns ``null``
+// when the error isn't a validation error or the body is unrecognised.
+export function extractValidationErrors(
+  err: unknown,
+): ValidationFieldError[] | null {
+  if (!(err instanceof ApiError) || err.status !== 422) return null;
+  const body = err.body;
+  if (typeof body !== "object" || body === null) return null;
+  const rec = body as Record<string, unknown>;
+  const detail = rec["detail"];
+  if (!Array.isArray(detail)) return null;
+  const out: ValidationFieldError[] = [];
+  for (const entry of detail) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const e = entry as Record<string, unknown>;
+    if (Array.isArray(e["loc"]) && typeof e["msg"] === "string") {
+      out.push({
+        loc: e["loc"] as (string | number)[],
+        msg: e["msg"],
+        type: typeof e["type"] === "string" ? e["type"] : undefined,
+      });
+    }
+  }
+  return out.length > 0 ? out : null;
+}
+
+// Step 18: pull the child_in_use detail off a 409 ApiError, or null if
+// the error isn't that shape. The editor renders "can't delete — N
+// activities still reference this profile" using the count.
+export function extractChildInUseDetail(
+  err: unknown,
+): ChildInUseDetail | null {
+  if (!(err instanceof ApiError) || err.status !== 409) return null;
+  const body = err.body;
+  if (typeof body !== "object" || body === null) return null;
+  const rec = body as Record<string, unknown>;
+  const candidate = "detail" in rec ? rec["detail"] : rec;
+  if (typeof candidate !== "object" || candidate === null) return null;
+  const c = candidate as Record<string, unknown>;
+  if (
+    c["code"] === "child_in_use" &&
+    typeof c["child_id"] === "string" &&
+    typeof c["referring_activity_count"] === "number"
+  ) {
+    return {
+      code: "child_in_use",
+      child_id: c["child_id"],
+      referring_activity_count: c["referring_activity_count"],
+    };
+  }
+  return null;
 }
 
 // Returns true for AbortError thrown by fetch when a signal aborts.

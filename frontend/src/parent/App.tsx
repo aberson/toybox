@@ -10,6 +10,7 @@ import {
 import type { Activity } from "./api";
 import { ActivityPanel } from "./components/ActivityPanel";
 import { CapabilityBanner } from "./components/CapabilityBanner";
+import { ChildProfileEditor } from "./components/ChildProfileEditor";
 import { Header } from "./components/Header";
 import { SuggestionCard } from "./components/SuggestionCard";
 import { TriggerButton } from "./components/TriggerButton";
@@ -39,6 +40,7 @@ function deriveWsUrl(): string {
 export function App(): JSX.Element {
   const state = useParentStore();
   const [muted, setMuted] = useState(false);
+  const [showChildEditor, setShowChildEditor] = useState(false);
   const apiRef = useRef<ApiClient | null>(null);
   const wsRef = useRef<ParentWsClient | null>(null);
 
@@ -380,9 +382,18 @@ export function App(): JSX.Element {
       />
       <CapabilityBanner reason={state.capabilityReason} />
       <div style={{ padding: 16 }}>
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 16, display: "flex", gap: 8 }}>
           <TriggerButton onTrigger={handleTrigger} />
+          <button
+            type="button"
+            data-testid="toggle-child-editor"
+            aria-pressed={showChildEditor}
+            onClick={() => setShowChildEditor((prev) => !prev)}
+          >
+            {showChildEditor ? "hide child profiles" : "child profiles"}
+          </button>
         </div>
+        {showChildEditor && <ChildProfileEditor api={api} /> }
         {showSuggestion && activity !== null && (
           <SuggestionCard
             activity={activity}

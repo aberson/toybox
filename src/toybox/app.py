@@ -10,6 +10,7 @@ from fastapi import FastAPI
 
 from .api.activities import router as activities_router
 from .api.auth import router as auth_router
+from .api.children import router as children_router
 from .api.health import router as health_router
 from .api.listening import router as listening_router
 from .api.transcripts import router as transcripts_router
@@ -23,6 +24,7 @@ def create_app() -> FastAPI:
     app.include_router(listening_router)
     app.include_router(auth_router)
     app.include_router(activities_router)
+    app.include_router(children_router)
     app.include_router(transcripts_router)
     app.include_router(build_ws_router())
     return app

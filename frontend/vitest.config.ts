@@ -8,6 +8,11 @@ export default defineConfig({
   test: {
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
     exclude: ["node_modules", "dist", "playwright"],
+    // Per-test environment: pure-reducer .test.ts files default to node
+    // (no DOM needed); Step 18's .test.tsx files mount React components
+    // and need a DOM. ``environmentMatchGlobs`` picks happy-dom for the
+    // tsx subset without slowing the pure-reducer tests.
     environment: "node",
+    environmentMatchGlobs: [["src/**/*.test.tsx", "happy-dom"]],
   },
 });
