@@ -1276,6 +1276,7 @@ What to look for:
 - **Type:** full-stack
 - **Issue:** #32
 - **Flags:** --reviewers full --ui (canonical) — running autonomously this session as `--reviewers code` per operating mode note above
+- **Status:** DONE (2026-05-03, commit `aa584be`) — visual UI verification pending bundled test pass after steps 16, 17, 19 land
 
 #### Step 19: Activity generator uses real content
 
