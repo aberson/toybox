@@ -483,6 +483,27 @@ Templates in `src/toybox/personas/templates/<archetype>/<intent>.json`. Each is 
 
 Slots fill deterministically from intent slot + child profile + persona + available toys/rooms. Hash-based seeding for reproducibility.
 
+#### Parametric slot registry
+
+`src/toybox/activities/slots.py` defines the placeholder vocabulary the offline path can fill:
+
+| Slot | Source | Contributes to feedback signature? |
+|------|--------|------------------------------------|
+| `{toy}` | resolved toy catalog (`{DEFAULT_TOY_NAME}` if empty) | yes |
+| `{slot}` | caller-supplied via propose body (`{DEFAULT_SLOT_FILLER}` if absent) | yes |
+| `{room}` | resolved room catalog (`{DEFAULT_ROOM_NAME}` if empty) | no |
+| `{action_verb}` | hand-curated word list (~15 silly verbs) | no |
+| `{adjective}` | hand-curated word list (~15 positive/silly) | no |
+| `{prop}` | hand-curated word list (everyday safe objects) | no |
+| `{body_part}` | hand-curated word list (kid-named body parts) | no |
+| `{count}` | English number words 2..6 | no |
+
+Fills resolve **once per activity** (in first-occurrence order across title + steps) so a single template like `"{toy} {action_verb}s through {room}"` reads consistently across all five steps. Word-list fills are intentionally excluded from the feedback signature so a `loved_it` on "{toy} stomps" still boosts the "{toy} skips" pick — same template, surface variety only.
+
+Adding a new slot is a five-step change documented in `slots.py`'s module docstring (add value source, branch in `fill`, append to `KNOWN_SLOTS`, decide signature contribution, update schema description).
+
+The Claude-authored template generation work (see Future enhancements: "AI-authored offline templates") will produce templates that reference these slots; the registry is the contract that lets that work happen without further generator changes.
+
 > **NOTE (Group 2 refinement):** child screen content (avatar + step text + sfx) is the v1 default. Pre-recorded persona voice clips and richer per-step assets are tracked as a Phase D+ refinement. Live parent controls (pause/skip/regenerate/end/"didn't work") are the agreed v1 set; richer mid-activity authoring is a future refinement.
 
 ### Claude path (modes 3+)
@@ -1346,6 +1367,14 @@ What to look for:
 - **Flags:** --reviewers full --ui
 - **Status:** DONE (2026-05-03, commit `8c2ddde`) — backend DELETE endpoints + frontend manager + 22 backend tests + 13 frontend tests all green. Notable: extracted `enforce_pin_check(pin, conn, rate_limiter)` from `auth.py::post_parent` so the wipe-all endpoint shares the same lock-precedence + verify + counter logic; the helper does NOT call `record_successful_attempt` (login still does — wipe success isn't an auth event). Wipe-all uses `DELETE` with JSON body — unconventional but FastAPI accepts it; the alternative (PIN-in-header) is harder to type-check on the frontend. Delete-one is single-statement atomic (`DELETE` + `cursor.rowcount == 0` → 404, no SELECT-then-DELETE). Optimistic delete restores the row on non-404 errors; 404 keeps the row removed with a "already deleted" notice. Cursor pagination only enables "Load more" for the unfiltered list (search returns up to `limit` matches without a cursor in v1). PIN re-validation does NOT log the PIN value — covered by an explicit `caplog` audit on the wipe handler. Per-search `AbortController` cancels older in-flight requests so fast typing doesn't surface stale results. Wipe-all does NOT cascade — schema review + explicit "before/after row counts on sessions/activities/labeled_events" test pin the invariant.
 
+#### Step 23: Live activity polish + suggestion "why this?"
+
+- **Problem:** Polish the live activity controls and fill in the suggestion-card "why this?" panel that was scaffolded in Phase A step 9. Backend: `POST /api/activities/{id}/pause` and `/resume` endpoints with idempotent semantics — pause-when-already-paused returns 200 with no version bump and no state envelope publish; the state-equality check fires BEFORE the version check so concurrent same-version double-taps return 200 instead of 409. Pause from terminal states (ended, completed, dismissed) and from proposed return 409 invalid_transition. New `STATE_PAUSED` constant added to the lifecycle; `_VALID_TRANSITIONS` includes paused→{running, ended, didnt_work, dismissed}. `ProposeRequest`/`RegenerateRequest` accept optional `trigger_phrase` and `persona_reasoning` (capped at 512 chars each); `_build_persona_reasoning` falls back through caller-supplied → `"<persona_display_name> picked for <intent>"` → `"matched on intent"`. Both fields persist in the activity's existing summary JSON envelope (alongside step 20's signature, no schema change) and surface on `ActivityResponse`. Regenerate inherits trigger_phrase + persona_reasoning from the source. Frontend: SuggestionCard "why this?" panel renders trigger phrase + persona reasoning + intent with kind null-safe fallbacks; ActivityPanel End button gates on `window.confirm` (matches ChildProfileEditor / TranscriptsManager pattern). `paused` added to the ActivityState union and PANEL_STATES so a paused activity stays visible.
+- **Type:** code
+- **Issue:** #28
+- **Flags:** --reviewers full --ui
+- **Status:** DONE (2026-05-03, commit `3b6287e`) — visual UI verification of why-panel + End-confirm pending bundled handoff. Notable: trigger_phrase is a literal substring of a child-spoken transcript = PII; the activity.state WS topic is shared with the child kiosk, so `_emit_state` strips `trigger_phrase` AND `persona_reasoning` from the WS payload before publishing. REST GET path remains parent-scoped and full-fidelity. Both fields capped at 512 chars on the request models. Regenerate semantics intentionally preserved as "skip & try another" (creates new activity_id, dismisses source) rather than the spec's "preserve activity_id mutate-in-place" — required because labeled_events has a UNIQUE index on activity_id and step 20 anti-signal feedback flows through the dismissed-source signature. The fresh activity inherits why-telemetry from the source so cycles stay coherent.
+
 #### Step 24: Metrics endpoint + ws topic + parent operator dashboard
 
 - **Problem:** Add `/api/metrics` (parent-token GET) and a `metrics` ws topic (30 s snapshot publisher) so an operator can see system + activity-quality + breaker + audio-pipeline state at a glance. Snapshot shape includes activities counts (totals + last-24h breakdown), transcripts counts, audio pipeline (mic device, queue depth, buffer-overruns over the last 24h), AI status (breaker state + retry-after, Claude capability check + reason, listening mode, min-interval throttle), activity-quality (per-dimension judge means over the last 24h, judge-vs-parent agreement on the overlap, safety auto-fail count), and eval-gate status (last run timestamp, mean baseline scores, regressions count, placeholder flag). Parent UI gains an "Operator" toggle that renders the snapshot; the tab subscribes to the `metrics` ws topic for push updates and falls back to a 30 s REST poll when ws is unavailable. Counter persistence: load-bearing counters come from DB COUNT(*) so they survive process restart; only the buffer-overrun counter is process-local (acceptable noise floor). Judge-parent agreement metric is the simpler `sign_agreement_rate` (sign of `parent_signal` vs sign of `mean(judge_scores) - 3.0`); Cohen's kappa was deferred as out of scope for v1.
@@ -1994,3 +2023,4 @@ jobs:
 - `CHANGELOG.md` (Keep-a-Changelog format) — track schema migrations and behavioral changes
 - Process supervision (Windows service / systemd unit) so the backend survives terminal close
 - Disk-quota enforcement (warn/halt at configured cap on `data/` size)
+- AI-authored offline templates: one-shot Claude pass that generates N parametric templates per intent (using the slot registry vocabulary), validates them against `_schema.json`, and persists them as new JSON files under `src/toybox/activities/templates/`. Companion `tools/lint_templates` extension to enforce the slot whitelist on every reference. Goal: rich offline variety without per-propose Claude calls.
