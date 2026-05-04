@@ -46,7 +46,7 @@ from .audio.capture import MicCapture
 from .audio.pipeline import TranscriptPipeline
 from .audio.stt import WhisperTranscriber
 from .audio.test_adapter import WavToBufferStream
-from .core.bind_guard import BindGuardError, check_bind_safe
+from .core.bind_guard import BindGuardError, check_bind_safe, pin_is_set
 from .core.capability import CapabilityReason
 from .core.escalation import EscalationDispatcher
 from .core.listening import ListeningMode
@@ -132,8 +132,21 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
 
 
 def _pin_is_set() -> bool:
-    """Phase A: there is no PIN yet. Step 4+ wires this to the settings store."""
-    return False
+    """Read the parent-PIN flag from the settings table.
+
+    Step 21 wires this to :func:`toybox.core.bind_guard.pin_is_set`.
+    The DB is opened, queried, and closed inline so the startup path
+    doesn't require a long-lived connection — running migrations
+    first guarantees the ``settings`` table exists even on a fresh
+    worktree boot.
+    """
+    db_path = resolve_db_path()
+    conn = connect(db_path, check_same_thread=False)
+    try:
+        run_migrations(conn)
+        return pin_is_set(conn)
+    finally:
+        conn.close()
 
 
 # ----------------------------------------------------------------------

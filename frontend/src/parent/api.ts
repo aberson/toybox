@@ -53,6 +53,44 @@ export interface ParentTokenResponse {
   subject: { kind: "parent" };
 }
 
+// Step 21: PIN-gate wire shapes. Mirror the Pydantic models in
+// src/toybox/api/auth.py.
+
+// GET /api/auth/parent/status — pre-token bootstrap probe. Used to
+// decide between the first-run PinSetup screen and the recurring
+// PinLogin screen, plus to surface an active lockout countdown
+// without first issuing a (failing) login attempt.
+export interface ParentAuthStatus {
+  pin_set: boolean;
+  locked: boolean;
+  // Integer seconds remaining on a lock; 0 when not locked.
+  seconds_until_unlock: number;
+}
+
+// Body for POST /api/auth/parent (login). Digits-only PIN, 4-12 chars.
+export interface ParentLoginRequest {
+  pin: string;
+}
+
+// Body for POST /api/auth/parent/setup (first-run only).
+export interface ParentSetupRequest {
+  pin: string;
+  confirm: string;
+}
+
+// Detail body for the 401 returned when a wrong PIN is submitted.
+export interface PinInvalidDetail {
+  code: "pin_invalid";
+  attempts_remaining: number;
+}
+
+// Detail body for the 423 (Locked) returned during lockout. The
+// ``Retry-After`` header carries the same integer.
+export interface PinLockedDetail {
+  code: "pin_locked";
+  seconds_until_unlock: number;
+}
+
 export interface ProposePayload {
   intent: string;
   slot?: string | null;
@@ -466,11 +504,41 @@ export class ApiClient {
     });
   }
 
+  // Step 21: PIN-gated login. Body carries the entered PIN; failures
+  // surface as either ApiError(401) with ``pin_invalid`` detail or
+  // ApiError(423) with ``pin_locked`` detail (use
+  // ``extractPinInvalidDetail`` / ``extractPinLockedDetail`` to read).
   async issueParentToken(
+    body: ParentLoginRequest,
     opts: RequestOptions = {},
   ): Promise<ParentTokenResponse> {
     return this.request<ParentTokenResponse>("/api/auth/parent", {
       method: "POST",
+      body: JSON.stringify(body),
+      signal: opts.signal,
+    });
+  }
+
+  // First-run PIN setup. 409 if a PIN is already set (the bootstrap
+  // path checks ``getAuthStatus`` first to avoid that branch in the
+  // normal flow). On success returns a parent token immediately.
+  async setupPin(
+    body: ParentSetupRequest,
+    opts: RequestOptions = {},
+  ): Promise<ParentTokenResponse> {
+    return this.request<ParentTokenResponse>("/api/auth/parent/setup", {
+      method: "POST",
+      body: JSON.stringify(body),
+      signal: opts.signal,
+    });
+  }
+
+  // Pre-token probe: report whether a PIN is set and whether the
+  // login gate is currently locked out. The bootstrap flow polls this
+  // first to choose between PinSetup and PinLogin.
+  async getAuthStatus(opts: RequestOptions = {}): Promise<ParentAuthStatus> {
+    return this.request<ParentAuthStatus>("/api/auth/parent/status", {
+      method: "GET",
       signal: opts.signal,
     });
   }
@@ -819,6 +887,17 @@ export interface ValidationFieldError {
 
 // Pull pydantic's ``detail`` array off a 422 ApiError. Returns ``null``
 // when the error isn't a validation error or the body is unrecognised.
+//
+// Two shapes are recognised:
+//
+//   1. The Pydantic auto-validation array: ``detail: [{loc, msg, type}]``.
+//      This is what FastAPI emits when a Pydantic field validator
+//      rejects the body.
+//   2. The sibling-route ``{code: ..., field?: ...}`` dict shape used by
+//      explicit ``raise HTTPException(422, detail={...})`` sites
+//      (children/toys/rooms/metrics/auth-setup). The dict is mapped
+//      back to a single-entry validation array so callers can treat
+//      both 422 origins uniformly.
 export function extractValidationErrors(
   err: unknown,
 ): ValidationFieldError[] | null {
@@ -827,20 +906,39 @@ export function extractValidationErrors(
   if (typeof body !== "object" || body === null) return null;
   const rec = body as Record<string, unknown>;
   const detail = rec["detail"];
-  if (!Array.isArray(detail)) return null;
-  const out: ValidationFieldError[] = [];
-  for (const entry of detail) {
-    if (typeof entry !== "object" || entry === null) continue;
-    const e = entry as Record<string, unknown>;
-    if (Array.isArray(e["loc"]) && typeof e["msg"] === "string") {
-      out.push({
-        loc: e["loc"] as (string | number)[],
-        msg: e["msg"],
-        type: typeof e["type"] === "string" ? e["type"] : undefined,
-      });
+  if (Array.isArray(detail)) {
+    const out: ValidationFieldError[] = [];
+    for (const entry of detail) {
+      if (typeof entry !== "object" || entry === null) continue;
+      const e = entry as Record<string, unknown>;
+      if (Array.isArray(e["loc"]) && typeof e["msg"] === "string") {
+        out.push({
+          loc: e["loc"] as (string | number)[],
+          msg: e["msg"],
+          type: typeof e["type"] === "string" ? e["type"] : undefined,
+        });
+      }
     }
+    return out.length > 0 ? out : null;
   }
-  return out.length > 0 ? out : null;
+  if (typeof detail === "object" && detail !== null) {
+    const d = detail as Record<string, unknown>;
+    const code = d["code"];
+    if (typeof code !== "string") return null;
+    const field = typeof d["field"] === "string" ? d["field"] : undefined;
+    // Map ``{code, field?}`` → single ValidationFieldError so the
+    // PinSetup-style consumer can route on ``loc[1]`` exactly as it
+    // does for the array shape. ``msg`` is derived from ``code`` so
+    // the field-level UI surface still has something to render.
+    return [
+      {
+        loc: field !== undefined ? ["body", field] : ["body"],
+        msg: code,
+        type: code,
+      },
+    ];
+  }
+  return null;
 }
 
 // Step 18: pull the child_in_use detail off a 409 ApiError, or null if
@@ -947,6 +1045,56 @@ export function extractRoomInUseDetail(
       code: "room_in_use",
       room_id: c["room_id"],
       feature_count: c["feature_count"],
+    };
+  }
+  return null;
+}
+
+// Step 21: pull the ``pin_invalid`` detail off a 401 ApiError, or null
+// if the error isn't that shape. The login screen uses this to render
+// "Wrong PIN. N attempts remaining" without leaking the PIN.
+export function extractPinInvalidDetail(
+  err: unknown,
+): PinInvalidDetail | null {
+  if (!(err instanceof ApiError) || err.status !== 401) return null;
+  const body = err.body;
+  if (typeof body !== "object" || body === null) return null;
+  const rec = body as Record<string, unknown>;
+  const candidate = "detail" in rec ? rec["detail"] : rec;
+  if (typeof candidate !== "object" || candidate === null) return null;
+  const c = candidate as Record<string, unknown>;
+  if (
+    c["code"] === "pin_invalid" &&
+    typeof c["attempts_remaining"] === "number"
+  ) {
+    return {
+      code: "pin_invalid",
+      attempts_remaining: c["attempts_remaining"],
+    };
+  }
+  return null;
+}
+
+// Step 21: pull the ``pin_locked`` detail off a 423 ApiError, or null
+// if the error isn't that shape. The login screen uses this to switch
+// to the locked-state UI with countdown.
+export function extractPinLockedDetail(
+  err: unknown,
+): PinLockedDetail | null {
+  if (!(err instanceof ApiError) || err.status !== 423) return null;
+  const body = err.body;
+  if (typeof body !== "object" || body === null) return null;
+  const rec = body as Record<string, unknown>;
+  const candidate = "detail" in rec ? rec["detail"] : rec;
+  if (typeof candidate !== "object" || candidate === null) return null;
+  const c = candidate as Record<string, unknown>;
+  if (
+    c["code"] === "pin_locked" &&
+    typeof c["seconds_until_unlock"] === "number"
+  ) {
+    return {
+      code: "pin_locked",
+      seconds_until_unlock: c["seconds_until_unlock"],
     };
   }
   return null;

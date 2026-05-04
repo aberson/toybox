@@ -56,6 +56,16 @@ export interface ParentTokenResponse {
   subject: { kind: "parent" };
 }
 
+// Step 21: ``POST /api/auth/parent`` is now PIN-gated. The kiosk does
+// not own the PIN and will get its token from the parent UI via the
+// kiosk pairing flow (``POST /api/auth/pair``). Until that landing
+// step ships, the kiosk has no usable bootstrap token; the
+// ``issueParentToken`` call below is kept for type-safety but expects
+// the caller to provide a PIN (the test path mocks the response).
+export interface ParentLoginRequest {
+  pin: string;
+}
+
 export class ApiError extends Error {
   readonly status: number;
   readonly body: unknown;
@@ -168,10 +178,12 @@ export class ApiClient {
   }
 
   async issueParentToken(
+    body: ParentLoginRequest,
     opts: RequestOptions = {},
   ): Promise<ParentTokenResponse> {
     return this.request<ParentTokenResponse>("/api/auth/parent", {
       method: "POST",
+      body: JSON.stringify(body),
       signal: opts.signal,
     });
   }

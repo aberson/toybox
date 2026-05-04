@@ -115,13 +115,21 @@ export function App(): JSX.Element {
     preloadSfx("success");
     const boot = async (): Promise<void> => {
       try {
-        // Retry the parent-token issuance on transient 5xx / network
-        // blips. The iter-1 SQLite cross-thread bug 500'd
-        // intermittently; without retry the kiosk would freeze on the
-        // idle screen until a manual reload. 4xx (e.g. auth failures)
-        // are not retried.
+        // Step 21: ``/api/auth/parent`` is now PIN-gated. The kiosk
+        // does not own the PIN — production will hand the kiosk a
+        // pre-issued token via the (yet-to-ship) kiosk pairing flow.
+        // Until then, the bootstrap PIN is read from
+        // ``window.__TOYBOX_KIOSK_PIN__`` (set by the test harness or
+        // the operator's local config); a 401/423 response here is
+        // surfaced as a bootstrap toast so the kiosk doesn't silently
+        // hang. Retry-with-backoff still applies for transient 5xx /
+        // network blips.
+        const kioskWindow = window as unknown as {
+          __TOYBOX_KIOSK_PIN__?: string;
+        };
+        const bootstrapPin = kioskWindow.__TOYBOX_KIOSK_PIN__ ?? "";
         const tokenResp = await retryWithBackoff(() =>
-          api.issueParentToken({ signal: aborter.signal }),
+          api.issueParentToken({ pin: bootstrapPin }, { signal: aborter.signal }),
         );
         if (!mounted) return;
         useChildStore.getState().setToken(tokenResp);

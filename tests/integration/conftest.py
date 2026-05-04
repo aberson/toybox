@@ -19,6 +19,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from toybox.api.activities import get_activities_db
+from toybox.api.auth import get_pin_rate_limiter
 from toybox.api.auth_dep import get_auth_db
 from toybox.api.children import get_children_db
 from toybox.api.listening import get_db as get_listening_db
@@ -28,6 +29,7 @@ from toybox.api.toys import get_toys_db
 from toybox.api.transcripts import get_transcripts_db
 from toybox.app import create_app
 from toybox.core.auth import TokenScope, issue_token
+from toybox.core.pin_rate_limit import PinRateLimiter
 from toybox.core.pubsub import PubSub
 from toybox.db.connection import connect
 from toybox.db.migrations import run_migrations
@@ -93,6 +95,10 @@ def app(db_path: Path, pubsub: PubSub) -> Iterator[FastAPI]:
 
     test_breaker = _CB()
     application.dependency_overrides[get_metrics_breaker] = lambda: test_breaker
+    # Step 21: per-test PIN rate limiter so failure-counter state from
+    # one test (e.g. four wrong attempts) can't bleed into the next.
+    test_rate_limiter = PinRateLimiter()
+    application.dependency_overrides[get_pin_rate_limiter] = lambda: test_rate_limiter
     try:
         yield application
     finally:

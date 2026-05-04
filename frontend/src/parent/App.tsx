@@ -7,12 +7,14 @@ import {
   retryWithBackoff,
   withConflictHandler,
 } from "./api";
-import type { Activity } from "./api";
+import type { Activity, ParentAuthStatus, ParentTokenResponse } from "./api";
 import { ActivityPanel } from "./components/ActivityPanel";
 import { CapabilityBanner } from "./components/CapabilityBanner";
 import { ChildProfileEditor } from "./components/ChildProfileEditor";
 import { Header } from "./components/Header";
 import { OperatorTab } from "./components/OperatorTab";
+import { PinLogin } from "./components/PinLogin";
+import { PinSetup } from "./components/PinSetup";
 import { RoomIngestBulk } from "./components/RoomIngestBulk";
 import { SuggestionCard } from "./components/SuggestionCard";
 import { ToyIngest } from "./components/ToyIngest";
@@ -40,6 +42,12 @@ function deriveWsUrl(): string {
   return `${proto}//${window.location.host}/ws`;
 }
 
+// Step 21: bootstrap modes. We probe ``/api/auth/parent/status`` first
+// and pick a screen based on the response — setup if no PIN is stored,
+// login otherwise. The "bootstrap" mode keeps the screen blank during
+// the initial probe so neither screen flashes incorrectly.
+type AuthMode = "bootstrap" | "setup" | "login" | "ready" | "error";
+
 export function App(): JSX.Element {
   const state = useParentStore();
   const [muted, setMuted] = useState(false);
@@ -47,6 +55,9 @@ export function App(): JSX.Element {
   const [showToyIngest, setShowToyIngest] = useState(false);
   const [showRoomIngest, setShowRoomIngest] = useState(false);
   const [showOperator, setShowOperator] = useState(false);
+  const [authMode, setAuthMode] = useState<AuthMode>("bootstrap");
+  const [authStatus, setAuthStatus] = useState<ParentAuthStatus | null>(null);
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const apiRef = useRef<ApiClient | null>(null);
   const wsRef = useRef<ParentWsClient | null>(null);
   // Step 24: registry of metrics-envelope listeners. The ws onEnvelope
@@ -73,108 +84,135 @@ export function App(): JSX.Element {
   }
   const api = apiRef.current;
 
-  // Phase A bootstrap: issue a parent token, fetch /api/health, open
-  // ws. AbortController binds in-flight fetches to this effect's
-  // lifetime; StrictMode's double-effect cleanup will cancel them and
-  // also stop any ws client started by the first run before the second
-  // attempts to start its own.
-  useEffect(() => {
-    const aborter = new AbortController();
-    let mounted = true;
-    const boot = async (): Promise<void> => {
+  // Step 21 bootstrap: probe ``GET /api/auth/parent/status`` first so
+  // the UI can decide between PinSetup (first-run) and PinLogin
+  // (recurring). The token-issuance + health + ws bring-up only run
+  // AFTER the user clears the PIN gate (via ``onAuthSuccess`` below).
+  // The AbortController is constructed inside the effect body so each
+  // mount (including StrictMode's deliberate double-mount) gets a
+  // fresh, un-aborted controller — reusing a ref-cached controller
+  // across mounts would cause the second mount's fetches to throw
+  // AbortError synchronously and the UI to stick on bootstrap.
+  // ``aborterRef`` still mirrors the live controller so the
+  // ``continueBootstrap`` continuation (called from a child
+  // component's onSuccess after the effect already returned) can
+  // share the same abort signal.
+  const aborterRef = useRef<AbortController | null>(null);
+
+  // Continuation: run after a PIN flow successfully mints a token.
+  // Stores the token, fetches health, and starts the ws client.
+  const continueBootstrap = useCallback(
+    async (tokenResp: ParentTokenResponse): Promise<void> => {
+      // If the effect already cleaned up (e.g. parent unmount mid-flow)
+      // there is no live controller — fall back to an inert one so the
+      // fetches are still cancellable but never hit a null deref.
+      const aborter = aborterRef.current ?? new AbortController();
+      useParentStore.getState().setToken(tokenResp);
+      setAuthMode("ready");
       try {
-        // Retry-with-backoff on transient 5xx + network errors so a
-        // flapping /api/auth/parent (e.g. the iter-1 SQLite cross-thread
-        // bug) doesn't strand the parent UI without a token.
-        const tokenResp = await retryWithBackoff(() =>
-          api.issueParentToken({ signal: aborter.signal }),
-        );
-        if (!mounted) return;
-        useParentStore.getState().setToken(tokenResp);
-        try {
-          const health = await api.getHealth({ signal: aborter.signal });
-          if (!mounted) return;
-          useParentStore.getState().setHealth(health);
-        } catch (err) {
-          if (isAbortError(err)) return;
-          // health is best-effort during bootstrap
-        }
-        if (!mounted) return;
-        const ws = new ParentWsClient({
-          url: deriveWsUrl(),
-          // Pull a fresh token on every (re)connect so reconnect after
-          // a TTL roll picks up the new value rather than reusing the
-          // captured-at-construction one.
-          getToken: () => useParentStore.getState().token,
-          onEnvelope: (env: Envelope) => {
-            useParentStore.getState().applyEnvelope(env);
-            // Step 24: fan metrics envelopes out to OperatorTab
-            // listeners. Other topics flow through the store (the
-            // existing applyEnvelope reducer); metrics is dashboard-
-            // only so it doesn't need a store slot.
-            if (env.topic === "metrics") {
-              for (const listener of metricsListenersRef.current) {
-                try {
-                  listener(env);
-                } catch {
-                  // listener bugs must not crash the ws callback.
-                }
+        const health = await api.getHealth({ signal: aborter.signal });
+        useParentStore.getState().setHealth(health);
+      } catch (err) {
+        if (isAbortError(err)) return;
+        // health is best-effort during bootstrap
+      }
+      const ws = new ParentWsClient({
+        url: deriveWsUrl(),
+        getToken: () => useParentStore.getState().token,
+        onEnvelope: (env: Envelope) => {
+          useParentStore.getState().applyEnvelope(env);
+          if (env.topic === "metrics") {
+            for (const listener of metricsListenersRef.current) {
+              try {
+                listener(env);
+              } catch {
+                // listener bugs must not crash the ws callback.
               }
             }
-          },
-          onState: (s) => {
-            useParentStore.getState().setWsState(s);
-          },
-          onRejected: (rejected) => {
-            useParentStore.getState().applyRejectedTopics(rejected);
-          },
-          onReconnect: () => {
-            // On reconnect: refetch the active activity if we have one,
-            // so we don't drift past missed envelopes.
-            const cur = useParentStore.getState().activity;
-            if (cur === null) return;
-            void api
-              .getActivity(cur.id, { signal: aborter.signal })
-              .then((fresh) => {
-                if (!mounted) return;
-                // Route through the version guard so an in-flight
-                // GET can't regress past a fresher ws envelope.
-                useParentStore.getState().applyReconnectResync(fresh);
-              })
-              .catch((err: unknown) => {
-                if (isAbortError(err)) return;
-                const message =
-                  err instanceof Error ? err.message : "reconnect refetch failed";
-                useParentStore
-                  .getState()
-                  .pushToast("warning", `reconnect: ${message}`);
-              });
-          },
-        });
-        // StrictMode double-mount can fire cleanup before this point;
-        // if so, abandon this ws so we don't leak a live socket.
-        if (!mounted) {
-          ws.stop();
-          return;
-        }
-        wsRef.current = ws;
-        ws.start();
+          }
+        },
+        onState: (s) => {
+          useParentStore.getState().setWsState(s);
+        },
+        onRejected: (rejected) => {
+          useParentStore.getState().applyRejectedTopics(rejected);
+        },
+        onReconnect: () => {
+          const cur = useParentStore.getState().activity;
+          if (cur === null) return;
+          void api
+            .getActivity(cur.id, { signal: aborter.signal })
+            .then((fresh) => {
+              useParentStore.getState().applyReconnectResync(fresh);
+            })
+            .catch((err: unknown) => {
+              if (isAbortError(err)) return;
+              const message =
+                err instanceof Error ? err.message : "reconnect refetch failed";
+              useParentStore
+                .getState()
+                .pushToast("warning", `reconnect: ${message}`);
+            });
+        },
+      });
+      wsRef.current = ws;
+      ws.start();
+    },
+    [api],
+  );
+
+  useEffect(() => {
+    // Fresh controller per mount — StrictMode-safe. Abort on cleanup
+    // and clear the ref so the next mount starts with no controller
+    // until this effect body runs again.
+    const aborter = new AbortController();
+    aborterRef.current = aborter;
+    let mounted = true;
+    const probeStatus = async (): Promise<void> => {
+      try {
+        const status = await retryWithBackoff(() =>
+          api.getAuthStatus({ signal: aborter.signal }),
+        );
+        if (!mounted) return;
+        setAuthStatus(status);
+        setAuthMode(status.pin_set ? "login" : "setup");
       } catch (err) {
         if (!mounted || isAbortError(err)) return;
         const message =
-          err instanceof Error ? err.message : "bootstrap failed";
-        useParentStore.getState().pushToast("error", `bootstrap: ${message}`);
+          err instanceof Error ? err.message : "status probe failed";
+        setBootstrapError(message);
+        setAuthMode("error");
       }
     };
-    void boot();
+    void probeStatus();
     return () => {
       mounted = false;
       aborter.abort();
+      // Clear the ref so a stale (already-aborted) controller can't
+      // leak into a follow-on remount via ``continueBootstrap``.
+      if (aborterRef.current === aborter) {
+        aborterRef.current = null;
+      }
       wsRef.current?.stop();
       wsRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // PIN-flow success handler: invoked by either PinSetup or PinLogin
+  // when the backend returns a token. Kicks the rest of the bootstrap
+  // (health probe + ws) via ``continueBootstrap``.
+  const handleAuthSuccess = useCallback(
+    (tokenResp: ParentTokenResponse): void => {
+      void continueBootstrap(tokenResp).catch((err: unknown) => {
+        if (isAbortError(err)) return;
+        const message =
+          err instanceof Error ? err.message : "bootstrap failed";
+        useParentStore.getState().pushToast("error", `bootstrap: ${message}`);
+      });
+    },
+    [continueBootstrap],
+  );
 
   // Phase A has no real capture pipeline. The mic indicator stays at
   // "paused" until something declares actual capture. The mute toggle
@@ -404,6 +442,58 @@ export function App(): JSX.Element {
   const showSuggestion =
     activity !== null && SUGGESTION_STATES.has(activity.state);
   const showPanel = activity !== null && PANEL_STATES.has(activity.state);
+
+  // Step 21: gate on PIN status before rendering the main app.
+  if (authMode === "bootstrap") {
+    return (
+      <main
+        data-testid="pin-bootstrap"
+        style={{ fontFamily: "system-ui, sans-serif" }}
+      />
+    );
+  }
+  if (authMode === "error") {
+    return (
+      <main
+        data-testid="pin-bootstrap-error"
+        style={{ fontFamily: "system-ui, sans-serif", padding: 16 }}
+      >
+        <p>Could not contact the toybox backend.</p>
+        {bootstrapError !== null && (
+          <pre style={{ fontSize: 12 }}>{bootstrapError}</pre>
+        )}
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          data-testid="pin-bootstrap-retry"
+        >
+          Retry
+        </button>
+      </main>
+    );
+  }
+  if (authMode === "setup") {
+    return (
+      <main style={{ fontFamily: "system-ui, sans-serif" }}>
+        <PinSetup api={api} onSuccess={handleAuthSuccess} />
+      </main>
+    );
+  }
+  if (authMode === "login") {
+    return (
+      <main style={{ fontFamily: "system-ui, sans-serif" }}>
+        <PinLogin
+          api={api}
+          initialLockSeconds={
+            authStatus !== null && authStatus.locked
+              ? authStatus.seconds_until_unlock
+              : 0
+          }
+          onSuccess={handleAuthSuccess}
+        />
+      </main>
+    );
+  }
 
   return (
     <main style={{ fontFamily: "system-ui, sans-serif", maxWidth: 720 }}>

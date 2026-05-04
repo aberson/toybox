@@ -73,7 +73,7 @@ describe("child ApiClient", () => {
     expect(headers.get("If-Match-Version")).toBe("3");
   });
 
-  it("issueParentToken POSTs to /api/auth/parent", async () => {
+  it("issueParentToken POSTs to /api/auth/parent with PIN body", async () => {
     const fetchImpl = vi
       .fn<Parameters<FetchLike>, ReturnType<FetchLike>>()
       .mockResolvedValue(
@@ -84,11 +84,12 @@ describe("child ApiClient", () => {
         }),
       );
     const client = new ApiClient({ fetchImpl, getToken: () => null });
-    const resp = await client.issueParentToken();
+    const resp = await client.issueParentToken({ pin: "1357" });
     expect(resp.token).toBe("tok-abc");
     const [url, init] = fetchImpl.mock.calls[0]!;
     expect(url).toBe("/api/auth/parent");
     expect(init?.method).toBe("POST");
+    expect(JSON.parse(init?.body as string)).toEqual({ pin: "1357" });
   });
 
   it("turns 409 with version_conflict body into VersionConflictError", async () => {

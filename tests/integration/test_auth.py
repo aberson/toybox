@@ -1,4 +1,10 @@
-"""Auth scaffolding: ``/api/auth/parent``, ``/api/auth/pair``, and validation."""
+"""Auth scaffolding: ``/api/auth/parent``, ``/api/auth/pair``, and validation.
+
+Step 21 turned ``/api/auth/parent`` into a PIN-gated endpoint; the
+sequential-request and concurrent-request regressions still apply but
+have to seed a PIN and pass the right body. Detailed PIN-flow coverage
+lives in :mod:`tests.integration.test_pin_auth_flow`.
+"""
 
 from __future__ import annotations
 
@@ -18,11 +24,24 @@ from toybox.core.auth import (
     revoke_token,
     validate_token,
 )
+from toybox.core.pin import set_pin_hash
 from toybox.db.connection import connect
 
+_TEST_PIN = "1357"
 
-def test_post_parent_returns_token(client: TestClient) -> None:
-    response = client.post("/api/auth/parent")
+
+def _seed_pin(db_path: Path) -> None:
+    """Set ``_TEST_PIN`` on the per-test DB so /api/auth/parent succeeds."""
+    conn = connect(db_path)
+    try:
+        set_pin_hash(conn, _TEST_PIN)
+    finally:
+        conn.close()
+
+
+def test_post_parent_returns_token(client: TestClient, db_path: Path) -> None:
+    _seed_pin(db_path)
+    response = client.post("/api/auth/parent", json={"pin": _TEST_PIN})
     assert response.status_code == 200
     body = response.json()
     assert body["subject"] == {"kind": "parent"}
@@ -30,7 +49,7 @@ def test_post_parent_returns_token(client: TestClient) -> None:
     assert body["expires_at"] > time.time()
 
 
-def test_post_parent_survives_repeated_requests(client: TestClient) -> None:
+def test_post_parent_survives_repeated_requests(client: TestClient, db_path: Path) -> None:
     """Regression: ``POST /api/auth/parent`` must not 500 on repeated calls.
 
     Iter-1 cached its SQLite connection without ``check_same_thread=False``,
@@ -40,22 +59,27 @@ def test_post_parent_survives_repeated_requests(client: TestClient) -> None:
     setup. Five sequential calls is enough to exercise that flip in
     practice; we also stress it with a thread pool below.
     """
+    _seed_pin(db_path)
     for _ in range(5):
-        response = client.post("/api/auth/parent")
+        response = client.post("/api/auth/parent", json={"pin": _TEST_PIN})
         assert response.status_code == 200, response.text
 
 
-def test_post_parent_concurrent_requests_all_succeed(client: TestClient) -> None:
+def test_post_parent_concurrent_requests_all_succeed(
+    client: TestClient,
+    db_path: Path,
+) -> None:
     """Regression: concurrent calls from a real ``ThreadPoolExecutor``.
 
     Each request goes through a different FastAPI threadpool worker so
     we cover the cross-thread close path (the iter-1 bug shape) more
     robustly than the sequential test alone.
     """
+    _seed_pin(db_path)
     from concurrent.futures import ThreadPoolExecutor
 
     def _hit() -> int:
-        return client.post("/api/auth/parent").status_code
+        return client.post("/api/auth/parent", json={"pin": _TEST_PIN}).status_code
 
     with ThreadPoolExecutor(max_workers=8) as pool:
         statuses = list(pool.map(lambda _i: _hit(), range(16)))

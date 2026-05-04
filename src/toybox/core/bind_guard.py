@@ -5,15 +5,17 @@ would leak the family-private API to any device on the LAN. This module
 refuses such configurations at startup, with a stable error code so the
 frontend (and operators) can detect the failure mode.
 
-Phase A note: the parent PIN system is not implemented yet. Until Phase D
-ships PIN auth, ``pin_set`` is always ``False`` in production code, so the
-guard is effectively "loopback-only." The ``pin_set`` parameter is plumbed
-through now to keep the call sites honest once the PIN is real.
+Step 21 wires the real PIN check through :func:`toybox.core.pin.pin_is_set`,
+re-exported here so the call site in :mod:`toybox.main` stays a one-liner
+without having to import both modules.
 """
 
 from __future__ import annotations
 
+import sqlite3
+
 from .errors import ErrorCode
+from .pin import pin_is_set as _pin_is_set
 
 # Hosts that do not expose the service to the LAN.
 _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
@@ -49,4 +51,14 @@ def check_bind_safe(host: str, *, pin_set: bool) -> None:
     raise BindGuardError(host)
 
 
-__all__ = ["BindGuardError", "check_bind_safe", "is_loopback"]
+def pin_is_set(conn: sqlite3.Connection) -> bool:
+    """Re-export of :func:`toybox.core.pin.pin_is_set`.
+
+    Kept here so the bind-guard call site in :mod:`toybox.main` only
+    has to import this module: ``check_bind_safe(host, pin_set=pin_is_set(conn))``
+    reads as a single startup invariant.
+    """
+    return _pin_is_set(conn)
+
+
+__all__ = ["BindGuardError", "check_bind_safe", "is_loopback", "pin_is_set"]

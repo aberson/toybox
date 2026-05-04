@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "AI assistant for play with children — passive-listening home device."
 requires-python = "~=3.12.0"
 dependencies = [
+    "argon2-cffi>=23.1",
     "fastapi>=0.110",
     "jsonschema>=4.21",
     "uvicorn[standard]>=0.27",
