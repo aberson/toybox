@@ -1,6 +1,6 @@
-"""Transcripts read-only REST API.
+"""Transcripts REST API.
 
-Step 13 surface:
+Step 13 (Phase B) shipped the read-only surface:
 
 * ``GET /api/transcripts?limit=50&before=<iso>`` — paginated list
   ordered by ``ended_at DESC`` (most recent first). The ``before``
@@ -11,11 +11,19 @@ Step 13 surface:
   case-insensitive substring search over ``text``. ``q`` is required
   and must be non-empty (HTTP 400 otherwise).
 
-Read-only by design: Step 21 (Phase D) ships the wipe / delete surface.
-The routes follow the rest of the v1 LAN-only API: no auth (matches
-``/api/listening`` and ``/api/health``); a future hardening pass can
-gate them through :class:`toybox.api.auth_dep.RequireScope` without
-changing the wire shape.
+Step 22 (Phase D) adds the destructive surface, gated behind a
+parent-scope token:
+
+* ``DELETE /api/transcripts/{id}`` — single delete. 404 with
+  ``transcript_not_found`` when the row is missing.
+* ``DELETE /api/transcripts`` — wipe all rows. PIN re-confirm body
+  required on top of the parent token; the wire shape and lock
+  precedence mirror ``POST /api/auth/parent`` so a hot-recently-failed
+  login session can't be bypassed by switching to the wipe-all surface.
+  Wipe-all is intentionally a single ``DELETE FROM transcripts`` —
+  ``transcripts`` has no FKs pointing at it (only its own FK to
+  ``sessions``) so the operation does NOT cascade to other tables.
+  The action CANNOT be undone.
 """
 
 from __future__ import annotations
@@ -24,12 +32,17 @@ import logging
 import sqlite3
 from collections.abc import Iterator
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
+from ..core.auth import TokenScope
+from ..core.pin import PIN_MAX_LENGTH, PIN_MIN_LENGTH
+from ..core.pin_rate_limit import PinRateLimiter
 from ..db import connect, resolve_db_path
+from .auth import enforce_pin_check, get_pin_rate_limiter
+from .auth_dep import RequireScope, get_auth_db
 
 _logger = logging.getLogger(__name__)
 
@@ -73,6 +86,36 @@ class TranscriptListResponse(BaseModel):
     """Wire shape for the list/search endpoints."""
 
     items: list[TranscriptRow] = Field(default_factory=list)
+
+
+class DeleteOneResponse(BaseModel):
+    """Wire shape for ``DELETE /api/transcripts/{id}``."""
+
+    ok: bool = True
+
+
+class WipeAllRequest(BaseModel):
+    """Body for ``DELETE /api/transcripts`` (wipe-all).
+
+    Wipe is destructive and shares the global PIN rate limiter, so the
+    body shape mirrors :class:`toybox.api.auth.ParentLoginRequest` —
+    digits-only PIN, 4-:data:`PIN_MAX_LENGTH` chars. A missing or
+    malformed body is rejected with 422 by Pydantic before the limiter
+    sees anything.
+    """
+
+    pin: str = Field(min_length=PIN_MIN_LENGTH, max_length=PIN_MAX_LENGTH)
+
+
+class WipeAllResponse(BaseModel):
+    """Wire shape for the wipe-all endpoint.
+
+    ``deleted`` is the number of rows removed by the single
+    ``DELETE FROM transcripts`` — surfaced to the parent UI so the
+    confirmation toast can read "deleted N transcripts" honestly.
+    """
+
+    deleted: int = Field(ge=0)
 
 
 def _row_to_model(row: sqlite3.Row) -> TranscriptRow:
@@ -176,11 +219,101 @@ def search_transcripts(
     return TranscriptListResponse(items=[_row_to_model(r) for r in rows])
 
 
+@router.delete("/{transcript_id}", response_model=DeleteOneResponse)
+def delete_transcript(
+    transcript_id: str,
+    conn: Annotated[sqlite3.Connection, Depends(get_transcripts_db)],
+    _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
+) -> DeleteOneResponse:
+    """Delete one transcript row by id, or 404 if missing.
+
+    Parent token only — the same scope guard as the rest of the
+    parent-managed surfaces (children/toys/rooms). Single-row delete
+    doesn't require a PIN re-confirm because the blast radius is one
+    row; wipe-all is the high-stakes case that does.
+
+    The ``404 transcript_not_found`` shape mirrors the sibling
+    ``children``/``toys``/``rooms`` 404s so the frontend's typed-error
+    helper can dispatch on ``code``.
+    """
+    # Single-statement atomic delete. ``rowcount == 0`` distinguishes
+    # "row never existed" from a successful delete without a separate
+    # SELECT round-trip (and without a tiny TOCTOU window between SELECT
+    # and DELETE that an admin script racing on the same DB could land
+    # in). ``with conn`` keeps the txn boundary so a crash mid-statement
+    # leaves the row count consistent.
+    with conn:
+        cursor = conn.execute("DELETE FROM transcripts WHERE id = ?", (transcript_id,))
+    if cursor.rowcount == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "transcript_not_found", "id": transcript_id},
+        )
+    return DeleteOneResponse(ok=True)
+
+
+# ``DELETE`` with a request body is unusual but FastAPI / starlette
+# both accept it, and the alternative (PIN-in-header) is awkward to
+# type-check on the frontend. The body carries the PIN re-confirm only;
+# no other fields, so the wipe-all wire is unambiguously "operator
+# typed their PIN to consent".
+@router.delete("", response_model=WipeAllResponse)
+def wipe_transcripts(
+    body: WipeAllRequest,
+    conn: Annotated[sqlite3.Connection, Depends(get_transcripts_db)],
+    auth_conn: Annotated[sqlite3.Connection, Depends(get_auth_db)],
+    rate_limiter: Annotated[PinRateLimiter, Depends(get_pin_rate_limiter)],
+    _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
+) -> WipeAllResponse:
+    """Wipe every transcript row after PIN re-confirm.
+
+    The PIN check is delegated to :func:`toybox.api.auth.enforce_pin_check`
+    so this endpoint shares the global rate limiter with
+    ``POST /api/auth/parent``. A burst of failed login attempts already
+    near the lock threshold will lock the wipe surface as well — the
+    spec invariant that "5 wrong attempts in 5 min across the PIN
+    surface" cannot be sidestepped by switching endpoints.
+
+    Failure modes (matching the auth spec):
+
+    * 423 ``pin_locked`` (+ ``Retry-After``) — limiter engaged.
+    * 401 ``pin_invalid`` (+ ``attempts_remaining``) — wrong PIN.
+    * 412 ``pin_not_set`` — no stored hash. Defensive; the bind guard
+      prevents normal boot from reaching here without setup, but a
+      hand-edited DB could.
+    * 422 — missing/malformed body (Pydantic, before this handler).
+
+    On success the limiter does NOT record success — the wipe-all
+    endpoint isn't an authentication event in the way that login is,
+    so we leave the counter alone and let the next successful login
+    reset it. The single ``DELETE FROM transcripts`` runs inside a
+    transaction (``with conn:``) so a mid-transaction crash leaves
+    the table consistent.
+    """
+    enforce_pin_check(body.pin, auth_conn, rate_limiter)
+    # ``DELETE FROM transcripts`` returns the rowcount via cursor.
+    # Wrapping in ``with conn`` makes the deletion atomic — the
+    # pre-count + delete pair doesn't need atomicity since we only use
+    # the rowcount for the response, but a partial delete would
+    # otherwise leak rows on a crash mid-statement.
+    with conn:
+        cursor = conn.execute("DELETE FROM transcripts")
+    deleted = cursor.rowcount if cursor.rowcount is not None else 0
+    # ``rowcount`` returns -1 in some SQLite paths when undetermined;
+    # clamp to 0 so the wire shape never carries a negative count.
+    if deleted < 0:
+        deleted = 0
+    return WipeAllResponse(deleted=deleted)
+
+
 __all__ = [
     "DEFAULT_LIMIT",
     "MAX_LIMIT",
+    "DeleteOneResponse",
     "TranscriptListResponse",
     "TranscriptRow",
+    "WipeAllRequest",
+    "WipeAllResponse",
     "get_transcripts_db",
     "router",
 ]

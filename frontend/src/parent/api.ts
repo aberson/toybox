@@ -310,6 +310,47 @@ export interface RoomInUseDetail {
   feature_count: number;
 }
 
+// Step 13/22: transcripts wire shapes. Mirror the Pydantic models in
+// src/toybox/api/transcripts.py.
+export interface TranscriptRow {
+  id: string;
+  session_id: string;
+  mic_id: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+  text: string | null;
+  confidence: number | null;
+  language: string;
+  triggered_intent: string | null;
+}
+
+export interface TranscriptListResponse {
+  items: TranscriptRow[];
+}
+
+// Body of the 200 returned by DELETE /api/transcripts/{id}.
+export interface TranscriptDeleteOneResponse {
+  ok: boolean;
+}
+
+// Body for DELETE /api/transcripts (wipe-all).
+export interface TranscriptWipeRequest {
+  pin: string;
+}
+
+// Body of the 200 returned by DELETE /api/transcripts.
+export interface TranscriptWipeResponse {
+  deleted: number;
+}
+
+// Body of the 404 returned by DELETE /api/transcripts/{id} when no row
+// matches. The frontend reads this to render "already deleted" inline
+// when the operator double-clicks delete.
+export interface TranscriptNotFoundDetail {
+  code: "transcript_not_found";
+  id: string;
+}
+
 // Step 24: operator dashboard wire shapes. Mirror the dataclasses in
 // src/toybox/metrics/__init__.py. The same shape is delivered both as
 // the body of GET /api/metrics and as the payload of a ``metrics`` ws
@@ -874,6 +915,70 @@ export class ApiClient {
       signal: opts.signal,
     });
   }
+
+  // Step 13: list transcripts. ``before`` is an ISO timestamp cursor;
+  // rows with ``ended_at < before`` are returned, most-recent first.
+  // Step 22 reuses this for the management UI's pagination.
+  async listTranscripts(
+    params: { limit?: number; before?: string | null } = {},
+    opts: RequestOptions = {},
+  ): Promise<TranscriptListResponse> {
+    const search = new URLSearchParams();
+    if (params.limit !== undefined) search.set("limit", String(params.limit));
+    if (params.before !== undefined && params.before !== null) {
+      search.set("before", params.before);
+    }
+    const qs = search.toString();
+    return this.request<TranscriptListResponse>(
+      `/api/transcripts${qs.length > 0 ? `?${qs}` : ""}`,
+      { method: "GET", signal: opts.signal },
+    );
+  }
+
+  // Step 13: case-insensitive substring search over transcript text.
+  // ``q`` is sent verbatim; the backend rejects empty/whitespace-only
+  // queries.
+  async searchTranscripts(
+    query: string,
+    params: { limit?: number } = {},
+    opts: RequestOptions = {},
+  ): Promise<TranscriptListResponse> {
+    const search = new URLSearchParams();
+    search.set("q", query);
+    if (params.limit !== undefined) search.set("limit", String(params.limit));
+    return this.request<TranscriptListResponse>(
+      `/api/transcripts/search?${search.toString()}`,
+      { method: "GET", signal: opts.signal },
+    );
+  }
+
+  // Step 22: delete one transcript by id. 404 surfaces as ApiError(404)
+  // with detail.code === "transcript_not_found"; the management UI
+  // treats that as "already deleted" rather than a hard error.
+  async deleteTranscript(
+    id: string,
+    opts: RequestOptions = {},
+  ): Promise<TranscriptDeleteOneResponse> {
+    return this.request<TranscriptDeleteOneResponse>(
+      `/api/transcripts/${encodeURIComponent(id)}`,
+      { method: "DELETE", signal: opts.signal },
+    );
+  }
+
+  // Step 22: wipe all transcripts. PIN re-confirm body is required on
+  // top of the parent token; the rate limiter is shared with
+  // ``POST /api/auth/parent`` so a wrong PIN here counts toward the
+  // global lock just like a wrong login.
+  async wipeTranscripts(
+    body: TranscriptWipeRequest,
+    opts: RequestOptions = {},
+  ): Promise<TranscriptWipeResponse> {
+    return this.request<TranscriptWipeResponse>("/api/transcripts", {
+      method: "DELETE",
+      body: JSON.stringify(body),
+      signal: opts.signal,
+    });
+  }
 }
 
 // Step 18: a single FastAPI validation error. The wire shape comes
@@ -1045,6 +1150,31 @@ export function extractRoomInUseDetail(
       code: "room_in_use",
       room_id: c["room_id"],
       feature_count: c["feature_count"],
+    };
+  }
+  return null;
+}
+
+// Step 22: pull the ``transcript_not_found`` detail off a 404 ApiError.
+// The management UI uses this to distinguish "already deleted" (which
+// is benign — refetch + show inline notice) from other 404s.
+export function extractTranscriptNotFoundDetail(
+  err: unknown,
+): TranscriptNotFoundDetail | null {
+  if (!(err instanceof ApiError) || err.status !== 404) return null;
+  const body = err.body;
+  if (typeof body !== "object" || body === null) return null;
+  const rec = body as Record<string, unknown>;
+  const candidate = "detail" in rec ? rec["detail"] : rec;
+  if (typeof candidate !== "object" || candidate === null) return null;
+  const c = candidate as Record<string, unknown>;
+  if (
+    c["code"] === "transcript_not_found" &&
+    typeof c["id"] === "string"
+  ) {
+    return {
+      code: "transcript_not_found",
+      id: c["id"],
     };
   }
   return null;

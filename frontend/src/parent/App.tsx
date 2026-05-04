@@ -18,6 +18,7 @@ import { PinSetup } from "./components/PinSetup";
 import { RoomIngestBulk } from "./components/RoomIngestBulk";
 import { SuggestionCard } from "./components/SuggestionCard";
 import { ToyIngest } from "./components/ToyIngest";
+import { TranscriptsManager } from "./components/TranscriptsManager";
 import { TriggerButton } from "./components/TriggerButton";
 import { useParentStore } from "./store";
 import type { Envelope } from "./ws";
@@ -55,6 +56,7 @@ export function App(): JSX.Element {
   const [showToyIngest, setShowToyIngest] = useState(false);
   const [showRoomIngest, setShowRoomIngest] = useState(false);
   const [showOperator, setShowOperator] = useState(false);
+  const [showTranscripts, setShowTranscripts] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>("bootstrap");
   const [authStatus, setAuthStatus] = useState<ParentAuthStatus | null>(null);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
@@ -539,6 +541,14 @@ export function App(): JSX.Element {
           >
             {showOperator ? "hide operator" : "operator"}
           </button>
+          <button
+            type="button"
+            data-testid="toggle-transcripts"
+            aria-pressed={showTranscripts}
+            onClick={() => setShowTranscripts((prev) => !prev)}
+          >
+            {showTranscripts ? "hide transcripts" : "transcripts"}
+          </button>
         </div>
         {showChildEditor && <ChildProfileEditor api={api} /> }
         {showToyIngest && <ToyIngest api={api} />}
@@ -546,6 +556,7 @@ export function App(): JSX.Element {
         {showOperator && (
           <OperatorTab api={api} subscribeToMetrics={subscribeToMetrics} />
         )}
+        {showTranscripts && <TranscriptsManager api={api} />}
         {showSuggestion && activity !== null && (
           <SuggestionCard
             activity={activity}

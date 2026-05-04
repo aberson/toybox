@@ -120,6 +120,70 @@ def _seconds_until_unlock_int(seconds: float) -> int:
     return max(0, math.ceil(seconds))
 
 
+def enforce_pin_check(
+    pin: str,
+    conn: sqlite3.Connection,
+    rate_limiter: PinRateLimiter,
+) -> None:
+    """Validate ``pin`` against the stored hash + rate limiter, or raise.
+
+    Shared between the login endpoint (Step 21) and the wipe-all
+    transcripts endpoint (Step 22) so both honour the same global lock,
+    counter, and ordering invariants:
+
+    * Lock takes precedence over PIN correctness — even a correct PIN
+      returns 423 ``pin_locked`` while the limiter is engaged.
+    * Wrong PIN records a failed attempt; the resulting status is
+      surfaced as 401 ``pin_invalid`` (with ``attempts_remaining``) or
+      423 ``pin_locked`` (with ``Retry-After``) when the failure tipped
+      the limiter into lockout.
+    * Missing stored hash returns 412 ``pin_not_set``.
+
+    The login endpoint additionally calls ``record_successful_attempt``
+    on success and issues a token; this helper does NOT — callers can
+    layer that on top so the helper stays a pure auth check.
+    """
+    if rate_limiter.is_locked():
+        seconds = _seconds_until_unlock_int(rate_limiter.seconds_until_unlock())
+        raise HTTPException(
+            status_code=status.HTTP_423_LOCKED,
+            detail={"code": "pin_locked", "seconds_until_unlock": seconds},
+            headers={"Retry-After": str(seconds)},
+        )
+
+    stored = get_pin_hash(conn)
+    if stored is None:
+        raise HTTPException(
+            status_code=status.HTTP_412_PRECONDITION_FAILED,
+            detail={"code": "pin_not_set"},
+        )
+
+    if not verify_pin(pin, stored):
+        rl_status = rate_limiter.record_failed_attempt()
+        # Log the failure without revealing the attempted PIN. Count is
+        # the only payload — this is the spec invariant from Step 21.
+        _logger.warning(
+            "parent pin verification failed (attempts=%d, attempts_remaining=%d, locked=%s)",
+            rl_status.attempts,
+            rl_status.attempts_remaining,
+            rl_status.locked,
+        )
+        if rl_status.locked:
+            seconds = _seconds_until_unlock_int(rl_status.seconds_until_unlock)
+            raise HTTPException(
+                status_code=status.HTTP_423_LOCKED,
+                detail={"code": "pin_locked", "seconds_until_unlock": seconds},
+                headers={"Retry-After": str(seconds)},
+            )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "code": "pin_invalid",
+                "attempts_remaining": rl_status.attempts_remaining,
+            },
+        )
+
+
 @router.get("/parent/status", response_model=ParentAuthStatus)
 def get_parent_status(
     conn: Annotated[sqlite3.Connection, Depends(get_auth_db)],
@@ -190,48 +254,12 @@ def post_parent(
     * 412 ``pin_not_set`` — the operator hasn't run setup yet; the UI
       should redirect to the setup screen.
     """
-    # Lock check first — even a correct PIN can't bypass an active
-    # lock per the spec's "during lock, all attempts return 423".
-    if rate_limiter.is_locked():
-        seconds = _seconds_until_unlock_int(rate_limiter.seconds_until_unlock())
-        raise HTTPException(
-            status_code=status.HTTP_423_LOCKED,
-            detail={"code": "pin_locked", "seconds_until_unlock": seconds},
-            headers={"Retry-After": str(seconds)},
-        )
-
-    stored = get_pin_hash(conn)
-    if stored is None:
-        raise HTTPException(
-            status_code=status.HTTP_412_PRECONDITION_FAILED,
-            detail={"code": "pin_not_set"},
-        )
-
-    if not verify_pin(body.pin, stored):
-        rl_status = rate_limiter.record_failed_attempt()
-        # Log the failure without revealing the attempted PIN. Count
-        # is the only payload — this is the spec invariant.
-        _logger.warning(
-            "parent pin verification failed (attempts=%d, attempts_remaining=%d, locked=%s)",
-            rl_status.attempts,
-            rl_status.attempts_remaining,
-            rl_status.locked,
-        )
-        if rl_status.locked:
-            seconds = _seconds_until_unlock_int(rl_status.seconds_until_unlock)
-            raise HTTPException(
-                status_code=status.HTTP_423_LOCKED,
-                detail={"code": "pin_locked", "seconds_until_unlock": seconds},
-                headers={"Retry-After": str(seconds)},
-            )
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={
-                "code": "pin_invalid",
-                "attempts_remaining": rl_status.attempts_remaining,
-            },
-        )
-
+    # The shared helper enforces lock-precedence + verify + counter
+    # bookkeeping; on success we still record the successful attempt so
+    # the limiter resets, then mint the parent token. Wipe-all reuses
+    # the same helper but does NOT record success (it doesn't issue a
+    # token), so the helper is the auth check only.
+    enforce_pin_check(body.pin, conn, rate_limiter)
     rate_limiter.record_successful_attempt()
     issued = issue_token(conn, TokenScope.parent)
     return _to_parent_response(issued)
@@ -306,6 +334,7 @@ __all__ = [
     "ParentSetupRequest",
     "ParentTokenResponse",
     "ParentTokenSubject",
+    "enforce_pin_check",
     "get_pin_rate_limiter",
     "router",
 ]
