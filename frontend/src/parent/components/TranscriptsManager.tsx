@@ -382,6 +382,13 @@ export function TranscriptsManager(
           style={{ padding: 6, fontSize: 13, width: 220 }}
         />
       </div>
+      <p
+        data-testid="transcripts-listening-hint"
+        style={{ fontSize: 12, color: "#6b7280", margin: "0 0 8px 0" }}
+      >
+        Transcription is controlled by the listening mode. Set it in the
+        Operator tab — OFFLINE stops transcription entirely.
+      </p>
 
       {loading && (
         <p

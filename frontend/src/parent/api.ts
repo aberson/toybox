@@ -405,6 +405,14 @@ export interface MetricsAIStatus {
   min_interval_throttle_seconds: number;
 }
 
+// Mirrors backend ``ListeningMode`` enum (toybox/core/listening.py):
+// 1=OFFLINE, 2=LOW, 3=DEFAULT, 4=HIGH, 5=INTENSE.
+export type ListeningMode = 1 | 2 | 3 | 4 | 5;
+
+export interface ListeningModeResponse {
+  mode: ListeningMode;
+}
+
 export interface MetricsJudgeParentAgreement {
   overlap_count: number;
   agreement_rate: number | null;
@@ -1025,6 +1033,22 @@ export class ApiClient {
   async getMetrics(opts: RequestOptions = {}): Promise<MetricsSnapshot> {
     return this.request<MetricsSnapshot>("/api/metrics", {
       method: "GET",
+      signal: opts.signal,
+    });
+  }
+
+  // Listening-mode write path. The current value is read from
+  // ``snapshot.ai.listening_mode`` (already in the metrics envelope),
+  // so the operator tab does not need a paired GET — it patches the
+  // local snapshot with the response from this PUT and lets the next
+  // metrics envelope reconcile.
+  async setListeningMode(
+    mode: ListeningMode,
+    opts: RequestOptions = {},
+  ): Promise<ListeningModeResponse> {
+    return this.request<ListeningModeResponse>("/api/listening/mode", {
+      method: "PUT",
+      body: JSON.stringify({ mode }),
       signal: opts.signal,
     });
   }

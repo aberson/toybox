@@ -9,11 +9,11 @@
 // - ws-then-stale fallback timing: ws envelope arrives, threshold trips,
 //   poll resumes
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { Mock } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ApiClient, MetricsSnapshot } from "../api";
+import type { ApiClient, ListeningMode, MetricsSnapshot } from "../api";
 import type { Envelope } from "../ws";
 import { OperatorTab } from "./OperatorTab";
 
@@ -73,11 +73,15 @@ function fakeSnapshot(overrides: Partial<MetricsSnapshot> = {}): MetricsSnapshot
 
 interface StubApi {
   getMetrics: Mock;
+  setListeningMode: Mock;
 }
 
 function buildStubApi(snapshot: MetricsSnapshot): StubApi {
   return {
     getMetrics: vi.fn(async () => snapshot) as Mock,
+    // Default: PUT echoes the requested mode. Tests that need failure
+    // mocks can override via ``mockRejectedValueOnce`` etc.
+    setListeningMode: vi.fn(async (mode: ListeningMode) => ({ mode })) as Mock,
   };
 }
 
@@ -336,5 +340,60 @@ describe("OperatorTab", () => {
     await vi.waitFor(() => {
       expect(screen.getByTestId("operator-error").textContent).toContain("boom");
     });
+  });
+
+  it("PUTs the requested listening mode and reflects it in the active button", async () => {
+    const snapshot = fakeSnapshot();
+    const api = buildStubApi(snapshot);
+    render(<OperatorTab api={api as unknown as ApiClient} />);
+
+    await vi.waitFor(() => {
+      expect(screen.getByTestId("listening-mode-buttons")).toBeTruthy();
+    });
+    // Snapshot says mode 3 is active.
+    expect(
+      screen.getByTestId("listening-mode-btn-3").getAttribute("data-active"),
+    ).toBe("true");
+    expect(
+      screen.getByTestId("listening-mode-btn-1").getAttribute("data-active"),
+    ).toBe("false");
+
+    fireEvent.click(screen.getByTestId("listening-mode-btn-1"));
+
+    await vi.waitFor(() => {
+      expect(api.setListeningMode).toHaveBeenCalledWith(1);
+    });
+    // The active button flips immediately via the optimistic
+    // ``pendingMode`` state. The AI-table cell only updates once the
+    // PUT resolves and the local snapshot is patched, so wait on that.
+    await vi.waitFor(() => {
+      expect(screen.getByTestId("m-ai-listening-mode").textContent).toBe("1");
+    });
+    expect(
+      screen.getByTestId("listening-mode-btn-1").getAttribute("data-active"),
+    ).toBe("true");
+    expect(
+      screen.getByTestId("listening-mode-btn-3").getAttribute("data-active"),
+    ).toBe("false");
+  });
+
+  it("surfaces an inline error when the listening-mode PUT fails", async () => {
+    const snapshot = fakeSnapshot();
+    const api = buildStubApi(snapshot);
+    api.setListeningMode.mockRejectedValueOnce(new Error("backend down"));
+    render(<OperatorTab api={api as unknown as ApiClient} />);
+    await vi.waitFor(() => {
+      expect(screen.getByTestId("listening-mode-btn-5")).toBeTruthy();
+    });
+    fireEvent.click(screen.getByTestId("listening-mode-btn-5"));
+    await vi.waitFor(() => {
+      expect(screen.getByTestId("listening-mode-error").textContent).toContain(
+        "backend down",
+      );
+    });
+    // The active button does not change when the PUT fails.
+    expect(
+      screen.getByTestId("listening-mode-btn-3").getAttribute("data-active"),
+    ).toBe("true");
   });
 });
