@@ -202,4 +202,41 @@ class CircuitBreaker:
         self._rate_limited = rate_limited
 
 
-__all__ = ["BreakerState", "CircuitBreaker"]
+_LOCAL_COOLDOWN_ENV = "TOYBOX_LOCAL_BREAKER_COOLDOWN_SEC"
+_LOCAL_THRESHOLD_ENV = "TOYBOX_LOCAL_BREAKER_THRESHOLD"
+
+_local_breaker: CircuitBreaker | None = None
+
+
+def get_local_breaker() -> CircuitBreaker:
+    """Return the process-wide local-adapter breaker, lazily constructed.
+
+    Phase E carve-out stub: the local probe in :func:`toybox.ai.capability.is_local_capable`
+    always returns ``False`` until E1c lands a real runtime, but the
+    breaker instance is wired now so the dispatch matrix has a
+    populated seam to integrate against. Threshold + cooldown read
+    from their own env vars so an operator can tune Claude and local
+    breakers independently — the Claude path's :data:`_THRESHOLD_ENV`
+    must NOT be inherited.
+    """
+    global _local_breaker
+    if _local_breaker is None:
+        _local_breaker = CircuitBreaker(
+            threshold=_env_int(_LOCAL_THRESHOLD_ENV, _DEFAULT_THRESHOLD),
+            cooldown_sec=_env_float(_LOCAL_COOLDOWN_ENV, _DEFAULT_COOLDOWN_SEC),
+        )
+    return _local_breaker
+
+
+def reset_local_breaker_for_tests() -> None:
+    """Drop the cached local breaker. Used by test fixtures."""
+    global _local_breaker
+    _local_breaker = None
+
+
+__all__ = [
+    "BreakerState",
+    "CircuitBreaker",
+    "get_local_breaker",
+    "reset_local_breaker_for_tests",
+]

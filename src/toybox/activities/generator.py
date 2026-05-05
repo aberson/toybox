@@ -59,6 +59,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import random
 import re
 import sqlite3
@@ -829,13 +830,86 @@ def build_generator_context(
     )
 
 
+GENERATOR_ADAPTER_ENV: Final[str] = "TOYBOX_GENERATOR_ADAPTER"
+GENERATOR_MODE_ENV: Final[str] = "TOYBOX_GENERATOR_MODE"
+
+ADAPTER_CLAUDE: Final[str] = "claude"
+ADAPTER_LOCAL: Final[str] = "local"
+MODE_SINGLE: Final[str] = "single"
+MODE_LOOP: Final[str] = "loop"
+
+VALID_ADAPTERS: Final[frozenset[str]] = frozenset({ADAPTER_CLAUDE, ADAPTER_LOCAL})
+VALID_MODES: Final[frozenset[str]] = frozenset({MODE_SINGLE, MODE_LOOP})
+
+
+@dataclass(frozen=True, slots=True)
+class GeneratorDispatch:
+    """Effective adapter + mode after reading env vars.
+
+    Built by :func:`resolve_dispatch` so call sites can branch on a
+    typed value rather than re-reading env strings inline.
+    """
+
+    adapter: str
+    mode: str
+
+    @property
+    def is_v1_default(self) -> bool:
+        """True iff this is the v1 ``claude+single`` configuration."""
+        return self.adapter == ADAPTER_CLAUDE and self.mode == MODE_SINGLE
+
+
+def resolve_dispatch() -> GeneratorDispatch:
+    """Read ``TOYBOX_GENERATOR_ADAPTER`` + ``TOYBOX_GENERATOR_MODE``.
+
+    Defaults: adapter=claude, mode=single (= v1 behavior). Unknown
+    values fall back to the default and emit a WARNING — better to
+    serve a v1-shape activity than to crash propose on a typo.
+    """
+    raw_adapter = os.environ.get(GENERATOR_ADAPTER_ENV, ADAPTER_CLAUDE).strip().lower()
+    if raw_adapter not in VALID_ADAPTERS:
+        _logger.warning(
+            "%s=%r is not in %s; using default %r",
+            GENERATOR_ADAPTER_ENV,
+            raw_adapter,
+            sorted(VALID_ADAPTERS),
+            ADAPTER_CLAUDE,
+        )
+        raw_adapter = ADAPTER_CLAUDE
+    raw_mode = os.environ.get(GENERATOR_MODE_ENV, MODE_SINGLE).strip().lower()
+    if raw_mode not in VALID_MODES:
+        _logger.warning(
+            "%s=%r is not in %s; using default %r",
+            GENERATOR_MODE_ENV,
+            raw_mode,
+            sorted(VALID_MODES),
+            MODE_SINGLE,
+        )
+        raw_mode = MODE_SINGLE
+    return GeneratorDispatch(adapter=raw_adapter, mode=raw_mode)
+
+
+def _local_not_implemented(mode: str) -> NotImplementedError:
+    return NotImplementedError(f"local adapter ships in Step 26 (E2); requested mode={mode}")
+
+
 __all__ = [
+    "ADAPTER_CLAUDE",
+    "ADAPTER_LOCAL",
     "DEFAULT_SLOT_FILLER",
     "DEFAULT_TOY_NAME",
     "FALLBACK_INTENT",
+    "GENERATOR_ADAPTER_ENV",
+    "GENERATOR_MODE_ENV",
+    "GeneratorDispatch",
+    "MODE_LOOP",
+    "MODE_SINGLE",
     "SUPPORTED_INTENTS",
     "TEMPLATES_DIR",
+    "VALID_ADAPTERS",
+    "VALID_MODES",
     "build_generator_context",
     "clear_template_cache",
     "generate",
+    "resolve_dispatch",
 ]

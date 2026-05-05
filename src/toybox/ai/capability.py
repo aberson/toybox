@@ -160,9 +160,35 @@ async def is_capable_from_state(state: CapabilityState) -> tuple[bool, Capabilit
     return compose_capability(state)
 
 
+# Cause string returned by :func:`is_local_capable` until E1c lands the
+# real probe. Centralised so the integration test that pins the carve-
+# out behavior matches the actual return value.
+LOCAL_NOT_INSTALLED_REASON: str = "local runtime not yet installed"
+
+
+async def is_local_capable() -> tuple[bool, str | None]:
+    """Phase E carve-out stub: local runtime is never capable yet.
+
+    Returns ``(False, "local runtime not yet installed")`` until E1c
+    lands the real ``HTTP GET /v1/models`` probe + the per-adapter
+    breaker integration. The Claude :func:`is_capable` is unchanged;
+    the two probes are intentionally orthogonal so a Claude breaker
+    trip can't disable the local path (and vice versa).
+
+    The shape mirrors :func:`is_capable` (``(bool, reason)``); we use
+    a plain ``str`` instead of ``CapabilityReason`` because the local
+    probe's failure causes don't overlap the Claude reason enum and
+    we don't want a fake enum entry stored on the labeled_events
+    capability column.
+    """
+    return False, LOCAL_NOT_INSTALLED_REASON
+
+
 __all__ = [
+    "LOCAL_NOT_INSTALLED_REASON",
     "NetworkProbe",
     "default_network_probe",
     "is_capable",
     "is_capable_from_state",
+    "is_local_capable",
 ]

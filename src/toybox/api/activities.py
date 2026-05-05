@@ -16,6 +16,7 @@ is stored in ``activity_steps.body``; the response uses the same
 
 from __future__ import annotations
 
+import asyncio
 import functools
 import json
 import logging
@@ -27,7 +28,7 @@ from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ..activities.content_resolver import (
     ResolvedRoom,
@@ -41,9 +42,17 @@ from ..activities.feedback import (
     KIND_DISMISSED_PRE_APPROVAL,
     KIND_LOVED_IT,
 )
-from ..activities.generator import build_generator_context, generate
+from ..activities.generator import (
+    ADAPTER_CLAUDE,
+    ADAPTER_LOCAL,
+    MODE_LOOP,
+    build_generator_context,
+    generate,
+    resolve_dispatch,
+)
 from ..ai.judge import judge_and_persist
 from ..ai.labeled_events import (
+    GENERATOR_PATH_CLAUDE,
     GENERATOR_PATH_OFFLINE,
     PARENT_SIGNAL_DISMISS,
     PARENT_SIGNAL_END_EARLY,
@@ -701,6 +710,119 @@ def _pick_random_library_persona(conn: sqlite3.Connection) -> dict[str, Any] | N
     }
 
 
+def _run_loop_generation(
+    body: ProposeRequest,
+    conn: sqlite3.Connection,
+    *,
+    effective_persona_id: str | None,
+    resolved_toys: list[ResolvedToy],
+    resolved_rooms: list[ResolvedRoom],
+) -> tuple[Any, list[dict[str, Any]]]:
+    """Drive ``ClaudeActivityGenerator.generate_activity_loop`` end-to-end.
+
+    Returns ``(activity, tool_calls)``. The propose path persists both
+    onto the labeled_events row.
+
+    Late imports (asyncio, the adapter, AnthropicClient, the OAuth
+    loader) keep the v1 ``claude+single`` path's import surface
+    untouched — those modules only matter when an operator opts in via
+    ``TOYBOX_GENERATOR_MODE=loop``.
+    """
+    from ..ai.adapters import ClaudeActivityGenerator  # noqa: PLC0415
+    from ..ai.adapters.claude import ClaudeAdapterContext  # noqa: PLC0415
+    from ..ai.client import AnthropicClient, StubClient  # noqa: PLC0415
+    from ..ai.oauth import load_token  # noqa: PLC0415
+    from ..ai.tools import ToolContext, ToolDispatcher  # noqa: PLC0415
+
+    token = load_token()
+    client: Any
+    if token is None:
+        # Loop mode requires Claude. Without a token we can't ship a
+        # loop-mode response; fall back to a deterministic stub so
+        # tests can drive the path without OAuth. Production callers
+        # without a token won't hit this branch because the capability
+        # gate filters at the listening-mode layer.
+        client = StubClient()
+    else:
+        client = AnthropicClient(token)
+
+    db_path = resolve_db_path()
+
+    def _connection_factory() -> sqlite3.Connection:
+        return connect(db_path, check_same_thread=False)
+
+    tool_ctx = ToolContext(
+        connection_factory=_connection_factory,
+        activity_id=None,
+        child_id=None,
+        session_id=body.session_id,
+    )
+    tools = ToolDispatcher(tool_ctx)
+
+    system_prompt = _build_loop_system_prompt(
+        intent=body.intent,
+        slot=body.slot,
+        persona_id=effective_persona_id,
+        toys=resolved_toys,
+        rooms=resolved_rooms,
+    )
+    user_prompt = json.dumps(
+        {
+            "intent": body.intent,
+            "slot": body.slot,
+            "hour": body.hour,
+            "seed": body.seed,
+        },
+        sort_keys=True,
+        ensure_ascii=False,
+    )
+    adapter_ctx = ClaudeAdapterContext(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+    )
+
+    adapter = ClaudeActivityGenerator(client)
+
+    activity = asyncio.run(adapter.generate_activity_loop(adapter_ctx, tools))
+    return activity, adapter.tool_calls
+
+
+def _build_loop_system_prompt(
+    *,
+    intent: str,
+    slot: str | None,
+    persona_id: str | None,
+    toys: list[ResolvedToy],
+    rooms: list[ResolvedRoom],
+) -> str:
+    """Compose a minimal system prompt for the loop-mode adapter.
+
+    Kept short on purpose — the loop's system prompt is augmented at
+    the adapter layer with the tool catalog and the JSON schema
+    instruction. Catalog content (toys, rooms) is offered in summary
+    so the model knows what's available before it starts calling
+    tools to look up specifics.
+    """
+    parts = [
+        "You generate a single 5-step play activity for a young child.",
+        f"Intent: {intent}",
+    ]
+    if slot is not None:
+        parts.append(f"Slot: {slot}")
+    if persona_id is not None:
+        parts.append(f"Persona: {persona_id}")
+    if toys:
+        parts.append("Toys (most recent first): " + ", ".join(t.display_name for t in toys[:8]))
+    if rooms:
+        parts.append("Rooms: " + ", ".join(r.display_name for r in rooms[:6]))
+    parts.append(
+        "Reply with EXACTLY one Activity JSON object "
+        "({id, template_id, title, steps:[5 items], version, metadata}) "
+        "and nothing else when you are done."
+    )
+    return "\n".join(parts)
+
+
 def _do_propose(
     body: ProposeRequest,
     conn: sqlite3.Connection,
@@ -718,6 +840,12 @@ def _do_propose(
     via :func:`toybox.ai.labeled_events.schedule_judge_sample` to fill
     in ``judge_scores_json``. The task runs detached; the kid-facing
     HTTP response returns immediately.
+
+    Phase E Step 28 carve-out: ``TOYBOX_GENERATOR_ADAPTER`` and
+    ``TOYBOX_GENERATOR_MODE`` env vars dispatch between the v1 offline
+    path (default), the Claude tool-loop path
+    (``adapter=claude, mode=loop``), and the not-yet-implemented local
+    paths (``adapter=local`` raises :class:`NotImplementedError`).
     """
     # Caller-pinned persona wins; otherwise pick a fresh library one
     # so the kiosk avatar varies across propose calls. Falls through to
@@ -748,23 +876,88 @@ def _do_propose(
             exc_info=True,
         )
 
-    # Pass ``conn`` so the picker consults the ``feedback`` table —
-    # past parent ``didnt_work``/``loved_it``/``dismissed_pre_approval``
-    # entries adjust candidate ranking per Phase D step 20. The
-    # consultation is best-effort (sqlite errors degrade to uniform
-    # pick) so this can't break propose.
-    activity = generate(
-        intent=body.intent,
-        slot=body.slot,
-        context=body.context,
-        hour=body.hour,
-        seed=body.seed,
-        persona_id=effective_persona_id,
-        conn=conn,
-        available_toys=resolved_toys,
-        available_rooms=resolved_rooms,
-        resolved_children=resolved_children,
-    )
+    # Phase E Step 28: dispatch matrix.
+    # - claude+single (default = v1): offline generator (current path)
+    # - claude+loop: ClaudeActivityGenerator.generate_activity_loop
+    # - local+*: NotImplementedError (Step 26 / E2 deliverable)
+    dispatch = resolve_dispatch()
+    loop_tool_calls: list[dict[str, Any]] | None = None
+    generator_path_for_recording = GENERATOR_PATH_OFFLINE
+    if dispatch.adapter == ADAPTER_LOCAL:
+        raise NotImplementedError(
+            f"local adapter ships in Step 26 (E2); requested mode={dispatch.mode}"
+        )
+    loop_fallback_reason: str | None = None
+    if dispatch.adapter == ADAPTER_CLAUDE and dispatch.mode == MODE_LOOP:
+        try:
+            activity, loop_tool_calls = _run_loop_generation(
+                body,
+                conn,
+                effective_persona_id=effective_persona_id,
+                resolved_toys=resolved_toys,
+                resolved_rooms=resolved_rooms,
+            )
+            generator_path_for_recording = GENERATOR_PATH_CLAUDE
+        except NotImplementedError:
+            raise
+        # H3: narrow the catch to expected transient failures only.
+        # ``TypeError``/``AttributeError``/``KeyError``/``ImportError`` are
+        # programming bugs and must propagate to the route handler so an
+        # operator sees a 500 (and the structured traceback) rather than
+        # a silent fallback to the offline path indistinguishable from a
+        # real Claude outage.
+        except (
+            RuntimeError,
+            TimeoutError,  # asyncio.TimeoutError is an alias on 3.11+
+            sqlite3.Error,
+            ValidationError,
+            ConnectionError,
+        ) as exc:
+            _logger.error(
+                "claude+loop dispatch failed (%s: %s); falling back to offline generator",
+                type(exc).__name__,
+                exc,
+                exc_info=True,
+                extra={
+                    "error_class": exc.__class__.__name__,
+                    "fallback_reason": "transient",
+                    "intent": body.intent,
+                    "slot": body.slot,
+                },
+            )
+            loop_fallback_reason = "transient_loop_failure"
+            activity = generate(
+                intent=body.intent,
+                slot=body.slot,
+                context=body.context,
+                hour=body.hour,
+                seed=body.seed,
+                persona_id=effective_persona_id,
+                conn=conn,
+                available_toys=resolved_toys,
+                available_rooms=resolved_rooms,
+                resolved_children=resolved_children,
+            )
+            loop_tool_calls = None
+    else:
+        # claude+single (default = v1 byte-identical path).
+        # Pass ``conn`` so the picker consults the ``feedback`` table —
+        # past parent ``didnt_work``/``loved_it``/``dismissed_pre_approval``
+        # entries adjust candidate ranking per Phase D step 20. The
+        # consultation is best-effort (sqlite errors degrade to uniform
+        # pick) so this can't break propose.
+        activity = generate(
+            intent=body.intent,
+            slot=body.slot,
+            context=body.context,
+            hour=body.hour,
+            seed=body.seed,
+            persona_id=effective_persona_id,
+            conn=conn,
+            available_toys=resolved_toys,
+            available_rooms=resolved_rooms,
+            resolved_children=resolved_children,
+        )
     session_id = _ensure_session(conn, body.session_id)
 
     # Evict oldest first so the cap of 5 holds for the new row.
@@ -802,6 +995,13 @@ def _do_propose(
         intent=body.intent,
         persona_meta=persona_meta,
     )
+    # H3: when the loop-mode dispatch caught a narrow transient failure
+    # and fell back to the offline generator, surface the reason on the
+    # activity's metadata envelope so an operator running queries
+    # against ``labeled_events.activity_json`` can compute the % of
+    # intended loop calls that fell back vs. real Claude outages.
+    if loop_fallback_reason is not None:
+        metadata["fallback_reason"] = loop_fallback_reason
     summary_payload = {
         "title": activity.title,
         "metadata": metadata,
@@ -868,7 +1068,8 @@ def _do_propose(
             conn,
             activity=activity,
             ctx=ctx,
-            generator_path=GENERATOR_PATH_OFFLINE,
+            generator_path=generator_path_for_recording,
+            tool_calls=loop_tool_calls,
         )
     except Exception:  # noqa: BLE001 -- eval scaffold must never break propose
         _logger.warning(

@@ -1,0 +1,26 @@
+-- Phase E Step 28 carve-out — tool-loop telemetry column.
+--
+-- Loop-mode generations (TOYBOX_GENERATOR_MODE=loop) emit one or more
+-- tool calls per generation. Each call is captured into this JSON column
+-- as part of the same labeled_events row that holds the activity. Shape
+-- pinned in documentation/phase-e-plan.md §"Tool-call telemetry shape":
+--
+--   [
+--     {
+--       "tool": "get_room",
+--       "args": {"room_id": "550e8400-..."},
+--       "result_summary": "kitchen -- features: counter, fridge, sink",
+--       "latency_ms": 12,
+--       "error": null,
+--       "ts": "2026-05-12T14:30:01.234Z"
+--     },
+--     ...
+--   ]
+--
+-- NULL on rows produced by single-shot generations (the v1 path) so
+-- existing rows stay undisturbed by the migration. Loop-mode rows
+-- always populate the column with at least an empty list so a
+-- "tool_calls IS NOT NULL" probe is sufficient to identify the loop
+-- path.
+
+ALTER TABLE labeled_events ADD COLUMN tool_calls TEXT;

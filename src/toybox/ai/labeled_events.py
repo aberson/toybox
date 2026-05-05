@@ -216,6 +216,7 @@ def record_generation(
     ctx: GeneratorContext,
     generator_path: str,
     generated_at: str | None = None,
+    tool_calls: Sequence[dict[str, Any]] | None = None,
 ) -> int:
     """Insert one ``labeled_events`` row. Returns the new row id.
 
@@ -224,30 +225,71 @@ def record_generation(
     typo at the call site surfaces with the offending value rather than
     SQLite's opaque ``CHECK constraint failed`` message.
 
+    ``tool_calls`` is the per-generation tool-call telemetry produced
+    by loop-mode generators (see
+    ``documentation/phase-e-plan.md`` §"Tool-call telemetry shape").
+    ``None`` (the default) leaves the column NULL so single-shot rows
+    are byte-identical to the pre-Step-28 path. Loop-mode callers pass
+    a (possibly empty) list which is JSON-encoded and stored verbatim.
+
     Raises:
         ValueError: if ``generator_path`` is not recognised.
     """
     if generator_path not in VALID_GENERATOR_PATHS:
         raise ValueError(
-            f"generator_path must be one of {sorted(VALID_GENERATOR_PATHS)}; "
-            f"got {generator_path!r}"
+            f"generator_path must be one of {sorted(VALID_GENERATOR_PATHS)}; got {generator_path!r}"
         )
     messages = build_chatml_messages(ctx)
     inputs_json = serialize_chatml(messages)
     activity_json = serialize_activity(activity)
     ts = generated_at if generated_at is not None else _now_iso()
+    tool_calls_json: str | None = None
+    if tool_calls is not None:
+        tool_calls_json = json.dumps(
+            list(tool_calls),
+            sort_keys=True,
+            ensure_ascii=False,
+        )
     with conn:
         cur = conn.execute(
             "INSERT INTO labeled_events "
             "(activity_id, generated_at, generator_path, "
-            " inputs_chatml_json, activity_json) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (activity.id, ts, generator_path, inputs_json, activity_json),
+            " inputs_chatml_json, activity_json, tool_calls) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                activity.id,
+                ts,
+                generator_path,
+                inputs_json,
+                activity_json,
+                tool_calls_json,
+            ),
         )
     new_id = cur.lastrowid
     if new_id is None:  # pragma: no cover - sqlite always returns an id
         raise RuntimeError("INSERT did not return a rowid")
     return int(new_id)
+
+
+def get_tool_calls(
+    conn: sqlite3.Connection,
+    *,
+    activity_id: str,
+) -> list[dict[str, Any]] | None:
+    """Read back the tool_calls JSON column for ``activity_id``.
+
+    Returns ``None`` for rows persisted before Step 28's loop mode
+    landed, OR rows from the single-shot path (which leaves the column
+    NULL by design). Returns an empty list when loop mode ran but the
+    model emitted zero tool calls before the final activity.
+    """
+    row = conn.execute(
+        "SELECT tool_calls FROM labeled_events WHERE activity_id = ?",
+        (activity_id,),
+    ).fetchone()
+    if row is None or row["tool_calls"] is None:
+        return None
+    return list(json.loads(row["tool_calls"]))
 
 
 def update_parent_signal(
@@ -339,20 +381,18 @@ def _run_judge_in_thread(coro_factory: Any) -> threading.Thread:
     same best-effort contract as the in-loop scheduler. Exceptions are
     logged via the same callback used for the in-loop path.
     """
+
     def _runner() -> None:
         try:
             asyncio.run(coro_factory())
         except Exception as exc:  # noqa: BLE001 -- best-effort
             _logger.warning(
-                "background judge task raised in thread (%s: %s); "
-                "judge_scores stays NULL",
+                "background judge task raised in thread (%s: %s); judge_scores stays NULL",
                 type(exc).__name__,
                 exc,
             )
 
-    thread = threading.Thread(
-        target=_runner, name="toybox-judge-sample", daemon=True
-    )
+    thread = threading.Thread(target=_runner, name="toybox-judge-sample", daemon=True)
     thread.start()
     return thread
 
@@ -403,9 +443,7 @@ def schedule_judge_sample(
         # propose path). Spin up a daemon thread that owns its own
         # loop. Capture (activity, ctx, row_id) by closure so the
         # coroutine builds inside the new loop's thread.
-        return _run_judge_in_thread(
-            lambda: judge_call(activity=activity, ctx=ctx, row_id=row_id)
-        )
+        return _run_judge_in_thread(lambda: judge_call(activity=activity, ctx=ctx, row_id=row_id))
     coro = judge_call(activity=activity, ctx=ctx, row_id=row_id)
     task = loop.create_task(coro)
     task.add_done_callback(_log_judge_task_exception)
@@ -425,6 +463,8 @@ __all__ = [
     "PARENT_SIGNAL_THUMBS_UP",
     "VALID_GENERATOR_PATHS",
     "build_chatml_messages",
+    "count_rows",
+    "get_tool_calls",
     "record_generation",
     "resolve_judge_rate",
     "schedule_judge_sample",
@@ -434,3 +474,150 @@ __all__ = [
     "update_judge_scores",
     "update_parent_signal",
 ]
+
+
+# --------------------------------------------------------------------- CLI
+
+
+def count_rows(
+    conn: sqlite3.Connection,
+    *,
+    since: str | None = None,
+    sft_filter: bool = False,
+) -> int:
+    """Count rows in ``labeled_events`` matching the optional filters.
+
+    Args:
+        conn: SQLite connection.
+        since: Optional ISO 8601 lower bound on ``generated_at``. Caller
+            is expected to pass a validated string; the CLI front-end
+            does the validation.
+        sft_filter: When True, apply the Phase E SFT-export filter:
+            (1) ``parent_signal != -1``, AND
+            (2) when ``judge_scores_json`` is present, ``safety >= 4``
+            AND the sum of the five 1..5-int rubric scores
+            (schema, age_appropriateness, doability, persona_fidelity,
+            coherence) is ``>= 18`` — i.e. mean ``>= 3.6`` (strictly
+            above 3.5). Sums of integers can't equal 17.5; the SQL
+            comparison ``>= 17.5`` is therefore equivalent to ``>= 18``,
+            which we keep documented honestly here. The
+            ``redact_for_sft`` column doesn't exist yet — Step 27 adds
+            it via migration 0005, so for now the filter omits it.
+            Future Step 27 work should extend this filter to require
+            ``redact_for_sft = 0`` once the column lands.
+
+    Returns:
+        The integer count.
+    """
+    clauses: list[str] = []
+    params: list[Any] = []
+    if since is not None:
+        clauses.append("generated_at >= ?")
+        params.append(since)
+    if sft_filter:
+        # Mean-quality floor: judge scores live in a JSON column. We
+        # apply the filter via json_extract so the CLI doesn't have to
+        # decode every row in Python. The mean-quality formula is
+        # ((schema + age_appropriateness + doability + persona_fidelity
+        #   + coherence) / 5.0). We keep the SQL straightforward by
+        # using sqlite's json1 extension (shipped with the stdlib build
+        # used by uv-managed Python on Windows).
+        clauses.append("(parent_signal IS NULL OR parent_signal != -1)")
+        clauses.append(
+            "(judge_scores_json IS NULL OR ("
+            " CAST(json_extract(judge_scores_json, '$.safety') AS INTEGER) >= 4"
+            " AND ("
+            "  CAST(json_extract(judge_scores_json, '$.schema') AS INTEGER)"
+            "  + CAST(json_extract(judge_scores_json, '$.age_appropriateness') AS INTEGER)"
+            "  + CAST(json_extract(judge_scores_json, '$.doability') AS INTEGER)"
+            "  + CAST(json_extract(judge_scores_json, '$.persona_fidelity') AS INTEGER)"
+            "  + CAST(json_extract(judge_scores_json, '$.coherence') AS INTEGER)"
+            " ) >= 17.5"
+            "))"
+        )
+    sql = "SELECT COUNT(*) AS n FROM labeled_events"
+    if clauses:
+        sql += " WHERE " + " AND ".join(clauses)
+    row = conn.execute(sql, params).fetchone()
+    return int(row["n"]) if row is not None else 0
+
+
+def _validate_iso8601(raw: str) -> str:
+    """Raise :class:`argparse.ArgumentTypeError` if ``raw`` is not ISO 8601."""
+    import argparse
+
+    candidate = raw
+    if candidate.endswith("Z"):
+        candidate = candidate[:-1] + "+00:00"
+    try:
+        datetime.fromisoformat(candidate)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"--since must be ISO 8601 (got {raw!r}: {exc})") from exc
+    return raw
+
+
+def _cli_main(argv: list[str] | None = None) -> int:
+    """Operator CLI: ``python -m toybox.ai.labeled_events --count [--since ISO] [--sft-filter]``.
+
+    Prints the integer count (followed by a newline) to stdout. Exits 0
+    on success. Useful for shell-side gates such as::
+
+        if [ "$(uv run python -m toybox.ai.labeled_events --count --sft-filter)" -ge 50 ]; then
+          echo "ok"
+        fi
+
+    Note: ``redact_for_sft`` is added by Step 27 (migration 0005) and is
+    NOT yet part of ``--sft-filter``. When that lands, extend the filter
+    here to require ``redact_for_sft = 0``.
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        prog="toybox.ai.labeled_events",
+        description=(
+            "Count labeled_events rows matching optional filters. "
+            "redact_for_sft is added by Step 27 (migration 0005); when "
+            "it lands, extend --sft-filter to require redact_for_sft = 0."
+        ),
+    )
+    parser.add_argument(
+        "--count",
+        action="store_true",
+        help="Print the row count (default behavior; flag exists for shell parity).",
+    )
+    parser.add_argument(
+        "--since",
+        type=_validate_iso8601,
+        default=None,
+        help="Filter to rows with generated_at >= this ISO 8601 timestamp.",
+    )
+    parser.add_argument(
+        "--sft-filter",
+        action="store_true",
+        help=(
+            "Apply the SFT-export filter (parent_signal != -1 AND, when judge "
+            "scores are present, safety >= 4 AND mean_quality >= 3.6 — i.e. "
+            "strictly above 3.5; the rubric scores are 1..5 ints, so the sum "
+            "of the five rubric fields is gated at >= 18). "
+            "redact_for_sft is not yet supported (Step 27)."
+        ),
+    )
+    args = parser.parse_args(argv)
+
+    # Late import to keep module import lightweight.
+    from ..db import resolve_db_path
+    from ..db.connection import connect
+
+    conn = connect(resolve_db_path())
+    try:
+        count = count_rows(conn, since=args.since, sft_filter=args.sft_filter)
+    finally:
+        conn.close()
+    print(count)
+    return 0
+
+
+if __name__ == "__main__":
+    import sys
+
+    sys.exit(_cli_main(sys.argv[1:]))
