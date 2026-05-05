@@ -16,7 +16,7 @@ from toybox.core.auth import TokenScope, TokenSubject
 from toybox.core.pubsub import PubSub
 from toybox.ws.envelope import build_envelope
 from toybox.ws.heartbeat import HeartbeatConfig
-from toybox.ws.server import _resolve_subscription_with_rejects, _serve
+from toybox.ws.server import _resolve_subscription_with_rejects, _safe_close, _serve
 from toybox.ws.topics import Topic
 
 
@@ -134,3 +134,17 @@ async def test_serve_logs_sibling_exception_alongside_disconnect(
         "ws-send" in record.getMessage() and "send-side explode" in record.getMessage()
         for record in caplog.records
     ), [r.getMessage() for r in caplog.records]
+
+
+async def test_safe_close_swallows_runtime_error_from_uvicorn() -> None:
+    # Regression: when a client disconnects mid-handshake, uvicorn raises
+    # RuntimeError on the second ``websocket.close`` we send. _safe_close
+    # must absorb that so the ASGI handler doesn't crash.
+    class _ClosedWebSocket:
+        async def close(self, code: int = 1000) -> None:
+            raise RuntimeError(
+                "Unexpected ASGI message 'websocket.close', after sending "
+                "'websocket.close' or response already completed."
+            )
+
+    await _safe_close(_ClosedWebSocket(), 1008)  # type: ignore[arg-type]

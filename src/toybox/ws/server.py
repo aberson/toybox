@@ -194,6 +194,17 @@ def _resolve_subscription_with_rejects(
     return out, rejected
 
 
+async def _safe_close(ws: WebSocket, code: int) -> None:
+    # The client may have already torn the socket down (common during the
+    # auth handshake — they open, see they have no token, and disconnect
+    # before our close fires). Uvicorn raises RuntimeError when we try to
+    # send a second close in that race; swallow it.
+    try:
+        await ws.close(code=code)
+    except RuntimeError:
+        pass
+
+
 async def _read_token_from_first_message(ws: WebSocket) -> str | None:
     """Wait for the first client frame and pull a token out of it."""
     try:
@@ -376,13 +387,13 @@ def build_router() -> APIRouter:
             plaintext = await _read_token_from_first_message(ws)
 
         if not plaintext:
-            await ws.close(code=status.WS_1008_POLICY_VIOLATION)
+            await _safe_close(ws, status.WS_1008_POLICY_VIOLATION)
             return
 
         try:
             subject = validate_token(conn, plaintext)
         except TokenError:
-            await ws.close(code=status.WS_1008_POLICY_VIOLATION)
+            await _safe_close(ws, status.WS_1008_POLICY_VIOLATION)
             return
 
         try:
@@ -397,10 +408,7 @@ def build_router() -> APIRouter:
             return
         except Exception:  # pragma: no cover - defensive
             _logger.exception("ws handler crashed")
-            try:
-                await ws.close(code=status.WS_1011_INTERNAL_ERROR)
-            except RuntimeError:
-                pass
+            await _safe_close(ws, status.WS_1011_INTERNAL_ERROR)
 
     return router
 
