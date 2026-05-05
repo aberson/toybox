@@ -3,11 +3,13 @@ import type { CSSProperties, JSX } from "react";
 
 import {
   ApiClient,
+  ApiError,
   isAbortError,
   retryWithBackoff,
   withConflictHandler,
 } from "./api";
 import type { Activity } from "./api";
+import { KioskPinPrompt } from "./components/KioskPinPrompt";
 import { NextStepButton } from "./components/NextStepButton";
 import { PersonaAvatar } from "./components/PersonaAvatar";
 import { StepCard } from "./components/StepCard";
@@ -27,6 +29,58 @@ import type { Envelope } from "./ws";
 function deriveWsUrl(): string {
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
   return `${proto}//${window.location.host}/ws`;
+}
+
+// Dev-shim PIN sources for the kiosk. The kiosk does not own the parent
+// PIN — production replaces this entire path with the kiosk pairing
+// flow (Phase D Step 20). Until then, the bootstrap accepts:
+//   1. ``window.__TOYBOX_KIOSK_PIN__`` — set by the test harness pre-mount.
+//      Wins because existing tests depend on this precedence.
+//   2. ``localStorage["toybox.kiosk.pin"]`` — survives reload, so a
+//      developer can set it once via DevTools and the kiosk authenticates
+//      thereafter. Plaintext storage is acceptable for this dev shim.
+// Values must match the backend's 4-12 digit PIN format; bad shapes
+// fall through to the "not configured" toast rather than 422 the backend.
+const KIOSK_PIN_STORAGE_KEY = "toybox.kiosk.pin";
+
+function isValidKioskPin(s: unknown): s is string {
+  return typeof s === "string" && /^[0-9]{4,12}$/.test(s);
+}
+
+function readKioskBootstrapPin(): string {
+  const w = window as unknown as { __TOYBOX_KIOSK_PIN__?: string };
+  if (isValidKioskPin(w.__TOYBOX_KIOSK_PIN__)) {
+    return w.__TOYBOX_KIOSK_PIN__;
+  }
+  try {
+    const stored = window.localStorage.getItem(KIOSK_PIN_STORAGE_KEY);
+    if (isValidKioskPin(stored)) {
+      return stored;
+    }
+  } catch {
+    // localStorage can throw on disabled storage / strict sandboxing.
+    // Fall through to "" so the bootstrap shows the PIN prompt rather
+    // than crashing the kiosk shell.
+  }
+  return "";
+}
+
+function storeKioskPin(pin: string): void {
+  try {
+    window.localStorage.setItem(KIOSK_PIN_STORAGE_KEY, pin);
+  } catch {
+    // Storage disabled — the prompt's onSubmit caller will still fall
+    // through to the bootstrap and either succeed (window var set) or
+    // re-prompt. Nothing else we can do.
+  }
+}
+
+function clearStoredKioskPin(): void {
+  try {
+    window.localStorage.removeItem(KIOSK_PIN_STORAGE_KEY);
+  } catch {
+    // See storeKioskPin — pass.
+  }
 }
 
 const FULL_BLEED_STYLE: CSSProperties = {
@@ -95,6 +149,14 @@ export function App(): JSX.Element {
   const prevTerminalSeenRef = useRef<boolean>(false);
   const prevTerminalRef = useRef<boolean>(false);
   const [busyAdvance, setBusyAdvance] = useState(false);
+  // Step 21 dev-shim: when no valid PIN is configured (or the cached
+  // value is rejected by the backend), render KioskPinPrompt instead of
+  // toasting. ``bootCounter`` re-runs the bootstrap effect after the
+  // user submits a new PIN — incrementing it triggers cleanup → setup
+  // with the new localStorage value picked up by readKioskBootstrapPin.
+  const [pinPromptVisible, setPinPromptVisible] = useState(false);
+  const [pinPromptError, setPinPromptError] = useState<string | null>(null);
+  const [bootCounter, setBootCounter] = useState(0);
 
   if (apiRef.current === null) {
     apiRef.current = new ApiClient({
@@ -115,23 +177,27 @@ export function App(): JSX.Element {
     preloadSfx("success");
     const boot = async (): Promise<void> => {
       try {
-        // Step 21: ``/api/auth/parent`` is now PIN-gated. The kiosk
-        // does not own the PIN — production will hand the kiosk a
-        // pre-issued token via the (yet-to-ship) kiosk pairing flow.
-        // Until then, the bootstrap PIN is read from
-        // ``window.__TOYBOX_KIOSK_PIN__`` (set by the test harness or
-        // the operator's local config); a 401/423 response here is
-        // surfaced as a bootstrap toast so the kiosk doesn't silently
-        // hang. Retry-with-backoff still applies for transient 5xx /
-        // network blips.
-        const kioskWindow = window as unknown as {
-          __TOYBOX_KIOSK_PIN__?: string;
-        };
-        const bootstrapPin = kioskWindow.__TOYBOX_KIOSK_PIN__ ?? "";
+        // Step 21: ``/api/auth/parent`` is now PIN-gated. PIN sources
+        // are described above on ``readKioskBootstrapPin``. When no
+        // valid PIN is configured we render KioskPinPrompt instead of
+        // POSTing an empty body (would 422). 401 from the backend is
+        // treated as "stale cached PIN" — clear and re-prompt. 423
+        // (locked) and other errors still toast — they're not user-
+        // recoverable from the kiosk's PIN form.
+        const bootstrapPin = readKioskBootstrapPin();
+        if (bootstrapPin === "") {
+          if (mounted) {
+            setPinPromptError(null);
+            setPinPromptVisible(true);
+          }
+          return;
+        }
         const tokenResp = await retryWithBackoff(() =>
           api.issueParentToken({ pin: bootstrapPin }, { signal: aborter.signal }),
         );
         if (!mounted) return;
+        setPinPromptVisible(false);
+        setPinPromptError(null);
         useChildStore.getState().setToken(tokenResp);
         const ws = new ChildWsClient({
           url: deriveWsUrl(),
@@ -185,6 +251,15 @@ export function App(): JSX.Element {
         ws.start();
       } catch (err) {
         if (!mounted || isAbortError(err)) return;
+        if (err instanceof ApiError && err.status === 401) {
+          // The cached PIN was rejected (e.g. parent rotated their PIN).
+          // Drop the bad value and re-prompt so the user can supply the
+          // current one without resorting to DevTools.
+          clearStoredKioskPin();
+          setPinPromptError("Wrong PIN — try again.");
+          setPinPromptVisible(true);
+          return;
+        }
         const message =
           err instanceof Error ? err.message : "bootstrap failed";
         useChildStore.getState().pushToast("error", `bootstrap: ${message}`);
@@ -198,6 +273,13 @@ export function App(): JSX.Element {
       wsRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bootCounter]);
+
+  const handlePinPromptSubmit = useCallback((pin: string): void => {
+    storeKioskPin(pin);
+    setPinPromptError(null);
+    setPinPromptVisible(false);
+    setBootCounter((c) => c + 1);
   }, []);
 
   const refetchActivity = useCallback(
@@ -281,6 +363,15 @@ export function App(): JSX.Element {
     activity !== null &&
     !showAllDone &&
     (activity.state === "approved" || activity.state === "running");
+
+  if (pinPromptVisible) {
+    return (
+      <KioskPinPrompt
+        onSubmit={handlePinPromptSubmit}
+        errorMessage={pinPromptError ?? undefined}
+      />
+    );
+  }
 
   return (
     <main data-testid="child-root" style={FULL_BLEED_STYLE}>
