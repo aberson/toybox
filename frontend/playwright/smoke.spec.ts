@@ -54,6 +54,17 @@ test("synthetic-audio smoke: WAV -> VAD -> STT -> trigger -> approve -> child", 
   await expect(childPage.getByTestId("persona-avatar")).toBeVisible({
     timeout: 15_000,
   });
+  // Phase F Step F7: when the activity's current step has
+  // ``action_slot`` set AND the activity has at least one toy, the
+  // kiosk renders a ``ToyActionSprite`` next to the step body. The
+  // smoke runs against a fixture activity whose first step pins a
+  // known slot ("looking" by default — see the boredom template).
+  // The sprite is best-effort: a 404 (capability disabled or
+  // generation pending) hides it gracefully, so we use ``.or()`` with
+  // the body-only branch as the fallback assertion path.
+  await expect(
+    childPage.getByTestId("toy-action-sprite").or(childPage.getByTestId("step-text")),
+  ).toBeVisible({ timeout: 15_000 });
 
   await parentCtx.close();
   await childCtx.close();

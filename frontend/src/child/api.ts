@@ -26,6 +26,12 @@ export interface ActivityStep {
   sfx: string | null;
   expected_action: string | null;
   current: boolean;
+  // Phase F Step F6/F7: per-step toy-action vocabulary key (one of the
+  // 10 ACTION_SLOTS) or null when the step has no associated sprite.
+  // F7 reads this to decide whether to render a ToyActionSprite next
+  // to the step body. Optional on the wire so legacy envelopes /
+  // pre-F6 fixtures continue to typecheck without an explicit null.
+  action_slot?: string | null;
 }
 
 export interface Activity {
@@ -42,6 +48,13 @@ export interface Activity {
   ended_at: string | null;
   steps: ActivityStep[];
   metadata: Record<string, unknown>;
+  // Phase F Step F7: list of toy ids associated with this activity.
+  // The kiosk's ToyActionSprite renders the sprite for the FIRST id
+  // (deterministic) when both ``action_slot`` on the current step AND
+  // a non-empty ``toy_ids`` are present. Optional because the wire
+  // shape may not expose this yet for pre-F7 callers; missing/empty
+  // → no sprite, same as today.
+  toy_ids?: string[];
 }
 
 export interface VersionConflictBody {

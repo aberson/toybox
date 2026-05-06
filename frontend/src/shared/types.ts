@@ -3,4 +3,10 @@
 //
 // Phase A Step 1 placeholder: there are no Pydantic models worth syncing
 // yet. Step 2+ will populate this file once schema + activity models land.
+//
+// Phase F Step F7: until the codegen pipeline is wired, the kiosk-side
+// ``ActivityStep`` shape (including ``action_slot``) and the kiosk-side
+// ``Activity`` shape (including the optional ``toy_ids`` array) live in
+// :mod:`frontend/src/child/api.ts`. Once codegen lands they will move
+// here and the kiosk will import from this module.
 export {};

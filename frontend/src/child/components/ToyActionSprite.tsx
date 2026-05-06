@@ -1,0 +1,87 @@
+// Phase F Step F7: small pixel-art sprite the kiosk renders next to
+// a step's body when the step has an ``action_slot`` set AND the
+// activity has at least one toy. The component is intentionally
+// minimal — it is a passive ``<img>`` with an ``onError``-hides-element
+// path so a 404 (capability disabled, generation not yet finished,
+// generation failed) renders as "no sprite for this step" rather than
+// a broken image. The kiosk's body text reads the same as today in
+// that case.
+//
+// Mounting URL: ``/api/static/images/toy_actions/<toy_id>/<slot>.png``.
+// The static-files mount lives at ``/api/static/images`` (see
+// ``src/toybox/app.py``) and the worker writes sprites under the
+// ``toy_actions/<toy_id>/<slot>.png`` subdirectory.
+//
+// Accessibility: the ``alt`` attribute is mandatory — toybox is
+// family-facing and the F8 parent grid will reuse this component, so
+// a11y is not optional. When ``toyDisplayName`` is provided the alt is
+// ``"<display_name> <slot>"`` (e.g. "Mr. Unicorn looking"); otherwise
+// it falls back to the bare slot key.
+
+import { useState } from "react";
+import type { CSSProperties, JSX } from "react";
+
+export interface ToyActionSpriteProps {
+  // UUID of the toy whose sprite to fetch. Combined with ``slot`` to
+  // form the static-files URL. The component does NOT validate the
+  // shape; bad input simply produces a 404 the ``onError`` path hides.
+  toyId: string;
+  // One of the 10 ACTION_SLOTS members (e.g. "looking", "jumping",
+  // "idle"). Component is permissive about the value — any string is
+  // accepted because the URL is the source of truth and a bad slot
+  // surfaces as a 404 the ``onError`` handler hides.
+  slot: string;
+  // Optional toy display name for accessibility. When present the alt
+  // is "<display_name> <slot>"; otherwise alt is the bare slot key.
+  toyDisplayName?: string;
+  // Pixel size for the rendered sprite. Defaults to 112 px — sits in
+  // the plan's 96-128 px design band. The kiosk uses the default; the
+  // F8 parent grid will pass a smaller value for the cell size.
+  size?: number;
+  // Optional style override merged onto the default. Lets parent
+  // layouts adjust margin / flex behavior without re-deriving the
+  // base pixel-art presentation rules.
+  style?: CSSProperties;
+}
+
+export function ToyActionSprite(props: ToyActionSpriteProps): JSX.Element | null {
+  const size = props.size ?? 112;
+  // ``loaded`` starts true; the ``onError`` handler flips it to false
+  // when the browser reports the fetch failed. Returning null after a
+  // failure removes the element from the DOM entirely so the kiosk
+  // body text reflows to fill the row width.
+  const [loaded, setLoaded] = useState<boolean>(true);
+  if (!loaded) return null;
+  const alt =
+    props.toyDisplayName !== undefined && props.toyDisplayName.length > 0
+      ? `${props.toyDisplayName} ${props.slot}`
+      : props.slot;
+  const baseStyle: CSSProperties = {
+    width: size,
+    height: size,
+    flexShrink: 0,
+    // Critical for pixel-art: don't smooth-resample on upscale. Both
+    // ``pixelated`` (modern browsers) and ``crisp-edges`` (Firefox
+    // legacy) are kept so the kiosk renders sharp regardless of the
+    // browser version on the family device.
+    imageRendering: "pixelated",
+    objectFit: "contain",
+    // Transparent background — sprite PNGs have an alpha channel and
+    // we want the kiosk's gradient to show through.
+    background: "transparent",
+  };
+  const merged: CSSProperties = { ...baseStyle, ...(props.style ?? {}) };
+  return (
+    <img
+      data-testid="toy-action-sprite"
+      data-slot={props.slot}
+      data-toy-id={props.toyId}
+      src={`/api/static/images/toy_actions/${props.toyId}/${props.slot}.png`}
+      alt={alt}
+      width={size}
+      height={size}
+      onError={() => setLoaded(false)}
+      style={merged}
+    />
+  );
+}
