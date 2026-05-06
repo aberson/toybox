@@ -19,6 +19,20 @@ dependencies = [
     "python-multipart>=0.0.9",
 ]
 
+[project.optional-dependencies]
+image_gen = [
+    "torch>=2.6",
+    "torchvision",
+    "diffusers>=0.37",
+    "transformers>=5",
+    "accelerate>=1",
+    "safetensors",
+    "peft>=0.19",
+    "rembg",
+    "Pillow",
+    "huggingface-hub>=1",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=8",
@@ -67,4 +81,7 @@ testpaths = ["tests"]
 # An ``addopts = "-m 'not slow'"`` setting was removed in 14b iter-3:
 # it collided with explicit ``-m slow`` on the CLI (pytest applies
 # addopts first, then CLI; behaviour depended on the pytest version).
-markers = ["slow: marks tests as slow (deselect with -m 'not slow')"]
+markers = [
+    "slow: marks tests as slow (deselect with -m 'not slow')",
+    "requires_gpu: opt-in test that needs a real CUDA GPU + image_gen checkpoints",
+]
