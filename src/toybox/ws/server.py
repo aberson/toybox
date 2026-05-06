@@ -62,6 +62,10 @@ _PARENT_TOPICS = frozenset(
         Topic.transcript,
         # Step 24: operator dashboard pushes snapshots to parents only.
         Topic.metrics,
+        # Phase F Step F4: action-sprite generation status. Parent-scope
+        # only — the kiosk renders sprites via static <img src=...> and
+        # never needs the per-job status stream.
+        Topic.toy_actions,
     }
 )
 _CHILD_TOPICS = frozenset(

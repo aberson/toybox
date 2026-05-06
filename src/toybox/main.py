@@ -41,7 +41,7 @@ from .activities.models import Activity
 from .ai.breaker import CircuitBreaker
 from .ai.client import AIClient, StubClient
 from .api.metrics import get_metrics_breaker
-from .app import create_app
+from .app import create_app, image_gen_worker_lifespan
 from .audio.capture import MicCapture
 from .audio.pipeline import TranscriptPipeline
 from .audio.stt import WhisperTranscriber
@@ -529,28 +529,45 @@ def _build_smoke_lifespan(
         )
         metrics_task = start_metrics_publisher(pubsub, metrics_deps)
 
-        try:
-            yield
-        finally:
-            # Cancel the metrics publisher first — it has no I/O
-            # dependencies on mic/pipeline/transcriber, but we want
-            # it down before the rest tears down so a final pre-close
-            # snapshot doesn't observe a half-stopped mic.
-            metrics_task.cancel()
-            with contextlib.suppress(BaseException):
-                await asyncio.gather(metrics_task, return_exceptions=True)
-            # Sequential cleanup: each stop() in its own suppressed
-            # block so a failure in one component doesn't strand the
-            # others. Order is reverse-of-start: pipeline first (so it
-            # stops pulling from the mic queue), mic next, transcriber
-            # last (the pipeline holds a reference to it).
-            with contextlib.suppress(Exception):
-                await pipeline.stop()
-            with contextlib.suppress(Exception):
-                await mic.stop()
-            with contextlib.suppress(Exception):
-                await transcriber.close()
-            _logger.info("smoke pipeline stopped")
+        # Phase F Step F4: image-gen worker — started inside the smoke
+        # lifespan so the smoke E2E path exercises the same wiring as
+        # production. The worker is a no-op until something enqueues a
+        # job, so it costs nothing in the smoke path that doesn't
+        # exercise toy ingest. We push the lifespan into an
+        # ``AsyncExitStack`` (rather than calling ``__aenter__`` /
+        # ``__aexit__`` by hand) so the worker tears down with proper
+        # exception propagation — the canonical pattern used elsewhere
+        # in the codebase. The metrics + mic/pipeline/transcriber
+        # teardown stays in the explicit ``finally`` block to preserve
+        # the documented reverse-of-start ordering (cancelling metrics
+        # first, then stopping pipeline → mic → transcriber).
+        async with contextlib.AsyncExitStack() as stack:
+            await stack.enter_async_context(image_gen_worker_lifespan(app))
+
+            try:
+                yield
+            finally:
+                # Cancel the metrics publisher first — it has no I/O
+                # dependencies on mic/pipeline/transcriber, but we want
+                # it down before the rest tears down so a final
+                # pre-close snapshot doesn't observe a half-stopped
+                # mic.
+                metrics_task.cancel()
+                with contextlib.suppress(BaseException):
+                    await asyncio.gather(metrics_task, return_exceptions=True)
+                # Sequential cleanup: each stop() in its own suppressed
+                # block so a failure in one component doesn't strand
+                # the others. Order is reverse-of-start: pipeline first
+                # (so it stops pulling from the mic queue), mic next,
+                # transcriber last (the pipeline holds a reference to
+                # it).
+                with contextlib.suppress(Exception):
+                    await pipeline.stop()
+                with contextlib.suppress(Exception):
+                    await mic.stop()
+                with contextlib.suppress(Exception):
+                    await transcriber.close()
+                _logger.info("smoke pipeline stopped")
 
     return _lifespan
 
@@ -616,12 +633,19 @@ def _build_metrics_inputs_factory(
 
 @contextlib.asynccontextmanager
 async def _metrics_lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Lifespan that only starts the metrics publisher.
+    """Lifespan that starts the metrics publisher + image-gen worker.
 
     Used in the non-smoke path where the audio pipeline isn't started
     in-process (the operator runs ``audio.capture`` separately or runs
     in a stripped-down API mode for tests). The smoke lifespan composes
-    its own publisher start/stop on top of the audio pump.
+    its own publisher start/stop on top of the audio pump and also
+    threads the image-gen worker through.
+
+    Phase F Step F4: the image-gen worker is started under
+    :func:`image_gen_worker_lifespan` BEFORE the metrics publisher so
+    the worker's restart-recovery sweep happens at the same point in
+    boot as the (now-historical) metrics-only path. Stop order is
+    reversed in the ``finally`` block.
     """
     breaker = get_metrics_breaker()
     mic_holder: dict[str, MicCapture | None] = {"mic": None}
@@ -633,15 +657,16 @@ async def _metrics_lifespan(app: FastAPI) -> AsyncIterator[None]:
         ),
     )
     pubsub = get_pubsub()
-    task = start_metrics_publisher(pubsub, deps)
-    try:
-        yield
-    finally:
-        task.cancel()
-        # Mirror the ws server's pattern: gather with
-        # ``return_exceptions=True`` so a CancelledError doesn't escape
-        # and produce ``Task exception was never retrieved``.
-        await asyncio.gather(task, return_exceptions=True)
+    async with image_gen_worker_lifespan(app):
+        task = start_metrics_publisher(pubsub, deps)
+        try:
+            yield
+        finally:
+            task.cancel()
+            # Mirror the ws server's pattern: gather with
+            # ``return_exceptions=True`` so a CancelledError doesn't
+            # escape and produce ``Task exception was never retrieved``.
+            await asyncio.gather(task, return_exceptions=True)
 
 
 def _synthetic_transcript_for(intent: Intent) -> Any:

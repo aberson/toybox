@@ -6,7 +6,11 @@ running uvicorn or going through CLI parsing.
 
 from __future__ import annotations
 
+import contextlib
 import logging
+import sqlite3
+from collections.abc import AsyncIterator, Awaitable, Callable
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -20,9 +24,18 @@ from .api.metrics import router as metrics_router
 from .api.rooms import router as rooms_router
 from .api.toys import router as toys_router
 from .api.transcripts import router as transcripts_router
+from .db import connect, resolve_db_path
 from .image_gen.capability import is_image_gen_capable
+from .image_gen.worker import (
+    ImageGenWorker,
+    start_image_gen_worker,
+    stop_image_gen_worker,
+)
 from .storage.images import images_root
+from .ws.envelope import build_envelope
 from .ws.server import build_router as build_ws_router
+from .ws.server import get_pubsub
+from .ws.topics import Topic
 
 _logger = logging.getLogger(__name__)
 
@@ -82,4 +95,75 @@ def create_app() -> FastAPI:
     return app
 
 
-__all__ = ["create_app"]
+# ---------------------------------------------------------------------
+# Phase F Step F4 — image-gen worker lifespan helpers
+# ---------------------------------------------------------------------
+
+
+def default_worker_conn_factory() -> Callable[[], sqlite3.Connection]:
+    """Return a ``conn_factory`` matching :class:`ImageGenWorker`'s contract.
+
+    Mirrors :func:`toybox.metrics.default_conn_factory` — a per-call
+    ``sqlite3.Connection`` opened against ``TOYBOX_DB_PATH`` with
+    ``check_same_thread=False`` (the worker runs DB work via
+    :func:`asyncio.to_thread`, so the connection may bounce between
+    threads). Each helper opens + closes its own connection so the
+    long-lived consumer task doesn't pin a single sqlite handle.
+    """
+
+    def _factory() -> sqlite3.Connection:
+        return connect(resolve_db_path(), check_same_thread=False)
+
+    return _factory
+
+
+def default_worker_emit() -> Callable[[Topic, dict[str, Any]], Awaitable[None]]:
+    """Return an ``emit`` callable that publishes via the singleton pubsub.
+
+    The callable awaits-but-returns-immediately: pubsub.publish is sync
+    and never blocks (drop-oldest backpressure). We wrap it in an async
+    function so the worker's ``EmitCallable`` typing matches both the
+    real publisher and async test stubs.
+    """
+    pubsub = get_pubsub()
+
+    async def _emit(topic: Topic, payload: dict[str, Any]) -> None:
+        envelope = build_envelope(topic=topic, payload=payload)
+        pubsub.publish(envelope)
+
+    return _emit
+
+
+@contextlib.asynccontextmanager
+async def image_gen_worker_lifespan(app: FastAPI) -> AsyncIterator[ImageGenWorker]:
+    """Start the image-gen worker; stop on shutdown. Composable.
+
+    Usage::
+
+        async with image_gen_worker_lifespan(app) as worker:
+            yield
+
+    The worker is the singleton retrieved via
+    :func:`toybox.image_gen.worker.get_image_gen_worker`. Restart
+    recovery runs BEFORE the consumer task starts, with the recovered
+    count logged at INFO. Both the smoke and the metrics-only lifespan
+    in :mod:`toybox.main` compose this helper so the worker is wired
+    identically across runtime modes.
+    """
+    del app  # not used; kept for the lifespan signature contract.
+    worker = await start_image_gen_worker(
+        default_worker_conn_factory(),
+        default_worker_emit(),
+    )
+    try:
+        yield worker
+    finally:
+        await stop_image_gen_worker()
+
+
+__all__ = [
+    "create_app",
+    "default_worker_conn_factory",
+    "default_worker_emit",
+    "image_gen_worker_lifespan",
+]

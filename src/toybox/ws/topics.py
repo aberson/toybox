@@ -28,6 +28,13 @@ class Topic(StrEnum):
     # updates and falls back to polling /api/metrics if the socket is
     # unavailable.
     metrics = "metrics"
+    # Phase F Step F4: per-toy action-sprite generation status.
+    # Parent-scope only — child tokens never receive these envelopes.
+    # Envelope payload shape: ``{toy_id, slot, status, image_path?,
+    # error?}`` where ``image_path`` is non-null only on
+    # ``status == "done"`` and ``error`` is non-null only on
+    # ``status == "failed"``.
+    toy_actions = "toy_actions"
 
 
 __all__ = ["Topic"]
