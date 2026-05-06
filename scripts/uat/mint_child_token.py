@@ -14,7 +14,8 @@ assert the strip.
 Usage (PowerShell):
 
     $env:WS_TOKEN = (uv run python scripts/uat/mint_child_token.py)
-    uv run python scripts/uat/ws_inspect.py --topic activity.state --duration 5 --filter trigger_phrase
+    uv run python scripts/uat/ws_inspect.py --topic activity.state --duration 5 \
+        --filter trigger_phrase
 
 Default TTL is 1 hour (more than enough for a UAT pass). Pass
 ``--label`` to record a human-friendly label on the token row.

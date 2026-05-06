@@ -11,7 +11,8 @@ Idempotent. Run as:
     uv run scripts/image_gen_setup.py
 
 What it does:
-    1. Downloads SDXL base 1.0 fp16 weights to data/models/image_gen/sdxl/stable-diffusion-xl-base-1.0/
+    1. Downloads SDXL base 1.0 fp16 weights to
+       data/models/image_gen/sdxl/stable-diffusion-xl-base-1.0/
        (filtered to fp16 variants only -- saves ~7 GB vs the full repo)
     2. Downloads IP-Adapter SDXL ViT-H weights + the matching CLIP image encoder to
        data/models/image_gen/ip_adapter/

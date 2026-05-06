@@ -94,7 +94,13 @@ def main(argv: list[str] | None = None) -> int:
 
     for idx, (label, color) in enumerate(ROOM_PALETTE, start=1):
         room = FIXTURE_DIR / f"room-{idx}.jpg"
-        print(_ensure(room, lambda r=room, l=label, c=color, i=idx: _draw_room(r, l, c, i), args.force))
+        print(
+            _ensure(
+                room,
+                lambda r=room, lbl=label, c=color, i=idx: _draw_room(r, lbl, c, i),
+                args.force,
+            )
+        )
 
     for idx in range(1, 52):
         bulk = BULK_DIR / f"photo-{idx:02d}.jpg"

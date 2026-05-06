@@ -93,7 +93,7 @@ async def _run(args: argparse.Namespace) -> int:
                 ack = json.loads(ack_raw)
                 if ack.get("type") != "subscribed":
                     print(f"unexpected ack frame: {ack}", file=sys.stderr)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass
 
             print(
@@ -109,7 +109,7 @@ async def _run(args: argparse.Namespace) -> int:
                     break
                 try:
                     raw = await asyncio.wait_for(ws.recv(), timeout=remaining)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     break
 
                 try:
