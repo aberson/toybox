@@ -228,6 +228,74 @@ export interface ToyListResponse {
   toys: Toy[];
 }
 
+// Phase F Step F5: action-sprite REST shapes. Mirror the Pydantic
+// models in src/toybox/api/toys.py and the StrEnum in
+// src/toybox/image_gen/models.py.
+//
+// The literal union for ``ToyActionStatus`` is hand-mirrored from
+// :class:`toybox.image_gen.models.ToyActionStatus`. Keeping the
+// values inline rather than importing a generated type avoids a
+// codegen step for a 6-member enum that has been stable since F2.
+export type ToyActionStatus =
+  | "queued"
+  | "running"
+  | "done"
+  | "failed"
+  | "superseded"
+  | "not_started";
+
+// Wire row for one slot. Mirrors :class:`ToyActionResponse`.
+// ``image_path`` is non-null only on ``status === "done"``;
+// ``error_msg`` is non-null only on ``status === "failed"``.
+export interface ToyActionRow {
+  toy_id: string;
+  slot: string;
+  status: ToyActionStatus;
+  image_path: string | null;
+  seed: number | null;
+  error_msg: string | null;
+  updated_at: string;
+}
+
+// Snapshot of ``is_image_gen_capable()`` bundled into the actions
+// response so the grid can render the disabled banner without a
+// second round-trip. ``capable=false`` ⇒ "regenerate" buttons MUST be
+// disabled with ``reason`` surfaced verbatim.
+export interface ToyActionsCapability {
+  capable: boolean;
+  reason: string;
+}
+
+// Envelope for ``GET /api/toys/{id}/actions``. ``actions`` always
+// carries exactly 10 rows in :data:`ACTION_SLOTS` order.
+export interface ToyActionsResponse {
+  actions: ToyActionRow[];
+  capability: ToyActionsCapability;
+}
+
+// Envelope for the two regenerate POST endpoints. ``queued`` is the
+// list of slot keys the worker just enqueued.
+export interface ToyActionsRegenerateResponse {
+  queued: string[];
+}
+
+// The 10 action slot keys, in canonical order. Mirrors
+// :data:`toybox.image_gen.models.ACTION_SLOTS`. The parent grid
+// renders cells in this order; consumers can iterate this constant
+// rather than re-deriving the order from the response array.
+export const ACTION_SLOTS: readonly string[] = [
+  "idle",
+  "pointing",
+  "looking",
+  "jumping",
+  "cheering",
+  "thinking",
+  "waving",
+  "running",
+  "sleeping",
+  "confused",
+];
+
 // Step 17: room ingest bulk wire shapes. Mirror the Pydantic models in
 // src/toybox/api/rooms.py.
 export interface Room {
@@ -895,6 +963,51 @@ export class ApiClient {
       method: "DELETE",
       signal: opts.signal,
     });
+  }
+
+  // Phase F Step F5: list per-slot action-sprite status for a toy.
+  // Always returns 10 rows in ``ACTION_SLOTS`` order; slots without
+  // a DB row are synthesized server-side as ``not_started``. The
+  // ``capability`` field carries the ``is_image_gen_capable()``
+  // snapshot so the grid can render the disabled banner inline.
+  async listToyActions(
+    toyId: string,
+    opts: RequestOptions = {},
+  ): Promise<ToyActionsResponse> {
+    return this.request<ToyActionsResponse>(
+      `/api/toys/${encodeURIComponent(toyId)}/actions`,
+      { method: "GET", signal: opts.signal },
+    );
+  }
+
+  // Phase F Step F5: enqueue all 10 ``ACTION_SLOTS`` jobs for a toy.
+  // The "regenerate all" button on the parent grid calls this once;
+  // the worker picks the jobs up off the queue and emits
+  // ``toy_actions`` envelopes per slot transition. Returns the list
+  // of enqueued slot keys (always all 10).
+  async regenerateAllActions(
+    toyId: string,
+    opts: RequestOptions = {},
+  ): Promise<ToyActionsRegenerateResponse> {
+    return this.request<ToyActionsRegenerateResponse>(
+      `/api/toys/${encodeURIComponent(toyId)}/actions/regenerate`,
+      { method: "POST", body: JSON.stringify({}), signal: opts.signal },
+    );
+  }
+
+  // Phase F Step F5: enqueue exactly one slot for a toy. Mirrors
+  // ``regenerateAllActions`` but with the slot in the URL; supersede
+  // semantics for an in-flight ``running`` row are handled by the
+  // worker.
+  async regenerateActionSlot(
+    toyId: string,
+    slot: string,
+    opts: RequestOptions = {},
+  ): Promise<ToyActionsRegenerateResponse> {
+    return this.request<ToyActionsRegenerateResponse>(
+      `/api/toys/${encodeURIComponent(toyId)}/actions/${encodeURIComponent(slot)}/regenerate`,
+      { method: "POST", body: JSON.stringify({}), signal: opts.signal },
+    );
   }
 
   // Step 17: bulk room ingest. The upload endpoint takes multipart

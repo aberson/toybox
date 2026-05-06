@@ -4,11 +4,13 @@
 
 import { describe, expect, it } from "vitest";
 
-import type { Activity, ParentTokenResponse } from "./api";
+import type { Activity, ParentTokenResponse, ToyActionRow } from "./api";
 import {
   applyEnvelope,
   applyRejectedTopics,
+  applyToyActionEnvelope,
   applyVersionConflict,
+  clearToyActions,
   dismissToast,
   INITIAL_STATE,
   isTerminalState,
@@ -18,6 +20,7 @@ import {
   setHealth,
   setMicState,
   setToken,
+  setToyActions,
   setWsState,
 } from "./store";
 
@@ -220,5 +223,165 @@ describe("parent store reducers", () => {
     expect(next.toasts.length).toBe(1);
     expect(next.toasts[0]?.message).toContain("bogus.topic");
     expect(next.toasts[0]?.message).toContain("system.fake");
+  });
+});
+
+// Phase F Step F8: per-toy action grid reducer coverage. The grid
+// surface depends on three load-bearing behaviors:
+//   1. ``setToyActions`` (REST seed) wholesale replaces the inner map
+//      so refetching can't leave stale slots from a prior toy.
+//   2. ``applyToyActionEnvelope`` (WS push) latest-wins per slot
+//      across queued → running → done, carrying over previously-
+//      known seed/image_path when the worker omits the field.
+//   3. ``clearToyActions`` removes a toy's slot map entirely so the
+//      memory footprint stays bounded across many archive cycles.
+
+function fakeRow(overrides: Partial<ToyActionRow> = {}): ToyActionRow {
+  return {
+    toy_id: "toy-1",
+    slot: "looking",
+    status: "queued",
+    image_path: null,
+    seed: null,
+    error_msg: null,
+    updated_at: "2026-05-06T10:00:00Z",
+    ...overrides,
+  };
+}
+
+describe("toyActions reducers", () => {
+  it("setToyActions seeds the inner map keyed by slot", () => {
+    const rows: ToyActionRow[] = [
+      fakeRow({ slot: "idle", status: "done", image_path: "data/x.png" }),
+      fakeRow({ slot: "looking", status: "running" }),
+    ];
+    const next = setToyActions(INITIAL_STATE, "toy-1", rows);
+    expect(Object.keys(next.toyActions["toy-1"] ?? {})).toEqual([
+      "idle",
+      "looking",
+    ]);
+    expect(next.toyActions["toy-1"]?.["idle"]?.status).toBe("done");
+  });
+
+  it("setToyActions wholesale replaces an existing inner map", () => {
+    const seeded = setToyActions(INITIAL_STATE, "toy-1", [
+      fakeRow({ slot: "idle", status: "done" }),
+      fakeRow({ slot: "looking", status: "queued" }),
+    ]);
+    const replaced = setToyActions(seeded, "toy-1", [
+      fakeRow({ slot: "jumping", status: "done" }),
+    ]);
+    expect(Object.keys(replaced.toyActions["toy-1"] ?? {})).toEqual([
+      "jumping",
+    ]);
+    // Old slots are gone — replace, not merge.
+    expect(replaced.toyActions["toy-1"]?.["idle"]).toBeUndefined();
+  });
+
+  it("applyToyActionEnvelope merges done after running after queued (latest wins)", () => {
+    // The worker emits queued → running → done in order. The reducer
+    // must take the latest envelope's status as the source of truth
+    // while carrying forward fields the intermediate envelopes omit
+    // (image_path is only known on done).
+    let s = INITIAL_STATE;
+    s = applyToyActionEnvelope(s, {
+      topic: "toy_actions",
+      ts: "2026-05-06T10:00:00Z",
+      payload: { toy_id: "toy-1", slot: "looking", status: "queued" },
+      schema_version: 1,
+    });
+    expect(s.toyActions["toy-1"]?.["looking"]?.status).toBe("queued");
+
+    s = applyToyActionEnvelope(s, {
+      topic: "toy_actions",
+      ts: "2026-05-06T10:00:01Z",
+      payload: { toy_id: "toy-1", slot: "looking", status: "running" },
+      schema_version: 1,
+    });
+    expect(s.toyActions["toy-1"]?.["looking"]?.status).toBe("running");
+
+    s = applyToyActionEnvelope(s, {
+      topic: "toy_actions",
+      ts: "2026-05-06T10:00:02Z",
+      payload: {
+        toy_id: "toy-1",
+        slot: "looking",
+        status: "done",
+        image_path: "data/images/toy_actions/toy-1/looking.png",
+      },
+      schema_version: 1,
+    });
+    expect(s.toyActions["toy-1"]?.["looking"]?.status).toBe("done");
+    expect(s.toyActions["toy-1"]?.["looking"]?.image_path).toBe(
+      "data/images/toy_actions/toy-1/looking.png",
+    );
+  });
+
+  it("applyToyActionEnvelope failed envelope captures error_msg", () => {
+    const next = applyToyActionEnvelope(INITIAL_STATE, {
+      topic: "toy_actions",
+      ts: "2026-05-06T10:00:00Z",
+      payload: {
+        toy_id: "toy-1",
+        slot: "jumping",
+        status: "failed",
+        error: "CUDA OOM",
+      },
+      schema_version: 1,
+    });
+    expect(next.toyActions["toy-1"]?.["jumping"]?.status).toBe("failed");
+    expect(next.toyActions["toy-1"]?.["jumping"]?.error_msg).toBe("CUDA OOM");
+  });
+
+  it("applyToyActionEnvelope ignores non-toy_actions topics", () => {
+    const next = applyToyActionEnvelope(INITIAL_STATE, {
+      topic: "system",
+      ts: "2026-05-06T10:00:00Z",
+      payload: { toy_id: "toy-1", slot: "looking", status: "done" },
+      schema_version: 1,
+    });
+    expect(next).toBe(INITIAL_STATE);
+  });
+
+  it("applyEnvelope routes toy_actions topic into the slot map", () => {
+    const next = applyEnvelope(INITIAL_STATE, {
+      topic: "toy_actions",
+      ts: "2026-05-06T10:00:00Z",
+      payload: { toy_id: "toy-1", slot: "idle", status: "queued" },
+      schema_version: 1,
+    });
+    expect(next.toyActions["toy-1"]?.["idle"]?.status).toBe("queued");
+  });
+
+  it("clearToyActions removes one toy's map without touching others", () => {
+    let s = INITIAL_STATE;
+    s = setToyActions(s, "toy-1", [fakeRow({ slot: "idle" })]);
+    s = setToyActions(s, "toy-2", [fakeRow({ toy_id: "toy-2", slot: "idle" })]);
+    const next = clearToyActions(s, "toy-1");
+    expect(next.toyActions["toy-1"]).toBeUndefined();
+    expect(next.toyActions["toy-2"]).toBeDefined();
+  });
+
+  it("applyToyActionEnvelope drops malformed payloads", () => {
+    // No toy_id → no-op.
+    const a = applyToyActionEnvelope(INITIAL_STATE, {
+      topic: "toy_actions",
+      ts: "2026-05-06T10:00:00Z",
+      payload: { slot: "idle", status: "queued" },
+      schema_version: 1,
+    });
+    expect(a).toBe(INITIAL_STATE);
+    // Unknown status → no-op (defensive against schema drift).
+    const b = applyToyActionEnvelope(INITIAL_STATE, {
+      topic: "toy_actions",
+      ts: "2026-05-06T10:00:00Z",
+      payload: {
+        toy_id: "toy-1",
+        slot: "idle",
+        status: "completely_made_up",
+      },
+      schema_version: 1,
+    });
+    expect(b).toBe(INITIAL_STATE);
   });
 });

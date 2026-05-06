@@ -9,6 +9,8 @@ import type {
   Activity,
   HealthResponse,
   ParentTokenResponse,
+  ToyActionRow,
+  ToyActionStatus,
   VersionConflictBody,
 } from "./api";
 import type { Envelope, WsState } from "./ws";
@@ -35,6 +37,13 @@ export interface ParentState {
   toasts: Toast[];
   // monotonically increasing counter so toast IDs are stable
   nextToastId: number;
+  // Phase F Step F8: per-toy slot status map. Outer key is the toy_id;
+  // inner key is the slot string. The grid component reads this to
+  // render live status badges as the worker emits ``toy_actions``
+  // envelopes. ``setToyActions`` (REST seed) wholesale replaces the
+  // inner map for one toy; ``applyToyActionEnvelope`` (WS push)
+  // merges one slot at a time.
+  toyActions: Record<string, Record<string, ToyActionRow>>;
 }
 
 export const INITIAL_STATE: ParentState = {
@@ -46,6 +55,7 @@ export const INITIAL_STATE: ParentState = {
   wsState: "idle",
   toasts: [],
   nextToastId: 1,
+  toyActions: {},
 };
 
 export function setToken(
@@ -121,7 +131,130 @@ export function applyEnvelope(
       return { ...state, capabilityReason: reason ?? null };
     }
   }
+  if (env.topic === "toy_actions") {
+    return applyToyActionEnvelope(state, env);
+  }
   return state;
+}
+
+// Phase F Step F8: REST-seed helper. The grid loads the initial 10
+// rows via ``api.listToyActions``; this reducer drops them into the
+// per-toy slot map so a ws envelope arriving mid-render (e.g. a
+// ``running`` push for a slot the REST snapshot reported as
+// ``queued``) can latest-wins-merge over the seed without flicker.
+//
+// Replaces the existing inner map for ``toyId`` wholesale — REST is
+// always the freshest authoritative snapshot at the moment it
+// returns. Once seeded, ``applyToyActionEnvelope`` mutates per-slot.
+export function setToyActions(
+  state: ParentState,
+  toyId: string,
+  rows: ToyActionRow[],
+): ParentState {
+  const inner: Record<string, ToyActionRow> = {};
+  for (const row of rows) {
+    inner[row.slot] = row;
+  }
+  return {
+    ...state,
+    toyActions: { ...state.toyActions, [toyId]: inner },
+  };
+}
+
+// Phase F Step F8: drop a toy's inner map entirely. Used when the
+// parent archives a toy (the grid hides on archived rows; clearing
+// the slot map keeps memory bounded across many archive cycles).
+export function clearToyActions(
+  state: ParentState,
+  toyId: string,
+): ParentState {
+  if (!(toyId in state.toyActions)) return state;
+  const next = { ...state.toyActions };
+  delete next[toyId];
+  return { ...state, toyActions: next };
+}
+
+// Phase F Step F8: per-slot envelope merge. Latest envelope wins —
+// the worker emits ``queued`` → ``running`` → ``done`` or
+// ``failed`` in order, so we always take the incoming row and
+// overwrite the previous slot entry. We DO carry over the previous
+// row's ``seed`` and ``image_path`` when the envelope omits them,
+// because the worker's intermediate ``running`` envelope doesn't
+// re-emit fields that haven't changed.
+//
+// The envelope payload shape (per ``Topic.toy_actions`` docstring):
+//   {toy_id, slot, status, image_path?, error?}
+// Anything we can't parse defensively returns the previous state
+// unchanged.
+export function applyToyActionEnvelope(
+  state: ParentState,
+  env: Envelope,
+): ParentState {
+  if (env.topic !== "toy_actions") return state;
+  const payload = env.payload;
+  const toyId = payload["toy_id"];
+  const slot = payload["slot"];
+  const rawStatus = payload["status"];
+  if (
+    typeof toyId !== "string" ||
+    typeof slot !== "string" ||
+    typeof rawStatus !== "string"
+  ) {
+    return state;
+  }
+  if (!isToyActionStatus(rawStatus)) {
+    return state;
+  }
+  const status: ToyActionStatus = rawStatus;
+  const incomingImage =
+    typeof payload["image_path"] === "string"
+      ? (payload["image_path"] as string)
+      : null;
+  const incomingError =
+    typeof payload["error"] === "string"
+      ? (payload["error"] as string)
+      : null;
+  const incomingSeed =
+    typeof payload["seed"] === "number" ? (payload["seed"] as number) : null;
+  const incomingUpdatedAt =
+    typeof payload["updated_at"] === "string"
+      ? (payload["updated_at"] as string)
+      : env.ts;
+
+  const prevInner = state.toyActions[toyId] ?? {};
+  const prevRow: ToyActionRow | undefined = prevInner[slot];
+  // Carry-over: an intermediate ``running`` envelope shouldn't drop
+  // a previously known seed/image. Latest-wins per FIELD, falling
+  // back to the previous row when the envelope omits the field.
+  const merged: ToyActionRow = {
+    toy_id: toyId,
+    slot,
+    status,
+    image_path: incomingImage ?? prevRow?.image_path ?? null,
+    seed: incomingSeed ?? prevRow?.seed ?? null,
+    error_msg: status === "failed" ? incomingError : null,
+    updated_at: incomingUpdatedAt,
+  };
+  return {
+    ...state,
+    toyActions: {
+      ...state.toyActions,
+      [toyId]: { ...prevInner, [slot]: merged },
+    },
+  };
+}
+
+const TOY_ACTION_STATUSES: ReadonlySet<string> = new Set([
+  "queued",
+  "running",
+  "done",
+  "failed",
+  "superseded",
+  "not_started",
+]);
+
+function isToyActionStatus(value: string): value is ToyActionStatus {
+  return TOY_ACTION_STATUSES.has(value);
 }
 
 const TERMINAL_STATES = new Set([
@@ -226,6 +359,9 @@ export interface ParentStore extends ParentState {
   applyMutationResult: (fresh: Activity) => void;
   pushToast: (kind: Toast["kind"], message: string) => void;
   dismissToast: (id: number) => void;
+  // Phase F Step F8: per-toy action grid wiring.
+  setToyActions: (toyId: string, rows: ToyActionRow[]) => void;
+  clearToyActions: (toyId: string) => void;
 }
 
 export function createParentStore(initial: ParentState = INITIAL_STATE) {
@@ -247,6 +383,9 @@ export function createParentStore(initial: ParentState = INITIAL_STATE) {
       set((s) => applyMutationResult(s, fresh)),
     pushToast: (kind, message) => set((s) => pushToast(s, kind, message)),
     dismissToast: (id) => set((s) => dismissToast(s, id)),
+    setToyActions: (toyId, rows) =>
+      set((s) => setToyActions(s, toyId, rows)),
+    clearToyActions: (toyId) => set((s) => clearToyActions(s, toyId)),
   }));
 }
 

@@ -11,9 +11,12 @@ import {
 import type {
   ApiClient,
   Toy,
+  ToyActionsCapability,
   ToyUploadResponse,
   ValidationFieldError,
 } from "../api";
+import { useParentStore } from "../store";
+import { ToyActionGrid } from "./ToyActionGrid";
 
 // Step 16: parent-facing toy ingest UI. The component runs in two
 // phases.
@@ -163,6 +166,28 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
   >({});
   const [archivingId, setArchivingId] = useState<string | null>(null);
 
+  // Phase F Step F8: track the id of the toy whose action grid should
+  // render below the form. Set to the freshly-committed toy id after
+  // a successful save; mirrors what the toy-edit flow surfaces when
+  // ``editingToyId`` is non-null. Cleared on resetPhase so picking a
+  // new file gets a clean form.
+  const [justCommittedToyId, setJustCommittedToyId] = useState<string | null>(
+    null,
+  );
+  // Capability snapshot keyed by toy_id — ``ToyActionsResponse``
+  // bundles the capability gate state. We cache it locally rather
+  // than redoing a /api/health probe so the disabled-banner reason
+  // matches what the actions endpoint returned.
+  const [toyCapabilities, setToyCapabilities] = useState<
+    Record<string, ToyActionsCapability>
+  >({});
+
+  // Selector: pull the per-toy slot map out of the zustand store so
+  // grid cells re-render as ws envelopes arrive. ``shallow``-style
+  // equality isn't needed — zustand defaults to ===, and we replace
+  // the inner object on each merge.
+  const toyActions = useParentStore((s) => s.toyActions);
+
   // AbortController spanning one mount of the editor. Recreated on each
   // mount inside the useEffect below — under React 18 StrictMode the
   // mount→cleanup→remount cycle would otherwise leave us with a
@@ -212,12 +237,78 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
     setTopError(null);
     setDuplicate(null);
     setFieldErrors({});
+    setJustCommittedToyId(null);
     if (previewRef.current !== null) {
       URL.revokeObjectURL(previewRef.current);
       previewRef.current = null;
     }
     setPreviewUrl(null);
   }, []);
+
+  // Phase F Step F8: pull the action grid + capability snapshot for
+  // a single toy and seed the store. Best-effort — a 4xx/5xx is
+  // swallowed (logged via the editError surface only when the caller
+  // is the edit flow); the grid renders with whatever ws envelopes
+  // populate the slot map, so a transient failure here just means
+  // the operator may see an empty grid until the next ws push.
+  const loadToyActions = useCallback(
+    async (toyId: string): Promise<void> => {
+      try {
+        const resp = await api.listToyActions(toyId, {
+          signal: aborterRef.current?.signal,
+        });
+        useParentStore.getState().setToyActions(toyId, resp.actions);
+        setToyCapabilities((prev) => ({
+          ...prev,
+          [toyId]: resp.capability,
+        }));
+      } catch (err) {
+        if (isAbortError(err)) return;
+        // Non-fatal — the grid still renders from whatever ws push
+        // has arrived (or as 10 ``not_started`` placeholders).
+      }
+    },
+    [api],
+  );
+
+  const handleRegenerateAll = useCallback(
+    async (toyId: string): Promise<void> => {
+      try {
+        await api.regenerateAllActions(toyId, {
+          signal: aborterRef.current?.signal,
+        });
+        // The worker will emit ws envelopes; the store updates as
+        // they arrive. We don't need to refetch — the envelopes are
+        // the authoritative progress signal.
+      } catch (err) {
+        if (isAbortError(err)) return;
+        const message =
+          err instanceof Error ? err.message : "regenerate failed";
+        useParentStore
+          .getState()
+          .pushToast("error", `regenerate all: ${message}`);
+      }
+    },
+    [api],
+  );
+
+  const handleRegenerateSlot = useCallback(
+    async (toyId: string, slot: string): Promise<void> => {
+      try {
+        await api.regenerateActionSlot(toyId, slot, {
+          signal: aborterRef.current?.signal,
+        });
+      } catch (err) {
+        if (isAbortError(err)) return;
+        const message =
+          err instanceof Error ? err.message : "regenerate failed";
+        useParentStore
+          .getState()
+          .pushToast("error", `regenerate ${slot}: ${message}`);
+      }
+    },
+    [api],
+  );
 
   const handleFile = useCallback(
     async (file: File): Promise<void> => {
@@ -286,7 +377,7 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
     setTopError(null);
     setFieldErrors({});
     try {
-      await api.confirmToy(
+      const committed = await api.confirmToy(
         {
           staging_id: upload.staging_id,
           display_name: form.display_name,
@@ -296,7 +387,26 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
         { signal: aborterRef.current?.signal },
       );
       await refetchToys();
-      resetPhase();
+      // Phase F Step F8: keep enough of phase B alive to render the
+      // action grid below the form. We clear ``upload``/preview/etc.
+      // — the form is hidden — but ``justCommittedToyId`` keeps the
+      // grid mounted with the freshly-committed toy id. The image-
+      // gen worker has already enqueued 10 jobs (see
+      // toys.py:_maybe_enqueue_action_jobs_for_toy), so the grid
+      // populates as ws envelopes arrive.
+      setUpload(null);
+      setForm(EMPTY_FORM);
+      setTopError(null);
+      setDuplicate(null);
+      setFieldErrors({});
+      if (previewRef.current !== null) {
+        URL.revokeObjectURL(previewRef.current);
+        previewRef.current = null;
+      }
+      setPreviewUrl(null);
+      setJustCommittedToyId(committed.id);
+      void loadToyActions(committed.id);
+      return;
     } catch (err) {
       if (isAbortError(err)) return;
       const validation = extractValidationErrors(err);
@@ -319,7 +429,7 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
     } finally {
       setSubmitting(false);
     }
-  }, [api, form, refetchToys, resetPhase, upload]);
+  }, [api, form, loadToyActions, refetchToys, resetPhase, upload]);
 
   const updateField = useCallback(
     <K extends keyof FormState>(key: K, value: FormState[K]): void => {
@@ -328,15 +438,27 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
     [],
   );
 
-  const openToyEdit = useCallback((toy: Toy): void => {
-    setEditingToyId(toy.id);
-    setEditForm({
-      display_name: toy.display_name,
-      tags: toy.tags.join(", "),
-    });
-    setEditError(null);
-    setEditFieldErrors({});
-  }, []);
+  const openToyEdit = useCallback(
+    (toy: Toy): void => {
+      setEditingToyId(toy.id);
+      setEditForm({
+        display_name: toy.display_name,
+        tags: toy.tags.join(", "),
+      });
+      setEditError(null);
+      setEditFieldErrors({});
+      // Phase F Step F8: seed the action grid for the toy under edit.
+      // Archived toys (toy.archived === true) hide the grid entirely
+      // per plan §F8 — the existing toy list already filters
+      // archived rows server-side, but we defensively skip the load
+      // here too in case a future flag exposes archived toys to the
+      // edit flow.
+      if (!toy.archived) {
+        void loadToyActions(toy.id);
+      }
+    },
+    [loadToyActions],
+  );
 
   const cancelToyEdit = useCallback((): void => {
     setEditingToyId(null);
@@ -650,6 +772,42 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
         </form>
       )}
 
+      {/* Phase F Step F8: post-commit action grid. The form has just */}
+      {/* cleared; the grid renders below to show the parent the */}
+      {/* worker's progress on the 10 sprites it queued for this toy. */}
+      {justCommittedToyId !== null && upload === null && (
+        <div data-testid="toy-post-commit-grid" style={{ marginTop: 8 }}>
+          <p style={{ color: "#2e7d32", fontSize: 13, margin: "0 0 8px" }}>
+            Saved. Generating action sprites — this can take a few minutes.
+          </p>
+          <ToyActionGrid
+            toyId={justCommittedToyId}
+            actions={Object.values(toyActions[justCommittedToyId] ?? {})}
+            toyDisplayName={
+              toys.find((t) => t.id === justCommittedToyId)?.display_name
+            }
+            onRegenerateAll={() => handleRegenerateAll(justCommittedToyId)}
+            onRegenerateSlot={(slot) =>
+              handleRegenerateSlot(justCommittedToyId, slot)
+            }
+            disabledReason={
+              toyCapabilities[justCommittedToyId] !== undefined &&
+              !toyCapabilities[justCommittedToyId]!.capable
+                ? toyCapabilities[justCommittedToyId]!.reason
+                : undefined
+            }
+          />
+          <button
+            type="button"
+            data-testid="dismiss-post-commit-grid"
+            onClick={() => setJustCommittedToyId(null)}
+            style={{ marginTop: 8, fontSize: 12 }}
+          >
+            done
+          </button>
+        </div>
+      )}
+
       <hr style={{ margin: "16px 0 8px", border: "none", borderTop: "1px solid #eee" }} />
 
       {listLoading && (
@@ -899,6 +1057,27 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
                         cancel
                       </button>
                     </div>
+                    {/* Phase F Step F8: action grid in the edit flow. */}
+                    {/* Hidden on archived toys per plan (the list is */}
+                    {/* already filtered server-side, defensive guard */}
+                    {/* keeps it that way if a future flag exposes them). */}
+                    {!t.archived && (
+                      <ToyActionGrid
+                        toyId={t.id}
+                        actions={Object.values(toyActions[t.id] ?? {})}
+                        toyDisplayName={t.display_name}
+                        onRegenerateAll={() => handleRegenerateAll(t.id)}
+                        onRegenerateSlot={(slot) =>
+                          handleRegenerateSlot(t.id, slot)
+                        }
+                        disabledReason={
+                          toyCapabilities[t.id] !== undefined &&
+                          !toyCapabilities[t.id]!.capable
+                            ? toyCapabilities[t.id]!.reason
+                            : undefined
+                        }
+                      />
+                    )}
                   </form>
                 )}
               </li>

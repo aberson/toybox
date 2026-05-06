@@ -24,6 +24,11 @@ export const PARENT_TOPICS: readonly string[] = [
   // 30s snapshot pushes; OperatorTab still falls back to REST polling
   // when the ws connection is unavailable.
   "metrics",
+  // Phase F Step F8: parent toy detail UI subscribes to
+  // ``toy_actions`` so the 2x5 sprite grid receives per-slot status
+  // transitions (queued → running → done/failed) without polling.
+  // Parent-scope only — child tokens never receive these envelopes.
+  "toy_actions",
 ];
 
 // Step 9 keeps these strings local rather than extending the codegen
