@@ -1448,8 +1448,8 @@ uv run python -c "import sqlite3; c = sqlite3.connect('data/toybox.db'); print('
 # Expected: toys: 0, rooms: 0, children: 0, parent_pin_hash rows: 0
 
 # 5. Confirm Claude vision capability (steps M2.5.3, M2.5.4 need this)
-uv run python -c "from toybox.ai.capability import resolve_capability; import asyncio; print(asyncio.run(resolve_capability()))"
-# Expected: claude_capable=True. If False, vision is silently skipped and the suggested-fields path won't be exercised.
+uv run python -c "import asyncio; from toybox.ai.capability import is_capable; from toybox.ai.breaker import CircuitBreaker; ok, reason = asyncio.run(is_capable(CircuitBreaker())); print(f'claude_capable={ok}, reason={reason}')"
+# Expected: claude_capable=True, reason=None. If False, vision is silently skipped and the suggested-fields path won't be exercised; the printed reason (e.g., token_missing, network_unreachable) tells you what to fix.
 
 # 6. Generate UAT image fixtures (idempotent — skips existing files)
 uv run python scripts/uat/generate_m2_5_fixtures.py
