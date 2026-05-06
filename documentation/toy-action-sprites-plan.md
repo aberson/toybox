@@ -256,7 +256,7 @@ Existing pattern is one breaker per call-site: Claude vision has its own breaker
 - **Type:** code
 - **Issue:** #47
 - **Flags:** --reviewers code
-- **Status:** PENDING
+- **Status:** DONE (2026-05-06) — merged in c09050c. 9 files / 1112 insertions. Migration `0005_toy_actions.sql` + `storage/toy_actions.py` (CRUD + UUIDv4 + slot validators + 10-row synthesizer) + `app.py` boot probe (try/except Exception for resilience, logs INFO + WARNING-on-probe-exception) + `ToyActionStatus.NOT_STARTED` UI-only placeholder (rejected at storage seam). Quality gates green on F3-scoped files: ruff clean, mypy strict 83 source files, pytest 1072 passed + 2 skipped. 2 dev iterations.
 - **Depends on:** Step F2 (#46 — `ACTION_SLOTS` + `ToyActionStatus` defined)
 - **Parallel-safe with:** none — strictly sequential; F4 + F6 both wait on F3's migration number resolution before they can pick the next available number for their own migrations (F4 doesn't actually migrate but F6 does; running both in parallel risks number collision)
 - **Done when:** Migration lands forward + idempotent (verified via the existing `tests/integration/migrations/` pattern that re-applies + asserts no error); `storage/toy_actions.py` CRUD round-trip covered by pytest with tmp DB; foreign-key cascade on `toys` archive verified; capability-gate startup probe logs the resolved branch with reason; missing-checkpoints branch tested by `monkeypatch`-ing the model dir.
