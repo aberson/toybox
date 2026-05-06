@@ -72,6 +72,7 @@ from typing import Any, Final
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
+from ..image_gen.models import ACTION_SLOTS
 from .content_resolver import (
     SAFE_DEFAULT_TEMPLATE,
     ResolvedChildren,
@@ -113,6 +114,11 @@ class _StepTemplate:
     text: str
     sfx: str | None
     expected_action: str | None
+    # Phase F Step F6: per-step action vocabulary key (one of
+    # ``ACTION_SLOTS`` or ``None``). The template loader rejects
+    # out-of-vocab values at boot so a typo'd template fails LOUDLY
+    # rather than silently degrading the kiosk render path.
+    action_slot: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,21 +151,39 @@ def _load_schema() -> Draft202012Validator:
     return validator
 
 
-def _parse_template(raw: dict[str, Any]) -> _Template:
+def _parse_template(raw: dict[str, Any], *, source: str = "<inline>") -> _Template:
+    """Convert a JSON-shaped template dict into the internal dataclass.
+
+    Phase F Step F6: ``action_slot`` (when present) is cross-checked
+    against :data:`ACTION_SLOTS`. Bad values raise :class:`ValueError`
+    so a hand-edited template with a typo fails LOUDLY at load time
+    rather than silently degrading on the kiosk path. ``source`` is
+    a label (filename or in-memory marker) used in the error message
+    so operators can find the offending file fast.
+    """
+    template_id = str(raw["id"])
     steps_raw = raw["steps"]
-    steps = tuple(
-        _StepTemplate(
-            text=str(s["text"]),
-            sfx=s.get("sfx"),
-            expected_action=s.get("expected_action"),
+    parsed_steps: list[_StepTemplate] = []
+    for s in steps_raw:
+        slot = s.get("action_slot")
+        if slot is not None and slot not in ACTION_SLOTS:
+            raise ValueError(
+                f"template {template_id!r} in {source}: step action_slot={slot!r} "
+                f"is not in ACTION_SLOTS={ACTION_SLOTS!r}"
+            )
+        parsed_steps.append(
+            _StepTemplate(
+                text=str(s["text"]),
+                sfx=s.get("sfx"),
+                expected_action=s.get("expected_action"),
+                action_slot=slot,
+            )
         )
-        for s in steps_raw
-    )
     return _Template(
-        id=str(raw["id"]),
+        id=template_id,
         title=str(raw["title"]),
         buckets=frozenset(raw.get("buckets", []) or []),
-        steps=steps,
+        steps=tuple(parsed_steps),
     )
 
 
@@ -211,7 +235,7 @@ def _load_intent_templates(intent: str) -> list[_Template]:
         _TEMPLATE_CACHE[cache_key] = []
         return []
 
-    templates = [_parse_template(t) for t in payload["templates"]]
+    templates = [_parse_template(t, source=path.name) for t in payload["templates"]]
     # Sort by id so that downstream selection is deterministic
     # regardless of file order.
     templates.sort(key=lambda t: t.id)
@@ -309,6 +333,10 @@ def _safe_default_to_template() -> _Template:
             text=str(step["text"]),
             sfx=step.get("sfx"),
             expected_action=step.get("expected_action"),
+            # The safe-default template is hand-curated; if a future
+            # entry adds an action_slot we honor it. Otherwise NULL,
+            # which means kiosk renders no sprite (current behavior).
+            action_slot=step.get("action_slot"),
         )
         for step in SAFE_DEFAULT_TEMPLATE.steps
     )
@@ -731,6 +759,10 @@ def generate(
                 text=body,
                 sfx=step_tpl.sfx,
                 expected_action=step_tpl.expected_action,
+                # Phase F Step F6: pass through the static slot from
+                # the offline template. Validated against ACTION_SLOTS
+                # at template-load time, so this is always valid here.
+                action_slot=step_tpl.action_slot,
             )
         )
 

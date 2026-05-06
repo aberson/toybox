@@ -72,6 +72,10 @@
         "expected_action": {
           "type": ["string", "null"],
           "maxLength": 64
+        },
+        "action_slot": {
+          "type": ["string", "null"],
+          "description": "Phase F Step F6 action vocabulary key. One of the 10 fixed slots in toybox.image_gen.models.ACTION_SLOTS, or null to render no sprite. The actual vocabulary enforcement lives in toybox.activities.generator._parse_template so a typo fails LOUDLY (the JSON-schema layer here intentionally leaves the value free-form so the parse layer is the single source of truth — keeping the enum in two places risks drift)."
         }
       }
     }

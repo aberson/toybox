@@ -10,9 +10,30 @@ step can serialize without translation gymnastics. Both models are
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field
+
+from ..image_gen.models import ACTION_SLOTS
+
+
+def _validate_action_slot(v: str | None) -> str | None:
+    """Validate that ``v`` is ``None`` or a member of :data:`ACTION_SLOTS`.
+
+    Phase F Step F6: the generator (offline + single-shot Claude path)
+    emits one of the 10 fixed action slot keys per step; out-of-vocab
+    values from the model fall through the existing malformed-output
+    fallback path. ``None`` is the default both for missing-field input
+    AND for legacy rows pre-F6, so the kiosk's "no sprite" branch is
+    the natural pre-F6 behavior.
+    """
+    if v is None:
+        return v
+    if v not in ACTION_SLOTS:
+        raise ValueError(
+            f"action_slot must be one of {ACTION_SLOTS!r} or None, got {v!r}"
+        )
+    return v
 
 
 class ActivityStep(BaseModel):
@@ -22,8 +43,10 @@ class ActivityStep(BaseModel):
     DB, but we use ``step_index`` in-memory and 0-index it because
     Python lists are 0-indexed and that matches how callers iterate
     ``activity.steps``), ``body`` (the spoken/displayed text), ``sfx``,
-    and ``expected_action``. ``current`` lives at runtime, not on
-    generated output, and is therefore omitted here.
+    ``expected_action``, and (Phase F Step F6) ``action_slot`` —
+    one of the 10 fixed action vocabulary keys (or ``None`` to render
+    no sprite). ``current`` lives at runtime, not on generated output,
+    and is therefore omitted here.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -32,6 +55,7 @@ class ActivityStep(BaseModel):
     text: str = Field(min_length=1)
     sfx: str | None = None
     expected_action: str | None = None
+    action_slot: Annotated[str | None, AfterValidator(_validate_action_slot)] = None
 
 
 class Activity(BaseModel):

@@ -6,11 +6,11 @@
       "title": "Morning {slot} parade with {toy}",
       "buckets": ["morning"],
       "steps": [
-        { "text": "Good morning! Let's get {toy} ready for a {slot} parade." },
-        { "text": "Line up three of your favorite things for {toy} to march past.", "expected_action": "child_lines_up_objects" },
-        { "text": "March around the room with {toy}, calling out what you see.", "sfx": "drumroll" },
-        { "text": "Pick the silliest object from the parade and give it a name.", "expected_action": "child_names_object" },
-        { "text": "Take a bow with {toy} — the {slot} parade was a hit!" }
+        { "text": "Good morning! Let's get {toy} ready for a {slot} parade.", "action_slot": "waving" },
+        { "text": "Line up three of your favorite things for {toy} to march past.", "expected_action": "child_lines_up_objects", "action_slot": "pointing" },
+        { "text": "March around the room with {toy}, calling out what you see.", "sfx": "drumroll", "action_slot": "running" },
+        { "text": "Pick the silliest object from the parade and give it a name.", "expected_action": "child_names_object", "action_slot": "pointing" },
+        { "text": "Take a bow with {toy} — the {slot} parade was a hit!", "action_slot": "cheering" }
       ]
     },
     {
@@ -18,11 +18,11 @@
       "title": "Afternoon {slot} quest",
       "buckets": ["afternoon"],
       "steps": [
-        { "text": "{toy} has heard rumors of a {slot} hidden in this very room." },
-        { "text": "Search high for clues — check shelves and tables.", "expected_action": "child_searches_high" },
-        { "text": "Search low for clues — check under the couch and in baskets.", "expected_action": "child_searches_low" },
-        { "text": "Bring three clues back to {toy} and arrange them on the floor." },
-        { "text": "Together, decide what the clues mean and where the {slot} must be!" }
+        { "text": "{toy} has heard rumors of a {slot} hidden in this very room.", "action_slot": "thinking" },
+        { "text": "Search high for clues — check shelves and tables.", "expected_action": "child_searches_high", "action_slot": "looking" },
+        { "text": "Search low for clues — check under the couch and in baskets.", "expected_action": "child_searches_low", "action_slot": "looking" },
+        { "text": "Bring three clues back to {toy} and arrange them on the floor.", "action_slot": "pointing" },
+        { "text": "Together, decide what the clues mean and where the {slot} must be!", "action_slot": "thinking" }
       ]
     },
     {
@@ -30,11 +30,11 @@
       "title": "Evening {slot} puppet show",
       "buckets": ["evening"],
       "steps": [
-        { "text": "{toy} wants to put on a small puppet show about {slot}." },
-        { "text": "Build a stage from a couch cushion or a chair seat." },
-        { "text": "Pick two helper toys to play the other characters." },
-        { "text": "Act out the story — what happens when {toy} meets the {slot}?", "expected_action": "child_acts_out" },
-        { "text": "Take a bow together. The audience claps for {toy}!", "sfx": "applause" }
+        { "text": "{toy} wants to put on a small puppet show about {slot}.", "action_slot": "thinking" },
+        { "text": "Build a stage from a couch cushion or a chair seat.", "action_slot": "idle" },
+        { "text": "Pick two helper toys to play the other characters.", "action_slot": "pointing" },
+        { "text": "Act out the story — what happens when {toy} meets the {slot}?", "expected_action": "child_acts_out", "action_slot": "waving" },
+        { "text": "Take a bow together. The audience claps for {toy}!", "sfx": "applause", "action_slot": "cheering" }
       ]
     },
     {
@@ -42,11 +42,11 @@
       "title": "Quiet {slot} cuddle with {toy}",
       "buckets": ["wind_down"],
       "steps": [
-        { "text": "Curl up somewhere cozy with {toy}." },
-        { "text": "Whisper a secret about {slot} to {toy}." },
-        { "text": "Imagine {slot} on a calm, slow adventure — picture it together." },
-        { "text": "Tell {toy} one favorite thing about today.", "expected_action": "child_shares_highlight" },
-        { "text": "Give {toy} a gentle goodnight squeeze." }
+        { "text": "Curl up somewhere cozy with {toy}.", "action_slot": "sleeping" },
+        { "text": "Whisper a secret about {slot} to {toy}.", "action_slot": "thinking" },
+        { "text": "Imagine {slot} on a calm, slow adventure — picture it together.", "action_slot": "thinking" },
+        { "text": "Tell {toy} one favorite thing about today.", "expected_action": "child_shares_highlight", "action_slot": "thinking" },
+        { "text": "Give {toy} a gentle goodnight squeeze.", "action_slot": "sleeping" }
       ]
     },
     {
@@ -54,11 +54,11 @@
       "title": "{toy} and the {slot} dance party",
       "buckets": ["always"],
       "steps": [
-        { "text": "Hold {toy} up high and announce the {slot} dance party!" },
-        { "text": "Pick a song or hum a tune for {toy} to dance to." },
-        { "text": "Spin around three times with {toy}.", "sfx": "spin_whoosh" },
-        { "text": "Freeze like a statue when {toy} says STOP!", "expected_action": "child_freezes" },
-        { "text": "Bow to {toy} and end the dance party with a giggle." }
+        { "text": "Hold {toy} up high and announce the {slot} dance party!", "action_slot": "cheering" },
+        { "text": "Pick a song or hum a tune for {toy} to dance to.", "action_slot": "thinking" },
+        { "text": "Spin around three times with {toy}.", "sfx": "spin_whoosh", "action_slot": "jumping" },
+        { "text": "Freeze like a statue when {toy} says STOP!", "expected_action": "child_freezes", "action_slot": "idle" },
+        { "text": "Bow to {toy} and end the dance party with a giggle.", "action_slot": "cheering" }
       ]
     },
     {
@@ -66,11 +66,11 @@
       "title": "{toy} the {slot} inventor",
       "buckets": ["always"],
       "steps": [
-        { "text": "{toy} just had a brilliant idea for a brand-new {slot} invention." },
-        { "text": "Gather two everyday objects from nearby — they're the parts.", "expected_action": "child_gathers_parts" },
-        { "text": "Help {toy} build the invention by stacking, leaning, or arranging the parts." },
-        { "text": "Give the invention a name and tell {toy} what it does.", "expected_action": "child_names_invention" },
-        { "text": "Pretend to switch it on — what happens? Show {toy} the result!" }
+        { "text": "{toy} just had a brilliant idea for a brand-new {slot} invention.", "action_slot": "thinking" },
+        { "text": "Gather two everyday objects from nearby — they're the parts.", "expected_action": "child_gathers_parts", "action_slot": "pointing" },
+        { "text": "Help {toy} build the invention by stacking, leaning, or arranging the parts.", "action_slot": "idle" },
+        { "text": "Give the invention a name and tell {toy} what it does.", "expected_action": "child_names_invention", "action_slot": "pointing" },
+        { "text": "Pretend to switch it on — what happens? Show {toy} the result!", "action_slot": "cheering" }
       ]
     },
     {
@@ -78,11 +78,11 @@
       "title": "{toy} explores the {slot} world",
       "buckets": ["always"],
       "steps": [
-        { "text": "{toy} wants to explore — pick the room you're in as the new {slot} world." },
-        { "text": "Find one thing tall, one thing soft, and one thing colorful.", "expected_action": "child_finds_three_things" },
-        { "text": "Walk {toy} on a tour past each thing and describe it out loud." },
-        { "text": "Pick the most surprising one and tell {toy} a quick story about it.", "expected_action": "child_tells_story" },
-        { "text": "Bring {toy} back to home base and write the discovery in the explorer's log (or just say it aloud)." }
+        { "text": "{toy} wants to explore — pick the room you're in as the new {slot} world.", "action_slot": "looking" },
+        { "text": "Find one thing tall, one thing soft, and one thing colorful.", "expected_action": "child_finds_three_things", "action_slot": "looking" },
+        { "text": "Walk {toy} on a tour past each thing and describe it out loud.", "action_slot": "pointing" },
+        { "text": "Pick the most surprising one and tell {toy} a quick story about it.", "expected_action": "child_tells_story", "action_slot": "thinking" },
+        { "text": "Bring {toy} back to home base and write the discovery in the explorer's log (or just say it aloud).", "action_slot": "thinking" }
       ]
     },
     {
@@ -90,11 +90,11 @@
       "title": "{toy}'s {adjective} {action_verb} parade",
       "buckets": ["always"],
       "steps": [
-        { "text": "{toy} wants to lead a {adjective} {action_verb} parade through {room}." },
-        { "text": "Show {toy} how to {action_verb} — first {action_verb} {count} times in place.", "expected_action": "child_demonstrates_action" },
-        { "text": "Now {action_verb} all the way across {room}, holding {toy} high.", "sfx": "footsteps_silly" },
-        { "text": "Turn around and {action_verb} back, this time wiggling your {body_part}.", "expected_action": "child_wiggles_body_part" },
-        { "text": "Bow to {toy} — the {adjective} parade is complete!" }
+        { "text": "{toy} wants to lead a {adjective} {action_verb} parade through {room}.", "action_slot": "cheering" },
+        { "text": "Show {toy} how to {action_verb} — first {action_verb} {count} times in place.", "expected_action": "child_demonstrates_action", "action_slot": "jumping" },
+        { "text": "Now {action_verb} all the way across {room}, holding {toy} high.", "sfx": "footsteps_silly", "action_slot": "running" },
+        { "text": "Turn around and {action_verb} back, this time wiggling your {body_part}.", "expected_action": "child_wiggles_body_part", "action_slot": "jumping" },
+        { "text": "Bow to {toy} — the {adjective} parade is complete!", "action_slot": "cheering" }
       ]
     },
     {
@@ -102,11 +102,11 @@
       "title": "{toy} hunts the {adjective} {prop}",
       "buckets": ["always"],
       "steps": [
-        { "text": "{toy} has heard there's a {adjective} {prop} hidden somewhere in {room}." },
-        { "text": "Search high and low — check {count} different spots while {toy} watches.", "expected_action": "child_searches" },
-        { "text": "When you find a {prop}, hold it up and let {toy} inspect it." },
-        { "text": "Decide together: is it the {adjective} one? Make {toy} nod yes or shake no.", "expected_action": "child_consults_toy" },
-        { "text": "Celebrate the discovery — give {toy} a victory wiggle of your {body_part}!" }
+        { "text": "{toy} has heard there's a {adjective} {prop} hidden somewhere in {room}.", "action_slot": "thinking" },
+        { "text": "Search high and low — check {count} different spots while {toy} watches.", "expected_action": "child_searches", "action_slot": "looking" },
+        { "text": "When you find a {prop}, hold it up and let {toy} inspect it.", "action_slot": "looking" },
+        { "text": "Decide together: is it the {adjective} one? Make {toy} nod yes or shake no.", "expected_action": "child_consults_toy", "action_slot": "thinking" },
+        { "text": "Celebrate the discovery — give {toy} a victory wiggle of your {body_part}!", "action_slot": "cheering" }
       ]
     },
     {
@@ -114,11 +114,11 @@
       "title": "{toy}'s {adjective} show and tell",
       "buckets": ["always"],
       "steps": [
-        { "text": "{toy} is putting on a {adjective} show and tell in {room}." },
-        { "text": "Pick a {prop} — that's the first thing {toy} will introduce.", "expected_action": "child_picks_prop" },
-        { "text": "Have {toy} {action_verb} up to the audience (your {body_part} count as the audience)." },
-        { "text": "Announce three {adjective} facts about the {prop} — make them up if you have to!", "expected_action": "child_invents_facts" },
-        { "text": "Take a bow with {toy}. The {adjective} show was a hit!" }
+        { "text": "{toy} is putting on a {adjective} show and tell in {room}.", "action_slot": "cheering" },
+        { "text": "Pick a {prop} — that's the first thing {toy} will introduce.", "expected_action": "child_picks_prop", "action_slot": "pointing" },
+        { "text": "Have {toy} {action_verb} up to the audience (your {body_part} count as the audience).", "action_slot": "running" },
+        { "text": "Announce three {adjective} facts about the {prop} — make them up if you have to!", "expected_action": "child_invents_facts", "action_slot": "pointing" },
+        { "text": "Take a bow with {toy}. The {adjective} show was a hit!", "action_slot": "cheering" }
       ]
     }
   ]

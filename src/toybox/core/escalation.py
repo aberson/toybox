@@ -299,12 +299,17 @@ def _claude_system_prompt(directive: str | None = None) -> str:
         '  "persona_id": null,\n'
         '  "title": "<short title>",\n'
         '  "steps": [ five {"step_index": 0..4, "text": "<one line>", '
-        '"sfx": null, "expected_action": null} entries in order ],\n'
+        '"sfx": null, "expected_action": null, "action_slot": "<slot>"} '
+        "entries in order ],\n"
         '  "version": 1,\n'
         '  "metadata": {}\n'
         "}\n"
         "Steps MUST be exactly five, indexed 0 through 4 in order. "
         "Each `text` is a single sentence the toy speaks aloud. "
+        'Each `action_slot` is one of "idle", "pointing", "looking", '
+        '"jumping", "cheering", "thinking", "waving", "running", '
+        '"sleeping", "confused" — pick the slot that best matches the '
+        'verb in the step text. If no clear match, pick "idle". '
         "Do not include trailing commentary."
     )
     if directive:

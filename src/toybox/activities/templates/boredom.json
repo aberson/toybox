@@ -6,11 +6,11 @@
       "title": "Morning explorer's mission",
       "buckets": ["morning"],
       "steps": [
-        { "text": "{toy} declares this is now a morning expedition!" },
-        { "text": "Pick a room you have not really LOOKED at today and tiptoe in." },
-        { "text": "Find three things in that room you have never noticed before.", "expected_action": "child_finds_three_things" },
-        { "text": "Pick a favorite of the three and tell {toy} a fact about it." },
-        { "text": "Plant {toy} as a flag — this room has been officially explored!" }
+        { "text": "{toy} declares this is now a morning expedition!", "action_slot": "cheering" },
+        { "text": "Pick a room you have not really LOOKED at today and tiptoe in.", "action_slot": "looking" },
+        { "text": "Find three things in that room you have never noticed before.", "expected_action": "child_finds_three_things", "action_slot": "looking" },
+        { "text": "Pick a favorite of the three and tell {toy} a fact about it.", "action_slot": "pointing" },
+        { "text": "Plant {toy} as a flag — this room has been officially explored!", "action_slot": "cheering" }
       ]
     },
     {
@@ -18,11 +18,11 @@
       "title": "Invent a new game",
       "buckets": ["afternoon"],
       "steps": [
-        { "text": "{toy} has an idea: invent a brand-new game in five minutes!" },
-        { "text": "Pick one object from anywhere in the room — that is the main piece." },
-        { "text": "Make up ONE rule for how to use it." },
-        { "text": "Try the game with {toy} as your opponent.", "expected_action": "child_plays_game" },
-        { "text": "Give your new game a silly name and announce it to the room." }
+        { "text": "{toy} has an idea: invent a brand-new game in five minutes!", "action_slot": "thinking" },
+        { "text": "Pick one object from anywhere in the room — that is the main piece.", "action_slot": "pointing" },
+        { "text": "Make up ONE rule for how to use it.", "action_slot": "thinking" },
+        { "text": "Try the game with {toy} as your opponent.", "expected_action": "child_plays_game", "action_slot": "jumping" },
+        { "text": "Give your new game a silly name and announce it to the room.", "action_slot": "cheering" }
       ]
     },
     {
@@ -30,11 +30,11 @@
       "title": "Story swap with {toy}",
       "buckets": ["evening"],
       "steps": [
-        { "text": "Tell {toy} the most interesting thing that happened today." },
-        { "text": "{toy} 'tells' you a make-believe story about its own day — make one up!", "expected_action": "child_makes_up_story" },
-        { "text": "Trade the silliest detail from each story." },
-        { "text": "Pick which story was funnier and explain why." },
-        { "text": "Promise {toy} a new story tomorrow." }
+        { "text": "Tell {toy} the most interesting thing that happened today.", "action_slot": "thinking" },
+        { "text": "{toy} 'tells' you a make-believe story about its own day — make one up!", "expected_action": "child_makes_up_story", "action_slot": "thinking" },
+        { "text": "Trade the silliest detail from each story.", "action_slot": "thinking" },
+        { "text": "Pick which story was funnier and explain why.", "action_slot": "thinking" },
+        { "text": "Promise {toy} a new story tomorrow.", "action_slot": "waving" }
       ]
     },
     {
@@ -42,11 +42,11 @@
       "title": "Three good things",
       "buckets": ["wind_down"],
       "steps": [
-        { "text": "Sit somewhere cozy with {toy}." },
-        { "text": "Think of one good thing that happened today and whisper it to {toy}." },
-        { "text": "Think of a second good thing and whisper that one too.", "expected_action": "child_shares_second" },
-        { "text": "Think of a third good thing — say it loud enough for {toy} to hear." },
-        { "text": "Give {toy} a hug. Three good things is a good day." }
+        { "text": "Sit somewhere cozy with {toy}.", "action_slot": "idle" },
+        { "text": "Think of one good thing that happened today and whisper it to {toy}.", "action_slot": "thinking" },
+        { "text": "Think of a second good thing and whisper that one too.", "expected_action": "child_shares_second", "action_slot": "thinking" },
+        { "text": "Think of a third good thing — say it loud enough for {toy} to hear.", "action_slot": "thinking" },
+        { "text": "Give {toy} a hug. Three good things is a good day.", "action_slot": "sleeping" }
       ]
     },
     {
@@ -54,11 +54,11 @@
       "title": "Silly face contest with {toy}",
       "buckets": ["always"],
       "steps": [
-        { "text": "Sit face-to-face with {toy}." },
-        { "text": "Make the silliest face you can, and hold it for five seconds.", "expected_action": "child_makes_face" },
-        { "text": "Now make the most surprised face you can." },
-        { "text": "Now make the sleepiest face you can." },
-        { "text": "Decide which of {toy}'s 'reactions' was the funniest. Take a tiny bow." }
+        { "text": "Sit face-to-face with {toy}.", "action_slot": "idle" },
+        { "text": "Make the silliest face you can, and hold it for five seconds.", "expected_action": "child_makes_face", "action_slot": "confused" },
+        { "text": "Now make the most surprised face you can.", "action_slot": "confused" },
+        { "text": "Now make the sleepiest face you can.", "action_slot": "sleeping" },
+        { "text": "Decide which of {toy}'s 'reactions' was the funniest. Take a tiny bow.", "action_slot": "cheering" }
       ]
     }
   ]

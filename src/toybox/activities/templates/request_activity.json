@@ -6,11 +6,11 @@
       "title": "Morning stretch with {toy}",
       "buckets": ["morning"],
       "steps": [
-        { "text": "Stand tall next to {toy}. Reach for the ceiling like a tree growing." },
-        { "text": "Bend down and touch your toes — show {toy} how!", "expected_action": "child_touches_toes" },
-        { "text": "Twist side to side three times. {toy} watches and copies." },
-        { "text": "Hop on one foot for a count of five. Switch feet and hop again.", "sfx": "boing" },
-        { "text": "Take a deep breath. Tell {toy} you are ready for the day!" }
+        { "text": "Stand tall next to {toy}. Reach for the ceiling like a tree growing.", "action_slot": "cheering" },
+        { "text": "Bend down and touch your toes — show {toy} how!", "expected_action": "child_touches_toes", "action_slot": "pointing" },
+        { "text": "Twist side to side three times. {toy} watches and copies.", "action_slot": "jumping" },
+        { "text": "Hop on one foot for a count of five. Switch feet and hop again.", "sfx": "boing", "action_slot": "jumping" },
+        { "text": "Take a deep breath. Tell {toy} you are ready for the day!", "action_slot": "cheering" }
       ]
     },
     {
@@ -18,11 +18,11 @@
       "title": "Afternoon {slot} building project",
       "buckets": ["afternoon"],
       "steps": [
-        { "text": "Gather three soft objects (pillows, plushies, towels) into one spot with {toy}." },
-        { "text": "Stack the objects to make a small tower or fort." },
-        { "text": "Place {toy} on top — or inside — of your build.", "expected_action": "child_places_toy" },
-        { "text": "Decide what your build is for: a {slot} hideout, a lookout, a cozy nest?" },
-        { "text": "Show your build to a grown-up and tell them the story of it." }
+        { "text": "Gather three soft objects (pillows, plushies, towels) into one spot with {toy}.", "action_slot": "pointing" },
+        { "text": "Stack the objects to make a small tower or fort.", "action_slot": "idle" },
+        { "text": "Place {toy} on top — or inside — of your build.", "expected_action": "child_places_toy", "action_slot": "pointing" },
+        { "text": "Decide what your build is for: a {slot} hideout, a lookout, a cozy nest?", "action_slot": "thinking" },
+        { "text": "Show your build to a grown-up and tell them the story of it.", "action_slot": "pointing" }
       ]
     },
     {
@@ -30,11 +30,11 @@
       "title": "Evening drawing time",
       "buckets": ["evening"],
       "steps": [
-        { "text": "Gather paper and crayons next to {toy}." },
-        { "text": "Draw {toy} as the main character of the picture." },
-        { "text": "Add a friend to the drawing — anyone or anything you choose.", "expected_action": "child_draws_friend" },
-        { "text": "Color in the background — the sky, the ground, or a room." },
-        { "text": "Hold up your drawing for {toy} to admire." }
+        { "text": "Gather paper and crayons next to {toy}.", "action_slot": "idle" },
+        { "text": "Draw {toy} as the main character of the picture.", "action_slot": "thinking" },
+        { "text": "Add a friend to the drawing — anyone or anything you choose.", "expected_action": "child_draws_friend", "action_slot": "thinking" },
+        { "text": "Color in the background — the sky, the ground, or a room.", "action_slot": "thinking" },
+        { "text": "Hold up your drawing for {toy} to admire.", "action_slot": "cheering" }
       ]
     },
     {
@@ -42,11 +42,11 @@
       "title": "Calm breathing with {toy}",
       "buckets": ["wind_down"],
       "steps": [
-        { "text": "Sit cross-legged with {toy} resting on your lap." },
-        { "text": "Breathe in slowly through your nose for a count of four." },
-        { "text": "Hold the breath for two, then breathe out through your mouth for four." },
-        { "text": "Repeat the slow breath three more times — {toy} is breathing too.", "expected_action": "child_breathes_slowly" },
-        { "text": "Open your eyes. Whisper goodnight to {toy} or thank you for the calm." }
+        { "text": "Sit cross-legged with {toy} resting on your lap.", "action_slot": "idle" },
+        { "text": "Breathe in slowly through your nose for a count of four.", "action_slot": "sleeping" },
+        { "text": "Hold the breath for two, then breathe out through your mouth for four.", "action_slot": "sleeping" },
+        { "text": "Repeat the slow breath three more times — {toy} is breathing too.", "expected_action": "child_breathes_slowly", "action_slot": "sleeping" },
+        { "text": "Open your eyes. Whisper goodnight to {toy} or thank you for the calm.", "action_slot": "waving" }
       ]
     },
     {
@@ -54,11 +54,11 @@
       "title": "{slot} scavenger hunt with {toy}",
       "buckets": ["always"],
       "steps": [
-        { "text": "{toy} announces a scavenger hunt for things related to {slot}." },
-        { "text": "Find one thing that is the right COLOR.", "expected_action": "child_finds_color" },
-        { "text": "Find one thing that is the right SHAPE." },
-        { "text": "Find one thing that is the right SIZE." },
-        { "text": "Bring all three finds back to {toy} and tell the story they make together." }
+        { "text": "{toy} announces a scavenger hunt for things related to {slot}.", "action_slot": "cheering" },
+        { "text": "Find one thing that is the right COLOR.", "expected_action": "child_finds_color", "action_slot": "looking" },
+        { "text": "Find one thing that is the right SHAPE.", "action_slot": "looking" },
+        { "text": "Find one thing that is the right SIZE.", "action_slot": "looking" },
+        { "text": "Bring all three finds back to {toy} and tell the story they make together.", "action_slot": "pointing" }
       ]
     }
   ]

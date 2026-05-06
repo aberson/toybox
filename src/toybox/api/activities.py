@@ -176,7 +176,14 @@ def get_judge_call() -> JudgeCall:
 
 
 class ActivityStepResponse(BaseModel):
-    """Wire shape for one activity step."""
+    """Wire shape for one activity step.
+
+    Phase F Step F6: ``action_slot`` carries the per-step action
+    vocabulary key (one of :data:`toybox.image_gen.models.ACTION_SLOTS`)
+    or ``None`` for legacy rows / templates that don't pin a slot.
+    The kiosk renders the matching toy sprite (F7) when the slot is
+    set AND the activity has at least one toy with a sprite for it.
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -185,6 +192,7 @@ class ActivityStepResponse(BaseModel):
     sfx: str | None = None
     expected_action: str | None = None
     current: bool = False
+    action_slot: str | None = None
 
 
 class ActivityResponse(BaseModel):
@@ -463,7 +471,7 @@ def _fetch_activity_row(conn: sqlite3.Connection, activity_id: str) -> sqlite3.R
 
 def _fetch_steps(conn: sqlite3.Connection, activity_id: str) -> list[ActivityStepResponse]:
     rows = conn.execute(
-        "SELECT seq, body, sfx, expected_action, current "
+        "SELECT seq, body, sfx, expected_action, current, action_slot "
         "FROM activity_steps WHERE activity_id = ? ORDER BY seq ASC",
         (activity_id,),
     ).fetchall()
@@ -474,6 +482,7 @@ def _fetch_steps(conn: sqlite3.Connection, activity_id: str) -> list[ActivitySte
             sfx=r["sfx"],
             expected_action=r["expected_action"],
             current=bool(r["current"]),
+            action_slot=r["action_slot"],
         )
         for r in rows
     ]
@@ -603,8 +612,8 @@ def _persist_activity(
         for step in steps:
             conn.execute(
                 "INSERT INTO activity_steps "
-                "(id, activity_id, seq, body, sfx, expected_action, current) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "(id, activity_id, seq, body, sfx, expected_action, current, action_slot) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     str(uuid.uuid4()),
                     activity_id,
@@ -613,6 +622,9 @@ def _persist_activity(
                     step.get("sfx"),
                     step.get("expected_action"),
                     1 if step.get("current") else 0,
+                    # Phase F Step F6: per-step action slot. None for
+                    # legacy callers / templates that don't set it.
+                    step.get("action_slot"),
                 ),
             )
 
@@ -818,7 +830,11 @@ def _build_loop_system_prompt(
     parts.append(
         "Reply with EXACTLY one Activity JSON object "
         "({id, template_id, title, steps:[5 items], version, metadata}) "
-        "and nothing else when you are done."
+        "and nothing else when you are done. "
+        'Each step MUST include an "action_slot" key with one of '
+        '"idle", "pointing", "looking", "jumping", "cheering", '
+        '"thinking", "waving", "running", "sleeping", "confused" — '
+        'pick the slot that best matches the step\'s verb (default "idle").'
     )
     return "\n".join(parts)
 
@@ -1014,6 +1030,10 @@ def _do_propose(
             "sfx": step.sfx,
             "expected_action": step.expected_action,
             "current": False,
+            # Phase F Step F6: thread the per-step action slot from
+            # the generator output through the persistence layer to
+            # the kiosk WS envelope.
+            "action_slot": step.action_slot,
         }
         for idx, step in enumerate(activity.steps)
     ]
