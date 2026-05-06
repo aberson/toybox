@@ -2,6 +2,14 @@
 
 > Sibling expansion. Master plan ([plan.md](plan.md)) stays canonical for v1 scope; this doc carries the per-step `**Problem:**/**Type:**/**Issue:**/**Flags:**/**Status:**/**Done when:**` shape that `/build-phase` parses. Sequenced independently of [phase-e-plan.md](phase-e-plan.md) — Phase E and Phase F share migrations 0004/0005 numerically; whichever ships first claims those numbers and the other renumbers at build time (see §"Risks and open questions").
 
+## Build status (2026-05-06): Option B mode
+
+Host GPU pre-flight: **NVIDIA RTX 4070 Laptop, 8 GB total VRAM** (driver 581.95) — below the 12 GB floor declared in §"Operator pre-flight". Phase F is building in **Option B**: F2–F8 land against the stub-runtime fixture per §"Operator pre-flight" para. 5 ("the codebase is ready for any future household with a capable GPU"); F1 (operator install of CUDA + four checkpoints) and F9 (operator GPU smoke gate) and F10 (overnight observation soak) are **PAUSED** on this host. Capability gate `is_image_gen_capable()` returns `(False, "VRAM 8 GB < TOYBOX_IMAGE_GEN_MIN_VRAM_GB=12")` → kiosk silently degrades to persona-only display, exactly the documented degraded path.
+
+Concurrent investigation under way: research-only feasibility study on whether SDXL + IP-Adapter SDXL + pixel-art LoRA can fit in 8 GB with aggressive memory optimization (sequential CPU offload, attention slicing, fp16, smaller IP-Adapter variant) — or whether a different architecture (SD 1.5 + IPA at 768×768, SDXL Lightning, NF4-quantized Flux) better matches the goal. If the probe produces a config with peak VRAM < 7.5 GB end-to-end, F1 + F9 + F10 may be revisited with a revised `TOYBOX_IMAGE_GEN_MIN_VRAM_GB` default. Until then, treat F1 / F9 / F10 as deferred-on-this-host, not abandoned.
+
+Migration numbers settled at build time: F3 takes **0005** (next available after 0004 from Phase E #40); F6 takes **0006**.
+
 ## What this feature does
 
 Generate a small library of pixel-art "action sprites" of each ingested toy — the same toy posed in 10 fixed actions (idle, pointing, looking through a magnifying glass, jumping, cheering, thinking, waving, running, sleeping, confused). One sprite is rendered next to the step text on the child kiosk every time a new step is shown, so "Mr. Unicorn says: get the magnifying glass and look around the room!" pairs with a 16-bit pixel-art Mr. Unicorn holding a magnifying glass.
@@ -221,7 +229,7 @@ Existing pattern is one breaker per call-site: Claude vision has its own breaker
 - **Type:** operator
 - **Issue:** #45
 - **Flags:** n/a (operator step; not invoked through `/build-step`)
-- **Status:** PENDING
+- **Status:** PAUSED (2026-05-06) — host GPU 8 GB < 12 GB floor; deferred per §"Build status" Option B. F2 proceeds against stub-runtime fixture; F2's `@pytest.mark.requires_gpu` integration test stays unrun until checkpoints land.
 - **Depends on:** none (kicks off Phase F)
 - **Parallel-safe with:** none — strictly first step; F2 cannot start until checkpoints land
 - **Done when:** All four checkpoints sha256-verified on disk under `data/models/image_gen/`; the load snippet completes without OOM on the home GPU; `documentation/operator/image-gen-runtime.md` covers install + sha256s + env-var reference + GPU floor + troubleshooting.
@@ -322,7 +330,7 @@ Existing pattern is one breaker per call-site: Claude vision has its own breaker
 - **Type:** operator
 - **Issue:** #53
 - **Flags:** n/a (operator step; manual verification of the full pipeline)
-- **Status:** PENDING
+- **Status:** PAUSED (2026-05-06) — depends on F1; deferred per §"Build status" Option B until host GPU meets floor.
 - **Depends on:** Steps F1-F8 all DONE
 - **Parallel-safe with:** none — verification gate after the full implementation chain
 - **Done when:** Smoke run report at `documentation/runs/<date>-toy-action-sprites-smoke.md` with all 8 criteria passing; if any fails, file as a follow-up issue and fix before F10.
@@ -344,7 +352,7 @@ Existing pattern is one breaker per call-site: Claude vision has its own breaker
 - **Type:** wait
 - **Issue:** #54
 - **Flags:** n/a (operator step; long-wall-clock observation)
-- **Status:** PENDING
+- **Status:** PAUSED (2026-05-06) — depends on F9; deferred per §"Build status" Option B.
 - **Depends on:** Step F9 (#53 — smoke gate passed)
 - **Parallel-safe with:** none — final observation gate; runs after smoke gate passes
 - **Done when:** Soak report landed at `documentation/runs/<date>-toy-action-sprites-soak.md`; soft-pass criterion met (280+ of 300 jobs successful + no invariant violation); if not met, file follow-up issues for each invariant violation and re-run F10 after fixes.
