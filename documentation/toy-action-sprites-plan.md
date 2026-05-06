@@ -245,7 +245,7 @@ Existing pattern is one breaker per call-site: Claude vision has its own breaker
 - **Type:** code
 - **Issue:** #46
 - **Flags:** --reviewers code
-- **Status:** PENDING
+- **Status:** DONE (2026-05-06) — merged in commit 846b082. 17 files / 2785 insertions. Quality gates green on master: ruff clean, mypy strict 82 source files, pytest 1038 passed + 2 skipped (1 pre-existing + the new `@pytest.mark.requires_gpu` test which auto-skips without checkpoints + CUDA on the test runner). 2 dev iterations; iter-2 addressed 4 medium-severity bugs (path-traversal validator on `toy_id`, VRAM cleanup on partial pipeline construction failure, stub-mode WARNING log, NULL `image_path` LookupError handling) + 3 test deletions for duplicates/tautologies + AST-based regression test pinning Gotcha 2 (no `enable_attention_slicing` call sites).
 - **Depends on:** Step F1 (#45 — checkpoints on disk)
 - **Parallel-safe with:** none — strictly sequential; F3 + downstream consume `ACTION_SLOTS` + `ToyActionStatus` defined here
 - **Done when:** `pipeline.py` + `models.py` + `capability.py` shipped; `pipeline.generate_action(...)` produces a valid PNG end-to-end against the stub fixture in CI; `is_image_gen_capable()` covers four return branches with unit tests; CLI `--probe` writes the marker file on success; lazy-import test (sys.modules snapshot — see §"Testing strategy") asserts `torch` and `diffusers` are NOT in `sys.modules` immediately after `import toybox.image_gen.pipeline`; `@pytest.mark.requires_gpu`-gated integration test exercises the real pipeline on the operator machine and asserts the output PNG is non-empty + valid + ≤`TOYBOX_IMAGE_GEN_PALETTE_COLORS` (default 32) colors + has alpha channel.
