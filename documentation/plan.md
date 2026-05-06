@@ -1410,6 +1410,352 @@ What to look for table is "if X happens, run Y"; the operator doc holds the full
 | Image storage runaway | Stop backend; archive unwanted toys via parent UI; periodic cron at v1.5 will delete orphan files (manual: `python -m toybox.tools.gc_images`) |
 | "Factory reset" | Stop backend; remove `data/`; restart (re-runs migrations + first-run setup; all photos, transcripts, profiles, custom personas lost) |
 
+#### Manual M2.5 — v1 bundled UI smoke (release gate before Phase E)
+
+**Why bundled:** per the autonomous-build operating mode (see [`feedback_autonomous_build_bundled_ui.md`](../../../.claude/projects/c--Users-abero-dev/memory/feedback_autonomous_build_bundled_ui.md)) steps 16, 17, 18, 21, 22, 23, 24 ran with `--reviewers code` (no runtime `--ui` reviewer). Their `Status:` notes each defer "visual UI verification pending bundled test pass". M2.5 is that pass — the v1 release gate before Phase E begins.
+
+**Scope (v1):** steps 16, 17, 18, 21, 22, 23, 24. **Out of scope:** step 29 (E5) — not built yet; will be covered by a future bundled pass when Phase E lands.
+
+**Operator profile:** fresh pair of hands. Assume nothing.
+
+**Test fixtures (place in `tests/fixtures/uat/m2-5/`):**
+- `toy-1.png` — any 800×600 PNG of a toy
+- `toy-1-dup.png` — exact byte-copy of `toy-1.png` (dedup check)
+- `room-1.jpg` … `room-5.jpg` — 5 distinct room photos
+- `room-bulk-51/` — folder with 51 photos (bulk-cap negative path)
+
+##### Global setup (agent runs once at start)
+
+```powershell
+# 1. Stop any running backend / frontend
+Get-Process -Name "python","node" -ErrorAction SilentlyContinue |
+  Where-Object { $_.CommandLine -match "toybox|vite" } | Stop-Process -Force
+
+# 2. Back up current DB to a UAT-managed location (deletable later)
+$ts = Get-Date -Format "yyyyMMdd-HHmmss"
+$bakDir = "data/.uat-backups"
+if (-not (Test-Path $bakDir)) { New-Item -ItemType Directory -Path $bakDir | Out-Null }
+if (Test-Path data/toybox.db) {
+  Move-Item data/toybox.db "$bakDir/toybox.db.bak-$ts"
+  Write-Host "Backed up DB to $bakDir/toybox.db.bak-$ts"
+}
+
+# 3. Recreate schema on a clean DB
+uv run python -m toybox.db.migrate
+
+# 4. Confirm clean state
+uv run python -c "import sqlite3; c = sqlite3.connect('data/toybox.db'); print('toys:', c.execute('SELECT count(*) FROM toys').fetchone()[0]); print('rooms:', c.execute('SELECT count(*) FROM rooms').fetchone()[0]); print('children:', c.execute('SELECT count(*) FROM children').fetchone()[0]); print('parent_pin_hash rows:', c.execute(\"SELECT count(*) FROM settings WHERE key='parent_pin_hash'\").fetchone()[0])"
+# Expected: toys: 0, rooms: 0, children: 0, parent_pin_hash rows: 0
+
+# 5. Confirm Claude vision capability (steps M2.5.3, M2.5.4 need this)
+uv run python -c "from toybox.ai.capability import resolve_capability; import asyncio; print(asyncio.run(resolve_capability()))"
+# Expected: claude_capable=True. If False, vision is silently skipped and the suggested-fields path won't be exercised.
+
+# 6. Generate UAT image fixtures (idempotent — skips existing files)
+uv run python scripts/uat/generate_m2_5_fixtures.py
+
+# 7. Start backend (background) with stdout/stderr captured to logs/
+New-Item -ItemType Directory -Path logs -Force | Out-Null
+Start-Process -FilePath "uv" -ArgumentList "run","python","-m","toybox.main","--host","127.0.0.1","--port","8000" -WindowStyle Hidden -RedirectStandardOutput logs/backend.log -RedirectStandardError logs/backend.err
+$ok = $false; 1..30 | ForEach-Object { try { Invoke-RestMethod http://127.0.0.1:8000/api/health -TimeoutSec 1 | Out-Null; $ok = $true; return } catch { Start-Sleep -Seconds 1 } }
+if (-not $ok) { throw "backend did not start (check logs/backend.err)" }
+
+# 8. Start frontend (background)
+Push-Location frontend; Start-Process -FilePath "npm" -ArgumentList "run","dev" -WindowStyle Hidden; Pop-Location
+$ok = $false; 1..30 | ForEach-Object { try { Invoke-WebRequest http://127.0.0.1:4000 -TimeoutSec 1 | Out-Null; $ok = $true; return } catch { Start-Sleep -Seconds 1 } }
+if (-not $ok) { throw "frontend did not start" }
+```
+
+##### Step M2.5.1 — PIN first-run + lockout + countdown (covers step 21)
+
+**Setup (agent):** global setup left `parent_pin_hash` empty so first-run will trigger.
+
+**Action (human):**
+1. Open `http://127.0.0.1:4000/parent` in a fresh incognito tab.
+2. PinSetup screen renders. Type `1234` → Next → type `1234` → Submit.
+3. After token issues, log out (clear localStorage `parent_token` via DevTools, refresh).
+4. PinLogin screen renders. Submit 5 wrong PINs (e.g., `9999`) within 30 seconds.
+5. After the 5th, attempt login with the correct `1234`.
+6. Capture the parent token from localStorage and export as `$env:PARENT_TOKEN` for later steps.
+
+**Verify (agent):**
+```powershell
+# After step 2 — PIN was set
+Invoke-RestMethod http://127.0.0.1:8000/api/auth/parent/status
+# Expected: pin_set=True, locked=False
+uv run python -c "import sqlite3; print(sqlite3.connect('data/toybox.db').execute(\"SELECT key FROM settings WHERE key='parent_pin_hash'\").fetchone())"
+# Expected: ('parent_pin_hash',)
+
+# After step 5 — lock takes precedence even with correct PIN
+$body = @{pin="1234"} | ConvertTo-Json
+try { Invoke-RestMethod http://127.0.0.1:8000/api/auth/parent -Method Post -Body $body -ContentType "application/json" } catch { $_.Exception.Response.StatusCode.value__; $_.ErrorDetails.Message }
+# Expected: 423 with body containing pin_locked and seconds_until_unlock > 0
+```
+
+**Verify (human):**
+- After step 2: PinSetup screen replaced by parent home (no flash of login screen between them).
+- After step 4: lockout banner shows a countdown that ticks once per second (watch ~5 seconds — the second digit changes).
+- After step 5: input field disabled while locked; lock-takes-precedence message appears even with correct PIN.
+
+**Fail signals:**
+- Flash of login screen before setup completes.
+- Countdown stalls (no ticking).
+- Correct PIN bypasses lockout.
+- Status endpoint returns `pin_set: false` after setup.
+
+**Source of truth:** [src/toybox/api/auth.py](../src/toybox/api/auth.py), [frontend/src/parent/components/PinSetup.tsx:30](../frontend/src/parent/components/PinSetup.tsx#L30), [plan.md:1356](plan.md#L1356)
+
+##### Step M2.5.2 — Child profile CRUD + banned_themes round-trip (covers step 18)
+
+**Setup (agent):** PIN set from M2.5.1; reuse `$env:PARENT_TOKEN`. Database has zero `children` rows.
+
+**Action (human):**
+1. From parent home, open the Children/Profiles modal.
+2. Create child: display_name `Ada`, birthdate `2020-01-15`, reading_level `pre-reader`, banned_themes `violence, scary monsters`.
+3. Edit `Ada`: change reading_level to `early-reader`. Save.
+4. Create a second child `Bob`. Confirm list ordering puts `Ada` first (alphabetical).
+5. Delete `Ada` (no activities reference her yet → should succeed).
+
+**Verify (agent):**
+```powershell
+$h = @{Authorization="Bearer $env:PARENT_TOKEN"}
+Invoke-RestMethod http://127.0.0.1:8000/api/children -Headers $h | ConvertTo-Json -Depth 5
+# Expected after step 2: one child, banned_themes="violence, scary monsters"
+# Expected after step 3: same id, reading_level="early-reader"
+# Expected after step 4: two children, ordered Ada then Bob
+# Expected after step 5: only Bob remains
+uv run python -c "import sqlite3; c = sqlite3.connect('data/toybox.db'); print(c.execute('SELECT display_name, banned_themes, reading_level FROM children ORDER BY display_name COLLATE NOCASE').fetchall())"
+```
+
+**Verify (human):**
+- banned_themes input renders as chips OR comma-separated text (either acceptable per step 18 spec); saved value displays as entered.
+- Save button gets disabled during request, re-enables after.
+
+**Fail signals:**
+- List ordering not alphabetical.
+- Reading level form sends freeform text instead of validated enum.
+- banned_themes split or trimmed unexpectedly.
+
+**Source of truth:** [frontend/src/parent/components/ChildProfileEditor.tsx](../frontend/src/parent/components/ChildProfileEditor.tsx), [src/toybox/api/children.py](../src/toybox/api/children.py), [plan.md:1298](plan.md#L1298)
+
+##### Step M2.5.3 — Toy ingest happy path + dedup (covers step 16)
+
+**Setup (agent):** clean `toys` table; `data/images/toys/` and `data/images/.staging/` empty.
+```powershell
+ls data/images/toys/, data/images/.staging/ -ErrorAction SilentlyContinue
+uv run python -c "import sqlite3; print(sqlite3.connect('data/toybox.db').execute('SELECT count(*) FROM toys').fetchone())"
+# Expected: (0,)
+```
+
+**Action (human):**
+1. Open the Toys modal. Upload `tests/fixtures/uat/m2-5/toy-1.png`.
+2. Vision returns suggested fields. Confirm or adjust display_name → submit.
+3. Re-upload the same file (`toy-1-dup.png`, byte-identical) → expect a 409 dedup response surfaced to the operator.
+
+**Verify (agent):**
+```powershell
+$h = @{Authorization="Bearer $env:PARENT_TOKEN"}
+Invoke-RestMethod http://127.0.0.1:8000/api/toys -Headers $h | ConvertTo-Json -Depth 4
+# Expected after step 2: one toy with image_hash + display_name; one .png under data/images/toys/{uuid}.png
+ls data/images/toys/  # expected: exactly one .png
+uv run python -c "import sqlite3; print(sqlite3.connect('data/toybox.db').execute('SELECT count(*) FROM toys WHERE archived=0').fetchone())"
+# Expected: (1,)
+ls data/images/.staging/ -ErrorAction SilentlyContinue  # expected: empty (file moved out on confirm)
+```
+
+**Verify (human):**
+- Vision-suggested display_name is non-empty and reasonable.
+- On dedup re-upload (step 3): UI surfaces a "this toy already exists" message (not a generic error toast); the existing toy is highlighted or referenced.
+
+**Fail signals:**
+- File lingers in `.staging/` after confirm (janitor sweep skipped — log it but don't fail UAT; janitor TTL is 1h).
+- Dedup returns 200 instead of 409 (would create duplicate row).
+- Vision call hangs >30s without surfacing an error.
+
+**Source of truth:** [src/toybox/api/toys.py](../src/toybox/api/toys.py), [frontend/src/parent/components/ToyIngest.tsx](../frontend/src/parent/components/ToyIngest.tsx), [plan.md:1281](plan.md#L1281)
+
+##### Step M2.5.4 — Room bulk ingest + bulk cap (covers step 17)
+
+**Setup (agent):** clean `rooms` and `room_features`; vision capability already verified in global setup.
+
+**Action (human):**
+1. Upload 5 room photos (`room-1.jpg`…`room-5.jpg`) via the bulk modal.
+2. In the tabbed review UI, assign each photo to a room (some new, some merged) and confirm features.
+3. Submit.
+4. Then attempt to upload the 51-photo folder → expect a 413 bulk-cap-exceeded error surfaced to the operator.
+
+**Verify (agent):**
+```powershell
+$h = @{Authorization="Bearer $env:PARENT_TOKEN"}
+Invoke-RestMethod http://127.0.0.1:8000/api/rooms -Headers $h | ConvertTo-Json -Depth 5
+# Expected: rooms count matches the operator's assignment; room_features populated
+uv run python -c "import sqlite3; c = sqlite3.connect('data/toybox.db'); print('rooms:', c.execute('SELECT count(*) FROM rooms').fetchone()[0]); print('features:', c.execute('SELECT count(*) FROM room_features').fetchone()[0])"
+ls data/images/rooms/  # expected: one .jpg per canonical room photo
+```
+
+**Verify (human):**
+- Tabbed UI groups photos by suggested room with thumbnails visible.
+- 51-photo upload surfaces a clear "bulk cap exceeded" message (not a silent failure or generic 500).
+- Atomic rollback: if the operator deliberately picks a duplicate room name to trigger 409, no partial inserts remain (verify (agent) re-runs after this negative-path try).
+
+**Fail signals:**
+- Photos uploaded but not assigned to any room (orphan files in `data/images/rooms/`).
+- 51-photo upload silently truncates to 50 instead of rejecting.
+- Partial state after a failed atomic confirm.
+
+**Source of truth:** [src/toybox/api/rooms.py](../src/toybox/api/rooms.py), [frontend/src/parent/components/RoomIngestBulk.tsx](../frontend/src/parent/components/RoomIngestBulk.tsx), [plan.md:1289](plan.md#L1289)
+
+##### Step M2.5.5 — Live activity polish + "why this?" + End confirm (covers step 23)
+
+**Setup (agent):** spin up a proposed activity via the API (don't depend on a real trigger phrase firing).
+```powershell
+$h = @{Authorization="Bearer $env:PARENT_TOKEN"; "Content-Type"="application/json"}
+$child_id = (Invoke-RestMethod http://127.0.0.1:8000/api/children -Headers $h)[0].id
+$body = @{ child_ids=@($child_id); trigger_phrase="lets play knights"; persona_reasoning="Ada loves castle stories"; intent="dramatic_play" } | ConvertTo-Json
+$resp = Invoke-RestMethod http://127.0.0.1:8000/api/activities/propose -Headers $h -Method Post -Body $body
+$env:ACTIVITY_ID = $resp.id
+```
+
+**Action (human):**
+1. Refresh parent UI; SuggestionCard renders with a "why this?" expandable panel.
+2. Expand it — confirm trigger_phrase, persona_reasoning, intent are visible.
+3. Approve activity. ActivityPanel renders.
+4. Click Pause. Click Pause again.
+5. Click Resume.
+6. Click End — confirm dialog appears. Cancel. Click End again — confirm. Accept.
+
+**Verify (agent):**
+```powershell
+$h = @{Authorization="Bearer $env:PARENT_TOKEN"}
+# After step 4 (double pause): both calls returned 200 (not 409)
+Invoke-WebRequest "http://127.0.0.1:8000/api/activities/$env:ACTIVITY_ID/pause" -Headers $h -Method Post | Select-Object StatusCode
+# Expected: 200 (idempotent)
+# After step 6: activity.state = "ended"; version bumped only for End (not for double-pause)
+Invoke-RestMethod "http://127.0.0.1:8000/api/activities/$env:ACTIVITY_ID" -Headers $h | Select-Object state, version
+# Expected: state="ended"
+
+# trigger_phrase NOT leaked on the child WS topic (PII strip).
+# Mint a child token, then subscribe with child scope. (Parent-scope sees
+# the unstripped envelope by design — _emit_state strips per recipient.)
+$env:WS_TOKEN = (uv run python scripts/uat/mint_child_token.py)
+uv run python scripts/uat/ws_inspect.py --topic activity.state --duration 5 --filter trigger_phrase
+# Expected: exit 0; stderr summary "seen>0 matches=0"
+```
+
+**Verify (human):**
+- "Why this?" panel renders all three fields with sensible labels (not raw JSON).
+- End-confirm dialog actually appears (window.confirm or modal — either acceptable).
+- Pause button visually toggles state without flicker.
+
+**Fail signals:**
+- Second pause returns 409 in the network tab (broken idempotency).
+- End button skips the confirm dialog.
+- ws_inspect.py exits 1 (trigger_phrase appeared on the child topic).
+
+**Source of truth:** [frontend/src/parent/components/SuggestionCard.tsx:44](../frontend/src/parent/components/SuggestionCard.tsx#L44), [frontend/src/parent/components/ActivityPanel.tsx:51](../frontend/src/parent/components/ActivityPanel.tsx#L51), [src/toybox/api/activities.py:1392](../src/toybox/api/activities.py#L1392), [plan.md:1372](plan.md#L1372), [scripts/uat/ws_inspect.py](../scripts/uat/ws_inspect.py)
+
+##### Step M2.5.6 — Transcripts manager: list, search, delete one, wipe-all (covers step 22)
+
+**Setup (agent):** seed `transcripts` with 3 distinct rows so list, search, delete-one, wipe-all all have something to act on.
+```powershell
+uv run python -c @"
+import sqlite3, datetime
+c = sqlite3.connect('data/toybox.db')
+now = datetime.datetime.utcnow().isoformat()
+c.execute('INSERT INTO sessions (id, started_at) VALUES (?, ?)', ('sess-uat-1', now))
+for i, content in enumerate(['hello world', 'lets play knights', 'tea party time']):
+    c.execute('INSERT INTO transcripts (id, session_id, started_at, ended_at, content) VALUES (?, ?, ?, ?, ?)',
+              (f'tr-uat-{i}', 'sess-uat-1', now, now, content))
+c.commit()
+print(c.execute('SELECT count(*) FROM transcripts').fetchone())
+"@
+# Expected: (3,)
+```
+
+**Action (human):**
+1. Open the Transcripts modal.
+2. Confirm 3 rows render.
+3. Search for `knights` → confirm only one row remains visible.
+4. Clear search; delete one row.
+5. Click Wipe All. Modal opens with PIN field.
+6. Enter wrong PIN twice → see attempts-remaining decrement.
+7. Enter correct PIN → confirm wipe.
+
+**Verify (agent):**
+```powershell
+$h = @{Authorization="Bearer $env:PARENT_TOKEN"}
+# After step 4: 2 rows
+(Invoke-RestMethod http://127.0.0.1:8000/api/transcripts -Headers $h).Count
+# Expected: 2
+# After step 7: 0 transcripts; sessions row STILL EXISTS (no cascade)
+uv run python -c "import sqlite3; c = sqlite3.connect('data/toybox.db'); print('transcripts:', c.execute('SELECT count(*) FROM transcripts').fetchone()[0]); print('sessions:', c.execute(\"SELECT count(*) FROM sessions WHERE id='sess-uat-1'\").fetchone()[0])"
+# Expected: transcripts: 0, sessions: 1
+# Wipe attempts logged at WARNING with NO PIN value (logs/backend.log
+# captured by global setup step 7 redirect; logs/backend.err for stderr)
+Select-String -Path "logs/backend.log","logs/backend.err" -Pattern "wipe.*pin" | Select-Object -Last 5
+# Expected: WARN lines reference wipe + attempt counts but never a 4-digit PIN value
+```
+
+**Verify (human):**
+- Search debounce visibly delays results by ~250ms (not instant).
+- Wipe-all modal shows attempts-remaining inline with the failed PIN entry.
+- Optimistic delete (step 4): row disappears immediately, then either stays gone (success) or reappears with a "couldn't delete" message (network failure).
+
+**Fail signals:**
+- Wipe cascades — `sessions` row disappears too.
+- PIN value appears in a log line (PII leak).
+- Modal accepts wipe without re-confirming PIN.
+
+**Source of truth:** [frontend/src/parent/components/TranscriptsManager.tsx](../frontend/src/parent/components/TranscriptsManager.tsx), [src/toybox/api/transcripts.py](../src/toybox/api/transcripts.py), [plan.md:1364](plan.md#L1364)
+
+##### Step M2.5.7 — Operator metrics dashboard + ws → REST fallback (covers step 24)
+
+**Setup (agent):** state from prior steps is fine (some toys, rooms, children, transcripts wiped, one ended activity).
+
+**Action (human):**
+1. Open the Operator tab in parent UI.
+2. Watch for an initial render of all metric panels (activities, transcripts, audio, AI status, eval-judge, breaker).
+3. Wait ~30 seconds — confirm the panel auto-refreshes (timestamp updates without manual reload).
+4. **Negative path (ws fallback):** in DevTools → Network, kill the WebSocket connection (close frame, or stop the backend WS handler via a backend restart).
+5. Wait ≤30 seconds — confirm the panel keeps refreshing via REST poll.
+
+**Verify (agent):**
+```powershell
+$h = @{Authorization="Bearer $env:PARENT_TOKEN"}
+Invoke-RestMethod http://127.0.0.1:8000/api/metrics -Headers $h | ConvertTo-Json -Depth 5
+# Expected: object has activities (counts by current state), transcripts count=0, audio (mic_device, queue_depth, buffer_overruns_lifetime), ai (breaker_state, claude_capable, listening_mode), eval (per_dimension_means_24h, sign_agreement_rate)
+```
+
+**Verify (human):**
+- All panels render — none stuck on "loading…".
+- Timestamp visibly updates on the auto-refresh tick.
+- After ws kill (step 4): panel keeps updating (proves REST fallback).
+
+**Fail signals:**
+- Any panel stuck on a stale value while others update.
+- REST fallback never kicks in after ws death (panel freezes).
+
+**Source of truth:** [frontend/src/parent/components/OperatorTab.tsx](../frontend/src/parent/components/OperatorTab.tsx), [src/toybox/api/metrics.py:35](../src/toybox/api/metrics.py#L35), [plan.md:1380](plan.md#L1380)
+
+##### Teardown (agent)
+
+```powershell
+# Stop backend + frontend
+Get-Process -Name "python","node" -ErrorAction SilentlyContinue |
+  Where-Object { $_.CommandLine -match "toybox|vite" } | Stop-Process -Force
+
+# Restore the operator's pre-UAT DB if they had one (most recent backup)
+$bak = Get-ChildItem data/.uat-backups/toybox.db.bak-* -ErrorAction SilentlyContinue |
+  Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if ($bak) {
+  Move-Item -Force $bak.FullName data/toybox.db
+  Write-Host "Restored DB from $($bak.FullName)"
+}
+
+# Older backups in data/.uat-backups/ can be deleted once the operator
+# is confident the run was clean: Remove-Item data/.uat-backups/toybox.db.bak-*
+```
+
 ### Phase E — Local model + tool-loop + non-linear gameplay (post-v1)
 
 **Goal:** swap the Claude-OAuth path for a locally-hosted, supervised-fine-tuned open-weight model so nothing leaves the house, then refactor the activity generator into a step-by-step tool-using loop that enables responsive non-linear gameplay. Runs after v1 has produced real-use data via the Phase C step 15 eval scaffold.
