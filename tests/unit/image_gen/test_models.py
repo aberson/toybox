@@ -47,13 +47,18 @@ def test_toy_action_status_members() -> None:
     assert ToyActionStatus.done == "done"
     assert ToyActionStatus.failed == "failed"
     assert ToyActionStatus.superseded == "superseded"
-    # All five members and no surprise extras.
+    # F3 added ``not_started`` as a UI-only placeholder synthesized by
+    # ``storage.toy_actions.list_for_toy`` for slots with no DB row;
+    # never persisted, never produced by the worker.
+    assert ToyActionStatus.not_started == "not_started"
+    # All six members and no surprise extras.
     assert {m.value for m in ToyActionStatus} == {
         "queued",
         "running",
         "done",
         "failed",
         "superseded",
+        "not_started",
     }
 
 

@@ -71,12 +71,19 @@ ACTION_PROMPTS: Final[dict[str, str]] = {
 class ToyActionStatus(StrEnum):
     """Per-slot job status as persisted on ``toy_actions.status``.
 
-    * ``queued``     — enqueued by the worker, not yet started.
-    * ``running``    — pipeline currently generating.
-    * ``done``       — PNG written, ``image_path`` populated.
-    * ``failed``     — generation raised; ``error_msg`` populated.
-    * ``superseded`` — a regen request preempted this row mid-flight
-                       (the new row replaces it).
+    * ``queued``      — enqueued by the worker, not yet started.
+    * ``running``     — pipeline currently generating.
+    * ``done``        — PNG written, ``image_path`` populated.
+    * ``failed``      — generation raised; ``error_msg`` populated.
+    * ``superseded``  — a regen request preempted this row mid-flight
+                        (the new row replaces it).
+    * ``not_started`` — UI-only placeholder synthesized by
+                        :func:`storage.toy_actions.list_for_toy` for
+                        slots that have no DB row yet. NEVER persisted
+                        — the storage layer never INSERTs this status,
+                        and the worker never produces it. The parent
+                        UI grid uses it to render an empty cell with
+                        a "regenerate" button before any jobs enqueue.
     """
 
     queued = "queued"
@@ -84,6 +91,7 @@ class ToyActionStatus(StrEnum):
     done = "done"
     failed = "failed"
     superseded = "superseded"
+    not_started = "not_started"
 
 
 @dataclass(slots=True)
