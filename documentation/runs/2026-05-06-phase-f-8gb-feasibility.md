@@ -128,3 +128,149 @@ uv run python vram_probe.py
 - Sources cited above are all post-IPA-SDXL-release (Q4 2023+) and reflect diffusers 0.27+ / PyTorch 2.4+ behavior.
 
 — produced by build-phase orchestrator's investigation agent, 2026-05-06
+
+---
+
+## Empirical findings (2026-05-06, after probe ran)
+
+The probe was actually executed on the host machine after the research phase. **Verdict: PASS — definitive evidence the full Phase F stack fits in 8 GB.**
+
+### Final probe result (rerun 5 of 5)
+
+| Metric | Result | Threshold | Pass? |
+|---|---|---|---|
+| Peak VRAM | **6.11 GB** | <7.5 GB | ✅ |
+| Wall-clock (25 steps, 1024×1024 fp16) | **30.2 sec** | <90 sec | ✅ |
+| Stack | SDXL base + IP-Adapter ViT-H + pixel-art-XL LoRA + model_cpu_offload + vae.enable_slicing() | full | ✅ |
+| Output validity | Valid PNG, IPA conditioning visible (subject identity preserved), pixel-art aesthetic intact | required | ✅ |
+
+Visual evidence: [`2026-05-06-vram-probe-output.png`](2026-05-06-vram-probe-output.png) — pixel-art cat sprite generated from a generic cat reference photo with prompt "pixel art, cute toy character running, 8-bit". Full run log at [`2026-05-06-vram-probe.log`](2026-05-06-vram-probe.log).
+
+Hardware: NVIDIA GeForce RTX 4070 Laptop GPU, 8 GB total VRAM, driver 581.95. Software: torch 2.6.0+cu124, diffusers 0.37.1, transformers 5.8.0, accelerate 1.13.0, peft 0.19.1, Python 3.12.13.
+
+### Three diffusers gotchas discovered during the probe
+
+These are mandatory implementation details for toybox's `src/toybox/image_gen/pipeline.py`. Without them the stack OOMs or crashes regardless of VRAM headroom.
+
+**1. The image encoder MUST be loaded explicitly and passed at pipeline construction.**
+
+`ip-adapter_sdxl_vit-h.safetensors` does NOT bundle its image encoder. If you call `pipe.load_ip_adapter(...)` without first constructing a `CLIPVisionModelWithProjection` and passing it as `image_encoder=...` to `from_pretrained`, generation crashes at the first `image_projection_layer` call with a shape mismatch:
+
+```
+RuntimeError: mat1 and mat2 shapes cannot be multiplied (2x1280 and 1024x8192)
+```
+
+The diffusers default falls back to OpenCLIP-ViT-bigG (1280-dim), but the ViT-H IPA weights expect ViT-H (1024-dim).
+
+**Fix (mandatory):**
+```python
+from transformers import CLIPVisionModelWithProjection
+
+image_encoder = CLIPVisionModelWithProjection.from_pretrained(
+    "h94/IP-Adapter",
+    subfolder="models/image_encoder",
+    torch_dtype=torch.float16,
+)
+
+pipe = StableDiffusionXLPipeline.from_pretrained(
+    "stabilityai/stable-diffusion-xl-base-1.0",
+    image_encoder=image_encoder,        # <-- MANDATORY
+    torch_dtype=torch.float16,
+    variant="fp16",
+    use_safetensors=True,
+)
+pipe.load_ip_adapter(
+    "h94/IP-Adapter",
+    subfolder="sdxl_models",
+    weight_name="ip-adapter_sdxl_vit-h.safetensors",
+)
+```
+
+**2. `enable_attention_slicing()` is INCOMPATIBLE with IP-Adapter.**
+
+The `enable_attention_slicing()` call swaps the unet's attention processors with sliced versions, which **overwrites** the IPA-aware processors that `load_ip_adapter()` installs. Subsequent generation crashes inside the swapped processor at the first `attn2` call with:
+
+```
+AttributeError: 'tuple' object has no attribute 'shape'
+```
+
+The trace points at `attention_processor.py` line 4029, which is reading `encoder_hidden_states.shape` before unpacking the IPA-tuple format `(text_states, image_embeds)`.
+
+**Fix (mandatory): do NOT call `enable_attention_slicing()`.** PyTorch 2.4+ SDPA already provides memory-efficient attention by default, so slicing is redundant. The probe demonstrates that `enable_model_cpu_offload()` + `pipe.vae.enable_slicing()` is sufficient to land 6.11 GB peak.
+
+This is true even WITHOUT the LoRA — the slicing+IPA incompatibility is independent of LoRA. The probe confirmed this in two separate runs.
+
+**3. `enable_vae_slicing()` is deprecated; use `pipe.vae.enable_slicing()`.**
+
+The pipeline-level `enable_vae_slicing()` will be removed in diffusers 0.40. Calling the VAE method directly avoids the deprecation warning:
+
+```python
+# Old (deprecated):
+pipe.enable_vae_slicing()
+
+# New (canonical):
+pipe.vae.enable_slicing()
+```
+
+### Canonical config for toybox `src/toybox/image_gen/pipeline.py`
+
+This is the empirically-validated config that lands 6.11 GB peak / 30s wall-clock on 8 GB hardware. Bake it as defaults; no env knobs needed for memory tuning unless future hardware needs different.
+
+```python
+import torch
+from diffusers import StableDiffusionXLPipeline
+from transformers import CLIPVisionModelWithProjection
+
+image_encoder = CLIPVisionModelWithProjection.from_pretrained(
+    "h94/IP-Adapter",
+    subfolder="models/image_encoder",
+    torch_dtype=torch.float16,
+)
+
+pipe = StableDiffusionXLPipeline.from_pretrained(
+    "stabilityai/stable-diffusion-xl-base-1.0",
+    image_encoder=image_encoder,
+    torch_dtype=torch.float16,
+    variant="fp16",
+    use_safetensors=True,
+)
+pipe.load_ip_adapter(
+    "h94/IP-Adapter",
+    subfolder="sdxl_models",
+    weight_name="ip-adapter_sdxl_vit-h.safetensors",
+)
+pipe.set_ip_adapter_scale(0.6)            # toy ingest tuning may change this default
+pipe.load_lora_weights("nerijs/pixel-art-xl")
+
+pipe.enable_model_cpu_offload()           # ~50% VRAM cut, ~1.3-2x slowdown — required for 8 GB
+pipe.vae.enable_slicing()                 # cheap; covers VAE decode peak
+# DO NOT call enable_attention_slicing() — incompatible with IPA, see Gotcha #2
+```
+
+### Soak projection (revised)
+
+Original F10 projection was 10-15h for 30 toys × 10 sprites = 300 generations. With measured 30.2 s/generation:
+
+| Metric | Original projection | Empirical (with measured rate) |
+|---|---|---|
+| Per-sprite wall-clock | ~3 min | **30 sec** |
+| 10 sprites per toy | ~30 min | **5 min** |
+| 30 toys total | 10-15 hours | **2.5 hours** |
+
+This is a 4-6× faster soak than the plan assumed. F10's overnight schedule is now overkill — a soak could complete during a single workday session. Plan doc's F10 wall-clock estimate should be revised in a future update.
+
+### Implications for F1, F9, F10
+
+- **F1 unblocked:** the discovered config works on 8 GB. F1 still ships per the plan (download checkpoints to `data/models/image_gen/`, document, smoke probe) but the smoke procedure can use the canonical config above.
+- **F2 must bake in the canonical config as defaults.** This includes the explicit image_encoder load and the prohibition on attention_slicing. Detailed in F2's revised build-step prompt.
+- **`TOYBOX_IMAGE_GEN_MIN_VRAM_GB` default:** keep at 12 (matches plan default for headroom hosts), but the discovered config means 8 GB hosts can override with confidence. The capability gate's `(False, "VRAM 8 GB < 12 GB floor")` reason becomes user-actionable: "set `TOYBOX_IMAGE_GEN_MIN_VRAM_GB=8` if your host can use the canonical config".
+- **F9 unblocked:** the operator smoke gate now has empirical wall-clock budgets to validate against (30s/sprite ± 50%; 5 min/toy ± 50%).
+- **F10 unblocked, schedule shortened:** 2.5 hours instead of overnight.
+
+### Remaining unknowns
+
+- **rembg memory footprint when stacked with the diffusion pipeline.** Probe didn't load rembg. The plan says ~170 MB for `u2net.onnx`; should fit easily in the 1.9 GB headroom. F2 build should validate this.
+- **Phase E concurrent local-LLM contention.** If Phase E ships and the local LLM holds 5-8 GB simultaneously, the 8 GB host runs out. Per-pipeline breaker isolates failures, but coordinated GPU scheduling is a follow-up.
+- **Generation quality for actual toy photos.** The probe used a generic cat reference. Real toys (varied lighting, multiple objects in frame, plush vs hard surface) may need different IPA scale or LoRA strength. F9's smoke gate is the first real test.
+
+— probe executed and findings recorded by build-phase orchestrator, 2026-05-06

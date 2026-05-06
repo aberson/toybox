@@ -2,11 +2,16 @@
 
 > Sibling expansion. Master plan ([plan.md](plan.md)) stays canonical for v1 scope; this doc carries the per-step `**Problem:**/**Type:**/**Issue:**/**Flags:**/**Status:**/**Done when:**` shape that `/build-phase` parses. Sequenced independently of [phase-e-plan.md](phase-e-plan.md) — Phase E and Phase F share migrations 0004/0005 numerically; whichever ships first claims those numbers and the other renumbers at build time (see §"Risks and open questions").
 
-## Build status (2026-05-06): Option B mode
+## Build status (2026-05-06): 8 GB feasibility CONFIRMED — Phase F fully unblocked
 
-Host GPU pre-flight: **NVIDIA RTX 4070 Laptop, 8 GB total VRAM** (driver 581.95) — below the 12 GB floor declared in §"Operator pre-flight". Phase F is building in **Option B**: F2–F8 land against the stub-runtime fixture per §"Operator pre-flight" para. 5 ("the codebase is ready for any future household with a capable GPU"); F1 (operator install of CUDA + four checkpoints) and F9 (operator GPU smoke gate) and F10 (overnight observation soak) are **PAUSED** on this host. Capability gate `is_image_gen_capable()` returns `(False, "VRAM 8 GB < TOYBOX_IMAGE_GEN_MIN_VRAM_GB=12")` → kiosk silently degrades to persona-only display, exactly the documented degraded path.
+Host GPU pre-flight found NVIDIA RTX 4070 Laptop, 8 GB total VRAM (driver 581.95) — below the 12 GB floor originally declared. Started in **Option B** mode (F2–F8 against the stub-runtime fixture), then ran an empirical probe to test 8 GB feasibility per [`runs/2026-05-06-phase-f-8gb-feasibility.md`](runs/2026-05-06-phase-f-8gb-feasibility.md). Probe **passed**: full SDXL + IP-Adapter ViT-H + pixel-art LoRA stack lands at **6.11 GB peak / 30.2 s wall-clock** at 1024×1024 fp16 with `enable_model_cpu_offload()` + `pipe.vae.enable_slicing()`. Output ([visual evidence](runs/2026-05-06-vram-probe-output.png)) is a clean pixel-art sprite with subject identity preserved from the reference photo.
 
-Concurrent investigation under way: research-only feasibility study on whether SDXL + IP-Adapter SDXL + pixel-art LoRA can fit in 8 GB with aggressive memory optimization (sequential CPU offload, attention slicing, fp16, smaller IP-Adapter variant) — or whether a different architecture (SD 1.5 + IPA at 768×768, SDXL Lightning, NF4-quantized Flux) better matches the goal. If the probe produces a config with peak VRAM < 7.5 GB end-to-end, F1 + F9 + F10 may be revisited with a revised `TOYBOX_IMAGE_GEN_MIN_VRAM_GB` default. Until then, treat F1 / F9 / F10 as deferred-on-this-host, not abandoned.
+**F1 + F9 + F10 are unblocked on this host.** The plan's `TOYBOX_IMAGE_GEN_MIN_VRAM_GB` default stays at 12 (matches headroom-host posture); 8 GB hosts override via `.env` after running the probe. F10's wall-clock projection drops from overnight (10-15h) to ~2.5 hours given the measured 30 s/sprite rate.
+
+Three diffusers gotchas discovered during the probe — these are **mandatory** for F2's `pipeline.py` implementation:
+1. The CLIP image encoder must be loaded explicitly via `CLIPVisionModelWithProjection.from_pretrained("h94/IP-Adapter", subfolder="models/image_encoder")` and passed to `StableDiffusionXLPipeline.from_pretrained(image_encoder=...)`. Otherwise IPA crashes with shape mismatch (`mat1 and mat2 shapes cannot be multiplied (2x1280 and 1024x8192)`).
+2. **Do NOT call `pipe.enable_attention_slicing()`** — it overwrites IPA-aware attention processors with sliced ones, crashing generation at the first `attn2` call (`AttributeError: 'tuple' object has no attribute 'shape'`). PyTorch 2.4+ SDPA already provides memory-efficient attention.
+3. Use `pipe.vae.enable_slicing()` (canonical) not the deprecated pipeline-level `enable_vae_slicing()`.
 
 Migration numbers settled at build time: F3 takes **0005** (next available after 0004 from Phase E #40); F6 takes **0006**.
 
@@ -229,10 +234,10 @@ Existing pattern is one breaker per call-site: Claude vision has its own breaker
 - **Type:** operator
 - **Issue:** #45
 - **Flags:** n/a (operator step; not invoked through `/build-step`)
-- **Status:** PAUSED (2026-05-06) — host GPU 8 GB < 12 GB floor; deferred per §"Build status" Option B. F2 proceeds against stub-runtime fixture; F2's `@pytest.mark.requires_gpu` integration test stays unrun until checkpoints land.
+- **Status:** PENDING (2026-05-06) — unblocked after 8 GB feasibility probe passed (peak 6.11 GB, 30 s/sprite). HF cache on this host already contains SDXL base + IPA ViT-H image encoder + IPA SDXL ViT-H weights + pixel-art-XL LoRA from the probe; F1's "download checkpoints" step can either (a) re-download to `data/models/image_gen/` for the documented layout, or (b) configure F2 to use HF cache via `HF_HOME`. F1 procedure also validates rembg `u2net.onnx` (~170 MB) which the probe did NOT touch.
 - **Depends on:** none (kicks off Phase F)
 - **Parallel-safe with:** none — strictly first step; F2 cannot start until checkpoints land
-- **Done when:** All four checkpoints sha256-verified on disk under `data/models/image_gen/`; the load snippet completes without OOM on the home GPU; `documentation/operator/image-gen-runtime.md` covers install + sha256s + env-var reference + GPU floor + troubleshooting.
+- **Done when:** All four checkpoints sha256-verified on disk under `data/models/image_gen/` (or `HF_HOME` cache); the load snippet completes without OOM on the home GPU; `documentation/operator/image-gen-runtime.md` covers install + sha256s + env-var reference + GPU floor + troubleshooting + the three diffusers gotchas surfaced by the probe (image_encoder explicit load; do-not-call attention_slicing; vae.enable_slicing canonical).
 
 #### Step F2: Pipeline module — bg-remove → SDXL+IPA+LoRA → quantize → PNG
 
@@ -330,7 +335,7 @@ Existing pattern is one breaker per call-site: Claude vision has its own breaker
 - **Type:** operator
 - **Issue:** #53
 - **Flags:** n/a (operator step; manual verification of the full pipeline)
-- **Status:** PAUSED (2026-05-06) — depends on F1; deferred per §"Build status" Option B until host GPU meets floor.
+- **Status:** PENDING (2026-05-06) — unblocked after 8 GB probe; budget per slot validated at ~30 s wall-clock (was projected at 2-3 min).
 - **Depends on:** Steps F1-F8 all DONE
 - **Parallel-safe with:** none — verification gate after the full implementation chain
 - **Done when:** Smoke run report at `documentation/runs/<date>-toy-action-sprites-smoke.md` with all 8 criteria passing; if any fails, file as a follow-up issue and fix before F10.
@@ -352,7 +357,7 @@ Existing pattern is one breaker per call-site: Claude vision has its own breaker
 - **Type:** wait
 - **Issue:** #54
 - **Flags:** n/a (operator step; long-wall-clock observation)
-- **Status:** PAUSED (2026-05-06) — depends on F9; deferred per §"Build status" Option B.
+- **Status:** PENDING (2026-05-06) — unblocked after 8 GB probe; expected wall-clock revised from overnight (10-15h) to ~2.5h given measured 30 s/sprite × 300 jobs.
 - **Depends on:** Step F9 (#53 — smoke gate passed)
 - **Parallel-safe with:** none — final observation gate; runs after smoke gate passes
 - **Done when:** Soak report landed at `documentation/runs/<date>-toy-action-sprites-soak.md`; soft-pass criterion met (280+ of 300 jobs successful + no invariant violation); if not met, file follow-up issues for each invariant violation and re-run F10 after fixes.
