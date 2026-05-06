@@ -52,3 +52,6 @@ playwright/.cache/
 # Claude Code (user-local settings + ephemeral worktrees; project settings.json is committed)
 .claude/settings.local.json
 .claude/worktrees/
+
+# Operator scratch
+zzscratch.txt
