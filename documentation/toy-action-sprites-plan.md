@@ -304,7 +304,7 @@ Existing pattern is one breaker per call-site: Claude vision has its own breaker
 - **Type:** code
 - **Issue:** #51
 - **Flags:** --reviewers code --ui (canonical) — autonomous-build operating mode runs as `--reviewers code`; visual UI verification batches at F9 per [`feedback_autonomous_build_bundled_ui.md`](../../../.claude/projects/c--Users-abero-dev/memory/feedback_autonomous_build_bundled_ui.md)
-- **Status:** PENDING
+- **Status:** DONE (2026-05-06) — merged. New `ToyActionSprite.tsx` (~112 px default, `image-rendering: pixelated`, `onError`-hides-element graceful 404 path, mandatory alt text). `StepCard.tsx` modified to render sprite to LEFT of body text when `step.action_slot` set + `activity.toy_ids[0]` present (deterministic). PersonaAvatar untouched at top; SFX timing tests unchanged. URL path corrected to `/api/static/images/toy_actions/<toy_id>/<slot>.png` (actual static-files mount). +15 vitest tests; frontend 210 passed. **Follow-up before F9:** backend `ActivityResponse` doesn't yet expose `toy_ids` on the wire — kiosk treats missing as no-sprite (graceful degradation), but a small wire-shape addition is needed before F9 smoke can validate sprites against real data.
 - **Depends on:** Step F5 (#49 — sprites are reachable via the static mount); Step F6 (#50 — `action_slot` flows through the WS envelope)
 - **Parallel-safe with:** none — F8 depends on F7; F7 must land first
 - **Done when:** `ToyActionSprite` component shipped + 4 vitest cases green; `StepCard` layout updated; persona avatar position unchanged (snapshot test); SFX-timing tests unchanged; Playwright child smoke updated to assert the sprite element appears on a step with a known slot + toy.
