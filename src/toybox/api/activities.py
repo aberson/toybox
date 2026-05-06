@@ -208,6 +208,10 @@ class ActivityResponse(BaseModel):
     persona_id: str | None = None
     intent_source: str | None = None
     child_ids: list[str] = Field(default_factory=list)
+    # Phase F: hydrated toy ids for the kiosk's ToyActionSprite resolution
+    # (renders sprite for toy_ids[0]). Empty list when the activity didn't
+    # involve any toys.
+    toy_ids: list[str] = Field(default_factory=list)
     created_at: str
     started_at: str | None = None
     ended_at: str | None = None
@@ -521,6 +525,17 @@ def _row_to_response(
     else:
         child_ids = []
 
+    toy_ids_raw = row["toy_ids"]
+    toy_ids: list[str]
+    if toy_ids_raw:
+        try:
+            decoded_toy = json.loads(toy_ids_raw)
+            toy_ids = [str(t) for t in decoded_toy] if isinstance(decoded_toy, list) else []
+        except json.JSONDecodeError:
+            toy_ids = []
+    else:
+        toy_ids = []
+
     # Step 23: surface trigger_phrase + persona_reasoning at the top
     # level of the response so the parent UI's "why this?" panel can
     # render them without re-parsing ``metadata``. Both live inside the
@@ -546,6 +561,7 @@ def _row_to_response(
         persona_id=row["persona_id"],
         intent_source=row["intent_source"],
         child_ids=child_ids,
+        toy_ids=toy_ids,
         created_at=str(row["created_at"]),
         started_at=row["started_at"],
         ended_at=row["ended_at"],
