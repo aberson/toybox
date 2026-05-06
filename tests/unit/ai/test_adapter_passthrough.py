@@ -171,7 +171,12 @@ def test_extract_tool_calls_drops_entry_with_non_dict_args() -> None:
 
 
 def test_extract_tool_calls_drops_entry_with_missing_name() -> None:
-    """``name`` missing or empty → entry dropped (was already guarded)."""
+    """``name`` missing, empty, or non-str → entry dropped.
+
+    Iter-1 only guarded ``"name" in entry``; iter-2 H4 strengthened this
+    to require ``isinstance(name, str) and name`` so empty-string and
+    non-str names are also rejected. This test pins both branches.
+    """
     from toybox.ai.adapters.claude import _extract_tool_calls
 
     payload = json.dumps(

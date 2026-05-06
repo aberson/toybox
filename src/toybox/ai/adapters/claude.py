@@ -85,9 +85,6 @@ class ClaudeAdapterContext:
     user_prompt: str
     max_tokens: int = DEFAULT_GENERATION_MAX_TOKENS
     max_loop_turns: int = DEFAULT_LOOP_MAX_TURNS
-    # Set by the call site after the activity is parsed, if it wants the
-    # adapter to validate the persona id against a specific value.
-    expected_persona_id: str | None = None
 
 
 @dataclass
