@@ -51,6 +51,9 @@ from ..ai.toy_vision import (
 )
 from ..core.auth import TokenScope
 from ..db import connect, resolve_db_path
+from ..image_gen.capability import is_image_gen_capable
+from ..image_gen.models import ACTION_SLOTS, ToyActionStatus
+from ..image_gen.worker import get_image_gen_worker
 from ..storage.images import (
     StagingId,
     StagingLockedError,
@@ -66,6 +69,7 @@ from ..storage.images import (
     sweep_stale_staging,
     validate_upload,
 )
+from ..storage.toy_actions import list_for_toy
 from ..triggers.dynamic import refresh_mention_toys
 from .auth_dep import RequireScope
 
@@ -274,6 +278,77 @@ class DeleteResponse(BaseModel):
 
     ok: bool = True
     archived: bool = True
+
+
+# ---------------------------------------------------------------------
+# Phase F Step F5: action-sprite REST shapes
+# ---------------------------------------------------------------------
+
+
+class ToyActionResponse(BaseModel):
+    """Wire shape for one row in :class:`ToyActionsResponse`.
+
+    Mirrors :class:`toybox.image_gen.models.ToyActionRow` with one
+    behavioural difference: ``status`` is serialised as the underlying
+    enum value (a plain string) so the parent UI can switch on the
+    canonical literals (``not_started``, ``queued``, ``running``,
+    ``done``, ``failed``, ``superseded``) without a runtime import of
+    the StrEnum.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    toy_id: str
+    slot: str
+    status: ToyActionStatus
+    image_path: str | None = None
+    seed: int | None = None
+    error_msg: str | None = None
+    updated_at: str
+
+
+class CapabilityInfo(BaseModel):
+    """Snapshot of :func:`is_image_gen_capable` for the parent banner.
+
+    Bundled into :class:`ToyActionsResponse` so the grid can render the
+    disabled-banner without a second round-trip; ``capable=False`` also
+    means the regenerate buttons should be disabled, with ``reason``
+    surfaced verbatim.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    capable: bool
+    reason: str
+
+
+class ToyActionsResponse(BaseModel):
+    """Envelope for ``GET /api/toys/{id}/actions``.
+
+    ``actions`` always carries exactly 10 rows in
+    :data:`toybox.image_gen.models.ACTION_SLOTS` order — slots without
+    a DB row are synthesized as ``not_started`` placeholders by
+    :func:`toybox.storage.toy_actions.list_for_toy`.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    actions: list[ToyActionResponse]
+    capability: CapabilityInfo
+
+
+class RegenerateResponse(BaseModel):
+    """Envelope for the two regenerate POST endpoints.
+
+    ``queued`` is the list of slot keys that were just enqueued. For
+    ``POST /api/toys/{id}/actions/regenerate`` it equals
+    :data:`ACTION_SLOTS` (all 10); for the per-slot variant it is a
+    one-element list ``[slot]``.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    queued: list[str]
 
 
 # ---------------------------------------------------------------------
@@ -535,7 +610,7 @@ async def post_upload(
     response_model=ToyResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def post_confirm(
+async def post_confirm(
     body: ToyConfirmRequest,
     conn: Annotated[sqlite3.Connection, Depends(get_toys_db)],
     _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
@@ -657,8 +732,63 @@ def post_confirm(
     except Exception:  # noqa: BLE001
         _logger.warning("refresh_mention_toys failed after toy insert", exc_info=True)
 
+    # Phase F Step F5: enqueue 10 image-gen jobs (one per ACTION_SLOTS
+    # entry) so the parent UI's 2x5 sprite grid populates without an
+    # explicit "regenerate all" click. Best-effort: a worker that isn't
+    # running, an offline capability gate, or an enqueue exception are
+    # all logged and swallowed so toy creation still succeeds — the toy
+    # is fully usable without sprites and the parent can hit the
+    # explicit regenerate-all endpoint to retry.
+    await _maybe_enqueue_action_jobs_for_toy(new_id)
+
     row = _fetch_toy_row(conn, new_id)
     return _row_to_response(row)
+
+
+async def _maybe_enqueue_action_jobs_for_toy(toy_id: str) -> None:
+    """Best-effort post-commit hook: enqueue 10 image-gen jobs.
+
+    Step F5's "after-commit" wiring per the plan §F5. Runs through the
+    capability gate and the singleton worker accessor; logs and
+    swallows every failure so a toy-create response is never blocked
+    on the image-gen subsystem.
+    """
+    worker = get_image_gen_worker()
+    if worker is None:
+        # Worker hasn't been started (e.g. run mode without the
+        # image-gen lifespan) — toy still saved, parent can ingest;
+        # just nothing to enqueue.
+        _logger.info(
+            "toy %s: image-gen worker not running; skipping enqueue",
+            toy_id,
+        )
+        return
+    capable, reason = is_image_gen_capable()
+    if not capable:
+        _logger.info(
+            "toy %s: image-gen disabled (%s); skipping enqueue",
+            toy_id,
+            reason,
+        )
+        return
+    try:
+        for slot in ACTION_SLOTS:
+            await worker.enqueue(toy_id, slot)
+    except Exception as exc:  # noqa: BLE001 -- best-effort
+        # Anything from a transient queue-full to a malformed slot
+        # (shouldn't happen — ACTION_SLOTS is the canonical vocab) is
+        # logged but doesn't break the toy create. The toy is still
+        # usable; parent can hit the regenerate-all endpoint.
+        _logger.warning(
+            "toy %s: image-gen enqueue failed: %s",
+            toy_id,
+            exc,
+            exc_info=True,
+        )
+        return
+    _logger.info(
+        "toy %s: enqueued %d image-gen jobs", toy_id, len(ACTION_SLOTS)
+    )
 
 
 # ---------------------------------------------------------------------
@@ -863,8 +993,150 @@ def delete_toy(
     return DeleteResponse(ok=True, archived=True)
 
 
+# ---------------------------------------------------------------------
+# Phase F Step F5: action-sprite endpoints
+# ---------------------------------------------------------------------
+
+
+def _validate_toy_id_or_404(toy_id: str) -> None:
+    """Defensive UUIDv4 check at the REST boundary.
+
+    The storage seam re-validates, but raising HTTP 404 with the
+    canonical ``toy_not_found`` envelope here lets callers handle a
+    bogus path segment (e.g. ``../foo``) the same way they handle a
+    missing row, rather than a 500 from the storage seam's
+    ``ValueError``.
+    """
+    from ..storage.toy_actions import _validate_toy_id  # noqa: PLC0415
+
+    try:
+        _validate_toy_id(toy_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "toy_not_found", "id": toy_id},
+        ) from exc
+
+
+def _action_row_to_response(
+    row: Any,  # ToyActionRow — kept loose to avoid the import in the signature
+) -> ToyActionResponse:
+    """Project a :class:`ToyActionRow` into the wire shape."""
+    return ToyActionResponse(
+        toy_id=row.toy_id,
+        slot=row.slot,
+        status=row.status,
+        image_path=row.image_path,
+        seed=row.seed,
+        error_msg=row.error_msg,
+        updated_at=row.updated_at,
+    )
+
+
+@router.get("/{toy_id}/actions", response_model=ToyActionsResponse)
+def get_toy_actions(
+    toy_id: str,
+    conn: Annotated[sqlite3.Connection, Depends(get_toys_db)],
+    _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
+) -> ToyActionsResponse:
+    """Return the 10-row action list + capability snapshot.
+
+    Even when :func:`is_image_gen_capable` returns ``False`` we still
+    return the existing rows + the capability info — per the plan
+    §"is_image_gen_capable() as graceful degradation": existing
+    ``done`` rows remain visible regardless of the capability gate
+    state. The ``409 image_gen_disabled`` envelope only applies to
+    the enqueue-side endpoints below.
+    """
+    _validate_toy_id_or_404(toy_id)
+    _fetch_toy_row(conn, toy_id)  # 404 if toy doesn't exist.
+    rows = list_for_toy(conn, toy_id)
+    capable, reason = is_image_gen_capable()
+    return ToyActionsResponse(
+        actions=[_action_row_to_response(r) for r in rows],
+        capability=CapabilityInfo(capable=capable, reason=reason),
+    )
+
+
+def _check_capability_or_409() -> None:
+    """Raise 409 ``image_gen_disabled`` when the gate is closed."""
+    capable, reason = is_image_gen_capable()
+    if not capable:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "image_gen_disabled", "reason": reason},
+        )
+
+
+def _require_worker_or_503() -> Any:
+    """Return the singleton worker, raising 503 if it hasn't started.
+
+    Distinguishes "image-gen disabled by the capability gate" (409 —
+    actionable: free VRAM, enable env var) from "worker not started"
+    (503 — operational: backend run mode without the image-gen
+    lifespan, or the lifespan failed to start).
+    """
+    worker = get_image_gen_worker()
+    if worker is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "image_gen_worker_unavailable",
+                "reason": "image-gen worker not running",
+            },
+        )
+    return worker
+
+
+@router.post("/{toy_id}/actions/regenerate", response_model=RegenerateResponse)
+async def regenerate_all_actions(
+    toy_id: str,
+    conn: Annotated[sqlite3.Connection, Depends(get_toys_db)],
+    _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
+) -> RegenerateResponse:
+    """Enqueue all 10 :data:`ACTION_SLOTS` jobs for ``toy_id``."""
+    _validate_toy_id_or_404(toy_id)
+    _fetch_toy_row(conn, toy_id)  # 404 if missing.
+    _check_capability_or_409()
+    worker = _require_worker_or_503()
+    for slot in ACTION_SLOTS:
+        await worker.enqueue(toy_id, slot)
+    return RegenerateResponse(queued=list(ACTION_SLOTS))
+
+
+@router.post(
+    "/{toy_id}/actions/{slot}/regenerate",
+    response_model=RegenerateResponse,
+)
+async def regenerate_one_action(
+    toy_id: str,
+    slot: str,
+    conn: Annotated[sqlite3.Connection, Depends(get_toys_db)],
+    _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
+) -> RegenerateResponse:
+    """Enqueue one slot — supersede semantics handled by the worker."""
+    _validate_toy_id_or_404(toy_id)
+    _fetch_toy_row(conn, toy_id)
+    if slot not in ACTION_SLOTS:
+        # Plan §F5: out-of-vocab slot → 404 with code="slot_not_in_vocab"
+        # so the parent UI can distinguish "you typo'd a slot in the URL"
+        # from "the toy doesn't exist".
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "slot_not_in_vocab", "slot": slot},
+        )
+    _check_capability_or_409()
+    worker = _require_worker_or_503()
+    await worker.enqueue(toy_id, slot)
+    return RegenerateResponse(queued=[slot])
+
+
 __all__ = [
+    "CapabilityInfo",
     "DeleteResponse",
+    "RegenerateResponse",
+    "ToyActionResponse",
+    "ToyActionsResponse",
     "ToyConfirmRequest",
     "ToyListResponse",
     "ToyResponse",
