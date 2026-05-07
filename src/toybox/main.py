@@ -20,7 +20,22 @@ misconfigured ``TOYBOX_HOST=0.0.0.0`` exits non-zero with the documented
 the API.
 """
 
+# ruff: noqa: E402 -- load_dotenv() runs BEFORE any toybox imports so .env
+# values land in os.environ before downstream module-level env reads or the
+# F3 capability boot probe. Standard entrypoint pattern; suppresses E402 for
+# the whole file.
 from __future__ import annotations
+
+# Honor a ``.env`` in the project root before any toybox imports so env-driven
+# config (TOYBOX_IMAGE_GEN_MIN_VRAM_GB, TOYBOX_HOST, TOYBOX_PORT, etc.) lands
+# in ``os.environ`` BEFORE downstream module-level reads or the F3 capability
+# boot probe. ``load_dotenv`` does NOT override existing shell env vars by
+# default, so explicit shell-level config still wins (matches the project's
+# prior posture for users who set vars in their terminal). See
+# ``documentation/operator/image-gen-runtime.md`` for the env-var reference.
+from dotenv import load_dotenv
+
+load_dotenv()
 
 import argparse
 import asyncio

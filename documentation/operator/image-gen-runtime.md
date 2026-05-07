@@ -103,12 +103,22 @@ pipe.vae.enable_slicing()                    # Rule 3: canonical API; pipe.enabl
 
 The negative prompt baked into Phase F's pipeline is `"photorealistic, 3d, blurry, smooth shading, antialiased, gradient"` — pushes toward the crisp pixel-art aesthetic. See plan §"Action vocabulary" for the per-slot prompt strings.
 
+## Running the backend with image-gen enabled
+
+**Important: always start the backend with `--extra image_gen`**:
+
+```powershell
+uv run --extra image_gen python -m toybox.main
+```
+
+A bare `uv run python -m toybox.main` triggers an implicit `uv sync` that normalizes the venv to the default (non-extras) dependency set, **silently uninstalling torch + diffusers + transformers + rembg**. The capability gate then reports `CUDA not available` even on hosts with a working GPU. Always pass `--extra image_gen` when launching the backend (and any related script) to keep the optional deps resident.
+
 ## Smoke probe
 
 The canonical smoke probe is the F2-shipped CLI:
 
 ```powershell
-uv run python -m toybox.image_gen --probe <toy_id> --slot idle
+uv run --extra image_gen python -m toybox.image_gen --probe <toy_id> --slot idle
 ```
 
 Pass criteria:
@@ -134,11 +144,15 @@ If you have not yet built F2, the standalone probe at [`documentation/runs/2026-
 For the 8 GB host:
 
 ```dotenv
-# .env
-TOYBOX_IMAGE_GEN_MIN_VRAM_GB=8
+# .env (loaded automatically at backend startup via python-dotenv)
+TOYBOX_IMAGE_GEN_MIN_VRAM_GB=6
 ```
 
-This override has no effect on hosts with ≥12 GB; the capability gate's floor check just becomes trivially true earlier.
+The backend calls `dotenv.load_dotenv()` at the top of `src/toybox/main.py` before any other imports, so values in `.env` are honored — no need to export them in the shell first. Shell-level env vars still win over `.env` (default `load_dotenv` semantics: existing values are not overridden).
+
+Use **6** on this RTX 4070 Laptop (8 GB total, ~6.9 GB free with browser open) — the empirical probe peaked at 6.11 GB so 6 is the right floor with thin headroom. Use **8** on hosts with ≥10-12 GB total but stricter "no-headroom-for-other-apps" posture. Keep the default **12** on dedicated 16+ GB hosts.
+
+This override has no effect on hosts with ≥12 GB free; the capability gate's floor check just becomes trivially true earlier.
 
 ## Troubleshooting
 
