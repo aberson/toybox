@@ -33,6 +33,23 @@ image_gen = [
     "huggingface-hub>=1",
 ]
 
+# Phase F: pin torch + torchvision to the CUDA 12.4 wheel index so
+# `uv sync --extra image_gen` pulls GPU-capable wheels by default.
+# Without this, uv pulls the CPU-only wheel from PyPI (which is what
+# F2 originally shipped — F9 smoke surfaced the gap on first install).
+# The pytorch-cu124 index is "explicit" so it ONLY ships torch +
+# torchvision; everything else still resolves from the default PyPI
+# index. CPU-only hosts that don't opt-in via --extra image_gen are
+# unaffected — the index isn't consulted at all in that case.
+[tool.uv.sources]
+torch = { index = "pytorch-cu124" }
+torchvision = { index = "pytorch-cu124" }
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
 [dependency-groups]
 dev = [
     "pytest>=8",
