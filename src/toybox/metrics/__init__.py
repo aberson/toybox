@@ -62,6 +62,7 @@ from ..ai.capability import is_capable
 from ..ai.rubric import DIMENSION_KEYS
 from ..core.capability import CapabilityReason
 from ..core.listening import ListeningMode, current_mode
+from ..core.mic_state import current_mic_enabled
 from ..core.pubsub import PubSub
 from ..core.throttle import min_interval_from_env
 from ..db import connect, resolve_db_path
@@ -151,6 +152,7 @@ class AudioStatus:
     mic_device: str | None
     queue_depth: int
     buffer_overruns_total: int
+    mic_enabled: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -243,6 +245,7 @@ class MetricsSnapshot:
                 "mic_device": self.audio.mic_device,
                 "queue_depth": self.audio.queue_depth,
                 "buffer_overruns_total": self.audio.buffer_overruns_total,
+                "mic_enabled": self.audio.mic_enabled,
             },
             "ai": {
                 "breaker_state": self.ai.breaker_state,
@@ -618,6 +621,7 @@ def _audio_status(
     *,
     mic_device: str | None,
     queue_depth: int,
+    mic_enabled: bool,
 ) -> AudioStatus:
     """Build the AudioStatus block from caller-supplied live values.
 
@@ -631,6 +635,7 @@ def _audio_status(
         mic_device=mic_device,
         queue_depth=queue_depth,
         buffer_overruns_total=_read_buffer_overruns(),
+        mic_enabled=mic_enabled,
     )
 
 
@@ -718,7 +723,19 @@ def get_metrics_snapshot(
     """
     activities = _activity_counts(conn)
     transcripts = _transcript_counts(conn)
-    audio = _audio_status(mic_device=inputs.mic_device, queue_depth=inputs.mic_queue_depth)
+    try:
+        mic_enabled = current_mic_enabled(conn)
+    except sqlite3.Error:
+        # Defensive: a transient DB blip during a metrics tick should
+        # surface a "mic on" default rather than mislabel the status as
+        # muted. Audit trail prefers false-positives (extra rows) over
+        # false-negatives (silently-dropped rows).
+        mic_enabled = True
+    audio = _audio_status(
+        mic_device=inputs.mic_device,
+        queue_depth=inputs.mic_queue_depth,
+        mic_enabled=mic_enabled,
+    )
 
     # Resolve listening mode: caller value wins; otherwise read from
     # the same connection (best-effort, falls back to OFFLINE).

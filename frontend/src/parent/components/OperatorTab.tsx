@@ -23,7 +23,7 @@ import type {
 import type { Envelope } from "../ws";
 
 export interface OperatorTabProps {
-  api: Pick<ApiClient, "getMetrics" | "setListeningMode">;
+  api: Pick<ApiClient, "getMetrics" | "setListeningMode" | "setMicEnabled">;
   // Caller wires this from the ws layer: register a listener for
   // ``metrics`` envelopes and return an unsubscribe function. When the
   // ws path is unavailable (e.g. tests, kiosk-only build), pass a
@@ -130,6 +130,92 @@ interface ListeningModeControlProps {
   onModeChanged: (mode: ListeningMode) => void;
 }
 
+interface MicMuteControlProps {
+  api: Pick<ApiClient, "setMicEnabled">;
+  enabled: boolean;
+  onMicEnabledChanged: (enabled: boolean) => void;
+}
+
+function MicMuteControl(props: MicMuteControlProps): JSX.Element {
+  const { api, enabled, onMicEnabledChanged } = props;
+  const [pending, setPending] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleToggle = useCallback((): void => {
+    if (pending) return;
+    const next = !enabled;
+    setPending(true);
+    setError(null);
+    api
+      .setMicEnabled(next)
+      .then((resp) => {
+        onMicEnabledChanged(resp.enabled);
+        setPending(false);
+      })
+      .catch((err: unknown) => {
+        if (isAbortError(err)) return;
+        const message =
+          err instanceof Error ? err.message : "set mic enabled failed";
+        setError(message);
+        setPending(false);
+      });
+  }, [api, enabled, onMicEnabledChanged, pending]);
+
+  return (
+    <section data-testid="operator-mic-mute" style={CARD_STYLE}>
+      <h3 style={SECTION_HEADING_STYLE}>Mic</h3>
+      <p
+        style={{
+          fontSize: 11,
+          color: "#6b7280",
+          margin: "0 0 8px 0",
+          lineHeight: 1.4,
+        }}
+      >
+        Hard mute switch. While muted, the kiosk drains audio but skips
+        transcript persistence + ws emit. Independent of listening mode.
+      </p>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <button
+          type="button"
+          data-testid="mic-mute-toggle"
+          data-mic-enabled={enabled ? "true" : "false"}
+          disabled={pending}
+          onClick={handleToggle}
+          style={{
+            fontSize: 12,
+            padding: "4px 10px",
+            borderRadius: 4,
+            border: enabled ? "1px solid #16a34a" : "1px solid #b91c1c",
+            background: enabled ? "#dcfce7" : "#fee2e2",
+            color: enabled ? "#14532d" : "#7f1d1d",
+            fontWeight: 600,
+            cursor: pending ? "default" : "pointer",
+            opacity: pending ? 0.6 : 1,
+          }}
+        >
+          {enabled ? "● listening" : "○ muted"}
+        </button>
+        <span
+          data-testid="mic-mute-status"
+          style={{ fontSize: 11, color: "#374151" }}
+        >
+          {enabled ? "click to mute" : "click to unmute"}
+        </span>
+      </div>
+      {error !== null && (
+        <div
+          data-testid="mic-mute-error"
+          role="alert"
+          style={{ color: "#b91c1c", fontSize: 11, marginTop: 6 }}
+        >
+          {error}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function ListeningModeControl(props: ListeningModeControlProps): JSX.Element {
   const { api, currentMode, onModeChanged } = props;
   const [pendingMode, setPendingMode] = useState<ListeningMode | null>(null);
@@ -175,8 +261,9 @@ function ListeningModeControl(props: ListeningModeControlProps): JSX.Element {
           lineHeight: 1.4,
         }}
       >
-        Controls whether and how aggressively the kiosk listens to the child.
-        OFFLINE stops transcription entirely.
+        Controls how aggressively the kiosk escalates to Claude for
+        suggestions. OFFLINE never escalates; the mic still records
+        transcripts. Use the mic mute toggle to stop recording.
       </p>
       <div
         data-testid="listening-mode-buttons"
@@ -306,6 +393,12 @@ export function OperatorTab(props: OperatorTabProps): JSX.Element {
     );
   }, []);
 
+  const handleMicEnabledChanged = useCallback((enabled: boolean): void => {
+    setSnapshot((s) =>
+      s !== null ? { ...s, audio: { ...s.audio, mic_enabled: enabled } } : s,
+    );
+  }, []);
+
   const listeningCard = useMemo(
     () => (
       <ListeningModeControl
@@ -315,6 +408,17 @@ export function OperatorTab(props: OperatorTabProps): JSX.Element {
       />
     ),
     [api, handleListeningModeChanged, snapshot?.ai.listening_mode],
+  );
+
+  const micMuteCard = useMemo(
+    () => (
+      <MicMuteControl
+        api={api}
+        enabled={snapshot?.audio.mic_enabled ?? true}
+        onMicEnabledChanged={handleMicEnabledChanged}
+      />
+    ),
+    [api, handleMicEnabledChanged, snapshot?.audio.mic_enabled],
   );
 
   if (snapshot === null) {
@@ -403,6 +507,8 @@ export function OperatorTab(props: OperatorTabProps): JSX.Element {
 
         {listeningCard}
 
+        {micMuteCard}
+
         <section style={CARD_STYLE}>
           <h3 style={SECTION_HEADING_STYLE}>Transcripts</h3>
           <table data-testid="operator-transcripts">
@@ -439,6 +545,12 @@ export function OperatorTab(props: OperatorTabProps): JSX.Element {
                 <td>buffer overruns</td>
                 <td data-testid="m-audio-overruns">
                   {snapshot.audio.buffer_overruns_total}
+                </td>
+              </tr>
+              <tr>
+                <td>mic enabled</td>
+                <td data-testid="m-audio-mic-enabled">
+                  {snapshot.audio.mic_enabled ? "yes" : "no"}
                 </td>
               </tr>
             </tbody>

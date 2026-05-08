@@ -294,6 +294,14 @@ def _run_pipeline_sync(
                 f"{model_dir}/pixel_art_lora",
                 weight_name="pixel-art-xl.safetensors",
             )
+            # Fuse LoRA into the base UNet weights so the cpu-offload
+            # hook moves a single tensor graph. Without fusion, LoRA
+            # adapter modules attached by peft can stay on CPU when
+            # the offload hook moves the UNet to CUDA, producing the
+            # "addmm: tensors on cuda:0 and cpu" error on the first
+            # forward pass. Fusion is one-way; we never need to
+            # unload this LoRA so there's nothing to unfuse.
+            pipe.fuse_lora()
             # Memory knobs.
             pipe.enable_model_cpu_offload()
             pipe.vae.enable_slicing()

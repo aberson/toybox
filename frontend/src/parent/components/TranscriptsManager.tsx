@@ -386,8 +386,9 @@ export function TranscriptsManager(
         data-testid="transcripts-listening-hint"
         style={{ fontSize: 12, color: "#6b7280", margin: "0 0 8px 0" }}
       >
-        Transcription is controlled by the listening mode. Set it in the
-        Operator tab — OFFLINE stops transcription entirely.
+        The kiosk records transcripts whenever the mic is on. Listening
+        mode (Operator tab) controls AI escalation, not the mic. To stop
+        recording, use the mic mute toggle in the Operator tab.
       </p>
 
       {loading && (

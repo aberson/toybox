@@ -57,7 +57,10 @@ _DEFAULT_DATA_ROOT = Path("data")
 # ``data/images/toy_actions/``. The canonical helper for the storage
 # layer arrives in F3; F2 inlines the check here.
 _UUID4_RE: re.Pattern[str] = re.compile(
-    r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+    r"^("
+    r"[0-9a-f]{12}4[0-9a-f]{3}[89ab][0-9a-f]{15}"
+    r"|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+    r")$",
     re.IGNORECASE,
 )
 

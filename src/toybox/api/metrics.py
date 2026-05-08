@@ -72,6 +72,7 @@ class _MetricsAudioStatus(BaseModel):
     mic_device: str | None
     queue_depth: int
     buffer_overruns_total: int
+    mic_enabled: bool
 
 
 class _MetricsAIStatus(BaseModel):

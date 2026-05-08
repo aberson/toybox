@@ -18,6 +18,7 @@ class Topic(StrEnum):
     """Canonical ws topic identifiers."""
 
     listening_mode = "listening.mode"
+    mic_enabled = "mic.enabled"
     system = "system"
     triggers_invalidate = "triggers.invalidate"
     activity = "activity"

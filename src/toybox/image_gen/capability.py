@@ -131,17 +131,29 @@ def _probe_cuda_and_vram() -> tuple[bool, float]:
     return True, float(free_bytes) / float(1024**3)
 
 
-def is_image_gen_capable() -> tuple[bool, str]:
+def is_image_gen_capable(*, check_free_vram: bool = True) -> tuple[bool, str]:
     """Four-branch capability gate, in priority order.
 
     1. Env-disabled (``TOYBOX_IMAGE_GEN_ENABLED=false``).
     2. CUDA not available.
-    3. Free VRAM below floor.
+    3. Free VRAM below floor (skipped when ``check_free_vram=False``).
     4. One or more required checkpoints missing on disk.
     5. Else capable.
 
     Returns ``(capable, reason)``. ``reason`` is human-readable so
     the parent UI can render it in the disabled banner verbatim.
+
+    ``check_free_vram=False`` is for request-time callers (post-commit
+    enqueue hook, ``/regenerate`` endpoints, the actions GET): once the
+    boot probe established the hardware fits, mid-flight free-VRAM dips
+    during an active generation are normal — SDXL peaks at ~6 GB on
+    this card, which drops free VRAM below the 6 GB floor for the
+    duration of the gen. Re-checking at request time would 409 every
+    regenerate click that lands during another sprite's run. The worker
+    handles real OOM via ``ImageGenCapacityError`` + breaker, which is
+    the appropriate fast-fail for that case. The boot probe still uses
+    the strict check (default) so an operator with too small a card
+    sees the failure at startup.
     """
     if _env_bool_disabled(ENABLED_ENV):
         return False, "image-gen disabled via TOYBOX_IMAGE_GEN_ENABLED"
@@ -150,11 +162,12 @@ def is_image_gen_capable() -> tuple[bool, str]:
     if not cuda_available:
         return False, "CUDA not available"
 
-    floor_gb = _min_vram_gb()
-    if free_gb < floor_gb:
-        # Format VRAM with one decimal place so 7.4 GB doesn't render
-        # as "7GB" and look like the floor was exactly hit.
-        return False, f"VRAM {free_gb:.1f}GB < floor {floor_gb:.1f}GB"
+    if check_free_vram:
+        floor_gb = _min_vram_gb()
+        if free_gb < floor_gb:
+            # Format VRAM with one decimal place so 7.4 GB doesn't render
+            # as "7GB" and look like the floor was exactly hit.
+            return False, f"VRAM {free_gb:.1f}GB < floor {floor_gb:.1f}GB"
 
     model_dir = _model_dir()
     missing = _missing_checkpoints(model_dir)

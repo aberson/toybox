@@ -40,6 +40,7 @@ from numpy import int16
 from numpy.typing import NDArray
 
 from ..core.listening import Publisher
+from ..core.mic_state import current_mic_enabled
 from ..db import resolve_db_path
 from ..db.connection import connect
 from ..triggers.registry import Intent
@@ -71,6 +72,14 @@ class _TranscriberLike(Protocol):
 # argument is always supplied by the pipeline so the dynamic toy-name
 # source resolves against the right SQLite file.
 TriggerMatcher = Callable[[str, Path | None], list[Intent]]
+
+
+# Shape of the mic-enabled gate. Production passes a closure that reads
+# ``settings.mic_enabled`` from SQLite per-call; tests pass a constant
+# lambda (or a list-toggle for state transitions). Per-call read is
+# cheap (settings table is tiny + sqlite caches the page) and avoids a
+# cache-invalidation hop when the parent toggles mute mid-utterance.
+MicEnabledCheck = Callable[[], bool]
 
 
 def _confidence_floor_from_env() -> float:
@@ -123,6 +132,26 @@ def _default_trigger_matcher(text: str, db_path: Path | None) -> list[Intent]:
     return trigger_match(text, db_path=db_path)
 
 
+def _default_mic_enabled_check(db_path: Path) -> MicEnabledCheck:
+    """Build a per-call settings reader. Failures fail-open (mic on)."""
+
+    def _check() -> bool:
+        try:
+            conn = connect(db_path, check_same_thread=False)
+        except sqlite3.Error as exc:
+            _logger.warning("mic_enabled probe: cannot open DB: %s", exc)
+            return True
+        try:
+            return current_mic_enabled(conn)
+        except sqlite3.Error as exc:
+            _logger.warning("mic_enabled probe: query failed: %s", exc)
+            return True
+        finally:
+            conn.close()
+
+    return _check
+
+
 class TranscriptPipeline:
     """Wire VAD-gated speech to STT, persistence, ws emit, and triggers.
 
@@ -163,6 +192,7 @@ class TranscriptPipeline:
         mic_id: str | None = None,
         confidence_floor: float | None = None,
         trigger_matcher: TriggerMatcher | None = None,
+        mic_enabled_check: MicEnabledCheck | None = None,
     ) -> None:
         if confidence_floor is None:
             confidence_floor = _confidence_floor_from_env()
@@ -180,6 +210,11 @@ class TranscriptPipeline:
         self._confidence_floor = confidence_floor
         self._trigger_matcher = (
             trigger_matcher if trigger_matcher is not None else _default_trigger_matcher
+        )
+        self._mic_enabled_check = (
+            mic_enabled_check
+            if mic_enabled_check is not None
+            else _default_mic_enabled_check(self._db_path)
         )
         self._task: asyncio.Task[None] | None = None
         self._running = False
@@ -275,6 +310,23 @@ class TranscriptPipeline:
         # so a row like ``" "`` or ``"\n"`` doesn't sneak through the
         # plain ``not text`` falsiness check.
         if not transcript.text.strip():
+            return
+
+        # Mute gate: when the parent has muted the mic via the operator
+        # tab, we keep the capture loop draining (so PortAudio doesn't
+        # back up) but skip persistence, ws emit, and the trigger pass.
+        # Read fresh per-utterance so a mid-conversation toggle takes
+        # effect on the next chunk.
+        try:
+            mic_on = self._mic_enabled_check()
+        except Exception as exc:  # noqa: BLE001 -- defensive: gate fails open
+            _logger.warning(
+                "mic_enabled_check raised; treating mic as on (exc=%s: %s)",
+                type(exc).__name__,
+                exc,
+            )
+            mic_on = True
+        if not mic_on:
             return
 
         ended_at = datetime.now(UTC)

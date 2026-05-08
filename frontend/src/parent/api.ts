@@ -462,6 +462,15 @@ export interface MetricsAudioStatus {
   // Process-lifetime counter, not a 24h window. Resets to zero on
   // restart; surfacing it lets the operator spot a mic stall.
   buffer_overruns_total: number;
+  // Reflects ``settings.mic_enabled`` — false means the parent has muted
+  // the mic from the operator tab. Persistence + ws emit are skipped at
+  // the pipeline layer when this is false, but the capture loop keeps
+  // draining so PortAudio doesn't back up.
+  mic_enabled: boolean;
+}
+
+export interface MicEnabledResponse {
+  enabled: boolean;
 }
 
 export interface MetricsAIStatus {
@@ -1162,6 +1171,23 @@ export class ApiClient {
     return this.request<ListeningModeResponse>("/api/listening/mode", {
       method: "PUT",
       body: JSON.stringify({ mode }),
+      signal: opts.signal,
+    });
+  }
+
+  // Mic mute toggle. Distinct from listening mode: muting stops
+  // transcript persistence + ws emit at the pipeline layer; listening
+  // mode gates AI escalation only. The current value lives in
+  // ``snapshot.audio.mic_enabled`` so the OperatorTab patches the
+  // local snapshot with the PUT response and lets the next metrics
+  // envelope reconcile.
+  async setMicEnabled(
+    enabled: boolean,
+    opts: RequestOptions = {},
+  ): Promise<MicEnabledResponse> {
+    return this.request<MicEnabledResponse>("/api/audio/mic-enabled", {
+      method: "PUT",
+      body: JSON.stringify({ enabled }),
       signal: opts.signal,
     });
   }

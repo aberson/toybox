@@ -15,6 +15,11 @@ import type {
   ReadingLevel,
   ValidationFieldError,
 } from "../api";
+import {
+  BANNED_THEME_PRESETS,
+  findPreset,
+  mergeBannedThemes,
+} from "./bannedThemePresets";
 
 // Shape of the editor form. Matches ``ChildProfileCreate`` but with
 // strings (never null) so the controlled inputs round-trip cleanly.
@@ -147,6 +152,10 @@ export function ChildProfileEditor(
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [rowError, setRowError] = useState<string | null>(null);
+  // Banned-theme preset picker selection. Local to the open form;
+  // resets whenever the form opens, closes, or saves so re-opening
+  // the editor doesn't show a stale bundle preview.
+  const [selectedPresetId, setSelectedPresetId] = useState<string>("");
 
   // AbortController spanning one mount of the editor. Recreated on each
   // mount inside the useEffect below — under React 18 StrictMode the
@@ -191,6 +200,7 @@ export function ChildProfileEditor(
     setForm(EMPTY_FORM);
     setFormError(null);
     setFieldErrors({});
+    setSelectedPresetId("");
   }, []);
 
   const openEdit = useCallback((profile: ChildProfile): void => {
@@ -198,6 +208,7 @@ export function ChildProfileEditor(
     setForm(profileToForm(profile));
     setFormError(null);
     setFieldErrors({});
+    setSelectedPresetId("");
   }, []);
 
   const cancel = useCallback((): void => {
@@ -205,6 +216,7 @@ export function ChildProfileEditor(
     setForm(EMPTY_FORM);
     setFormError(null);
     setFieldErrors({});
+    setSelectedPresetId("");
   }, []);
 
   const submit = useCallback(async (): Promise<void> => {
@@ -288,6 +300,18 @@ export function ChildProfileEditor(
     },
     [],
   );
+
+  const appendSelectedPreset = useCallback((): void => {
+    const preset = findPreset(selectedPresetId);
+    if (preset === null) return;
+    setForm((prev) => ({
+      ...prev,
+      banned_themes: mergeBannedThemes(prev.banned_themes, preset.themes),
+    }));
+    setSelectedPresetId("");
+  }, [selectedPresetId]);
+
+  const selectedPreset = findPreset(selectedPresetId);
 
   return (
     <section
@@ -628,6 +652,66 @@ export function ChildProfileEditor(
             >
               Banned themes (comma-separated)
             </label>
+            <div
+              data-testid="banned-theme-preset-picker"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                margin: "4px 0",
+                flexWrap: "wrap",
+              }}
+            >
+              <label
+                htmlFor="banned-theme-preset"
+                style={{ fontSize: 12, color: "#555" }}
+              >
+                Add preset bundle:
+              </label>
+              <select
+                id="banned-theme-preset"
+                data-testid="banned-theme-preset-select"
+                value={selectedPresetId}
+                onChange={(e) => setSelectedPresetId(e.target.value)}
+                style={{ padding: 4, fontSize: 12 }}
+              >
+                <option value="">(choose a bundle…)</option>
+                {BANNED_THEME_PRESETS.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                data-testid="banned-theme-preset-append"
+                onClick={appendSelectedPreset}
+                disabled={selectedPreset === null}
+                style={{ fontSize: 12 }}
+              >
+                append to list
+              </button>
+            </div>
+            {selectedPreset !== null && (
+              <div
+                data-testid="banned-theme-preset-preview"
+                style={{
+                  background: "#f7f7f7",
+                  border: "1px solid #ddd",
+                  borderRadius: 4,
+                  padding: 8,
+                  margin: "0 0 6px",
+                  fontSize: 12,
+                  color: "#555",
+                }}
+              >
+                <div style={{ marginBottom: 4 }}>{selectedPreset.description}</div>
+                <div>
+                  <span style={{ color: "#888" }}>themes:</span>{" "}
+                  {selectedPreset.themes.join(", ")}
+                </div>
+              </div>
+            )}
             <textarea
               id="child-banned-themes"
               data-testid="field-banned-themes"

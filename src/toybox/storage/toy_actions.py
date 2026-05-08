@@ -48,14 +48,18 @@ from ..image_gen.models import ACTION_SLOTS, ToyActionRow, ToyActionStatus
 
 _logger = logging.getLogger(__name__)
 
-# UUIDv4 regex (case-insensitive). Mirrors the inline validator in
-# ``toybox.image_gen.__main__`` — same pattern, same intent. Kept here
-# because the storage layer is the canonical defensive seam between
-# user-controlled identifiers and on-disk paths; the CLI's inline
-# copy is a pre-F3 mirror and can collapse into this helper in a
-# future refactor.
+# UUIDv4 regex (case-insensitive). Accepts both the hyphenated form
+# (``str(uuid.uuid4())``) and the 32-char hex form (``uuid.uuid4().hex``)
+# because ``api.toys.post_confirm`` and ``storage.images`` mint toy ids
+# via ``.hex`` while activities + the original toy_actions tests use
+# the hyphenated form. Both encodings are equally safe as path
+# segments — what matters is that the pattern rejects path-traversal
+# payloads like ``../foo``. Mirrored in ``toybox.image_gen.__main__``.
 _UUID4_RE: Final[re.Pattern[str]] = re.compile(
-    r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+    r"^("
+    r"[0-9a-f]{12}4[0-9a-f]{3}[89ab][0-9a-f]{15}"
+    r"|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+    r")$",
     re.IGNORECASE,
 )
 

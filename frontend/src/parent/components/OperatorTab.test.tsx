@@ -36,6 +36,7 @@ function fakeSnapshot(overrides: Partial<MetricsSnapshot> = {}): MetricsSnapshot
       mic_device: "USB Audio (default)",
       queue_depth: 0,
       buffer_overruns_total: 2,
+      mic_enabled: true,
     },
     ai: {
       breaker_state: "closed",

@@ -87,6 +87,21 @@ DEFAULT_SMOKE_WAV: Path = Path("tests") / "fixtures" / "audio" / "lets_play_unic
 SMOKE_SESSION_ID = "smoke-session"
 SMOKE_MIC_ID = "smoke-mic"
 
+# Production session id: a single stable row in the ``sessions`` table
+# that all live transcripts FK to. Re-used across restarts (no purge,
+# no per-boot UUID) so the table doesn't accumulate one-row-per-process
+# garbage and operators can correlate transcripts across reboots without
+# walking a session-id history.
+PRODUCTION_SESSION_ID = "production-session"
+PRODUCTION_MIC_ID = "production-mic"
+
+# Opt-out for the audio pipeline. When set, ``_metrics_lifespan`` skips
+# mic + transcriber init entirely — useful for headless test boxes,
+# parent-only deployments, or operator runs where the host has no
+# functioning input device. Defaults to "0" (audio enabled) so a normal
+# ``python -m toybox.main`` boot starts recording.
+TOYBOX_DISABLE_AUDIO_ENV = "TOYBOX_DISABLE_AUDIO"
+
 # --smoke is a controlled CPU-only test path -- the host running it
 # (CI, an iter validation, the build-step orchestrator) is not assumed
 # to ship a working CUDA toolchain. ``WhisperTranscriber`` defaults to
@@ -194,6 +209,23 @@ def _ensure_smoke_session(db_path: Path, session_id: str) -> None:
                 )
     finally:
         conn.close()
+
+
+def _ensure_production_session(db_path: Path) -> None:
+    """Insert the production ``sessions`` row if absent. No purge.
+
+    Same shape as :func:`_ensure_smoke_session` but tied to the stable
+    :data:`PRODUCTION_SESSION_ID`. Unlike the smoke variant it does NOT
+    purge active activity rows — production preserves history across
+    restarts.
+    """
+    _ensure_smoke_session(db_path, PRODUCTION_SESSION_ID)
+
+
+def _audio_disabled_via_env() -> bool:
+    """Return True when ``TOYBOX_DISABLE_AUDIO`` is set to a truthy value."""
+    raw = os.environ.get(TOYBOX_DISABLE_AUDIO_ENV, "").strip().lower()
+    return raw in ("1", "true", "yes", "on")
 
 
 # Activity states the parent UI considers "active" -- any of these in the
@@ -646,24 +678,136 @@ def _build_metrics_inputs_factory(
     return _factory
 
 
+async def _start_production_audio(
+    db_path: Path,
+) -> tuple[MicCapture | None, TranscriptPipeline | None, WhisperTranscriber | None]:
+    """Build + start the production audio pipeline; gracefully no-op on failure.
+
+    Returns ``(mic, pipeline, transcriber)`` — any of the three may be
+    ``None`` when init failed at that step. Callers should pass each
+    to :func:`_stop_production_audio` regardless; ``None`` slots are
+    safely skipped.
+
+    The graceful degradation is deliberate: a parent-only deployment
+    (no mic on the host) or a misconfigured PortAudio install must NOT
+    take the API down. The metrics + REST surface stays up and the
+    operator dashboard surfaces ``mic_device=None`` so the gap is
+    visible without a crash log.
+    """
+    if _audio_disabled_via_env():
+        _logger.info(
+            "audio pipeline disabled via %s; transcripts will not flow",
+            TOYBOX_DISABLE_AUDIO_ENV,
+        )
+        return None, None, None
+
+    try:
+        _ensure_production_session(db_path)
+    except Exception as exc:  # noqa: BLE001 -- defensive: API must still boot
+        _logger.warning(
+            "production session bootstrap failed; skipping audio pipeline (%s: %s)",
+            type(exc).__name__,
+            exc,
+        )
+        return None, None, None
+
+    mic: MicCapture | None = None
+    transcriber: WhisperTranscriber | None = None
+    pipeline: TranscriptPipeline | None = None
+    try:
+        mic = MicCapture()
+        await mic.start()
+    except Exception as exc:  # noqa: BLE001 -- log + degrade
+        _logger.warning(
+            "mic capture failed to start; transcripts will not flow (%s: %s)",
+            type(exc).__name__,
+            exc,
+        )
+        if mic is not None:
+            with contextlib.suppress(Exception):
+                await mic.stop()
+        return None, None, None
+
+    try:
+        transcriber = WhisperTranscriber()
+    except Exception as exc:  # noqa: BLE001 -- log + degrade
+        _logger.warning(
+            "whisper transcriber failed to init; tearing down mic (%s: %s)",
+            type(exc).__name__,
+            exc,
+        )
+        with contextlib.suppress(Exception):
+            await mic.stop()
+        return None, None, None
+
+    try:
+        pipeline = TranscriptPipeline(
+            capture=mic,
+            transcriber=transcriber,
+            session_id=PRODUCTION_SESSION_ID,
+            publisher=lambda env: get_pubsub().publish(env),
+            db_path=db_path,
+            mic_id=PRODUCTION_MIC_ID,
+        )
+        await pipeline.start()
+    except Exception as exc:  # noqa: BLE001 -- log + degrade
+        _logger.warning(
+            "transcript pipeline failed to start; tearing down (%s: %s)",
+            type(exc).__name__,
+            exc,
+        )
+        with contextlib.suppress(Exception):
+            await transcriber.close()
+        with contextlib.suppress(Exception):
+            await mic.stop()
+        return None, None, None
+
+    _logger.info(
+        "production audio pipeline started (session_id=%s, mic_id=%s)",
+        PRODUCTION_SESSION_ID,
+        PRODUCTION_MIC_ID,
+    )
+    return mic, pipeline, transcriber
+
+
+async def _stop_production_audio(
+    mic: MicCapture | None,
+    pipeline: TranscriptPipeline | None,
+    transcriber: WhisperTranscriber | None,
+) -> None:
+    """Reverse-of-start teardown. Each stop is independently suppressed."""
+    if pipeline is not None:
+        with contextlib.suppress(Exception):
+            await pipeline.stop()
+    if mic is not None:
+        with contextlib.suppress(Exception):
+            await mic.stop()
+    if transcriber is not None:
+        with contextlib.suppress(Exception):
+            await transcriber.close()
+
+
 @contextlib.asynccontextmanager
 async def _metrics_lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Lifespan that starts the metrics publisher + image-gen worker.
+    """Production lifespan: audio pipeline + metrics publisher + image-gen worker.
 
-    Used in the non-smoke path where the audio pipeline isn't started
-    in-process (the operator runs ``audio.capture`` separately or runs
-    in a stripped-down API mode for tests). The smoke lifespan composes
-    its own publisher start/stop on top of the audio pump and also
-    threads the image-gen worker through.
+    Starts the live mic + transcript pipeline (real PortAudio device,
+    real Whisper) so that ``python -m toybox.main`` records transcripts
+    out of the box. Failures in any audio component are logged and
+    swallowed — the API + metrics stay up regardless so a parent-only
+    or headless deployment still boots.
 
-    Phase F Step F4: the image-gen worker is started under
-    :func:`image_gen_worker_lifespan` BEFORE the metrics publisher so
-    the worker's restart-recovery sweep happens at the same point in
-    boot as the (now-historical) metrics-only path. Stop order is
-    reversed in the ``finally`` block.
+    The smoke lifespan keeps its own bespoke wiring (WAV-pump capture,
+    offline-only escalation, smoke session purge) and is unaffected.
+
+    Start order: audio pipeline → image-gen worker → metrics publisher.
+    Stop order: metrics publisher → image-gen worker → audio pipeline.
     """
     breaker = get_metrics_breaker()
-    mic_holder: dict[str, MicCapture | None] = {"mic": None}
+    db_path = resolve_db_path()
+
+    mic, pipeline, transcriber = await _start_production_audio(db_path)
+    mic_holder: dict[str, MicCapture | None] = {"mic": mic}
     deps = PublisherDeps(
         conn_factory=default_conn_factory(),
         inputs_factory=_build_metrics_inputs_factory(
@@ -672,16 +816,19 @@ async def _metrics_lifespan(app: FastAPI) -> AsyncIterator[None]:
         ),
     )
     pubsub = get_pubsub()
-    async with image_gen_worker_lifespan(app):
-        task = start_metrics_publisher(pubsub, deps)
-        try:
-            yield
-        finally:
-            task.cancel()
-            # Mirror the ws server's pattern: gather with
-            # ``return_exceptions=True`` so a CancelledError doesn't
-            # escape and produce ``Task exception was never retrieved``.
-            await asyncio.gather(task, return_exceptions=True)
+    try:
+        async with image_gen_worker_lifespan(app):
+            task = start_metrics_publisher(pubsub, deps)
+            try:
+                yield
+            finally:
+                task.cancel()
+                # Mirror the ws server's pattern: gather with
+                # ``return_exceptions=True`` so a CancelledError doesn't
+                # escape and produce ``Task exception was never retrieved``.
+                await asyncio.gather(task, return_exceptions=True)
+    finally:
+        await _stop_production_audio(mic, pipeline, transcriber)
 
 
 def _synthetic_transcript_for(intent: Intent) -> Any:

@@ -763,7 +763,7 @@ async def _maybe_enqueue_action_jobs_for_toy(toy_id: str) -> None:
             toy_id,
         )
         return
-    capable, reason = is_image_gen_capable()
+    capable, reason = is_image_gen_capable(check_free_vram=False)
     if not capable:
         _logger.info(
             "toy %s: image-gen disabled (%s); skipping enqueue",
@@ -1051,7 +1051,11 @@ def get_toy_actions(
     _validate_toy_id_or_404(toy_id)
     _fetch_toy_row(conn, toy_id)  # 404 if toy doesn't exist.
     rows = list_for_toy(conn, toy_id)
-    capable, reason = is_image_gen_capable()
+    # Skip the live-VRAM branch: this endpoint informs the parent UI's
+    # disabled banner, and a flickering "VRAM 1.5GB < 6GB" reason while
+    # a sprite gen is mid-flight is misleading. See is_image_gen_capable
+    # docstring for the full rationale.
+    capable, reason = is_image_gen_capable(check_free_vram=False)
     return ToyActionsResponse(
         actions=[_action_row_to_response(r) for r in rows],
         capability=CapabilityInfo(capable=capable, reason=reason),
@@ -1060,7 +1064,12 @@ def get_toy_actions(
 
 def _check_capability_or_409() -> None:
     """Raise 409 ``image_gen_disabled`` when the gate is closed."""
-    capable, reason = is_image_gen_capable()
+    # Skip the live-VRAM branch at request time: SDXL peaks at ~6 GB
+    # mid-gen on the 8 GB host, which drops free VRAM below the 6 GB
+    # floor while a sprite is being generated. Re-checking here would
+    # 409 every regenerate click that lands during another slot's run.
+    # Real OOM is caught + breaker-tripped inside the worker.
+    capable, reason = is_image_gen_capable(check_free_vram=False)
     if not capable:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

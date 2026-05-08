@@ -161,7 +161,7 @@ def force_capable(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         toys_router_mod,
         "is_image_gen_capable",
-        lambda: (True, "capable"),
+        lambda **_kw: (True, "capable"),
     )
 
 
@@ -171,7 +171,7 @@ def force_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         toys_router_mod,
         "is_image_gen_capable",
-        lambda: (False, "test-disabled"),
+        lambda **_kw: (False, "test-disabled"),
     )
 
 
