@@ -65,7 +65,7 @@ Network reachability for v1 of this feature is **plain HTTP over LAN** — the i
 - **Issue:** #56
 - **Flags:** --reviewers code (UI evidence intentionally bundled to iK5 per `feedback_autonomous_build_bundled_ui.md`)
 - **Files:** CREATE `frontend/public/manifest.webmanifest`, `frontend/public/icons/source.svg`, `frontend/public/icons/apple-touch-icon-180.png`, `frontend/public/icons/icon-192.png`, `frontend/public/icons/icon-512.png`, `frontend/scripts/generate-icons.mjs`. MODIFY `frontend/index.html`, `frontend/package.json` (add `sharp` devDep + `generate:icons` script).
-- **Status:** PLANNED
+- **Status:** DONE (2026-05-07)
 
 ### Step iK2: Safe-area-inset padding on kiosk root
 
@@ -74,7 +74,7 @@ Network reachability for v1 of this feature is **plain HTTP over LAN** — the i
 - **Issue:** #57
 - **Flags:** --reviewers code (UI evidence intentionally bundled to iK5 per `feedback_autonomous_build_bundled_ui.md`)
 - **Files:** MODIFY `frontend/src/child/App.tsx` (split background + content; add `env(safe-area-inset-*)` padding to inner content container). MODIFY any associated CSS module if the App uses one (otherwise inline-style is fine).
-- **Status:** PLANNED
+- **Status:** DONE (2026-05-07)
 
 ### Step iK3: Screen Wake Lock during active activity
 
@@ -83,7 +83,7 @@ Network reachability for v1 of this feature is **plain HTTP over LAN** — the i
 - **Issue:** #58
 - **Flags:** --reviewers code (UI evidence intentionally bundled to iK5 per `feedback_autonomous_build_bundled_ui.md`)
 - **Files:** CREATE `frontend/src/child/wakeLock.ts` (module). CREATE `frontend/src/child/wakeLock.test.ts` (or co-located per project test convention) — unit tests with stubbed `navigator.wakeLock`. MODIFY `frontend/src/child/App.tsx` (acquire/release call sites + `visibilitychange` listener).
-- **Status:** PLANNED
+- **Status:** DONE (2026-05-07)
 - **File-conflict note:** iK3 modifies `App.tsx`, same file as iK2. NOT parallel-safe with iK2 — sequence iK2 → iK3 (or merge into one bundled run).
 
 ### Step iK4: iOS audio unlock + touch-target audit
@@ -92,8 +92,8 @@ Network reachability for v1 of this feature is **plain HTTP over LAN** — the i
 - **Type:** code
 - **Issue:** #59
 - **Flags:** --reviewers code (UI evidence intentionally bundled to iK5 per `feedback_autonomous_build_bundled_ui.md`)
-- **Files:** MODIFY `frontend/src/child/audio/sfx.ts` (add `export function unlockAudio(): void`). MODIFY `frontend/src/child/components/KioskPinPrompt.tsx` (call `unlockAudio()` on PIN submit; add `/* ≥44pt per Apple HIG */` comment near keypad button CSS). MODIFY `frontend/src/child/components/NextStepButton.tsx` (add same comment near button CSS; verify existing `min-height` / `min-width`).
-- **Status:** PLANNED
+- **Files:** MODIFY `frontend/src/child/sfx.ts` (add `export function unlockAudio(): void` — note: actual path is `child/sfx.ts`, not `child/audio/sfx.ts` as originally written). MODIFY `frontend/src/child/components/KioskPinPrompt.tsx` (call `unlockAudio()` on PIN submit; add `/* ≥44pt per Apple HIG */` comment near keypad button CSS). MODIFY `frontend/src/child/components/NextStepButton.tsx` (add same comment near button CSS; verify existing `min-height` / `min-width`).
+- **Status:** DONE (2026-05-07)
 
 ### Step iK5: Operator iPad setup doc + visual verification
 

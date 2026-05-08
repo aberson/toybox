@@ -1,10 +1,16 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { unlockAudio } from "../sfx";
 import { KioskPinPrompt } from "./KioskPinPrompt";
+
+vi.mock("../sfx", () => ({
+  unlockAudio: vi.fn(),
+}));
 
 afterEach(() => {
   cleanup();
+  vi.mocked(unlockAudio).mockClear();
 });
 
 describe("KioskPinPrompt", () => {
@@ -44,5 +50,25 @@ describe("KioskPinPrompt", () => {
     expect(
       screen.getByTestId("kiosk-pin-prompt-server-error").textContent,
     ).toMatch(/Wrong PIN/);
+  });
+
+  it("primes iOS audio (calls unlockAudio) when the form submits with a valid PIN", () => {
+    const onSubmit = vi.fn();
+    render(<KioskPinPrompt onSubmit={onSubmit} />);
+    const input = screen.getByTestId("kiosk-pin-prompt-input") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "1357" } });
+    fireEvent.click(screen.getByTestId("kiosk-pin-prompt-submit"));
+    expect(onSubmit).toHaveBeenCalledWith("1357");
+    expect(vi.mocked(unlockAudio)).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not call unlockAudio when the PIN is rejected client-side", () => {
+    const onSubmit = vi.fn();
+    render(<KioskPinPrompt onSubmit={onSubmit} />);
+    const input = screen.getByTestId("kiosk-pin-prompt-input") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "12" } });
+    fireEvent.click(screen.getByTestId("kiosk-pin-prompt-submit"));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(vi.mocked(unlockAudio)).not.toHaveBeenCalled();
   });
 });

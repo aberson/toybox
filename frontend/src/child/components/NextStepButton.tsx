@@ -29,6 +29,7 @@ export function NextStepButton(props: NextStepButtonProps): JSX.Element {
           : "linear-gradient(135deg, #1976d2 0%, #1565c0 100%)",
         boxShadow: "0 6px 18px rgba(25,118,210,0.35)",
         cursor: props.busy ? "default" : "pointer",
+        // >=44pt per Apple HIG
         minWidth: 240,
         marginTop: 32,
       }}

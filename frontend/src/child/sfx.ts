@@ -87,6 +87,55 @@ export function playSfx(name: SfxName): boolean {
   }
 }
 
+// iOS Safari only allows audio playback after a user gesture has
+// "unlocked" each Audio element. Calling play() inside the gesture
+// (then immediately pausing) is the standard idiom — once unlocked,
+// later programmatic plays succeed silently. Idempotent BY DESIGN:
+// callers don't need to track state, and a guard would break the
+// page-reload-with-cached-token edge case where the kiosk skips the
+// PIN prompt but audio still needs priming on the first user gesture.
+export function unlockAudio(): void {
+  if (!hasAudio()) return;
+  // Iterate the canonical SFX list rather than just-cached entries to
+  // guarantee both `transition` and `success` are unlocked together
+  // on the first PIN submit.
+  for (const name of Object.keys(SFX_URLS) as SfxName[]) {
+    const asset = getOrCreate(name);
+    // Note: we deliberately do NOT skip slots whose `failed` flag is
+    // set. unlockAudio is a best-effort gesture-time primer; calling
+    // .play() on a previously-failed slot is harmless (the rejection
+    // is swallowed below) and the slot may have recovered (e.g. the
+    // file finished loading after the initial preload error). The
+    // slot is only skipped when there is literally nothing to play
+    // on (asset null, or the Audio element couldn't be constructed).
+    if (asset === null || asset.audio === null) continue;
+    try {
+      const promise = asset.audio.play();
+      if (
+        typeof promise === "object" &&
+        promise !== null &&
+        typeof (promise as Promise<void>).catch === "function"
+      ) {
+        (promise as Promise<void>)
+          .then(() => {
+            // Pause immediately after play() resolves — the play call
+            // is what unlocks iOS audio for that element; pausing
+            // keeps the kiosk silent until a real playSfx call.
+            asset.audio?.pause();
+          })
+          .catch(() => {
+            // Autoplay-block / 404 / other rejection — silent no-op.
+            // Do NOT mark failed=true: a future playSfx after a real
+            // user gesture may still succeed. The unlock idiom is a
+            // best-effort prime, not a load test.
+          });
+      }
+    } catch {
+      // Synchronous exception (very rare) — silent no-op.
+    }
+  }
+}
+
 // Test seam: clear the cache so a fresh `getOrCreate` runs. Real
 // callers never need this; vitest uses it to isolate cases.
 export function _resetSfxCacheForTests(): void {

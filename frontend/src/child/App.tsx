@@ -21,6 +21,12 @@ import {
   shouldFireTransitionSfx,
   useChildStore,
 } from "./store";
+import {
+  acquireWakeLock,
+  releaseWakeLock,
+  watchVisibilityForReacquire,
+  type WakeLockSentinel,
+} from "./wakeLock";
 import { ChildWsClient } from "./ws";
 import type { Envelope } from "./ws";
 
@@ -83,21 +89,47 @@ function clearStoredKioskPin(): void {
   }
 }
 
-const FULL_BLEED_STYLE: CSSProperties = {
+// Outer layer: pinned to the viewport edges so the gradient bleeds into
+// the iPad's rounded corners with no color band. Carries no padding —
+// the inner content layer handles safe-area inset spacing.
+const FULL_BLEED_BACKGROUND_STYLE: CSSProperties = {
   position: "fixed",
   inset: 0,
   margin: 0,
+  background: "linear-gradient(180deg, #fefefe 0%, #f4f4f7 100%)",
+  boxSizing: "border-box",
+  overflow: "hidden",
+};
+
+// Inner layer: holds all kiosk content, centered. Padding uses
+// env(safe-area-inset-*) so on iPad the content clears the camera notch
+// / home indicator while the gradient stays edge-to-edge. The 32px
+// fallback matches prior desktop rendering (env() returns 0 outside
+// iPad-style safe areas, so the fallback is what actually applies).
+const FULL_BLEED_CONTENT_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
   justifyContent: "center",
   gap: 32,
-  background: "linear-gradient(180deg, #fefefe 0%, #f4f4f7 100%)",
   fontFamily: "system-ui, sans-serif",
-  padding: 32,
+  width: "100%",
+  height: "100%",
   boxSizing: "border-box",
-  overflow: "hidden",
+  padding:
+    "env(safe-area-inset-top, 32px) env(safe-area-inset-right, 32px) env(safe-area-inset-bottom, 32px) env(safe-area-inset-left, 32px)",
 };
+
+// Single source of truth for "the kiosk is currently displaying an
+// active, non-terminal activity that should keep the screen awake."
+// Extracted so the wake-lock effect (`wantLock`) and the render path
+// (`showActive`) cannot drift if a future state is added — both
+// derive from this helper.
+function isActiveKioskActivity(activity: Activity | null): boolean {
+  if (activity === null) return false;
+  if (isTerminalState(activity.state)) return false;
+  return activity.state === "approved" || activity.state === "running";
+}
 
 function avatarLetter(activity: Activity | null): string {
   if (activity === null) return "?";
@@ -331,6 +363,72 @@ export function App(): JSX.Element {
     prevTerminalRef.current = completedOrEnded;
   }, [activity]);
 
+  // Screen Wake Lock — keep the iPad display awake while an activity
+  // is approved/running. Released on terminal states or when the
+  // activity disappears. Browsers without the Wake Lock API silently
+  // no-op (acquireWakeLock returns null). The visibility watcher
+  // re-acquires after the OS releases the lock on backgrounding.
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+  // In-flight guard for acquireWakeLock. Two concurrent triggers (the
+  // activity-change effect AND the visibilitychange handler) can both
+  // observe `wakeLockRef.current === null` before either await
+  // resolves; without this guard the second call would orphan the
+  // first sentinel (overwritten in the ref, never released).
+  const acquireInFlightRef = useRef<Promise<WakeLockSentinel | null> | null>(
+    null,
+  );
+  // Mirrors the latest activity for the mount-only visibility watcher
+  // below — the watcher's effect runs once on mount and otherwise
+  // would close over a stale activity. Updating the ref each render
+  // keeps `getWantLock` reading the current value.
+  const activityForVisibilityRef = useRef<Activity | null>(activity);
+  activityForVisibilityRef.current = activity;
+
+  const acquireIfNeeded = useCallback(async (): Promise<void> => {
+    if (wakeLockRef.current !== null && !wakeLockRef.current.released) return;
+    if (acquireInFlightRef.current !== null) return;
+    const pending = acquireWakeLock();
+    acquireInFlightRef.current = pending;
+    try {
+      const sentinel = await pending;
+      // Activity may have transitioned to terminal while we awaited;
+      // the calling effect's cleanup is responsible for releasing if
+      // so. We just publish the sentinel here.
+      wakeLockRef.current = sentinel;
+    } finally {
+      acquireInFlightRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    const cleanup = watchVisibilityForReacquire(
+      () => wakeLockRef.current,
+      (s) => {
+        wakeLockRef.current = s;
+      },
+      () => isActiveKioskActivity(activityForVisibilityRef.current),
+    );
+    return () => {
+      cleanup();
+      // Release on unmount so we don't leak a held lock.
+      const held = wakeLockRef.current;
+      wakeLockRef.current = null;
+      void releaseWakeLock(held);
+    };
+  }, []);
+  useEffect(() => {
+    const wantLock = isActiveKioskActivity(activity);
+    if (wantLock) {
+      void acquireIfNeeded();
+    } else {
+      const held = wakeLockRef.current;
+      if (held !== null) {
+        wakeLockRef.current = null;
+        void releaseWakeLock(held);
+      }
+    }
+  }, [activity, acquireIfNeeded]);
+
   const handleAdvance = useCallback(async (): Promise<void> => {
     if (activity === null) return;
     if (busyAdvance) return;
@@ -359,10 +457,7 @@ export function App(): JSX.Element {
   }, [activity, api, busyAdvance, refetchActivity]);
 
   const showAllDone = activity !== null && isTerminalState(activity.state);
-  const showActive =
-    activity !== null &&
-    !showAllDone &&
-    (activity.state === "approved" || activity.state === "running");
+  const showActive = isActiveKioskActivity(activity);
 
   if (pinPromptVisible) {
     return (
@@ -374,111 +469,113 @@ export function App(): JSX.Element {
   }
 
   return (
-    <main data-testid="child-root" style={FULL_BLEED_STYLE}>
-      {activity === null && (
-        <section
-          data-testid="child-idle"
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 24,
-          }}
-        >
-          <PersonaAvatar letter="?" size={200} label="waiting" />
-          <h1
+    <main data-testid="child-root" style={FULL_BLEED_BACKGROUND_STYLE}>
+      <div style={FULL_BLEED_CONTENT_STYLE}>
+        {activity === null && (
+          <section
+            data-testid="child-idle"
             style={{
-              margin: 0,
-              fontSize: "clamp(1.75rem, 4vw, 3rem)",
-              color: "#555",
-              textAlign: "center",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 24,
             }}
           >
-            Waiting for play to start...
-          </h1>
-        </section>
-      )}
-      {showActive && activity !== null && (
-        <>
-          <PersonaAvatar
-            imagePath={avatarImage(activity)}
-            letter={avatarLetter(activity)}
-            size={240}
-          />
-          <StepCard activity={activity} />
-          <NextStepButton onClick={handleAdvance} busy={busyAdvance} />
-        </>
-      )}
-      {showAllDone && activity !== null && (
-        <section
-          data-testid="child-all-done"
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 24,
-          }}
-        >
-          <PersonaAvatar
-            imagePath={avatarImage(activity)}
-            letter={avatarLetter(activity)}
-            size={240}
-          />
-          <h1
-            style={{
-              margin: 0,
-              fontSize: "clamp(2.5rem, 6vw, 5rem)",
-              color: "#1565c0",
-              textAlign: "center",
-            }}
-          >
-            All done! Great playing!
-          </h1>
-        </section>
-      )}
-      {state.toasts.length > 0 && (
-        <div
-          data-testid="toasts"
-          style={{
-            position: "absolute",
-            top: 16,
-            right: 16,
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
-            maxWidth: 420,
-          }}
-        >
-          {state.toasts.map((t) => (
-            <div
-              key={t.id}
-              role="status"
-              data-toast-kind={t.kind}
+            <PersonaAvatar letter="?" size={200} label="waiting" />
+            <h1
               style={{
-                padding: 10,
-                background:
-                  t.kind === "error"
-                    ? "#fdecea"
-                    : t.kind === "warning"
-                      ? "#fff8e1"
-                      : "#e3f2fd",
-                border: "1px solid #ddd",
-                borderRadius: 6,
-                fontSize: 14,
+                margin: 0,
+                fontSize: "clamp(1.75rem, 4vw, 3rem)",
+                color: "#555",
+                textAlign: "center",
               }}
             >
-              {t.message}
-              <button
-                type="button"
-                onClick={() => useChildStore.getState().dismissToast(t.id)}
-                style={{ marginLeft: 8 }}
+              Waiting for play to start...
+            </h1>
+          </section>
+        )}
+        {showActive && activity !== null && (
+          <>
+            <PersonaAvatar
+              imagePath={avatarImage(activity)}
+              letter={avatarLetter(activity)}
+              size={240}
+            />
+            <StepCard activity={activity} />
+            <NextStepButton onClick={handleAdvance} busy={busyAdvance} />
+          </>
+        )}
+        {showAllDone && activity !== null && (
+          <section
+            data-testid="child-all-done"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 24,
+            }}
+          >
+            <PersonaAvatar
+              imagePath={avatarImage(activity)}
+              letter={avatarLetter(activity)}
+              size={240}
+            />
+            <h1
+              style={{
+                margin: 0,
+                fontSize: "clamp(2.5rem, 6vw, 5rem)",
+                color: "#1565c0",
+                textAlign: "center",
+              }}
+            >
+              All done! Great playing!
+            </h1>
+          </section>
+        )}
+        {state.toasts.length > 0 && (
+          <div
+            data-testid="toasts"
+            style={{
+              position: "absolute",
+              top: 16,
+              right: 16,
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+              maxWidth: 420,
+            }}
+          >
+            {state.toasts.map((t) => (
+              <div
+                key={t.id}
+                role="status"
+                data-toast-kind={t.kind}
+                style={{
+                  padding: 10,
+                  background:
+                    t.kind === "error"
+                      ? "#fdecea"
+                      : t.kind === "warning"
+                        ? "#fff8e1"
+                        : "#e3f2fd",
+                  border: "1px solid #ddd",
+                  borderRadius: 6,
+                  fontSize: 14,
+                }}
               >
-                dismiss
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+                {t.message}
+                <button
+                  type="button"
+                  onClick={() => useChildStore.getState().dismissToast(t.id)}
+                  style={{ marginLeft: 8 }}
+                >
+                  dismiss
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </main>
   );
 }
