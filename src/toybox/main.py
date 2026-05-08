@@ -808,6 +808,13 @@ async def _metrics_lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     mic, pipeline, transcriber = await _start_production_audio(db_path)
     mic_holder: dict[str, MicCapture | None] = {"mic": mic}
+    # Stash on app.state so the REST ``/api/metrics`` handler can
+    # resolve the live device name on its very first call — without
+    # this the handler returns ``mic_device=None`` and the parent
+    # header indicator paints "error" for ~30s until the first ws
+    # metrics envelope arrives. ``getattr`` lookup in the handler
+    # keeps tests + ``--smoke`` (which don't set this) safe.
+    app.state.mic_capture = mic
     deps = PublisherDeps(
         conn_factory=default_conn_factory(),
         inputs_factory=_build_metrics_inputs_factory(
@@ -828,6 +835,7 @@ async def _metrics_lifespan(app: FastAPI) -> AsyncIterator[None]:
                 # escape and produce ``Task exception was never retrieved``.
                 await asyncio.gather(task, return_exceptions=True)
     finally:
+        app.state.mic_capture = None
         await _stop_production_audio(mic, pipeline, transcriber)
 
 

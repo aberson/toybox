@@ -7,7 +7,12 @@ import {
   retryWithBackoff,
   withConflictHandler,
 } from "./api";
-import type { Activity, ParentAuthStatus, ParentTokenResponse } from "./api";
+import type {
+  Activity,
+  MetricsAudioStatus,
+  ParentAuthStatus,
+  ParentTokenResponse,
+} from "./api";
 import { ActivityPanel } from "./components/ActivityPanel";
 import { CapabilityBanner } from "./components/CapabilityBanner";
 import { ChildProfileEditor } from "./components/ChildProfileEditor";
@@ -57,7 +62,15 @@ type AuthMode = "bootstrap" | "setup" | "login" | "ready" | "error";
 
 export function App(): JSX.Element {
   const state = useParentStore();
-  const [muted, setMuted] = useState(false);
+  // Live audio block from the metrics topic. Seeded by a one-shot
+  // ``GET /api/metrics`` during bootstrap and refreshed by every
+  // ``metrics`` ws envelope (~30s cadence). The header indicator +
+  // mute button derive their state from this; ``null`` means we
+  // haven't seen a snapshot yet (initial gray state).
+  const [audioStatus, setAudioStatus] = useState<MetricsAudioStatus | null>(
+    null,
+  );
+  const [muteBusy, setMuteBusy] = useState(false);
   const [showChildEditor, setShowChildEditor] = useState(false);
   const [showToyIngest, setShowToyIngest] = useState(false);
   const [showRoomIngest, setShowRoomIngest] = useState(false);
@@ -78,6 +91,22 @@ export function App(): JSX.Element {
       metricsListenersRef.current.add(handler);
       return () => {
         metricsListenersRef.current.delete(handler);
+      };
+    },
+    [],
+  );
+
+  // Same pattern for live ``transcript`` envelopes — TranscriptsManager
+  // subscribes so a new utterance appears in the list without the user
+  // refreshing the panel. Without this, ``applyEnvelope`` would drop
+  // transcript envelopes on the floor (the store has no transcript
+  // slot) and the only way to see new rows would be hide/show.
+  const transcriptListenersRef = useRef<Set<(env: Envelope) => void>>(new Set());
+  const subscribeToTranscripts = useCallback(
+    (handler: (env: Envelope) => void): (() => void) => {
+      transcriptListenersRef.current.add(handler);
+      return () => {
+        transcriptListenersRef.current.delete(handler);
       };
     },
     [],
@@ -124,13 +153,41 @@ export function App(): JSX.Element {
         if (isAbortError(err)) return;
         // health is best-effort during bootstrap
       }
+      // Seed the audio block so the header indicator paints with a real
+      // state on first render rather than waiting up to 30s for the
+      // first metrics ws envelope. Failure is non-fatal — the header
+      // stays gray until a ws envelope arrives.
+      try {
+        const snap = await api.getMetrics({ signal: aborter.signal });
+        setAudioStatus(snap.audio);
+      } catch (err) {
+        if (isAbortError(err)) return;
+        // metrics is best-effort during bootstrap
+      }
       const ws = new ParentWsClient({
         url: deriveWsUrl(),
         getToken: () => useParentStore.getState().token,
         onEnvelope: (env: Envelope) => {
           useParentStore.getState().applyEnvelope(env);
           if (env.topic === "metrics") {
+            // Update the header's live audio state from every metrics
+            // envelope. Defensive cast: the wire shape is checked by
+            // the publisher but a malformed payload should not crash
+            // the ws callback.
+            const payload = env.payload as { audio?: MetricsAudioStatus };
+            if (payload.audio !== undefined) {
+              setAudioStatus(payload.audio);
+            }
             for (const listener of metricsListenersRef.current) {
+              try {
+                listener(env);
+              } catch {
+                // listener bugs must not crash the ws callback.
+              }
+            }
+          }
+          if (env.topic === "transcript") {
+            for (const listener of transcriptListenersRef.current) {
               try {
                 listener(env);
               } catch {
@@ -222,12 +279,53 @@ export function App(): JSX.Element {
     [continueBootstrap],
   );
 
-  // Phase A has no real capture pipeline. The mic indicator stays at
-  // "paused" until something declares actual capture. The mute toggle
-  // is a future-shape stub: it flips the button label and aria-pressed
-  // but does NOT light up the green-capturing dot. Phase B Step 11
-  // wires real capture; that's when the indicator switches to
-  // "capturing" — and only when audio is actually flowing.
+  // Header mic indicator + mute toggle, derived from the live audio
+  // block in the metrics envelope. Three states:
+  //   * audioStatus null               — gray "paused" (pre-snapshot)
+  //   * mic_device == null             — red "error" (capture daemon down)
+  //   * mic_enabled == false           — gray "paused" (parent muted)
+  //   * else                           — green "capturing"
+  const micState: "capturing" | "paused" | "error" = (() => {
+    if (audioStatus === null) return "paused";
+    if (audioStatus.mic_device === null) return "error";
+    if (!audioStatus.mic_enabled) return "paused";
+    return "capturing";
+  })();
+  const muted = audioStatus !== null && !audioStatus.mic_enabled;
+
+  const handleToggleMute = useCallback((): void => {
+    if (muteBusy) return;
+    if (audioStatus === null) return; // can't toggle before snapshot lands
+    const next = !muted;
+    setMuteBusy(true);
+    // Optimistic local update so the indicator + button label flip
+    // immediately. Reconciled by the next metrics envelope.
+    setAudioStatus((prev) =>
+      prev !== null ? { ...prev, mic_enabled: !next } : prev,
+    );
+    api
+      .setMicEnabled(!next)
+      .then((resp) => {
+        setAudioStatus((prev) =>
+          prev !== null ? { ...prev, mic_enabled: resp.enabled } : prev,
+        );
+        setMuteBusy(false);
+      })
+      .catch((err: unknown) => {
+        if (isAbortError(err)) {
+          setMuteBusy(false);
+          return;
+        }
+        // Revert the optimistic flip.
+        setAudioStatus((prev) =>
+          prev !== null ? { ...prev, mic_enabled: !muted } : prev,
+        );
+        const message =
+          err instanceof Error ? err.message : "toggle mute failed";
+        useParentStore.getState().pushToast("error", `mute: ${message}`);
+        setMuteBusy(false);
+      });
+  }, [api, audioStatus, muteBusy, muted]);
 
   const refetchActivity = useCallback(
     async (id: string): Promise<Activity | null> => {
@@ -506,9 +604,9 @@ export function App(): JSX.Element {
   return (
     <main style={{ fontFamily: "system-ui, sans-serif", maxWidth: 720 }}>
       <Header
-        micState={state.micState}
+        micState={micState}
         muted={muted}
-        onToggleMute={() => setMuted((prev) => !prev)}
+        onToggleMute={handleToggleMute}
         wsState={state.wsState}
       />
       <CapabilityBanner reason={state.capabilityReason} />
@@ -562,7 +660,12 @@ export function App(): JSX.Element {
         {showOperator && (
           <OperatorTab api={api} subscribeToMetrics={subscribeToMetrics} />
         )}
-        {showTranscripts && <TranscriptsManager api={api} />}
+        {showTranscripts && (
+          <TranscriptsManager
+            api={api}
+            subscribeToTranscripts={subscribeToTranscripts}
+          />
+        )}
         {showSuggestion && activity !== null && (
           <SuggestionCard
             activity={activity}

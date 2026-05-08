@@ -9,6 +9,7 @@ import {
   isAbortError,
 } from "../api";
 import type { ApiClient, TranscriptRow } from "../api";
+import type { Envelope } from "../ws";
 
 // Step 22: parent-facing transcript management UI.
 //
@@ -68,12 +69,19 @@ function confidenceBadge(confidence: number | null): string {
 
 export interface TranscriptsManagerProps {
   api: ApiClient;
+  // Optional ws subscriber for live ``transcript`` envelopes. When
+  // wired (production: App.tsx fans envelopes through here), new rows
+  // prepend into the visible list as the kiosk produces them. Tests
+  // omit this and continue to drive the list via the api stub.
+  subscribeToTranscripts?: (
+    handler: (envelope: Envelope) => void,
+  ) => () => void;
 }
 
 export function TranscriptsManager(
   props: TranscriptsManagerProps,
 ): JSX.Element {
-  const { api } = props;
+  const { api, subscribeToTranscripts } = props;
   const [items, setItems] = useState<TranscriptRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [listError, setListError] = useState<string | null>(null);
@@ -178,6 +186,56 @@ export function TranscriptsManager(
     }, SEARCH_DEBOUNCE_MS);
     return () => window.clearTimeout(handle);
   }, [searchInput, activeQuery, refetchList]);
+
+  // Live ``transcript`` envelope subscription. New rows prepend into
+  // the list as the kiosk produces them. Two guards:
+  // * Skip live-prepend when the operator is searching (activeQuery
+  //   non-empty) — the search results stay frozen until the search
+  //   clears, otherwise an unrelated new transcript would pollute
+  //   the result set without warning.
+  // * Dedupe by id — defensive against the rare case where a ws
+  //   envelope races a refetch.
+  useEffect(() => {
+    if (subscribeToTranscripts === undefined) return;
+    const unsubscribe = subscribeToTranscripts((envelope) => {
+      if (activeQuery !== "") return;
+      const payload = envelope.payload as {
+        id?: unknown;
+        text?: unknown;
+        confidence?: unknown;
+        started_at?: unknown;
+        ended_at?: unknown;
+        language?: unknown;
+      };
+      if (typeof payload.id !== "string") return;
+      // The ws envelope shape (pipeline.py:_handle_chunk) is a subset
+      // of the REST TranscriptRow — session_id / mic_id /
+      // triggered_intent aren't pushed live. Fill them with defaults
+      // here so the prepended row satisfies the same TypeScript
+      // contract the REST list does. Operator UI doesn't render
+      // these fields, but the type system needs them.
+      const row: TranscriptRow = {
+        id: payload.id,
+        session_id: "",
+        mic_id: null,
+        text: typeof payload.text === "string" ? payload.text : null,
+        confidence:
+          typeof payload.confidence === "number" ? payload.confidence : null,
+        started_at:
+          typeof payload.started_at === "string" ? payload.started_at : null,
+        ended_at:
+          typeof payload.ended_at === "string" ? payload.ended_at : null,
+        language:
+          typeof payload.language === "string" ? payload.language : "unknown",
+        triggered_intent: null,
+      };
+      setItems((prev) => {
+        if (prev.some((r) => r.id === row.id)) return prev;
+        return [row, ...prev];
+      });
+    });
+    return unsubscribe;
+  }, [subscribeToTranscripts, activeQuery]);
 
   const loadMore = useCallback(async (): Promise<void> => {
     if (items.length === 0 || loadingMore) return;

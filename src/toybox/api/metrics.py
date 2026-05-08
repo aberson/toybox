@@ -17,7 +17,7 @@ import sqlite3
 from collections.abc import Iterator
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, ConfigDict
 
 from ..ai.breaker import CircuitBreaker
@@ -173,8 +173,38 @@ def get_metrics_breaker() -> CircuitBreaker:
     return _process_breaker()
 
 
+def _live_mic_device_and_queue(request: Request) -> tuple[str | None, int]:
+    """Resolve the live mic device name + queue depth from ``app.state``.
+
+    The production lifespan stashes the started ``MicCapture`` on
+    ``app.state.mic_capture`` so this REST handler can surface real
+    values on the very first call (rather than waiting up to 30s for
+    the first ws metrics envelope to arrive). Tests and ``--smoke``
+    don't set this attribute; we fall back to ``(None, 0)`` so those
+    paths keep their existing snapshot shape.
+    """
+    mic = getattr(request.app.state, "mic_capture", None)
+    if mic is None:
+        return None, 0
+    queue_depth = 0
+    frame_queue = getattr(mic, "_frame_queue", None)
+    if frame_queue is not None:
+        try:
+            queue_depth = frame_queue.qsize()
+        except Exception:  # noqa: BLE001 -- defensive
+            queue_depth = 0
+    try:
+        from ..audio.devices import device_name as _device_name  # noqa: PLC0415
+
+        device_idx = getattr(mic, "_device_index", None)
+        return _device_name(device_idx), queue_depth
+    except Exception:  # noqa: BLE001 -- defensive (no PortAudio in CI)
+        return None, queue_depth
+
+
 @router.get("", response_model=MetricsSnapshotResponse)
 async def get_metrics(
+    request: Request,
     conn: Annotated[sqlite3.Connection, Depends(get_metrics_db)],
     breaker: Annotated[CircuitBreaker, Depends(get_metrics_breaker)],
     pubsub: Annotated[PubSub, Depends(get_pubsub)],
@@ -188,16 +218,11 @@ async def get_metrics(
     asyncio loop is the same trade-off the listening-mode endpoint makes.
     """
     capability_result = await resolve_capability(breaker, listening_mode=None)
+    mic_device, mic_queue_depth = _live_mic_device_and_queue(request)
     inputs = SnapshotInputs(
         breaker=breaker,
-        # The REST endpoint isn't holding a live mic handle, so the audio
-        # block surfaces ``None`` / ``0`` for device/queue. The ws
-        # publisher (started from the lifespan with the live MicCapture)
-        # is where those values come through. For v1 we accept this
-        # asymmetry — the dashboard prefers the ws snapshot when
-        # available; the REST poll is a fallback.
-        mic_device=None,
-        mic_queue_depth=0,
+        mic_device=mic_device,
+        mic_queue_depth=mic_queue_depth,
         ws_subscribers=pubsub.subscriber_count,
         listening_mode=None,
         capability_check_result=capability_result,

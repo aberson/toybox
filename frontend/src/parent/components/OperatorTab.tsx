@@ -178,7 +178,7 @@ function MicMuteControl(props: MicMuteControlProps): JSX.Element {
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <button
           type="button"
-          data-testid="mic-mute-toggle"
+          data-testid="operator-mic-mute-toggle"
           data-mic-enabled={enabled ? "true" : "false"}
           disabled={pending}
           onClick={handleToggle}
