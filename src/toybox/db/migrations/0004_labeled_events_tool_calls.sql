@@ -3,7 +3,7 @@
 -- Loop-mode generations (TOYBOX_GENERATOR_MODE=loop) emit one or more
 -- tool calls per generation. Each call is captured into this JSON column
 -- as part of the same labeled_events row that holds the activity. Shape
--- pinned in documentation/phase-e-plan.md §"Tool-call telemetry shape":
+-- pinned in documentation/plan/phase-e.md §"Tool-call telemetry shape":
 --
 --   [
 --     {

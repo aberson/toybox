@@ -161,6 +161,6 @@ These are intentional gaps. If Phase E A/B testing needs them, expand the matrix
 
 ## Cross-references
 
-- Step 15 (Phase C) — `documentation/plan.md` Phase C table — implements this fixture set
+- Step 15 (Phase C) — [`documentation/plan/phase-c.md`](plan/phase-c.md) "Step 15" — implements this fixture set
 - Step 24 (Phase D) — surfaces eval-judge metrics in the operator dashboard
 - Step 27 (Phase E) — uses these fixtures for the SFT-vs-Claude A/B comparison

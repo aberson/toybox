@@ -227,7 +227,7 @@ def record_generation(
 
     ``tool_calls`` is the per-generation tool-call telemetry produced
     by loop-mode generators (see
-    ``documentation/phase-e-plan.md`` §"Tool-call telemetry shape").
+    ``documentation/plan/phase-e.md`` §"Tool-call telemetry shape").
     ``None`` (the default) leaves the column NULL so single-shot rows
     are byte-identical to the pre-Step-28 path. Loop-mode callers pass
     a (possibly empty) list which is JSON-encoded and stored verbatim.

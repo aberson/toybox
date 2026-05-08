@@ -1,6 +1,6 @@
 -- Phase F Step F3 — toy_actions table for per-toy/per-slot pixel-art sprite jobs.
 --
--- See documentation/toy-action-sprites-plan.md §F3 + §"New components"
+-- See documentation/plan/phase-f-toy-action-sprites.md §F3 + §"New components"
 -- §storage/toy_actions.py. One row per (toy_id, slot) pair; the worker
 -- (F4) upserts the row through the four states the parent UI grid
 -- renders. Status values are the string members of

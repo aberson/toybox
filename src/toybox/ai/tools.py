@@ -14,7 +14,7 @@ they return a structured recovery error::
 
 So the model-loop adapter can feed the error back to the model and ask
 it to retry with corrected args. See
-``documentation/phase-e-plan.md`` §"Tool-call telemetry shape" for the
+``documentation/plan/phase-e.md`` §"Tool-call telemetry shape" for the
 companion telemetry shape that is recorded on the labeled_events row.
 """
 
@@ -835,7 +835,7 @@ def telemetry_entry(call_result: dict[str, Any]) -> dict[str, Any]:
     Used by adapters that already have the dispatcher result and want
     the storage-side projection without re-running the call. Keeps the
     shape pinned in one place — see
-    ``documentation/phase-e-plan.md`` §"Tool-call telemetry shape".
+    ``documentation/plan/phase-e.md`` §"Tool-call telemetry shape".
     """
     return {
         "tool": call_result["tool"],

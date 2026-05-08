@@ -201,7 +201,7 @@ This is content quality, not runtime — the IPA scale (`pipe.set_ip_adapter_sca
 
 ## Related
 
-- Plan: [`documentation/toy-action-sprites-plan.md`](../toy-action-sprites-plan.md)
+- Plan: [`documentation/plan/phase-f-toy-action-sprites.md`](../plan/phase-f-toy-action-sprites.md)
 - 8 GB feasibility report (with full probe procedure, output sample, three diffusers gotchas long-form): [`documentation/runs/2026-05-06-phase-f-8gb-feasibility.md`](../runs/2026-05-06-phase-f-8gb-feasibility.md)
 - Setup script: [`scripts/image_gen_setup.py`](../../scripts/image_gen_setup.py)
 - Generated manifest (after first run): `data/models/image_gen/manifest.json` (gitignored; regenerate via setup script)

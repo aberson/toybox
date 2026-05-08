@@ -1,6 +1,6 @@
 # M2.5 UAT fixtures
 
-Test images for [Manual M2.5](../../../../documentation/plan.md) — the v1 bundled UI smoke. Generated from [scripts/uat/generate_m2_5_fixtures.py](../../../../scripts/uat/generate_m2_5_fixtures.py); regenerate any time with:
+Test images for [Manual M2.5](../../../../documentation/plan/phase-d-uat-m2.5.md) — the v1 bundled UI smoke. Generated from [scripts/uat/generate_m2_5_fixtures.py](../../../../scripts/uat/generate_m2_5_fixtures.py); regenerate any time with:
 
 ```powershell
 uv run python scripts/uat/generate_m2_5_fixtures.py

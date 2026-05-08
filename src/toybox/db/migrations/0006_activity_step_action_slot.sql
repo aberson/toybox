@@ -1,6 +1,6 @@
 -- Phase F Step F6 — add action_slot column to activity_steps.
 --
--- See documentation/toy-action-sprites-plan.md §F6 + §"New components"
+-- See documentation/plan/phase-f-toy-action-sprites.md §F6 + §"New components"
 -- §"Action vocabulary". The generator (offline + Claude single-shot)
 -- emits one of the 10 fixed action slot keys per step; the kiosk
 -- StepCard renders a per-toy sprite next to the body text when the
