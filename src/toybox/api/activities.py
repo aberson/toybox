@@ -587,6 +587,14 @@ def _emit_state(pubsub: PubSub, response: ActivityResponse) -> None:
     payload = response.model_dump(mode="json")
     payload.pop("trigger_phrase", None)
     payload.pop("persona_reasoning", None)
+    # The same two fields are also persisted into ``metadata`` as Step 23
+    # "why this?" telemetry (see _propose's metadata write below). Popping
+    # only the top-level surface left the metadata copies on the wire,
+    # leaking PII to every subscriber including the child-scope kiosk.
+    metadata = payload.get("metadata")
+    if isinstance(metadata, dict):
+        metadata.pop("trigger_phrase", None)
+        metadata.pop("persona_reasoning", None)
     pubsub.publish(
         build_envelope(
             topic=Topic.activity_state,

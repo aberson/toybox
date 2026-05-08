@@ -307,6 +307,21 @@ def test_propose_trigger_phrase_at_cap_is_accepted(
 # ---------------------------------------------------------------------------
 
 
+def _payload_has_key_anywhere(node: object, key: str) -> bool:
+    """Recursive walk -- mirrors scripts/uat/ws_inspect.py so any caller
+    that adds a new copy of a stripped key (e.g. inside ``metadata``)
+    fails the assertion. Top-level-only checks miss the metadata leak
+    that the M2.5.5 UAT surfaced.
+    """
+    if isinstance(node, dict):
+        if key in node:
+            return True
+        return any(_payload_has_key_anywhere(v, key) for v in node.values())
+    if isinstance(node, list):
+        return any(_payload_has_key_anywhere(item, key) for item in node)
+    return False
+
+
 def test_child_ws_envelope_omits_pii(
     client: TestClient,
     parent_headers: dict[str, str],
@@ -318,6 +333,10 @@ def test_child_ws_envelope_omits_pii(
     rationale string). Both are stripped server-side in ``_emit_state``;
     the kid kiosk subscribes to the topic for state ticks but never
     needs to render either field.
+
+    Both keys also live nested under ``metadata`` (Step 23 "why this?"
+    telemetry persistence), so the assertion walks the whole tree --
+    a top-level membership check would miss the metadata copy.
     """
     sub = pubsub.subscribe([Topic.activity_state])
     try:
@@ -332,9 +351,10 @@ def test_child_ws_envelope_omits_pii(
         envelope = sub.get_nowait()
         assert envelope.topic is Topic.activity_state
         assert envelope.payload["id"] == body["id"]
-        # CRITICAL: the WS envelope does NOT carry the parent-only fields.
-        assert "trigger_phrase" not in envelope.payload
-        assert "persona_reasoning" not in envelope.payload
+        # CRITICAL: NEITHER field appears anywhere in the envelope tree --
+        # not at top-level, not nested in metadata.
+        assert not _payload_has_key_anywhere(envelope.payload, "trigger_phrase")
+        assert not _payload_has_key_anywhere(envelope.payload, "persona_reasoning")
     finally:
         sub.close()
 
