@@ -92,7 +92,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"could not write {dst}: {exc}", file=sys.stderr)
         return 2
 
-    print(f"bridged → {dst} (delta_h={delta_h})")
+    print(f"bridged -> {dst} (delta_h={delta_h})")
     return 0
 
 

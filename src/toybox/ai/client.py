@@ -1,12 +1,15 @@
-"""Async wrapper around the Anthropic SDK.
+"""Async wrapper around the Anthropic Messages API (raw HTTPS + OAuth).
 
 Step 5 ships a Protocol so call sites in steps 6-9 can land without
 live Claude. Two concrete impls are provided:
 
-* :class:`AnthropicClient` — wraps the official ``anthropic`` SDK in
-  ``asyncio.to_thread`` so the Phase B mic loop is not blocked. The SDK
-  is imported lazily so tests don't require the dep installed.
-* :class:`StubClient` — deterministic test double; no network at all.
+* :class:`AnthropicClient` -- POSTs to ``https://api.anthropic.com/v1/messages``
+  using the OAuth bearer from ``~/.toybox/secrets.json``. Sync HTTP via
+  stdlib ``urllib.request``, wrapped in ``asyncio.to_thread`` so the
+  Phase B mic loop is not blocked. No SDK dep -- toybox only has Claude
+  OAuth (subscription auth, not an API key), and the messages-API wire
+  format is stable across SDK versions.
+* :class:`StubClient` -- deterministic test double; no network at all.
 
 Models are pinned to env vars (``TOYBOX_CLAUDE_TEXT_MODEL`` and
 ``TOYBOX_CLAUDE_VISION_MODEL``); we never hard-code a model string at
@@ -19,11 +22,13 @@ to print live capability state for the M1 manual-setup step.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
+import urllib.request
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol, cast, runtime_checkable
 
 from .oauth import OAuthToken
 
@@ -34,6 +39,14 @@ DEFAULT_VISION_MODEL = "claude-haiku-4-5-20251001"
 
 TEXT_MODEL_ENV = "TOYBOX_CLAUDE_TEXT_MODEL"
 VISION_MODEL_ENV = "TOYBOX_CLAUDE_VISION_MODEL"
+
+# Messages API endpoint + wire-version header. The version pin is the
+# canonical Anthropic-recommended value -- it locks the response shape
+# so a future API rev that adds/changes fields doesn't break the
+# extraction below until we explicitly bump.
+_API_URL = "https://api.anthropic.com/v1/messages"
+_ANTHROPIC_VERSION = "2023-06-01"
+_REQUEST_TIMEOUT_SEC = 60
 
 
 def text_model() -> str:
@@ -100,21 +113,26 @@ class AIClient(Protocol):
 
 
 class AnthropicClient:
-    """Real Anthropic SDK wrapper.
+    """OAuth-direct client for the Anthropic Messages API.
 
-    The SDK is imported lazily so test environments without the
-    ``anthropic`` package can still import :mod:`toybox.ai.client`. The
-    constructor accepts the bearer ``token`` directly so the refresh
-    loop can rebuild the underlying SDK client when the token rotates.
+    Posts to ``https://api.anthropic.com/v1/messages`` with
+    ``Authorization: Bearer <oauth-access-token>`` and the standard
+    ``anthropic-version`` header. No SDK dependency -- toybox only has
+    Claude OAuth (subscription account, not an API key), and the
+    messages-API wire format is stable across SDK versions.
 
-    Real network calls are NOT exercised in unit/integration tests — the
-    test suite uses :class:`StubClient` everywhere. The thin wrapper
-    here exists so steps 6-9 can flip a flag and land live calls.
+    Sync HTTP via stdlib ``urllib.request``; the public methods wrap
+    each call in ``asyncio.to_thread`` so the Phase B mic loop is not
+    blocked.
+
+    Real network calls are NOT exercised in unit/integration tests --
+    the test suite uses :class:`StubClient` everywhere. This thin
+    wrapper is what production code-paths land on once capability is
+    green.
     """
 
     def __init__(self, token: OAuthToken) -> None:
         self._token = token
-        self._sdk: Any | None = None  # lazy
 
     @property
     def token(self) -> OAuthToken:
@@ -124,42 +142,55 @@ class AnthropicClient:
     def update_token(self, token: OAuthToken) -> None:
         """Swap the bearer token in place. Called by the refresh loop."""
         self._token = token
-        # Force the lazy SDK to rebuild on next call so the new bearer
-        # is picked up.
-        self._sdk = None
 
-    def _get_sdk(self) -> Any:
-        if self._sdk is None:
-            try:
-                import anthropic  # type: ignore[import-not-found,unused-ignore]
-            except ImportError as exc:  # pragma: no cover - dep-gated
-                raise RuntimeError(
-                    "anthropic SDK not installed; install or use StubClient"
-                ) from exc
-            self._sdk = anthropic.Anthropic(auth_token=self._token.access_token)
-        return self._sdk
+    def _post_messages(
+        self, payload: dict[str, Any]
+    ) -> dict[str, Any]:  # pragma: no cover - exercised only against live API
+        """Synchronous POST to ``/v1/messages``; returns the parsed JSON body.
+
+        Errors (auth, rate limit, server) bubble up as
+        ``urllib.error.HTTPError``; the breaker module is the
+        higher-level retry / circuit gate, so we don't add an inline
+        retry loop here.
+        """
+        body = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            _API_URL,
+            data=body,
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {self._token.access_token}",
+                "anthropic-version": _ANTHROPIC_VERSION,
+                "Content-Type": "application/json",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=_REQUEST_TIMEOUT_SEC) as resp:
+            return cast(dict[str, Any], json.loads(resp.read()))
+
+    @staticmethod
+    def _extract_text(data: dict[str, Any]) -> str:
+        """Concatenate all top-level ``type=="text"`` content blocks."""
+        text = ""
+        for block in data.get("content", []) or []:
+            if isinstance(block, dict) and block.get("type") == "text":
+                text += block.get("text", "")
+        return text
 
     def _complete_text_sync(
         self,
         messages: Sequence[AIMessage],
         max_tokens: int,
         system: str | None,
-    ) -> AIResponse:  # pragma: no cover - exercised only when SDK present
-        sdk = self._get_sdk()
-        kwargs: dict[str, Any] = {
+    ) -> AIResponse:  # pragma: no cover - exercised only against live API
+        payload: dict[str, Any] = {
             "model": text_model(),
             "max_tokens": max_tokens,
             "messages": [{"role": m.role, "content": m.content} for m in messages],
         }
         if system is not None:
-            kwargs["system"] = system
-        result = sdk.messages.create(**kwargs)
-        # Best-effort text extraction across SDK shapes.
-        text = ""
-        for block in getattr(result, "content", []) or []:
-            if getattr(block, "type", None) == "text":
-                text += getattr(block, "text", "")
-        return AIResponse(text=text, model=text_model())
+            payload["system"] = system
+        data = self._post_messages(payload)
+        return AIResponse(text=self._extract_text(data), model=text_model())
 
     async def complete_text(
         self,
@@ -176,36 +207,33 @@ class AnthropicClient:
         prompt: str,
         media_type: str,
         max_tokens: int,
-    ) -> AIResponse:  # pragma: no cover - exercised only when SDK present
+    ) -> AIResponse:  # pragma: no cover - exercised only against live API
         import base64
 
-        sdk = self._get_sdk()
         b64 = base64.b64encode(image_bytes).decode("ascii")
-        result = sdk.messages.create(
-            model=vision_model(),
-            max_tokens=max_tokens,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": media_type,
-                                "data": b64,
+        data = self._post_messages(
+            {
+                "model": vision_model(),
+                "max_tokens": max_tokens,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": media_type,
+                                    "data": b64,
+                                },
                             },
-                        },
-                        {"type": "text", "text": prompt},
-                    ],
-                }
-            ],
+                            {"type": "text", "text": prompt},
+                        ],
+                    }
+                ],
+            }
         )
-        text = ""
-        for block in getattr(result, "content", []) or []:
-            if getattr(block, "type", None) == "text":
-                text += getattr(block, "text", "")
-        return AIResponse(text=text, model=vision_model())
+        return AIResponse(text=self._extract_text(data), model=vision_model())
 
     async def describe_image(
         self,
