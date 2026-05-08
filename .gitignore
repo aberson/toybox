@@ -53,5 +53,10 @@ playwright/.cache/
 .claude/settings.local.json
 .claude/worktrees/
 
+# Runtime logs (backend.log/.err, frontend.log/.err — captured by the
+# M2.5 setup script's Start-Process redirects). The *.log pattern above
+# already covers .log files; this catches the .err siblings too.
+logs/
+
 # Operator scratch
 zzscratch.txt
