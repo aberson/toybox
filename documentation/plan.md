@@ -1025,6 +1025,8 @@ cd frontend; npm run dev
 
 ### Run dev — child tablet on LAN (Phase D and later only)
 
+> See also: [child-ipad-pwa-plan.md](child-ipad-pwa-plan.md) for iPad-specific setup (Add-to-Home-Screen install, Guided Access, Wake Lock, audio unlock troubleshooting). Generic LAN tablet pairing is below; iPad operators should follow this section first to confirm reachability, then jump to the iPad doc.
+
 After Phase D step 21 sets a parent PIN, LAN binding is unlocked:
 
 ```powershell
@@ -1798,6 +1800,28 @@ What to look for:
 - **Judge-as-target risk in SFT.** Optimizing toward judge preferences instead of parent preferences is the failure mode. Mitigation: parent signal weighted higher in SFT label composition; periodic judge-vs-parent agreement audit on the overlap.
 - **Tool-loop latency stack.** Multi-turn generation + tool resolution on a 7B model on consumer hardware can stack to 10s+ per activity. Mitigation: prompt cache aggressively in E4; max-step cap; "regenerate from here" remains the parent escape hatch.
 - **VRAM ceiling at 7B with KV cache.** Quoted ~5GB weight is misleading; working set creeps toward 7-8GB at 4K context. Mitigation: documented in E1 decision doc; 3B fallback is real, not theoretical.
+
+---
+
+### Phase iPad-Kiosk — Child kiosk on iPad (PWA, post-v1)
+
+**Goal:** turn the existing `/child` React route into an installable iPad app via the PWA "Add to Home Screen" path. Family-private testing only — no App Store, no Apple Developer account, no Mac/Xcode required. Network reachability for v1 is plain HTTP over LAN; HTTPS-over-Tailscale + offline service worker + Capacitor native wrapper are explicit Backlog enhancements in the sibling doc, not in scope here.
+
+**Prerequisite:** Phase D step 21 (parent PIN gate) must be DONE — LAN binding is gated on PIN-set, and the iPad reaches the backend over LAN. ✅ DONE 2026-05-03 (commit `72f530f`).
+
+**Sequencing rationale:** independent of Phase E (model substrate) and Phase F (toy action sprites). All five steps are presentation-layer changes inside `frontend/` plus one operator doc; zero backend changes, zero schema changes, zero API changes. iK1–iK4 are code-only and can be batched into a single bundled UI run; iK5 is the human-driven test pass on a real iPad and gates phase completion.
+
+| # | Step | Reviewers | Done-when (summary) |
+|---|------|-----------|---------------------|
+| iK1 | PWA manifest + icons + iOS meta tags | `--reviewers code` | `manifest.webmanifest` (display=standalone, orientation=landscape, start_url=/child) + apple-touch-icon + iOS meta tags wired in `index.html`; manifest validates in browser devtools |
+| iK2 | Safe-area-inset padding on kiosk root | `--reviewers code` | Kiosk content respects `env(safe-area-inset-*)` so rounded corners / Dynamic Island don't clip; gradient stays edge-to-edge; desktop rendering unchanged |
+| iK3 | Screen Wake Lock during active activity | `--reviewers code` | `acquireWakeLock`/`releaseWakeLock` wired around `running`/`paused` state; re-acquires on `visibilitychange: visible`; silent no-op on iPadOS <16.4 |
+| iK4 | iOS audio unlock + touch-target audit | `--reviewers code` | `unlockAudio()` primed on PIN submit (first user gesture); SFX plays on subsequent transitions; Next button + PIN keypad confirmed ≥44pt per Apple HIG |
+| iK5 | Operator iPad setup doc + visual verification | `--reviewers code` | `documentation/operator/ipad-setup.md` covers LAN setup recap + Add-to-Home-Screen + Guided Access + troubleshooting + known limitations; UAT on real iPad captured in `documentation/runs/<date>-phase-ipad-kiosk-uat.md` |
+
+**Canonical doc:** [child-ipad-pwa-plan.md](child-ipad-pwa-plan.md) carries the full per-step `**Problem:**/**Type:**/**Issue:**/**Flags:**/**Status:**` shape, the M_iK manual UAT script, the risks/open-questions section, and the Backlog enhancements (Tailscale+HTTPS, Service Worker, Capacitor).
+
+**Issues:** Phase iPad-Kiosk umbrella #55 · step iK1 → #56 · step iK2 → #57 · step iK3 → #58 · step iK4 → #59 · step iK5 → #60
 
 ---
 
