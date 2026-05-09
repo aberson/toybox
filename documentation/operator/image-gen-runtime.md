@@ -286,7 +286,7 @@ If you intended to run Tier B but capability is False, fix the underlying issue 
 ## Related
 
 - Plan: [`documentation/plan/phase-f-5-sprite-cartoon-redo.md`](../plan/phase-f-5-sprite-cartoon-redo.md)
-- Original Phase F plan (the now-superseded SDXL pipeline): [`documentation/plan/phase-f-toy-action-sprites.md`](../plan/phase-f-toy-action-sprites.md)
+- Original Phase F plan (the now-superseded SDXL pipeline, archived 2026-05-09): [`documentation/plan/archive/phase-f-toy-action-sprites.md`](../plan/archive/phase-f-toy-action-sprites.md)
 - F9 fail report (the motivation for F.5): [`documentation/runs/2026-05-07-toy-action-sprites-smoke.md`](../runs/2026-05-07-toy-action-sprites-smoke.md)
 - Investigation that produced the F.5 design: [`documentation/runs/2026-05-08-sprite-pipeline-alternatives.md`](../runs/2026-05-08-sprite-pipeline-alternatives.md)
 - Per-component download scripts: [`scripts/f5_download_sd15.py`](../../scripts/f5_download_sd15.py), [`scripts/f5_download_lcm.py`](../../scripts/f5_download_lcm.py), [`scripts/f5_download_cartoon_checkpoint.py`](../../scripts/f5_download_cartoon_checkpoint.py)
