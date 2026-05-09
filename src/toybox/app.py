@@ -20,6 +20,7 @@ from .api.audio import router as audio_router
 from .api.auth import router as auth_router
 from .api.children import router as children_router
 from .api.health import router as health_router
+from .api.image_gen_settings import router as image_gen_settings_router
 from .api.listening import router as listening_router
 from .api.metrics import router as metrics_router
 from .api.rooms import router as rooms_router
@@ -47,6 +48,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(listening_router)
     app.include_router(audio_router)
+    app.include_router(image_gen_settings_router)
     app.include_router(auth_router)
     app.include_router(activities_router)
     app.include_router(children_router)

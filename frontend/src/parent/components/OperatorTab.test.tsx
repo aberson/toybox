@@ -13,7 +13,12 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { Mock } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ApiClient, ListeningMode, MetricsSnapshot } from "../api";
+import type {
+  ApiClient,
+  ImageGenMode,
+  ListeningMode,
+  MetricsSnapshot,
+} from "../api";
 import type { Envelope } from "../ws";
 import { OperatorTab } from "./OperatorTab";
 
@@ -75,6 +80,9 @@ function fakeSnapshot(overrides: Partial<MetricsSnapshot> = {}): MetricsSnapshot
 interface StubApi {
   getMetrics: Mock;
   setListeningMode: Mock;
+  setMicEnabled: Mock;
+  getImageGenMode: Mock;
+  setImageGenMode: Mock;
 }
 
 function buildStubApi(snapshot: MetricsSnapshot): StubApi {
@@ -83,6 +91,11 @@ function buildStubApi(snapshot: MetricsSnapshot): StubApi {
     // Default: PUT echoes the requested mode. Tests that need failure
     // mocks can override via ``mockRejectedValueOnce`` etc.
     setListeningMode: vi.fn(async (mode: ListeningMode) => ({ mode })) as Mock,
+    setMicEnabled: vi.fn(async (enabled: boolean) => ({ enabled })) as Mock,
+    // F.5-toggle: image-gen mode card. Default GET returns cartoon and
+    // PUT echoes the requested mode.
+    getImageGenMode: vi.fn(async () => ({ mode: "cartoon" as ImageGenMode })) as Mock,
+    setImageGenMode: vi.fn(async (mode: ImageGenMode) => ({ mode })) as Mock,
   };
 }
 
@@ -260,6 +273,7 @@ describe("OperatorTab", () => {
     const snapshot = fakeSnapshot();
     let calls = 0;
     const api = {
+      ...buildStubApi(snapshot),
       getMetrics: vi.fn(async () => {
         calls += 1;
         if (calls === 1) {
@@ -312,13 +326,15 @@ describe("OperatorTab", () => {
 
   it("aborts the in-flight fetch on unmount", () => {
     const aborted: AbortSignal[] = [];
+    const snapshot = fakeSnapshot();
     const api = {
+      ...buildStubApi(snapshot),
       getMetrics: vi.fn(
         async (opts?: { signal?: AbortSignal }) => {
           if (opts?.signal !== undefined) {
             aborted.push(opts.signal);
           }
-          return fakeSnapshot();
+          return snapshot;
         },
       ) as Mock,
     };
@@ -332,7 +348,9 @@ describe("OperatorTab", () => {
   });
 
   it("renders an error when the fetch fails", async () => {
+    const snapshot = fakeSnapshot();
     const api = {
+      ...buildStubApi(snapshot),
       getMetrics: vi.fn(async () => {
         throw new Error("boom");
       }) as Mock,

@@ -19,6 +19,7 @@ class Topic(StrEnum):
 
     listening_mode = "listening.mode"
     mic_enabled = "mic.enabled"
+    image_gen_mode = "image_gen.mode"
     system = "system"
     triggers_invalidate = "triggers.invalidate"
     activity = "activity"

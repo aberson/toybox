@@ -481,6 +481,16 @@ export interface MicEnabledResponse {
   enabled: boolean;
 }
 
+// Mirrors backend ``ImageGenMode`` literal alias
+// (toybox/core/image_gen_mode.py): the operator-controlled toggle that
+// forces composite output even on a capable GPU host. Default is
+// ``cartoon``; legacy DBs without the seed row resolve the same.
+export type ImageGenMode = "cartoon" | "composite";
+
+export interface ImageGenModeResponse {
+  mode: ImageGenMode;
+}
+
 export interface MetricsAIStatus {
   breaker_state: "closed" | "open" | "half_open";
   breaker_retry_after_iso: string | null;
@@ -1196,6 +1206,30 @@ export class ApiClient {
     return this.request<MicEnabledResponse>("/api/audio/mic-enabled", {
       method: "PUT",
       body: JSON.stringify({ enabled }),
+      signal: opts.signal,
+    });
+  }
+
+  // Image-gen mode toggle. Read-write pair so the OperatorTab card can
+  // both load the persisted value on mount and persist a new value on
+  // toggle. The PUT requires parent scope; the GET is unauthenticated
+  // (mirrors the listening + audio GETs — household read).
+  async getImageGenMode(
+    opts: RequestOptions = {},
+  ): Promise<ImageGenModeResponse> {
+    return this.request<ImageGenModeResponse>("/api/settings/image-gen-mode", {
+      method: "GET",
+      signal: opts.signal,
+    });
+  }
+
+  async setImageGenMode(
+    mode: ImageGenMode,
+    opts: RequestOptions = {},
+  ): Promise<ImageGenModeResponse> {
+    return this.request<ImageGenModeResponse>("/api/settings/image-gen-mode", {
+      method: "PUT",
+      body: JSON.stringify({ mode }),
       signal: opts.signal,
     });
   }
