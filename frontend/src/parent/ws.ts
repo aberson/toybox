@@ -29,6 +29,9 @@ export const PARENT_TOPICS: readonly string[] = [
   // transitions (queued → running → done/failed) without polling.
   // Parent-scope only — child tokens never receive these envelopes.
   "toy_actions",
+  // F.5-toggle: operator UI subscribes so a setting flipped from
+  // another browser tab updates the toggle card without a refresh.
+  "image_gen.mode",
 ];
 
 // Step 9 keeps these strings local rather than extending the codegen

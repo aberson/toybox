@@ -147,3 +147,4 @@ INSERT INTO settings (key, value) VALUES ('vad_aggressiveness', '2');
 INSERT INTO settings (key, value) VALUES ('log_level', 'INFO');
 INSERT INTO settings (key, value) VALUES ('mic_enabled', 'true');
 INSERT INTO settings (key, value) VALUES ('time_of_day_aware', 'true');
+INSERT INTO settings (key, value) VALUES ('image_gen_mode', 'cartoon');

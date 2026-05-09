@@ -150,6 +150,7 @@ class ImageGenWorker:
         ]
         | None = None,
         capability_probe: Callable[[], tuple[bool, CapabilityReason, str]] | None = None,
+        mode_probe: Callable[[], str] | None = None,
         shutdown_grace_sec: float = _DEFAULT_SHUTDOWN_GRACE_SEC,
     ) -> None:
         self._conn_factory = conn_factory
@@ -172,6 +173,12 @@ class ImageGenWorker:
         # callers pass ``None`` and we use the real
         # :func:`is_image_gen_capable`.
         self._capability_probe = capability_probe
+        # F.5-toggle: per-job mode probe so the operator's
+        # ``settings.image_gen_mode`` toggle is honoured without a
+        # backend restart. ``None`` → read fresh from the DB via the
+        # conn factory on each dispatch (same per-job freshness as
+        # the capability probe).
+        self._mode_probe = mode_probe
 
     # ------------------------------------------------------------------
     # Public API
@@ -485,7 +492,37 @@ class ImageGenWorker:
             )
             return
 
-        composite_path = not capable
+        # F.5-toggle: operator can FORCE composite output even on a
+        # capable host via ``settings.image_gen_mode = "composite"``.
+        # The env_disabled hard-off branch above still wins regardless
+        # of mode (deliberate — TOYBOX_IMAGE_GEN_ENABLED=false is the
+        # operator's hard kill switch).
+        #
+        # Wrapped in try/except mirroring the capability probe above:
+        # ``_probe_mode`` opens a fresh DB connection per dispatch, so
+        # an OperationalError ("database is locked"), a conn-factory
+        # raise, or any other sqlite hiccup must NOT bubble out of the
+        # consumer task. If it did, the row would be left stuck in
+        # ``queued`` until the next restart-recovery sweep picked it up.
+        # Run the sync probe on a worker thread so a slow / locked DB
+        # doesn't block the event loop, matching the ``_load_toy_context``
+        # / ``_with_conn`` pattern elsewhere in this file.
+        try:
+            mode = await asyncio.to_thread(self._probe_mode)
+        except Exception:  # noqa: BLE001 -- defensive
+            _logger.exception(
+                "image_gen worker: mode probe raised for toy_id=%s slot=%s",
+                toy_id,
+                slot,
+            )
+            await self._mark_failed(
+                toy_id,
+                slot,
+                seed,
+                error="image_gen_mode_probe_failed",
+            )
+            return
+        composite_path = (not capable) or (mode == "composite")
 
         # Per-pipeline breaker check. Tier B only — Tier C ignores the
         # breaker entirely since composite failures are structural,
@@ -812,6 +849,25 @@ class ImageGenWorker:
         if self._capability_probe is not None:
             return self._capability_probe()
         return is_image_gen_capable(check_free_vram=False)
+
+    def _probe_mode(self) -> str:
+        """Return the persisted image-gen mode, honouring the test override.
+
+        Reads ``settings.image_gen_mode`` per dispatch via a fresh DB
+        connection — the operator's toggle in the parent UI must take
+        effect without a backend restart. Lazy-imported so a worker
+        constructed in a capability-disabled deployment doesn't pay the
+        ws-envelope import cost on construction.
+        """
+        if self._mode_probe is not None:
+            return self._mode_probe()
+        from ..core.image_gen_mode import current_image_gen_mode
+
+        conn = self._conn_factory()
+        try:
+            return current_image_gen_mode(conn)
+        finally:
+            conn.close()
 
     def _with_conn(
         self,

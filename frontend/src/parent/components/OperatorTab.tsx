@@ -17,13 +17,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isAbortError } from "../api";
 import type {
   ApiClient,
+  ImageGenMode,
   ListeningMode,
   MetricsSnapshot,
 } from "../api";
 import type { Envelope } from "../ws";
 
 export interface OperatorTabProps {
-  api: Pick<ApiClient, "getMetrics" | "setListeningMode" | "setMicEnabled">;
+  api: Pick<
+    ApiClient,
+    | "getMetrics"
+    | "setListeningMode"
+    | "setMicEnabled"
+    | "getImageGenMode"
+    | "setImageGenMode"
+  >;
   // Caller wires this from the ws layer: register a listener for
   // ``metrics`` envelopes and return an unsubscribe function. When the
   // ws path is unavailable (e.g. tests, kiosk-only build), pass a
@@ -206,6 +214,155 @@ function MicMuteControl(props: MicMuteControlProps): JSX.Element {
       {error !== null && (
         <div
           data-testid="mic-mute-error"
+          role="alert"
+          style={{ color: "#b91c1c", fontSize: 11, marginTop: 6 }}
+        >
+          {error}
+        </div>
+      )}
+    </section>
+  );
+}
+
+interface ImageGenModeChoice {
+  mode: ImageGenMode;
+  label: string;
+  description: string;
+}
+
+const IMAGE_GEN_MODES: readonly ImageGenModeChoice[] = [
+  {
+    mode: "cartoon",
+    label: "Cartoon",
+    description: "SD 1.5 stylized; uses GPU.",
+  },
+  {
+    mode: "composite",
+    label: "Composite (offline)",
+    description: "Pillow templates + cutout; no GPU, fastest.",
+  },
+];
+
+export interface ImageGenModeToggleProps {
+  api: Pick<ApiClient, "getImageGenMode" | "setImageGenMode">;
+}
+
+export function ImageGenModeToggle(props: ImageGenModeToggleProps): JSX.Element {
+  const { api } = props;
+  const [mode, setMode] = useState<ImageGenMode | null>(null);
+  // Tracks which button (if any) the operator just clicked so the
+  // active-side label can render "Saving..." while the PUT is in
+  // flight. ``null`` while idle.
+  const [pendingMode, setPendingMode] = useState<ImageGenMode | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const busy = pendingMode !== null;
+
+  // Initial GET: load the persisted mode on mount. AbortController
+  // cancels the in-flight fetch on unmount so a remount doesn't fire
+  // a stale setState.
+  useEffect(() => {
+    const controller = new AbortController();
+    api
+      .getImageGenMode({ signal: controller.signal })
+      .then((resp) => {
+        setMode(resp.mode);
+      })
+      .catch((err: unknown) => {
+        if (isAbortError(err)) return;
+        const message =
+          err instanceof Error ? err.message : "load image-gen mode failed";
+        setError(message);
+      });
+    return () => {
+      controller.abort();
+    };
+  }, [api]);
+
+  const handleSelect = useCallback(
+    (next: ImageGenMode): void => {
+      if (busy) return;
+      if (next === mode) return;
+      setPendingMode(next);
+      setError(null);
+      api
+        .setImageGenMode(next)
+        .then((resp) => {
+          setMode(resp.mode);
+          setPendingMode(null);
+        })
+        .catch((err: unknown) => {
+          if (isAbortError(err)) return;
+          const message =
+            err instanceof Error ? err.message : "set image-gen mode failed";
+          setError(message);
+          setPendingMode(null);
+        });
+    },
+    [api, busy, mode],
+  );
+
+  return (
+    <section data-testid="operator-image-gen-mode" style={CARD_STYLE}>
+      <h3 style={SECTION_HEADING_STYLE}>Image-gen mode</h3>
+      <p
+        style={{
+          fontSize: 11,
+          color: "#6b7280",
+          margin: "0 0 8px 0",
+          lineHeight: 1.4,
+        }}
+      >
+        Controls how toy action sprites are rendered. Cartoon uses the
+        SD 1.5 stylized pipeline (GPU). Composite stitches Pillow
+        templates and a rembg cutout — fastest, runs without a GPU.
+      </p>
+      <div
+        data-testid="image-gen-mode-buttons"
+        style={{ display: "flex", flexDirection: "column", gap: 4 }}
+      >
+        {IMAGE_GEN_MODES.map(({ mode: choice, label, description }) => {
+          const active = mode === choice;
+          const saving = pendingMode === choice;
+          return (
+            <button
+              key={choice}
+              type="button"
+              data-testid={`image-gen-mode-btn-${choice}`}
+              data-active={active ? "true" : "false"}
+              disabled={busy}
+              onClick={() => handleSelect(choice)}
+              style={{
+                fontSize: 12,
+                padding: "6px 10px",
+                borderRadius: 4,
+                border: active ? "1px solid #2563eb" : "1px solid #d1d5db",
+                background: active ? "#dbeafe" : "#fff",
+                color: active ? "#1e3a8a" : "#374151",
+                cursor: busy ? "default" : "pointer",
+                fontWeight: active ? 600 : 400,
+                opacity: busy && !saving && !active ? 0.6 : 1,
+                textAlign: "left",
+              }}
+            >
+              <div>{saving ? "Saving..." : label}</div>
+              <div
+                style={{
+                  fontSize: 10,
+                  color: "#6b7280",
+                  fontWeight: 400,
+                  marginTop: 2,
+                }}
+              >
+                {description}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      {error !== null && (
+        <div
+          data-testid="image-gen-mode-error"
           role="alert"
           style={{ color: "#b91c1c", fontSize: 11, marginTop: 6 }}
         >
@@ -421,6 +578,14 @@ export function OperatorTab(props: OperatorTabProps): JSX.Element {
     [api, handleMicEnabledChanged, snapshot?.audio.mic_enabled],
   );
 
+  // F.5-toggle: image-gen mode card. The component owns its own GET
+  // on mount + PUT-on-click; no metrics-snapshot integration since
+  // the mode isn't part of the snapshot wire shape.
+  const imageGenModeCard = useMemo(
+    () => <ImageGenModeToggle api={api} />,
+    [api],
+  );
+
   if (snapshot === null) {
     return (
       <section data-testid="operator-tab" style={{ padding: 12, fontSize: 12 }}>
@@ -508,6 +673,8 @@ export function OperatorTab(props: OperatorTabProps): JSX.Element {
         {listeningCard}
 
         {micMuteCard}
+
+        {imageGenModeCard}
 
         <section style={CARD_STYLE}>
           <h3 style={SECTION_HEADING_STYLE}>Transcripts</h3>
