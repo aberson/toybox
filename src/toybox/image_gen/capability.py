@@ -10,13 +10,17 @@ Mirrors :mod:`toybox.ai.capability` / :mod:`toybox.ai.breaker`:
   worker (F4) calls :meth:`check_and_record` after every job; F2
   just ships the class + a module-level singleton.
 
-The capability check intentionally does NOT also run the full
-``CLIPVisionModelWithProjection.from_pretrained`` smoke — that's
-expensive (~3 GB of weights into RAM) and the manifest sha-check
-shipped in F1 already validates checkpoint integrity. A per-file
-``Path.exists()`` here is sufficient to distinguish "no checkpoints
-at all" from "checkpoints loaded fine"; sha drift is the
-manifest's job.
+The capability check intentionally does NOT load the diffusers
+pipeline — that's expensive and the manifest sha-check shipped in
+F1 already validates checkpoint integrity. A per-file ``Path.is_file()``
+here is sufficient to distinguish "no checkpoints at all" from
+"checkpoints loaded fine"; sha drift is the manifest's job.
+
+The required checkpoint set is **mode-aware**: the
+``TOYBOX_IMAGE_GEN_CARTOON_MODE`` env var selects between
+``checkpoint`` (full cartoon checkpoint replaces SD 1.5 base) and
+``lora`` (SD 1.5 base + cartoon LoRA), each requiring a different
+file shape under the configured model dir.
 """
 
 from __future__ import annotations
@@ -68,26 +72,53 @@ class CapabilityReason(StrEnum):
 ENABLED_ENV: Final[str] = "TOYBOX_IMAGE_GEN_ENABLED"
 MIN_VRAM_GB_ENV: Final[str] = "TOYBOX_IMAGE_GEN_MIN_VRAM_GB"
 MODEL_DIR_ENV: Final[str] = "TOYBOX_IMAGE_GEN_MODEL_DIR"
+CARTOON_MODE_ENV: Final[str] = "TOYBOX_IMAGE_GEN_CARTOON_MODE"
 BREAKER_OPEN_SEC_ENV: Final[str] = "TOYBOX_IMAGE_GEN_BREAKER_OPEN_SEC"
 BREAKER_THRESHOLD_ENV: Final[str] = "TOYBOX_IMAGE_GEN_BREAKER_THRESHOLD"
 
 DEFAULT_MIN_VRAM_GB: Final[int] = 12
 DEFAULT_MODEL_DIR: Final[str] = "data/models/image_gen"
+DEFAULT_CARTOON_MODE: Final[str] = "checkpoint"
 DEFAULT_BREAKER_OPEN_SEC: Final[float] = 300.0
 DEFAULT_BREAKER_THRESHOLD: Final[int] = 3
 
-# Files that must exist under ``MODEL_DIR_ENV`` for image-gen to be
-# capable. Paths relative to the model dir root. Mirrors the layout
-# the F1 setup script writes under
-# ``data/models/image_gen/{sdxl,ip_adapter,pixel_art_lora,bg_remove}/``.
-REQUIRED_CHECKPOINTS: Final[tuple[str, ...]] = (
-    "sdxl/stable-diffusion-xl-base-1.0/model_index.json",
-    "sdxl/stable-diffusion-xl-base-1.0/unet/diffusion_pytorch_model.fp16.safetensors",
-    "ip_adapter/sdxl_models/ip-adapter_sdxl_vit-h.safetensors",
-    "ip_adapter/models/image_encoder/model.safetensors",
-    "pixel_art_lora/pixel-art-xl.safetensors",
+# Common-to-all-modes checkpoints under ``MODEL_DIR_ENV``. The LCM
+# LoRA is always loaded; the rembg u2net is always needed for
+# subject-isolation. Per-mode additions live in
+# :func:`_required_checkpoints`.
+_BASE_REQUIRED_CHECKPOINTS: Final[tuple[str, ...]] = (
+    "sd15/lcm_lora/pytorch_lora_weights.safetensors",
     "bg_remove/u2net.onnx",
 )
+
+
+def _required_checkpoints() -> tuple[str, ...]:
+    """Return the per-mode checkpoint set required for image-gen.
+
+    Reads ``TOYBOX_IMAGE_GEN_CARTOON_MODE`` and returns the union of
+    the always-required base files plus the mode-specific extras:
+
+    * ``checkpoint`` — cartoon checkpoint replaces SD 1.5 base; needs
+      ``cartoon_checkpoint/model_index.json`` + UNet weights.
+    * ``lora`` — SD 1.5 base + cartoon LoRA; needs SD 1.5 base
+      ``model_index.json`` + UNet weights and the cartoon LoRA
+      safetensors.
+    * Any other value — returns the base set only; the pipeline will
+      reject the unknown mode at load time.
+    """
+    mode = os.environ.get(CARTOON_MODE_ENV, DEFAULT_CARTOON_MODE).strip().lower()
+    if mode == "checkpoint":
+        return _BASE_REQUIRED_CHECKPOINTS + (
+            "cartoon_checkpoint/model_index.json",
+            "cartoon_checkpoint/unet/diffusion_pytorch_model.fp16.safetensors",
+        )
+    if mode == "lora":
+        return _BASE_REQUIRED_CHECKPOINTS + (
+            "sd15/base/model_index.json",
+            "sd15/base/unet/diffusion_pytorch_model.fp16.safetensors",
+            "cartoon_lora/pytorch_lora_weights.safetensors",
+        )
+    return _BASE_REQUIRED_CHECKPOINTS
 
 
 def _env_bool_disabled(name: str) -> bool:
@@ -129,9 +160,12 @@ def _min_vram_gb() -> float:
 
 
 def _missing_checkpoints(model_dir: Path) -> list[str]:
-    """Return relative paths of any missing required checkpoint files."""
+    """Return relative paths of any missing required checkpoint files.
+
+    The required set is mode-aware (see :func:`_required_checkpoints`).
+    """
     missing = []
-    for relative in REQUIRED_CHECKPOINTS:
+    for relative in _required_checkpoints():
         if not (model_dir / relative).is_file():
             missing.append(relative)
     return missing
@@ -340,16 +374,17 @@ def reset_image_gen_breaker_for_tests() -> None:
 __all__ = [
     "BREAKER_OPEN_SEC_ENV",
     "BREAKER_THRESHOLD_ENV",
+    "CARTOON_MODE_ENV",
     "CapabilityReason",
     "DEFAULT_BREAKER_OPEN_SEC",
     "DEFAULT_BREAKER_THRESHOLD",
+    "DEFAULT_CARTOON_MODE",
     "DEFAULT_MIN_VRAM_GB",
     "DEFAULT_MODEL_DIR",
     "ENABLED_ENV",
     "ImageGenBreaker",
     "MIN_VRAM_GB_ENV",
     "MODEL_DIR_ENV",
-    "REQUIRED_CHECKPOINTS",
     "get_image_gen_breaker",
     "is_image_gen_capable",
     "reset_image_gen_breaker_for_tests",

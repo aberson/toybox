@@ -1,13 +1,13 @@
-"""SDXL + IP-Adapter + pixel-art LoRA → quantize → bg-remove pipeline.
+"""SD 1.5 + LCM-LoRA + cartoon-style → bg-remove pipeline.
 
 Public entry: :func:`generate_action` — async, runs the heavy work
 in :func:`asyncio.to_thread` with a per-call :func:`asyncio.wait_for`
 cap.
 
-ALL heavy imports (``torch``, ``diffusers``, ``transformers``,
-``rembg``) live INSIDE :func:`_run_pipeline_sync` so module import
-is cheap when the feature is disabled. The
-``test_lazy_imports`` test pins this contract.
+ALL heavy imports (``torch``, ``diffusers``, ``rembg``) live INSIDE
+:func:`_run_pipeline_sync` so module import is cheap when the
+feature is disabled. The ``test_lazy_imports`` test pins this
+contract.
 
 Stub-runtime injection:
 
@@ -23,21 +23,25 @@ Stub-runtime injection:
   enough to trip the timeout, exercising
   :class:`ImageGenTimeoutError`.
 
-The canonical SDXL config follows
-``documentation/operator/image-gen-runtime.md`` §"Canonical pipeline
-config" — three rules pinned by the 8 GB feasibility probe:
+Cartoon mode dispatch (per ``TOYBOX_IMAGE_GEN_CARTOON_MODE``,
+default ``checkpoint``):
 
-1. Load ``CLIPVisionModelWithProjection`` explicitly and pass it
-   into the pipeline ``from_pretrained`` call.
-2. Do NOT call ``pipe.enable_attention_slicing()`` (clobbers the
-   IPA-aware attention processors).
-3. Use ``pipe.vae.enable_slicing()`` (the ``pipe.enable_vae_slicing()``
-   alias is deprecated).
+* ``checkpoint``: ``StableDiffusionPipeline.from_pretrained(TOYBOX_IMAGE_GEN_CARTOON_PATH, ...)``
+  — full cartoon checkpoint replaces SD 1.5 base. Then load
+  LCM-LoRA only and ``set_adapters(["lcm"])``.
+* ``lora``: ``StableDiffusionPipeline.from_pretrained(TOYBOX_IMAGE_GEN_BASE_MODEL_PATH, ...)``
+  then ``pipe.load_lora_weights(TOYBOX_IMAGE_GEN_CARTOON_PATH, adapter_name="cartoon")``
+  + LCM-LoRA, then ``set_adapters(["lcm", "cartoon"], adapter_weights=[1.0, 1.0])``.
 
-A module-level cached pipeline object keeps subsequent calls fast:
-loading SDXL + the IP-Adapter + LoRA takes minutes; reuse is
-mandatory for the 10-sprites-per-toy throughput. The F4 worker
-keeps the process alive so the cache stays warm across jobs.
+In both modes: ``pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)``,
+``pipe.to("cuda")`` once at construction, ``pipe.vae.enable_slicing()``,
+``safety_checker=None, requires_safety_checker=False``. Generation
+runs at ``num_inference_steps=4, guidance_scale=1.0, height=512,
+width=512`` (LCM convention; higher CFG hurts LCM output).
+
+A module-level cached pipeline object keeps subsequent calls fast.
+The F4 worker keeps the process alive so the cache stays warm
+across jobs. Cache survives env changes ONLY via process restart.
 """
 
 from __future__ import annotations
@@ -61,18 +65,30 @@ _logger = logging.getLogger(__name__)
 # Env knobs (mirroring the operator runbook).
 TIMEOUT_ENV: Final[str] = "TOYBOX_IMAGE_GEN_TIMEOUT_SEC"
 OUTPUT_DIM_ENV: Final[str] = "TOYBOX_IMAGE_GEN_OUTPUT_DIM"
-PALETTE_COLORS_ENV: Final[str] = "TOYBOX_IMAGE_GEN_PALETTE_COLORS"
 MODEL_DIR_ENV: Final[str] = "TOYBOX_IMAGE_GEN_MODEL_DIR"
+BASE_MODEL_PATH_ENV: Final[str] = "TOYBOX_IMAGE_GEN_BASE_MODEL_PATH"
+CARTOON_MODE_ENV: Final[str] = "TOYBOX_IMAGE_GEN_CARTOON_MODE"
+CARTOON_PATH_ENV: Final[str] = "TOYBOX_IMAGE_GEN_CARTOON_PATH"
+LCM_LORA_PATH_ENV: Final[str] = "TOYBOX_IMAGE_GEN_LCM_LORA_PATH"
 STUB_ENV: Final[str] = "TOYBOX_IMAGE_GEN_STUB"
 STUB_MODE_ENV: Final[str] = "TOYBOX_IMAGE_GEN_STUB_MODE"
 STUB_DELAY_ENV: Final[str] = "TOYBOX_IMAGE_GEN_STUB_DELAY_SEC"
 
 DEFAULT_TIMEOUT_SEC: Final[float] = 120.0
 DEFAULT_OUTPUT_DIM: Final[int] = 128
-DEFAULT_PALETTE_COLORS: Final[int] = 32
 DEFAULT_MODEL_DIR: Final[str] = "data/models/image_gen"
+DEFAULT_BASE_MODEL_PATH: Final[str] = "data/models/image_gen/sd15/base"
+DEFAULT_CARTOON_MODE: Final[str] = "checkpoint"
+DEFAULT_CARTOON_PATH: Final[str] = "data/models/image_gen/cartoon_checkpoint"
+DEFAULT_LCM_LORA_PATH: Final[str] = "data/models/image_gen/sd15/lcm_lora"
 DEFAULT_NEGATIVE_PROMPT: Final[str] = (
     "photorealistic, 3d, blurry, smooth shading, antialiased, gradient"
+)
+
+CARTOON_MODE_CHECKPOINT: Final[str] = "checkpoint"
+CARTOON_MODE_LORA: Final[str] = "lora"
+_VALID_CARTOON_MODES: Final[frozenset[str]] = frozenset(
+    {CARTOON_MODE_CHECKPOINT, CARTOON_MODE_LORA}
 )
 
 # Module-level cached pipeline. ``None`` until first real call;
@@ -124,26 +140,16 @@ def _output_dim() -> int:
     return parsed if parsed > 0 else DEFAULT_OUTPUT_DIM
 
 
-def _palette_colors() -> int:
-    raw = os.environ.get(PALETTE_COLORS_ENV)
+def _cartoon_mode() -> str:
+    raw = os.environ.get(CARTOON_MODE_ENV)
     if raw is None:
-        return DEFAULT_PALETTE_COLORS
-    try:
-        parsed = int(raw)
-    except ValueError:
-        _logger.warning(
-            "%s=%r is not an int; using %d",
-            PALETTE_COLORS_ENV,
-            raw,
-            DEFAULT_PALETTE_COLORS,
+        return DEFAULT_CARTOON_MODE
+    normalized = raw.strip().lower()
+    if normalized not in _VALID_CARTOON_MODES:
+        raise ValueError(
+            f"{CARTOON_MODE_ENV}={raw!r} not in {sorted(_VALID_CARTOON_MODES)}"
         )
-        return DEFAULT_PALETTE_COLORS
-    # Pillow's ``Image.quantize`` allows up to 256 palette entries.
-    if parsed < 2:
-        return 2
-    if parsed > 256:
-        return 256
-    return parsed
+    return normalized
 
 
 def _model_dir() -> str:
@@ -151,26 +157,72 @@ def _model_dir() -> str:
     return raw if raw else DEFAULT_MODEL_DIR
 
 
-def _build_prompt(slot: str, ctx: GenerationContext) -> str:
-    """Compose the SDXL positive prompt per plan §New components.
+def _base_model_path() -> str:
+    raw = os.environ.get(BASE_MODEL_PATH_ENV)
+    return raw if raw else DEFAULT_BASE_MODEL_PATH
 
-    Format: ``"<intro>, pixel art, 16-bit, sprite, retro game style,
-    transparent background, <ACTION_PROMPTS[slot]>"`` where ``<intro>``
-    is ``f"{persona_display_name} the {toy_display_name}"`` if
-    persona is set, else ``f"a {toy_display_name}"``.
 
-    Tags are NOT injected — IP-Adapter conditions on the photo and
-    the plan explicitly notes tags are noisy here.
+def _cartoon_path() -> str:
+    raw = os.environ.get(CARTOON_PATH_ENV)
+    return raw if raw else DEFAULT_CARTOON_PATH
+
+
+def _lcm_lora_path() -> str:
+    raw = os.environ.get(LCM_LORA_PATH_ENV)
+    return raw if raw else DEFAULT_LCM_LORA_PATH
+
+
+def _build_prompt(slot: str, ctx: GenerationContext, palette_hex: tuple[str, ...]) -> str:
+    """Compose the SD 1.5 positive prompt per plan §New components.
+
+    Format:
+
+        "<intro>, <tags>, <palette tokens>, <ACTION_PROMPTS[slot]>,
+         2D cartoon, simple shapes, clean lines, transparent background"
+
+    where ``<intro>`` is ``f"{persona_display_name} the {toy_display_name}"``
+    when persona is set, else ``f"a {toy_display_name}"``.
+
+    ``palette_hex`` holds top-N hex colours derived from the rembg
+    cutout (see :func:`_extract_palette_hex`); only the first three
+    are emitted as ``"primary color #RRGGBB"`` tokens.
+
+    ``ctx.tags`` may be empty — the comma is unconditional but
+    consecutive commas remain visible to the diffuser; that's fine
+    (SD 1.5 tokenizers handle empty tag lists without artifacts in
+    practice).
     """
     if slot not in ACTION_PROMPTS:
         raise ValueError(f"unknown action slot {slot!r}")
-    if ctx.persona_display_name:
-        intro = f"{ctx.persona_display_name} the {ctx.toy_display_name}"
-    else:
-        intro = f"a {ctx.toy_display_name}"
+    intro = (
+        f"{ctx.persona_display_name} the {ctx.toy_display_name}"
+        if ctx.persona_display_name
+        else f"a {ctx.toy_display_name}"
+    )
+    tags = ", ".join(ctx.tags) if ctx.tags else ""
+    palette = ", ".join(f"primary color {h}" for h in palette_hex[:3])
     return (
-        f"{intro}, pixel art, 16-bit, sprite, retro game style, "
-        f"transparent background, {ACTION_PROMPTS[slot]}"
+        f"{intro}, {tags}, {palette}, "
+        f"{ACTION_PROMPTS[slot]}, "
+        f"2D cartoon, simple shapes, clean lines, transparent background"
+    )
+
+
+def _extract_palette_hex(cutout: Any, n: int = 3) -> tuple[str, ...]:
+    """Top-N dominant hex colours from the rembg cutout's pixels.
+
+    ``cutout`` is a ``PIL.Image.Image``; typed as ``Any`` so the
+    Pillow import stays lazy in the call site. Returns up to ``n``
+    ``"#RRGGBB"`` strings ordered by frequency (Pillow's MEDIANCUT
+    quantize emits the most-used colour first).
+    """
+    quantized = cutout.convert("RGBA").quantize(colors=8)
+    palette_bytes = quantized.getpalette()
+    if not palette_bytes:
+        return ()
+    return tuple(
+        f"#{palette_bytes[i * 3]:02x}{palette_bytes[i * 3 + 1]:02x}{palette_bytes[i * 3 + 2]:02x}"
+        for i in range(min(n, 256))
     )
 
 
@@ -207,6 +259,61 @@ def _invoke_stub(
     return bytes(fn(reference_bytes, slot, seed, ctx))
 
 
+def _build_pipeline(torch_mod: Any) -> Any:
+    """Construct the cartoon pipeline per ``TOYBOX_IMAGE_GEN_CARTOON_MODE``.
+
+    Imports diffusers lazily; expects an already-imported ``torch``
+    module. Best-effort cleanup on partial-construction failure so a
+    LoRA-load OOM doesn't leave half-loaded CUDA tensors pinned.
+    """
+    from diffusers import LCMScheduler, StableDiffusionPipeline
+
+    mode = _cartoon_mode()
+    pipe = None
+    try:
+        if mode == CARTOON_MODE_CHECKPOINT:
+            pipe = StableDiffusionPipeline.from_pretrained(  # type: ignore[no-untyped-call]
+                _cartoon_path(),
+                torch_dtype=torch_mod.float16,
+                variant="fp16",
+                use_safetensors=True,
+                local_files_only=True,
+                safety_checker=None,
+                requires_safety_checker=False,
+            )
+            pipe.load_lora_weights(_lcm_lora_path(), adapter_name="lcm")
+            pipe.set_adapters(["lcm"], adapter_weights=[1.0])
+        else:
+            pipe = StableDiffusionPipeline.from_pretrained(  # type: ignore[no-untyped-call]
+                _base_model_path(),
+                torch_dtype=torch_mod.float16,
+                variant="fp16",
+                use_safetensors=True,
+                local_files_only=True,
+                safety_checker=None,
+                requires_safety_checker=False,
+            )
+            pipe.load_lora_weights(_cartoon_path(), adapter_name="cartoon")
+            pipe.load_lora_weights(_lcm_lora_path(), adapter_name="lcm")
+            pipe.set_adapters(["lcm", "cartoon"], adapter_weights=[1.0, 1.0])
+
+        pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)  # type: ignore[no-untyped-call]
+        pipe.to("cuda")
+        pipe.vae.enable_slicing()
+    except Exception:
+        try:
+            del pipe
+        except NameError:
+            pass
+        try:
+            if torch_mod.cuda.is_available():
+                torch_mod.cuda.empty_cache()
+        except Exception:  # pragma: no cover — defensive
+            pass
+        raise
+    return pipe
+
+
 def _run_pipeline_sync(
     reference_bytes: bytes,
     slot: str,
@@ -215,8 +322,8 @@ def _run_pipeline_sync(
 ) -> bytes:
     """Synchronous worker; runs inside :func:`asyncio.to_thread`.
 
-    Real-pipeline path lazy-imports torch / diffusers / transformers
-    / rembg INSIDE this function. CUDA OOM is caught + re-raised as
+    Real-pipeline path lazy-imports torch / diffusers / rembg INSIDE
+    this function. CUDA OOM is caught + re-raised as
     :class:`ImageGenCapacityError` so the worker breaker can trip.
     """
     if _stub_active():
@@ -230,24 +337,16 @@ def _run_pipeline_sync(
             ) from exc
 
     # ----------------------------------------------------------------
-    # Lazy heavy imports. Mypy does not see torch/diffusers/etc. in
-    # this venv (they're optional extras), so we type the locals as
-    # ``Any`` and rely on runtime structure. The lazy-import test
-    # asserts these are NOT loaded by ``import toybox.image_gen.pipeline``.
+    # Lazy heavy imports. Mypy's project-level override silences the
+    # missing-import warnings for these optional extras. The
+    # lazy-import test asserts these are NOT loaded by
+    # ``import toybox.image_gen.pipeline``.
     # ----------------------------------------------------------------
     import torch
-    from diffusers import StableDiffusionXLPipeline
     from PIL import Image
     from rembg import new_session, remove
-    from transformers import CLIPVisionModelWithProjection
-
-    model_dir = _model_dir()
 
     # 1. Subject-isolate via rembg using the local u2net.onnx.
-    # rembg lets you pass a session built from a model name; for
-    # robustness we honor whichever knob the installed version
-    # exposes. ``new_session(model_name="u2net")`` works across
-    # rembg ≥ 2.0.
     bg_session = new_session(
         model_name="u2net",
         providers=["CPUExecutionProvider"],
@@ -255,88 +354,25 @@ def _run_pipeline_sync(
     cutout_bytes = remove(reference_bytes, session=bg_session)
     cutout_image = Image.open(io.BytesIO(cutout_bytes)).convert("RGBA")
 
-    # 2. Construct (or reuse) the SDXL pipeline.
+    # 2. Construct (or reuse) the SD 1.5 + LCM + cartoon pipeline.
     global _cached_pipeline
     if _cached_pipeline is None:
-        # Wrap construction so a partial-construction failure (e.g.
-        # SDXL loads but LoRA OOMs) doesn't leave half-loaded
-        # CUDA tensors pinned via Python refs until GC runs.
-        # We bind ``image_encoder`` / ``pipe`` to ``None`` first so
-        # the cleanup branch can ``del`` them unconditionally.
-        image_encoder = None
-        pipe = None
-        try:
-            # Rule 1: load the CLIP image encoder explicitly.
-            image_encoder = CLIPVisionModelWithProjection.from_pretrained(
-                f"{model_dir}/ip_adapter/models/image_encoder",
-                torch_dtype=torch.float16,
-                local_files_only=True,
-            )
-            pipe = StableDiffusionXLPipeline.from_pretrained(  # type: ignore[no-untyped-call]
-                f"{model_dir}/sdxl/stable-diffusion-xl-base-1.0",
-                image_encoder=image_encoder,
-                torch_dtype=torch.float16,
-                variant="fp16",
-                use_safetensors=True,
-                local_files_only=True,
-            )
-            pipe.load_ip_adapter(
-                f"{model_dir}/ip_adapter",
-                subfolder="sdxl_models",
-                weight_name="ip-adapter_sdxl_vit-h.safetensors",
-            )
-            pipe.set_ip_adapter_scale(0.6)
-            pipe.load_lora_weights(
-                f"{model_dir}/pixel_art_lora",
-                weight_name="pixel-art-xl.safetensors",
-            )
-            # Fuse LoRA into the base UNet weights so the cpu-offload
-            # hook moves a single tensor graph. Without fusion, LoRA
-            # adapter modules attached by peft can stay on CPU when
-            # the offload hook moves the UNet to CUDA, producing the
-            # "addmm: tensors on cuda:0 and cpu" error on the first
-            # forward pass. Fusion is one-way; we never need to
-            # unload this LoRA so there's nothing to unfuse.
-            pipe.fuse_lora()
-            # Memory knobs.
-            pipe.enable_model_cpu_offload()
-            pipe.vae.enable_slicing()
-            # Rule 2: DO NOT call pipe.enable_attention_slicing().
-        except Exception:
-            # Best-effort cleanup so a partial-construction failure
-            # doesn't pin VRAM. (``del locals()[name]`` does NOT
-            # work in CPython for function locals — known footgun.
-            # Use explicit ``del`` on each binding instead.)
-            try:
-                del pipe
-            except NameError:
-                pass
-            try:
-                del image_encoder
-            except NameError:
-                pass
-            try:
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-            except Exception:  # pragma: no cover — defensive
-                pass
-            raise
-        _cached_pipeline = pipe
+        _cached_pipeline = _build_pipeline(torch)
     pipe = _cached_pipeline
 
     # 3. Build prompt + run generation.
-    prompt = _build_prompt(slot, ctx)
+    palette_hex = _extract_palette_hex(cutout_image)
+    prompt = _build_prompt(slot, ctx, palette_hex)
     generator = torch.Generator("cuda").manual_seed(seed)
     try:
         result = pipe(
             prompt=prompt,
             negative_prompt=DEFAULT_NEGATIVE_PROMPT,
-            ip_adapter_image=cutout_image,
             generator=generator,
-            num_inference_steps=25,
-            guidance_scale=5.0,
-            height=1024,
-            width=1024,
+            num_inference_steps=4,
+            guidance_scale=1.0,
+            height=512,
+            width=512,
         )
     except torch.cuda.OutOfMemoryError as exc:
         raise ImageGenCapacityError(
@@ -344,35 +380,24 @@ def _run_pipeline_sync(
         ) from exc
     raw_image = result.images[0]
 
-    # 4. Pillow palette quantize (downsample → quantize → RGBA).
+    # 4. Second rembg pass to clean residual non-transparent pixels
+    #    (the "transparent background" prompt is a hint, not a
+    #    guarantee). Feed it the raw PNG bytes so rembg operates on
+    #    the same artifact we'll downsample.
+    intermediate = io.BytesIO()
+    raw_image.convert("RGBA").save(intermediate, format="PNG")
+    cleaned_bytes = remove(intermediate.getvalue(), session=bg_session)
+    cleaned_image = Image.open(io.BytesIO(cleaned_bytes)).convert("RGBA")
+
+    # 5. Resize to the configured output dim and return PNG bytes.
     target_dim = _output_dim()
-    colors = _palette_colors()
-    rgba = raw_image.convert("RGBA")
-    downsampled = rgba.resize(
+    output_image = cleaned_image.resize(
         (target_dim, target_dim),
         Image.Resampling.BILINEAR,
     )
-    # ``Image.quantize`` requires an RGB-mode image; reduce to RGB
-    # for the quantize step then re-attach an alpha channel from
-    # the second rembg pass.
-    rgb_for_quant = downsampled.convert("RGB")
-    quantized = rgb_for_quant.quantize(
-        colors=colors,
-        method=Image.Quantize.MEDIANCUT,
-    )
-    quantized_rgba = quantized.convert("RGBA")
-
-    # 5. Second rembg pass to clean residual non-transparent pixels
-    #    (SDXL's "transparent background" prompt is a hint, not a
-    #    guarantee). We feed it the quantized PNG bytes so rembg
-    #    operates on the same artifact we'll save.
-    intermediate = io.BytesIO()
-    quantized_rgba.save(intermediate, format="PNG")
-    cleaned_bytes = remove(intermediate.getvalue(), session=bg_session)
-
-    # 6. Return PNG bytes. The second rembg pass returns PNG bytes
-    #    directly when given PNG input; no re-encode needed.
-    return bytes(cleaned_bytes)
+    buffer = io.BytesIO()
+    output_image.save(buffer, format="PNG")
+    return buffer.getvalue()
 
 
 class _StubCudaOOM(RuntimeError):
@@ -421,13 +446,21 @@ def reset_pipeline_cache_for_tests() -> None:
 
 
 __all__ = [
+    "BASE_MODEL_PATH_ENV",
+    "CARTOON_MODE_CHECKPOINT",
+    "CARTOON_MODE_ENV",
+    "CARTOON_MODE_LORA",
+    "CARTOON_PATH_ENV",
+    "DEFAULT_BASE_MODEL_PATH",
+    "DEFAULT_CARTOON_MODE",
+    "DEFAULT_CARTOON_PATH",
+    "DEFAULT_LCM_LORA_PATH",
     "DEFAULT_NEGATIVE_PROMPT",
     "DEFAULT_OUTPUT_DIM",
-    "DEFAULT_PALETTE_COLORS",
     "DEFAULT_TIMEOUT_SEC",
+    "LCM_LORA_PATH_ENV",
     "MODEL_DIR_ENV",
     "OUTPUT_DIM_ENV",
-    "PALETTE_COLORS_ENV",
     "STUB_DELAY_ENV",
     "STUB_ENV",
     "STUB_MODE_ENV",

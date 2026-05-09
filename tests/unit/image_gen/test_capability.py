@@ -7,6 +7,10 @@ than poking at ``torch.cuda``. This mirrors the
 ``tests/integration/test_capability_*.py`` pattern of asserting
 behaviour through monkeypatched seams instead of running real
 network probes.
+
+The required-checkpoint set is mode-aware via
+``TOYBOX_IMAGE_GEN_CARTOON_MODE``; tests cover both ``checkpoint``
+(default) and ``lora`` branches.
 """
 
 from __future__ import annotations
@@ -18,12 +22,13 @@ import pytest
 
 from toybox.image_gen import capability
 from toybox.image_gen.capability import (
+    CARTOON_MODE_ENV,
     ENABLED_ENV,
     MODEL_DIR_ENV,
-    REQUIRED_CHECKPOINTS,
     CapabilityReason,
     ImageGenBreaker,
     _probe_cuda_and_vram,
+    _required_checkpoints,
     get_image_gen_breaker,
     is_image_gen_capable,
     reset_image_gen_breaker_for_tests,
@@ -36,9 +41,9 @@ def _reset_breaker_singleton() -> None:
     reset_image_gen_breaker_for_tests()
 
 
-def _seed_all_checkpoints(model_dir: Path) -> None:
-    """Create empty placeholders for every required checkpoint."""
-    for relative in REQUIRED_CHECKPOINTS:
+def _seed_required(model_dir: Path) -> None:
+    """Create empty placeholders for whatever the current mode requires."""
+    for relative in _required_checkpoints():
         target = model_dir / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(b"")
@@ -49,7 +54,7 @@ def test_disabled_via_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> No
     # Ensure we'd otherwise pass — but env-disable should short-circuit.
     monkeypatch.setattr(capability, "_probe_cuda_and_vram", lambda: (True, 99.0))
     monkeypatch.setenv(MODEL_DIR_ENV, str(tmp_path))
-    _seed_all_checkpoints(tmp_path)
+    _seed_required(tmp_path)
 
     capable, reason_enum, detail = is_image_gen_capable()
 
@@ -96,7 +101,7 @@ def test_low_vram(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     # Free VRAM 4 GB, floor at default 12 GB → low-vram branch wins.
     monkeypatch.setattr(capability, "_probe_cuda_and_vram", lambda: (True, 4.0))
     monkeypatch.setenv(MODEL_DIR_ENV, str(tmp_path))
-    _seed_all_checkpoints(tmp_path)
+    _seed_required(tmp_path)
 
     capable, reason_enum, detail = is_image_gen_capable()
 
@@ -119,18 +124,102 @@ def test_missing_checkpoints(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
     assert detail.startswith("checkpoints missing:")
 
 
-def test_capable_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """All four gates pass → True with the canonical 'capable' reason."""
+def test_capable_path_checkpoint_mode(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """All four gates pass under default cartoon-mode=checkpoint."""
     monkeypatch.delenv(ENABLED_ENV, raising=False)
+    monkeypatch.delenv(CARTOON_MODE_ENV, raising=False)  # default = checkpoint
     monkeypatch.setattr(capability, "_probe_cuda_and_vram", lambda: (True, 16.0))
     monkeypatch.setenv(MODEL_DIR_ENV, str(tmp_path))
-    _seed_all_checkpoints(tmp_path)
+    _seed_required(tmp_path)
 
     capable, reason_enum, detail = is_image_gen_capable()
 
     assert capable is True
     assert reason_enum is CapabilityReason.capable
     assert detail == "capable"
+
+
+def test_capable_path_lora_mode(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """All four gates pass under cartoon-mode=lora."""
+    monkeypatch.delenv(ENABLED_ENV, raising=False)
+    monkeypatch.setenv(CARTOON_MODE_ENV, "lora")
+    monkeypatch.setattr(capability, "_probe_cuda_and_vram", lambda: (True, 16.0))
+    monkeypatch.setenv(MODEL_DIR_ENV, str(tmp_path))
+    _seed_required(tmp_path)
+
+    capable, reason_enum, _detail = is_image_gen_capable()
+
+    assert capable is True
+    assert reason_enum is CapabilityReason.capable
+
+
+def test_required_checkpoints_checkpoint_mode_lists_cartoon_checkpoint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Mode=checkpoint requires the cartoon_checkpoint UNet, not SD 1.5 base."""
+    monkeypatch.setenv(CARTOON_MODE_ENV, "checkpoint")
+    required = _required_checkpoints()
+    joined = "\n".join(required)
+    assert "cartoon_checkpoint/model_index.json" in joined
+    assert "cartoon_checkpoint/unet/diffusion_pytorch_model.fp16.safetensors" in joined
+    assert "sd15/lcm_lora/pytorch_lora_weights.safetensors" in joined
+    assert "bg_remove/u2net.onnx" in joined
+    assert "sd15/base/" not in joined
+    assert "cartoon_lora/" not in joined
+
+
+def test_required_checkpoints_lora_mode_lists_base_and_cartoon_lora(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Mode=lora requires SD 1.5 base + cartoon_lora, not cartoon_checkpoint."""
+    monkeypatch.setenv(CARTOON_MODE_ENV, "lora")
+    required = _required_checkpoints()
+    joined = "\n".join(required)
+    assert "sd15/base/model_index.json" in joined
+    assert "sd15/base/unet/diffusion_pytorch_model.fp16.safetensors" in joined
+    assert "cartoon_lora/pytorch_lora_weights.safetensors" in joined
+    assert "sd15/lcm_lora/pytorch_lora_weights.safetensors" in joined
+    assert "bg_remove/u2net.onnx" in joined
+    assert "cartoon_checkpoint/" not in joined
+
+
+def test_required_checkpoints_unknown_mode_returns_base_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Unknown mode → base set only; pipeline.py rejects the mode at load."""
+    monkeypatch.setenv(CARTOON_MODE_ENV, "garbage")
+    required = _required_checkpoints()
+    assert "sd15/lcm_lora/pytorch_lora_weights.safetensors" in required
+    assert "bg_remove/u2net.onnx" in required
+    joined = "\n".join(required)
+    assert "cartoon_checkpoint/" not in joined
+    assert "cartoon_lora/" not in joined
+    assert "sd15/base/" not in joined
+
+
+def test_missing_checkpoints_lora_mode_reports_cartoon_lora(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Lora mode missing the cartoon_lora file → missing_checkpoints reason."""
+    monkeypatch.delenv(ENABLED_ENV, raising=False)
+    monkeypatch.setenv(CARTOON_MODE_ENV, "lora")
+    monkeypatch.setattr(capability, "_probe_cuda_and_vram", lambda: (True, 99.0))
+    monkeypatch.setenv(MODEL_DIR_ENV, str(tmp_path))
+    # Seed everything except cartoon_lora.
+    for relative in _required_checkpoints():
+        if relative.startswith("cartoon_lora/"):
+            continue
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"")
+
+    capable, reason_enum, detail = is_image_gen_capable()
+
+    assert capable is False
+    assert reason_enum is CapabilityReason.missing_checkpoints
+    assert "cartoon_lora" in detail
 
 
 def test_breaker_records_failures_and_opens(monkeypatch: pytest.MonkeyPatch) -> None:
