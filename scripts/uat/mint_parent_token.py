@@ -30,7 +30,9 @@ from toybox.db import connect, resolve_db_path
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Mint a parent-scope token for M2.5.")
-    parser.add_argument("--ttl-minutes", type=int, default=240, help="Token lifetime (default: 240).")
+    parser.add_argument(
+        "--ttl-minutes", type=int, default=240, help="Token lifetime (default: 240)."
+    )
     args = parser.parse_args(argv)
 
     conn = connect(resolve_db_path(), check_same_thread=False)

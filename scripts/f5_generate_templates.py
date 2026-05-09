@@ -167,12 +167,13 @@ def template_cheering() -> None:
 def template_thinking() -> None:
     """Thought bubble — cloud-shape outline upper-right with question mark."""
     img, draw = _new()
-    # main thought cloud
-    draw.ellipse([(140, 30), (240, 110)], outline=(80, 80, 80, 220), width=4, fill=(255, 255, 255, 200))
-    draw.ellipse([(180, 70), (220, 100)], outline=(80, 80, 80, 220), width=3, fill=(255, 255, 255, 200))
-    # smaller bubbles trailing
-    draw.ellipse([(150, 110), (170, 130)], outline=(80, 80, 80, 220), width=3, fill=(255, 255, 255, 200))
-    draw.ellipse([(140, 130), (155, 145)], outline=(80, 80, 80, 220), width=2, fill=(255, 255, 255, 200))
+    outline = (80, 80, 80, 220)
+    fill = (255, 255, 255, 200)
+    # main thought cloud + smaller trailing bubbles
+    draw.ellipse([(140, 30), (240, 110)], outline=outline, width=4, fill=fill)
+    draw.ellipse([(180, 70), (220, 100)], outline=outline, width=3, fill=fill)
+    draw.ellipse([(150, 110), (170, 130)], outline=outline, width=3, fill=fill)
+    draw.ellipse([(140, 130), (155, 145)], outline=outline, width=2, fill=fill)
     # question mark in main bubble
     font = _font(40)
     draw.text((178, 50), "?", fill=(80, 80, 80, 240), font=font)
@@ -248,19 +249,21 @@ def template_confused() -> None:
 # Manifest — toy_box + behind + source per slot
 # ---------------------------------------------------------------------
 
+# toy_box [x0, y0, x1, y1] = upper-left to lower-right pixel coords (range 0..255)
+# behind: True = toy under template; False = toy over template
+_PLACEHOLDER_SOURCE = "operator-drawn (Pillow placeholder, CC0)"
+
 MANIFEST = {
-    # toy_box [x0, y0, x1, y1] = upper-left to lower-right pixel coords
-    # behind: True = toy under template; False = toy over template
-    "idle":     {"toy_box": [60, 40, 200, 200], "behind": False, "source": "operator-drawn (Pillow placeholder, CC0)"},
-    "pointing": {"toy_box": [20, 90, 140, 220], "behind": False, "source": "operator-drawn (Pillow placeholder, CC0)"},
-    "looking":  {"toy_box": [20, 30, 140, 180], "behind": False, "source": "operator-drawn (Pillow placeholder, CC0)"},
-    "jumping":  {"toy_box": [60, 30, 200, 180], "behind": False, "source": "operator-drawn (Pillow placeholder, CC0)"},
-    "cheering": {"toy_box": [50, 100, 200, 240], "behind": False, "source": "operator-drawn (Pillow placeholder, CC0)"},
-    "thinking": {"toy_box": [20, 130, 140, 240], "behind": False, "source": "operator-drawn (Pillow placeholder, CC0)"},
-    "waving":   {"toy_box": [80, 70, 220, 230], "behind": False, "source": "operator-drawn (Pillow placeholder, CC0)"},
-    "running":  {"toy_box": [40, 50, 180, 200], "behind": False, "source": "operator-drawn (Pillow placeholder, CC0)"},
-    "sleeping": {"toy_box": [40, 90, 180, 240], "behind": False, "source": "operator-drawn (Pillow placeholder, CC0)"},
-    "confused": {"toy_box": [30, 70, 160, 220], "behind": False, "source": "operator-drawn (Pillow placeholder, CC0)"},
+    "idle":     {"toy_box": [60, 40, 200, 200],  "behind": False, "source": _PLACEHOLDER_SOURCE},
+    "pointing": {"toy_box": [20, 90, 140, 220],  "behind": False, "source": _PLACEHOLDER_SOURCE},
+    "looking":  {"toy_box": [20, 30, 140, 180],  "behind": False, "source": _PLACEHOLDER_SOURCE},
+    "jumping":  {"toy_box": [60, 30, 200, 180],  "behind": False, "source": _PLACEHOLDER_SOURCE},
+    "cheering": {"toy_box": [50, 100, 200, 240], "behind": False, "source": _PLACEHOLDER_SOURCE},
+    "thinking": {"toy_box": [20, 130, 140, 240], "behind": False, "source": _PLACEHOLDER_SOURCE},
+    "waving":   {"toy_box": [80, 70, 220, 230],  "behind": False, "source": _PLACEHOLDER_SOURCE},
+    "running":  {"toy_box": [40, 50, 180, 200],  "behind": False, "source": _PLACEHOLDER_SOURCE},
+    "sleeping": {"toy_box": [40, 90, 180, 240],  "behind": False, "source": _PLACEHOLDER_SOURCE},
+    "confused": {"toy_box": [30, 70, 160, 220],  "behind": False, "source": _PLACEHOLDER_SOURCE},
 }
 
 

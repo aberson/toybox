@@ -29,7 +29,8 @@ def smoke_mode_a() -> bool:
             variant="fp16",
             use_safetensors=True,
             local_files_only=True,
-            safety_checker=None,           # toy-sprite use case; checker adds VRAM + false positives
+            # toy-sprite use case; safety checker adds VRAM + false positives
+            safety_checker=None,
             requires_safety_checker=False,
         )
         pipe.load_lora_weights(
