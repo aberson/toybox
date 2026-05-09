@@ -4,6 +4,13 @@ Exercises orchestration (timeout, OOM envelope, determinism)
 without touching torch. ``TOYBOX_IMAGE_GEN_STUB=1`` short-circuits
 the heavy path; the stub fixture honors the same env knobs the
 real pipeline would.
+
+Also covers the plain helpers exposed by ``pipeline.py`` whose
+behaviour is independent of the heavy path:
+
+* :func:`_build_prompt` — DB-fields + palette-token template
+* :func:`_extract_palette_hex` — Pillow MEDIANCUT colour extraction
+* :func:`_cartoon_mode` — env dispatch validation
 """
 
 from __future__ import annotations
@@ -19,28 +26,39 @@ from toybox.image_gen.models import (
     ImageGenTimeoutError,
 )
 from toybox.image_gen.pipeline import (
+    CARTOON_MODE_CHECKPOINT,
+    CARTOON_MODE_ENV,
+    CARTOON_MODE_LORA,
     STUB_DELAY_ENV,
     STUB_ENV,
     STUB_MODE_ENV,
     TIMEOUT_ENV,
+    _build_prompt,
+    _cartoon_mode,
+    _extract_palette_hex,
     generate_action,
 )
 
 
 @pytest.fixture(autouse=True)
 def _enable_stub(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Force the stub path for every test in this file."""
+    """Force the stub path for every async test in this file."""
     monkeypatch.setenv(STUB_ENV, "1")
     # Default: no delay, no oom mode unless the test sets one.
     monkeypatch.delenv(STUB_DELAY_ENV, raising=False)
     monkeypatch.delenv(STUB_MODE_ENV, raising=False)
 
 
-def _ctx() -> GenerationContext:
+def _ctx(
+    *,
+    persona: str | None = "Hopper",
+    name: str = "Bunny",
+    tags: tuple[str, ...] = ("plush",),
+) -> GenerationContext:
     return GenerationContext(
-        toy_display_name="Bunny",
-        persona_display_name="Hopper",
-        tags=("plush",),
+        toy_display_name=name,
+        persona_display_name=persona,
+        tags=tags,
     )
 
 
@@ -125,3 +143,118 @@ def test_pipeline_does_not_call_enable_attention_slicing() -> None:
         "see documentation/operator/image-gen-runtime.md §'Canonical pipeline config' "
         "Rule 2."
     )
+
+
+# ---------------------------------------------------------------------
+# _build_prompt
+# ---------------------------------------------------------------------
+
+
+def test_build_prompt_with_persona_tags_and_palette() -> None:
+    prompt = _build_prompt(
+        "pointing",
+        _ctx(persona="Hopper", name="Bunny", tags=("plush", "soft", "pink")),
+        ("#ffaabb", "#001122", "#deadbe"),
+    )
+    assert "Hopper the Bunny" in prompt
+    assert "plush, soft, pink" in prompt
+    assert "primary color #ffaabb" in prompt
+    assert "primary color #001122" in prompt
+    assert "primary color #deadbe" in prompt
+    assert "pointing at something off to the side" in prompt
+    assert "2D cartoon, simple shapes, clean lines, transparent background" in prompt
+
+
+def test_build_prompt_without_persona_uses_a_intro() -> None:
+    prompt = _build_prompt(
+        "idle",
+        _ctx(persona=None, name="Bunny", tags=("plush",)),
+        ("#aabbcc",),
+    )
+    assert prompt.startswith("a Bunny,")
+    assert "Hopper" not in prompt
+
+
+def test_build_prompt_with_empty_tags_degrades_gracefully() -> None:
+    """Empty ``ctx.tags`` produces an empty tag fragment without crashing."""
+    prompt = _build_prompt(
+        "idle",
+        _ctx(persona=None, name="Bunny", tags=()),
+        ("#112233",),
+    )
+    assert "a Bunny" in prompt
+    assert "primary color #112233" in prompt
+    # The tag fragment is the empty string; no NoneType / KeyError.
+    assert "None" not in prompt
+
+
+def test_build_prompt_palette_caps_at_three_colors() -> None:
+    """Only the first three palette hex codes are emitted."""
+    palette = ("#aaaaaa", "#bbbbbb", "#cccccc", "#dddddd", "#eeeeee")
+    prompt = _build_prompt("idle", _ctx(), palette)
+    for hex_code in palette[:3]:
+        assert f"primary color {hex_code}" in prompt
+    for hex_code in palette[3:]:
+        assert f"primary color {hex_code}" not in prompt
+
+
+def test_build_prompt_unknown_slot_raises_value_error() -> None:
+    with pytest.raises(ValueError, match="unknown action slot"):
+        _build_prompt("not-a-slot", _ctx(), ("#ffffff",))
+
+
+# ---------------------------------------------------------------------
+# _extract_palette_hex
+# ---------------------------------------------------------------------
+
+
+def test_extract_palette_hex_returns_hex_strings() -> None:
+    """Synthetic two-colour image yields hex codes shaped #RRGGBB."""
+    img = Image.new("RGBA", (32, 32), (255, 0, 0, 255))
+    # Splash a green square so MEDIANCUT picks up at least two colours.
+    for x in range(8):
+        for y in range(8):
+            img.putpixel((x, y), (0, 255, 0, 255))
+
+    palette = _extract_palette_hex(img, n=3)
+    assert 1 <= len(palette) <= 3
+    for entry in palette:
+        assert entry.startswith("#")
+        assert len(entry) == 7
+        # All lowercase hex digits per the f-string format.
+        assert entry[1:] == entry[1:].lower()
+        int(entry[1:], 16)  # hex-decode roundtrip
+
+
+def test_extract_palette_hex_caps_at_n_entries() -> None:
+    img = Image.new("RGBA", (16, 16), (10, 20, 30, 255))
+    palette = _extract_palette_hex(img, n=2)
+    assert len(palette) <= 2
+
+
+# ---------------------------------------------------------------------
+# _cartoon_mode env dispatch
+# ---------------------------------------------------------------------
+
+
+def test_cartoon_mode_default_is_checkpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(CARTOON_MODE_ENV, raising=False)
+    assert _cartoon_mode() == CARTOON_MODE_CHECKPOINT
+
+
+def test_cartoon_mode_explicit_lora(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(CARTOON_MODE_ENV, "lora")
+    assert _cartoon_mode() == CARTOON_MODE_LORA
+
+
+def test_cartoon_mode_normalizes_case_and_whitespace(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(CARTOON_MODE_ENV, "  Checkpoint  ")
+    assert _cartoon_mode() == CARTOON_MODE_CHECKPOINT
+
+
+def test_cartoon_mode_unknown_value_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(CARTOON_MODE_ENV, "garbage")
+    with pytest.raises(ValueError, match="not in"):
+        _cartoon_mode()
