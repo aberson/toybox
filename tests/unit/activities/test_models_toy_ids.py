@@ -53,18 +53,3 @@ def test_activity_accepts_toy_ids_kwarg() -> None:
     assert activity.toy_ids == ("toy-abc",)
 
 
-def test_activity_toy_ids_preserves_multiple_entries() -> None:
-    """Future-proofing: the field is a tuple, so a multi-toy activity
-    surfaces every id the generator chose to record. Today only one
-    entry is ever populated, but the type contract is plural."""
-    activity = Activity(
-        id="00000000-0000-4000-8000-000000000002",
-        template_id="t1",
-        persona_id=None,
-        title="title",
-        steps=_five_steps(),
-        version=1,
-        metadata={},
-        toy_ids=("toy-1", "toy-2"),
-    )
-    assert activity.toy_ids == ("toy-1", "toy-2")

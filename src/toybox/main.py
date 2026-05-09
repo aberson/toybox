@@ -320,6 +320,7 @@ def _persist_smoke_activity(
         "template_id": activity.template_id,
     }
     summary_blob = json.dumps(summary_payload, sort_keys=True)
+    toy_ids_blob = json.dumps(list(activity.toy_ids)) if activity.toy_ids else None
     created_at = datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
     conn = connect(db_path, check_same_thread=False)
@@ -331,13 +332,14 @@ def _persist_smoke_activity(
                 "INSERT INTO activities "
                 "(id, session_id, state, version, summary, persona_id, child_ids, "
                 " room_ids, toy_ids, intent_source, created_at, started_at, ended_at) "
-                "VALUES (?, ?, ?, 1, ?, ?, NULL, NULL, NULL, ?, ?, NULL, NULL)",
+                "VALUES (?, ?, ?, 1, ?, ?, NULL, NULL, ?, ?, ?, NULL, NULL)",
                 (
                     activity.id,
                     session_id,
                     PROPOSED_STATE,
                     summary_blob,
                     activity.persona_id,
+                    toy_ids_blob,
                     intent_source,
                     created_at,
                 ),

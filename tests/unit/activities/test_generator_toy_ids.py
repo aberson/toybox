@@ -73,5 +73,4 @@ def test_generate_toy_ids_picks_from_provided_set() -> None:
         seed=42,
         available_toys=toys,
     )
-    assert len(activity.toy_ids) == 1
-    assert activity.toy_ids[0] in {"toy-1", "toy-2", "toy-3"}
+    assert activity.toy_ids in {("toy-1",), ("toy-2",), ("toy-3",)}
