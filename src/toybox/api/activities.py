@@ -23,7 +23,7 @@ import logging
 import secrets
 import sqlite3
 import uuid
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
@@ -613,15 +613,17 @@ def _persist_activity(
     summary_payload: dict[str, Any],
     steps: list[dict[str, Any]],
     state: str,
+    toy_ids: Sequence[str] = (),
 ) -> None:
     summary_blob = json.dumps(summary_payload, sort_keys=True)
     created_at = _now_iso()
+    toy_ids_blob = json.dumps(list(toy_ids)) if toy_ids else None
     with conn:
         conn.execute(
             "INSERT INTO activities "
             "(id, session_id, state, version, summary, persona_id, child_ids, room_ids, "
             " toy_ids, intent_source, created_at, started_at, ended_at) "
-            "VALUES (?, ?, ?, 1, ?, ?, ?, NULL, NULL, ?, ?, NULL, NULL)",
+            "VALUES (?, ?, ?, 1, ?, ?, ?, NULL, ?, ?, ?, NULL, NULL)",
             (
                 activity_id,
                 session_id,
@@ -629,6 +631,7 @@ def _persist_activity(
                 summary_blob,
                 persona_id,
                 None,
+                toy_ids_blob,
                 intent_source,
                 created_at,
             ),
@@ -1070,6 +1073,7 @@ def _do_propose(
         summary_payload=summary_payload,
         steps=steps,
         state=PROPOSED_STATE,
+        toy_ids=list(activity.toy_ids),
     )
 
     # Phase C step 15: write a labeled_events row BEFORE returning the

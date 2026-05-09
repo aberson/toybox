@@ -611,6 +611,23 @@ def _derive_uuid(
     return str(uuid.UUID(bytes=bytes(raw)))
 
 
+def _pick_toy_entry(
+    available_toys: Sequence[ResolvedToy],
+    rng: random.Random,
+) -> ResolvedToy | None:
+    """Deterministically pick a :class:`ResolvedToy` from ``available_toys``.
+
+    Returns ``None`` when the input is empty so the caller can degrade
+    to :data:`DEFAULT_TOY_NAME` and an empty ``toy_ids`` tuple. Sorts
+    entries by ``display_name`` to match the legacy name-only picker's
+    rng draw byte-for-byte (same N items, same single ``rng.choice``).
+    """
+    if not available_toys:
+        return None
+    entries_sorted = sorted(available_toys, key=lambda entry: entry.display_name)
+    return rng.choice(entries_sorted)
+
+
 def _pick_toy_name(
     available_toys: Sequence[ResolvedToy],
     rng: random.Random,
@@ -619,16 +636,13 @@ def _pick_toy_name(
 
     Falls back to :data:`DEFAULT_TOY_NAME` when the input is empty so
     the Phase A placeholder behaviour holds for empty-catalog tests.
+    Thin shim over :func:`_pick_toy_entry` so name-only callers stay
+    valid while the generator captures the picked toy's id alongside.
     """
-    if not available_toys:
+    picked = _pick_toy_entry(available_toys, rng)
+    if picked is None:
         return DEFAULT_TOY_NAME
-    names = [entry.display_name for entry in available_toys]
-    if not names:
-        return DEFAULT_TOY_NAME
-    # Sort for determinism — caller's ordering is already stable but
-    # belt-and-braces here so a future caller can pass an unsorted list.
-    names_sorted = sorted(names)
-    return rng.choice(names_sorted)
+    return picked.display_name
 
 
 def generate(
@@ -720,7 +734,9 @@ def generate(
     # (since the template pick is deterministic given the consumed
     # rng state); the change is invisible to a fixed-seed test as
     # long as the test seeds the toy list consistently.
-    toy_name = _pick_toy_name(available_toys, rng)
+    picked_toy = _pick_toy_entry(available_toys, rng)
+    toy_name = picked_toy.display_name if picked_toy is not None else DEFAULT_TOY_NAME
+    toy_ids: tuple[str, ...] = (picked_toy.id,) if picked_toy is not None else ()
 
     template, _source_intent = _select_template(
         intent,
@@ -803,6 +819,7 @@ def generate(
         steps=steps,
         version=1,
         metadata=metadata,
+        toy_ids=toy_ids,
     )
 
 

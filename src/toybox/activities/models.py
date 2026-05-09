@@ -70,6 +70,9 @@ class Activity(BaseModel):
     Phase D step 19 ``signature`` computation: the template id, the
     sorted slot values, and the hour bucket label.
 
+    ``toy_ids`` carries the FK(s) of toys the generator picked for
+    this activity; an empty tuple means none.
+
     .. warning::
 
        ``frozen=True`` does NOT deep-freeze nested mutable values.
@@ -93,6 +96,7 @@ class Activity(BaseModel):
     steps: list[ActivityStep] = Field(min_length=5, max_length=5)
     version: int = Field(default=1, ge=1)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    toy_ids: tuple[str, ...] = Field(default_factory=tuple)
 
 
 __all__ = ["Activity", "ActivityStep"]
