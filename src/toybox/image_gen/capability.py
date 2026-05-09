@@ -146,7 +146,7 @@ def _probe_cuda_and_vram() -> tuple[bool, float]:
     first.
     """
     try:
-        import torch  # type: ignore[import-not-found]
+        import torch
     except ImportError:
         # No torch installed → effectively no CUDA. The image_gen
         # extras are optional; downstream tests use the stub path.

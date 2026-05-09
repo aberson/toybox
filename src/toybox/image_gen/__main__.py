@@ -275,7 +275,7 @@ def _peak_vram_gb_safe() -> float | None:
     Imported lazily so the stub-only CLI invocation never pulls torch.
     """
     try:
-        import torch  # type: ignore[import-not-found]
+        import torch
     except ImportError:
         return None
     try:

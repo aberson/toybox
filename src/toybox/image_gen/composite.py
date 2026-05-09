@@ -186,7 +186,7 @@ def _get_rembg_session() -> Any:
         return _REMBG_SESSION
     with _REMBG_SESSION_LOCK:
         if _REMBG_SESSION is None:
-            from rembg import new_session  # type: ignore[import-not-found]
+            from rembg import new_session
 
             _REMBG_SESSION = new_session(
                 model_name="u2net",

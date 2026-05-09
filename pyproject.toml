@@ -83,7 +83,25 @@ python_version = "3.12"
 files = ["src", "tests"]
 
 [[tool.mypy.overrides]]
-module = ["sounddevice", "onnxruntime", "faster_whisper", "Levenshtein", "playwright", "playwright.async_api", "PIL", "PIL.Image"]
+module = [
+    "sounddevice",
+    "onnxruntime",
+    "faster_whisper",
+    "Levenshtein",
+    "playwright",
+    "playwright.async_api",
+    "PIL",
+    "PIL.Image",
+    # image-gen extras (optional). Some have partial stubs, some none —
+    # uniform ignore_missing_imports covers both "extras not installed"
+    # and "installed without py.typed" so we don't carry per-line
+    # type:ignore comments that drift between environments.
+    "torch",
+    "diffusers",
+    "diffusers.*",
+    "transformers",
+    "rembg",
+]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

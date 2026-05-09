@@ -235,15 +235,11 @@ def _run_pipeline_sync(
     # ``Any`` and rely on runtime structure. The lazy-import test
     # asserts these are NOT loaded by ``import toybox.image_gen.pipeline``.
     # ----------------------------------------------------------------
-    import torch  # type: ignore[import-not-found]
-    from diffusers import (  # type: ignore[import-not-found]
-        StableDiffusionXLPipeline,
-    )
+    import torch
+    from diffusers import StableDiffusionXLPipeline
     from PIL import Image
-    from rembg import new_session, remove  # type: ignore[import-not-found]
-    from transformers import (  # type: ignore[import-not-found]
-        CLIPVisionModelWithProjection,
-    )
+    from rembg import new_session, remove
+    from transformers import CLIPVisionModelWithProjection
 
     model_dir = _model_dir()
 
@@ -276,7 +272,7 @@ def _run_pipeline_sync(
                 torch_dtype=torch.float16,
                 local_files_only=True,
             )
-            pipe = StableDiffusionXLPipeline.from_pretrained(
+            pipe = StableDiffusionXLPipeline.from_pretrained(  # type: ignore[no-untyped-call]
                 f"{model_dir}/sdxl/stable-diffusion-xl-base-1.0",
                 image_encoder=image_encoder,
                 torch_dtype=torch.float16,
