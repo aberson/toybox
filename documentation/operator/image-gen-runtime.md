@@ -62,9 +62,9 @@ Each script uses `huggingface_hub.snapshot_download` with `allow_patterns` filte
 
 ### Cartoon LoRA (optional, A/B alternative)
 
-The cartoon LoRA mode is the alternative to the cartoon checkpoint mode. F.5-4's smoke gate A/B-tests them and the operator picks the winner. If you don't want to source a cartoon LoRA, that's fine — the cartoon checkpoint mode (`TOYBOX_IMAGE_GEN_CARTOON_MODE=checkpoint`, the default) doesn't need it.
+**F.5-4 outcome (2026-05-09):** the smoke gate confirmed `TOYBOX_IMAGE_GEN_CARTOON_MODE=checkpoint` as the winner — the LoRA-mode A/B path was skip-clean because no SD 1.5 cartoon LoRA was sourced during F.5-1 (no good HF-hosted candidate without browser/auth at the time). The tiebreak rule applied: `checkpoint` is a single-model load (fewer moving parts, simpler operator setup, cleaner default). See [`documentation/runs/2026-05-09-toy-action-sprites-cartoon-smoke.md`](../runs/2026-05-09-toy-action-sprites-cartoon-smoke.md). Stick with the default unless you have a reason to want the LoRA path.
 
-If you do want one, civitai is the dominant source for SD 1.5 cartoon LoRAs. Pick one whose license permits local-private use (most do; redistribution is what's typically forbidden), download to `data/models/image_gen/cartoon_lora/pytorch_lora_weights.safetensors`, and document the source + license in the next section's manifest. Set `TOYBOX_IMAGE_GEN_CARTOON_MODE=lora` to switch the pipeline to LoRA-mode and observe.
+If you DO want to wire LoRA mode for an A/B comparison on your own host: civitai is the dominant source for SD 1.5 cartoon LoRAs. Pick one whose license permits local-private use (most do; redistribution is what's typically forbidden), download to `data/models/image_gen/cartoon_lora/pytorch_lora_weights.safetensors`, document the source + license in the manifest, and set `TOYBOX_IMAGE_GEN_CARTOON_MODE=lora` before backend restart.
 
 ### Verifying the manifest
 
