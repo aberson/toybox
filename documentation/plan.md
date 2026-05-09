@@ -83,7 +83,8 @@ Each phase doc carries the per-step `**Problem:**/**Type:**/**Issue:**/**Flags:*
 | [plan/phase-d-uat-m2.5.md](plan/phase-d-uat-m2.5.md) — v1 release gate (bundled UAT) | OUTSTANDING |
 | [plan/phase-ipad-kiosk.md](plan/phase-ipad-kiosk.md) — child kiosk on iPad PWA | iK1–iK4 ✅; iK5 outstanding |
 | [plan/phase-e.md](plan/phase-e.md) — local model + tool-loop + non-linear gameplay | NOT STARTED |
-| [plan/phase-f-toy-action-sprites.md](plan/phase-f-toy-action-sprites.md) — toy action sprites | NOT STARTED |
+| [plan/phase-f-toy-action-sprites.md](plan/phase-f-toy-action-sprites.md) — toy action sprites (SDXL pipeline) | F1-F8 ✅ 2026-05-06; F9 ❌ 2026-05-07 (c10.dll crash, [#61](https://github.com/aberson/toybox/issues/61)); F10 BLOCKED → superseded by Phase F.5 |
+| [plan/phase-f-5-sprite-cartoon-redo.md](plan/phase-f-5-sprite-cartoon-redo.md) — sprite pipeline cartoon redo (SD 1.5 + LCM-LoRA + Tier C composite) | F.5-1/2/3a/3b ✅ 2026-05-09; F.5-4 smoke gate + F.5-5 soak ⏳ operator UAT (closes [#61](https://github.com/aberson/toybox/issues/61) on F.5-5 soft-pass) |
 
 ### Other planning docs
 
