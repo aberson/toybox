@@ -28,6 +28,12 @@ data/*
 !data/.gitkeep
 !data/models/
 data/models/*
+# F.5-3b Tier C composite templates ARE shipped in the repo (CC0 art /
+# operator-drawn) — un-ignore them so composite.py can read from disk
+# and operators can iterate on the art without touching .gitignore.
+!data/sprites/
+!data/sprites/templates/
+!data/sprites/templates/**
 !data/models/.gitkeep
 
 # Secrets / OAuth
