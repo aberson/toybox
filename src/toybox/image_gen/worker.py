@@ -50,7 +50,11 @@ from pathlib import Path
 from typing import Final
 
 from ..ws.topics import Topic
-from .capability import get_image_gen_breaker
+from .capability import (
+    CapabilityReason,
+    get_image_gen_breaker,
+    is_image_gen_capable,
+)
 from .models import (
     ACTION_SLOTS,
     GenerationContext,
@@ -140,6 +144,12 @@ class ImageGenWorker:
             Awaitable[bytes],
         ]
         | None = None,
+        composite: Callable[
+            [bytes, str, int, GenerationContext],
+            Awaitable[bytes],
+        ]
+        | None = None,
+        capability_probe: Callable[[], tuple[bool, CapabilityReason, str]] | None = None,
         shutdown_grace_sec: float = _DEFAULT_SHUTDOWN_GRACE_SEC,
     ) -> None:
         self._conn_factory = conn_factory
@@ -153,6 +163,15 @@ class ImageGenWorker:
         # :func:`generate_action` lazily so a worker constructed in a
         # capability-disabled deployment doesn't pay the import cost.
         self._pipeline_override = pipeline
+        # F.5-3a: parallel override for the Tier C composite path.
+        # ``None`` → resolve the real :func:`composite.composite_action`
+        # lazily on first dispatch.
+        self._composite_override = composite
+        # F.5-3a: capability probe override so tests can pin the
+        # dispatch branch without poking torch / env vars. Production
+        # callers pass ``None`` and we use the real
+        # :func:`is_image_gen_capable`.
+        self._capability_probe = capability_probe
 
     # ------------------------------------------------------------------
     # Public API
@@ -217,8 +236,7 @@ class ImageGenWorker:
             conn.execute("BEGIN IMMEDIATE")
             try:
                 row = conn.execute(
-                    "SELECT status FROM toy_actions "
-                    "WHERE toy_id = ? AND slot = ?",
+                    "SELECT status FROM toy_actions WHERE toy_id = ? AND slot = ?",
                     (toy_id, slot),
                 ).fetchone()
                 now = _now_iso()
@@ -489,8 +507,7 @@ class ImageGenWorker:
         except ValueError as exc:
             # Validation error (e.g., bad tags JSON) — data issue.
             _logger.warning(
-                "image_gen worker: validation error loading context "
-                "for toy_id=%s slot=%s: %s",
+                "image_gen worker: validation error loading context for toy_id=%s slot=%s: %s",
                 toy_id,
                 slot,
                 exc,
@@ -517,13 +534,76 @@ class ImageGenWorker:
             )
             return
 
-        # Run the pipeline. Errors map to specific ``error_msg``
+        # F.5-3a: dispatch on the capability gate.
+        #
+        # * CAPABLE → Tier B diffusion pipeline (existing path).
+        # * ENV_DISABLED → operator hard-off; mark failed with
+        #   ``"image_gen_disabled"`` and skip both pipelines.
+        # * NO_CUDA / LOW_VRAM / MISSING_CHECKPOINTS → Tier C
+        #   composite fallback. Same DB-write + WS-emit path; on
+        #   composite failure the row is marked failed with
+        #   ``"image_gen_composite_only"`` (so parent UI can
+        #   distinguish "GPU pipeline + composite both unavailable"
+        #   from a Tier B OOM).
+        #
+        # No prefix-string matching anywhere — the dispatch is a
+        # straight enum compare.
+        try:
+            capable, reason_enum, _detail = self._probe_capability()
+        except Exception as exc:  # noqa: BLE001 -- defensive
+            _logger.exception(
+                "image_gen worker: capability probe raised for toy_id=%s slot=%s",
+                toy_id,
+                slot,
+            )
+            await self._mark_failed(
+                toy_id,
+                slot,
+                seed,
+                error=str(exc)[:200],
+            )
+            return
+
+        if not capable and reason_enum is CapabilityReason.ENV_DISABLED:
+            # Hard-off. Operator explicitly turned image-gen off; do
+            # NOT route to composite either. Match the historical
+            # error_msg so existing parent-UI consumers see the same
+            # value they did pre-F.5.
+            await self._mark_failed(
+                toy_id,
+                slot,
+                seed,
+                error="image_gen_disabled",
+            )
+            return
+
+        composite_path = not capable
+
+        # Run the chosen pipeline. Errors map to specific ``error_msg``
         # strings per the build-step brief.
-        pipeline = self._resolve_pipeline()
+        pipeline = self._resolve_composite() if composite_path else self._resolve_pipeline()
         try:
             png_bytes = await pipeline(reference_bytes, slot, seed, ctx)
-        except ImageGenCapacityError:
+        except ImageGenCapacityError as exc:
             breaker.check_and_record(success=False)
+            # On the composite path, ``ImageGenCapacityError`` means a
+            # template / manifest is missing — a structural Tier C
+            # problem, not a GPU OOM. Use a distinct ``error_msg`` so
+            # consumers can distinguish.
+            if composite_path:
+                _logger.warning(
+                    "image_gen worker: composite raised for toy_id=%s slot=%s: %s",
+                    toy_id,
+                    slot,
+                    exc,
+                )
+                await self._mark_failed(
+                    toy_id,
+                    slot,
+                    seed,
+                    error="image_gen_composite_only",
+                )
+                return
             await self._mark_failed(
                 toy_id,
                 slot,
@@ -542,11 +622,23 @@ class ImageGenWorker:
             return
         except Exception as exc:  # noqa: BLE001 -- one bad pipeline shouldn't kill the worker
             _logger.exception(
-                "image_gen worker: pipeline raised for toy_id=%s slot=%s",
+                "image_gen worker: %s raised for toy_id=%s slot=%s",
+                "composite" if composite_path else "pipeline",
                 toy_id,
                 slot,
             )
             breaker.check_and_record(success=False)
+            # Composite-path failures get the canonical
+            # ``"image_gen_composite_only"`` error_msg so the parent
+            # UI's per-cell tooltip surfaces a coherent reason.
+            if composite_path:
+                await self._mark_failed(
+                    toy_id,
+                    slot,
+                    seed,
+                    error="image_gen_composite_only",
+                )
+                return
             await self._mark_failed(
                 toy_id,
                 slot,
@@ -664,8 +756,7 @@ class ImageGenWorker:
             await asyncio.shield(asyncio.to_thread(_runner))
         except Exception:  # noqa: BLE001 -- shutdown cleanup must not raise
             _logger.warning(
-                "image_gen worker: failed to mark cancelled job "
-                "toy_id=%s slot=%s",
+                "image_gen worker: failed to mark cancelled job toy_id=%s slot=%s",
                 toy_id,
                 slot,
                 exc_info=True,
@@ -682,8 +773,7 @@ class ImageGenWorker:
             )
         except Exception:  # noqa: BLE001 -- shutdown cleanup must not raise
             _logger.warning(
-                "image_gen worker: failed to emit cancellation envelope "
-                "toy_id=%s slot=%s",
+                "image_gen worker: failed to emit cancellation envelope toy_id=%s slot=%s",
                 toy_id,
                 slot,
                 exc_info=True,
@@ -706,6 +796,36 @@ class ImageGenWorker:
         from .pipeline import generate_action
 
         return generate_action
+
+    def _resolve_composite(
+        self,
+    ) -> Callable[[bytes, str, int, GenerationContext], Awaitable[bytes]]:
+        """Return the composite callable, honouring the test override.
+
+        F.5-3a: the worker dispatches to this when the capability
+        gate returns False with a non-env-disabled reason (no CUDA,
+        low VRAM, missing checkpoints).
+        """
+        if self._composite_override is not None:
+            return self._composite_override
+        # Lazy import so the composite module's rembg / Pillow deps
+        # aren't loaded at worker construction time.
+        from .composite import composite_action
+
+        return composite_action
+
+    def _probe_capability(self) -> tuple[bool, CapabilityReason, str]:
+        """Return the resolved capability, honouring the test override.
+
+        Uses ``check_free_vram=False`` to mirror the request-time
+        callers (see :func:`is_image_gen_capable`'s docstring): once
+        the boot probe established the hardware fits, mid-flight VRAM
+        dips during another sprite's run shouldn't flip the dispatch
+        branch.
+        """
+        if self._capability_probe is not None:
+            return self._capability_probe()
+        return is_image_gen_capable(check_free_vram=False)
 
     def _with_conn(
         self,
@@ -737,8 +857,7 @@ class ImageGenWorker:
         conn = self._conn_factory()
         try:
             rows = conn.execute(
-                "SELECT toy_id, slot, seed FROM toy_actions "
-                "WHERE status IN (?, ?)",
+                "SELECT toy_id, slot, seed FROM toy_actions WHERE status IN (?, ?)",
                 (
                     ToyActionStatus.running.value,
                     ToyActionStatus.queued.value,
@@ -760,8 +879,7 @@ class ImageGenWorker:
                     )
                 except ValueError as exc:
                     _logger.warning(
-                        "restart recovery: skipping invalid row "
-                        "(toy_id=%s slot=%s): %s",
+                        "restart recovery: skipping invalid row (toy_id=%s slot=%s): %s",
                         row["toy_id"],
                         row["slot"],
                         exc,
@@ -1032,6 +1150,12 @@ async def start_image_gen_worker(
         Awaitable[bytes],
     ]
     | None = None,
+    composite: Callable[
+        [bytes, str, int, GenerationContext],
+        Awaitable[bytes],
+    ]
+    | None = None,
+    capability_probe: Callable[[], tuple[bool, CapabilityReason, str]] | None = None,
 ) -> ImageGenWorker:
     """Construct + start the singleton worker.
 
@@ -1043,7 +1167,13 @@ async def start_image_gen_worker(
     global _worker
     if _worker is not None:
         return _worker
-    worker = ImageGenWorker(conn_factory, emit, pipeline=pipeline)
+    worker = ImageGenWorker(
+        conn_factory,
+        emit,
+        pipeline=pipeline,
+        composite=composite,
+        capability_probe=capability_probe,
+    )
     recovered = await worker.run_restart_recovery()
     if recovered:
         _logger.info(

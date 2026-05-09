@@ -23,12 +23,46 @@ from __future__ import annotations
 
 import logging
 import os
+from enum import StrEnum
 from pathlib import Path
 from typing import Final
 
 from ..ai.breaker import CircuitBreaker
 
 _logger = logging.getLogger(__name__)
+
+
+class CapabilityReason(StrEnum):
+    """Branch key for :func:`is_image_gen_capable`'s return tuple.
+
+    Phase F.5-3a: the worker dispatch + REST endpoints branch on this
+    enum instead of prefix-matching the human-readable detail string.
+    Each member maps 1:1 to one of the four "False" arms of
+    :func:`is_image_gen_capable` (plus :attr:`CAPABLE` for the
+    success arm):
+
+    * :attr:`CAPABLE` — gate is open; full Tier B pipeline runs.
+    * :attr:`ENV_DISABLED` — operator explicitly set
+      ``TOYBOX_IMAGE_GEN_ENABLED=false``. Hard-off; no Tier C either.
+    * :attr:`NO_CUDA` — torch / CUDA driver not available. Tier C
+      composite is the fallback.
+    * :attr:`LOW_VRAM` — free VRAM below the configured floor. Tier C
+      composite is the fallback.
+    * :attr:`MISSING_CHECKPOINTS` — one or more required checkpoint
+      files absent on disk. Tier C composite is the fallback.
+
+    The bool component of :func:`is_image_gen_capable`'s return tuple
+    stays for backwards compat at call sites that only need yes/no;
+    the enum is the dispatch key; the human-readable string is for UI
+    display.
+    """
+
+    CAPABLE = "capable"
+    ENV_DISABLED = "env_disabled"
+    NO_CUDA = "no_cuda"
+    LOW_VRAM = "low_vram"
+    MISSING_CHECKPOINTS = "missing_checkpoints"
+
 
 # Env-var names mirror the operator runbook §"Env-var reference".
 ENABLED_ENV: Final[str] = "TOYBOX_IMAGE_GEN_ENABLED"
@@ -131,7 +165,7 @@ def _probe_cuda_and_vram() -> tuple[bool, float]:
     return True, float(free_bytes) / float(1024**3)
 
 
-def is_image_gen_capable(*, check_free_vram: bool = True) -> tuple[bool, str]:
+def is_image_gen_capable(*, check_free_vram: bool = True) -> tuple[bool, CapabilityReason, str]:
     """Four-branch capability gate, in priority order.
 
     1. Env-disabled (``TOYBOX_IMAGE_GEN_ENABLED=false``).
@@ -140,8 +174,16 @@ def is_image_gen_capable(*, check_free_vram: bool = True) -> tuple[bool, str]:
     4. One or more required checkpoints missing on disk.
     5. Else capable.
 
-    Returns ``(capable, reason)``. ``reason`` is human-readable so
-    the parent UI can render it in the disabled banner verbatim.
+    Returns ``(capable, reason_enum, detail)``:
+
+    * ``capable`` — bool, True iff every gate passed. Kept for
+      backwards-compat with call sites that only want yes/no.
+    * ``reason_enum`` — :class:`CapabilityReason`, the dispatch key
+      used by the F.5-3a worker + REST routes (no prefix-matching on
+      the detail string).
+    * ``detail`` — human-readable detail (e.g.
+      ``"VRAM 6.9GB < floor 12.0GB"``); the parent UI renders this
+      verbatim in the banner.
 
     ``check_free_vram=False`` is for request-time callers (post-commit
     enqueue hook, ``/regenerate`` endpoints, the actions GET): once the
@@ -156,18 +198,26 @@ def is_image_gen_capable(*, check_free_vram: bool = True) -> tuple[bool, str]:
     sees the failure at startup.
     """
     if _env_bool_disabled(ENABLED_ENV):
-        return False, "image-gen disabled via TOYBOX_IMAGE_GEN_ENABLED"
+        return (
+            False,
+            CapabilityReason.ENV_DISABLED,
+            "image-gen disabled via TOYBOX_IMAGE_GEN_ENABLED",
+        )
 
     cuda_available, free_gb = _probe_cuda_and_vram()
     if not cuda_available:
-        return False, "CUDA not available"
+        return False, CapabilityReason.NO_CUDA, "CUDA not available"
 
     if check_free_vram:
         floor_gb = _min_vram_gb()
         if free_gb < floor_gb:
             # Format VRAM with one decimal place so 7.4 GB doesn't render
             # as "7GB" and look like the floor was exactly hit.
-            return False, f"VRAM {free_gb:.1f}GB < floor {floor_gb:.1f}GB"
+            return (
+                False,
+                CapabilityReason.LOW_VRAM,
+                f"VRAM {free_gb:.1f}GB < floor {floor_gb:.1f}GB",
+            )
 
     model_dir = _model_dir()
     missing = _missing_checkpoints(model_dir)
@@ -178,9 +228,13 @@ def is_image_gen_capable(*, check_free_vram: bool = True) -> tuple[bool, str]:
         sample = ", ".join(missing[:3])
         if len(missing) > 3:
             sample += f", ... ({len(missing)} total)"
-        return False, f"checkpoints missing: {sample}"
+        return (
+            False,
+            CapabilityReason.MISSING_CHECKPOINTS,
+            f"checkpoints missing: {sample}",
+        )
 
-    return True, "capable"
+    return True, CapabilityReason.CAPABLE, "capable"
 
 
 # ---------------------------------------------------------------------
@@ -291,6 +345,7 @@ def reset_image_gen_breaker_for_tests() -> None:
 __all__ = [
     "BREAKER_OPEN_SEC_ENV",
     "BREAKER_THRESHOLD_ENV",
+    "CapabilityReason",
     "DEFAULT_BREAKER_OPEN_SEC",
     "DEFAULT_BREAKER_THRESHOLD",
     "DEFAULT_MIN_VRAM_GB",

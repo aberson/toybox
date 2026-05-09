@@ -157,21 +157,31 @@ def no_worker(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture
 def force_capable(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Pin ``is_image_gen_capable`` to ``(True, "capable")``."""
+    """Pin ``is_image_gen_capable`` to ``(True, CAPABLE, "capable")``."""
+    from toybox.image_gen.capability import CapabilityReason
+
     monkeypatch.setattr(
         toys_router_mod,
         "is_image_gen_capable",
-        lambda **_kw: (True, "capable"),
+        lambda **_kw: (True, CapabilityReason.CAPABLE, "capable"),
     )
 
 
 @pytest.fixture
 def force_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Pin ``is_image_gen_capable`` to ``(False, "test-disabled")``."""
+    """Pin ``is_image_gen_capable`` to ``(False, ENV_DISABLED, "test-disabled")``.
+
+    Uses ``ENV_DISABLED`` so the F.5-3a hard-off branch fires (409,
+    no composite fallback). Tests targeting the new composite-only
+    branches override this with their own monkeypatch using
+    ``NO_CUDA`` / ``LOW_VRAM`` / ``MISSING_CHECKPOINTS``.
+    """
+    from toybox.image_gen.capability import CapabilityReason
+
     monkeypatch.setattr(
         toys_router_mod,
         "is_image_gen_capable",
-        lambda **_kw: (False, "test-disabled"),
+        lambda **_kw: (False, CapabilityReason.ENV_DISABLED, "test-disabled"),
     )
 
 
@@ -274,13 +284,45 @@ def test_get_actions_includes_capability_disabled_reason(
 ) -> None:
     """GET still returns 200 with rows + capability=False (graceful degradation)."""
     _seed_toy(db_path)
-    resp = vc_client.get(
-        f"/api/toys/{_SEEDED_TOY_ID}/actions", headers=parent_headers
-    )
+    resp = vc_client.get(f"/api/toys/{_SEEDED_TOY_ID}/actions", headers=parent_headers)
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert len(body["actions"]) == 10
     assert body["capability"] == {"capable": False, "reason": "test-disabled"}
+    # ENV_DISABLED → mode is None (no Tier C fallback).
+    assert body.get("mode") is None
+
+
+@pytest.fixture
+def force_composite_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin capability to a Tier-C-eligible False reason."""
+    from toybox.image_gen.capability import CapabilityReason
+
+    monkeypatch.setattr(
+        toys_router_mod,
+        "is_image_gen_capable",
+        lambda **_kw: (
+            False,
+            CapabilityReason.MISSING_CHECKPOINTS,
+            "test-missing-checkpoints",
+        ),
+    )
+
+
+def test_get_actions_emits_composite_only_mode(
+    vc_client: TestClient,
+    parent_headers: dict[str, str],
+    db_path: Path,
+    force_composite_only: None,
+) -> None:
+    """F.5-3a: capability-False with non-env-disabled reason → mode=composite_only."""
+    _seed_toy(db_path)
+    resp = vc_client.get(f"/api/toys/{_SEEDED_TOY_ID}/actions", headers=parent_headers)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["mode"] == "composite_only"
+    assert body["capability"]["capable"] is False
+    assert body["capability"]["reason"] == "test-missing-checkpoints"
 
 
 def test_get_actions_requires_parent_token(
@@ -320,7 +362,9 @@ def test_regenerate_all_enqueues_10(
     )
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    assert body == {"queued": list(ACTION_SLOTS)}
+    assert body["queued"] == list(ACTION_SLOTS)
+    # F.5-3a: capability=CAPABLE → mode is None (no Tier C banner).
+    assert body.get("mode") is None
     assert len(stub_worker.enqueued) == 10
     enqueued_slots = [slot for (_, slot, _) in stub_worker.enqueued]
     assert enqueued_slots == list(ACTION_SLOTS)
@@ -334,6 +378,7 @@ def test_regenerate_all_409_when_disabled(
     force_disabled: None,
     stub_worker: _StubWorker,
 ) -> None:
+    """ENV_DISABLED still returns 409 (regression check for F.5-3a)."""
     _seed_toy(db_path)
     resp = vc_client.post(
         f"/api/toys/{_SEEDED_TOY_ID}/actions/regenerate",
@@ -346,6 +391,31 @@ def test_regenerate_all_409_when_disabled(
     assert stub_worker.enqueued == []
 
 
+def test_regenerate_all_200_with_composite_only_mode(
+    vc_client: TestClient,
+    parent_headers: dict[str, str],
+    db_path: Path,
+    force_composite_only: None,
+    stub_worker: _StubWorker,
+) -> None:
+    """F.5-3a: capability-False non-env-disabled → 200 + queued + mode field.
+
+    Worker still enqueues all 10 jobs (the worker dispatches to the
+    composite path internally); the response carries
+    ``mode="composite_only"`` so the parent UI renders the banner.
+    """
+    _seed_toy(db_path)
+    resp = vc_client.post(
+        f"/api/toys/{_SEEDED_TOY_ID}/actions/regenerate",
+        headers=parent_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["queued"] == list(ACTION_SLOTS)
+    assert body["mode"] == "composite_only"
+    assert len(stub_worker.enqueued) == 10
+
+
 def test_regenerate_all_404_for_unknown_toy(
     vc_client: TestClient,
     parent_headers: dict[str, str],
@@ -353,9 +423,7 @@ def test_regenerate_all_404_for_unknown_toy(
     stub_worker: _StubWorker,
 ) -> None:
     unknown = str(uuid.uuid4())
-    resp = vc_client.post(
-        f"/api/toys/{unknown}/actions/regenerate", headers=parent_headers
-    )
+    resp = vc_client.post(f"/api/toys/{unknown}/actions/regenerate", headers=parent_headers)
     assert resp.status_code == 404
     assert resp.json()["detail"]["code"] == "toy_not_found"
     assert stub_worker.enqueued == []
@@ -395,7 +463,9 @@ def test_regenerate_one_enqueues_single(
         headers=parent_headers,
     )
     assert resp.status_code == 200, resp.text
-    assert resp.json() == {"queued": ["jumping"]}
+    body = resp.json()
+    assert body["queued"] == ["jumping"]
+    assert body.get("mode") is None
     assert len(stub_worker.enqueued) == 1
     toy_id, slot, _seed = stub_worker.enqueued[0]
     assert toy_id == _SEEDED_TOY_ID
@@ -444,6 +514,7 @@ def test_regenerate_one_409_when_disabled(
     force_disabled: None,
     stub_worker: _StubWorker,
 ) -> None:
+    """ENV_DISABLED still returns 409 for the per-slot endpoint."""
     _seed_toy(db_path)
     resp = vc_client.post(
         f"/api/toys/{_SEEDED_TOY_ID}/actions/idle/regenerate",
@@ -454,6 +525,26 @@ def test_regenerate_one_409_when_disabled(
     assert detail["code"] == "image_gen_disabled"
     assert detail["reason"] == "test-disabled"
     assert stub_worker.enqueued == []
+
+
+def test_regenerate_one_200_with_composite_only_mode(
+    vc_client: TestClient,
+    parent_headers: dict[str, str],
+    db_path: Path,
+    force_composite_only: None,
+    stub_worker: _StubWorker,
+) -> None:
+    """F.5-3a: per-slot regenerate also signals ``mode=composite_only``."""
+    _seed_toy(db_path)
+    resp = vc_client.post(
+        f"/api/toys/{_SEEDED_TOY_ID}/actions/idle/regenerate",
+        headers=parent_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["queued"] == ["idle"]
+    assert body["mode"] == "composite_only"
+    assert len(stub_worker.enqueued) == 1
 
 
 def test_regenerate_one_503_when_worker_not_running(
@@ -525,6 +616,32 @@ def test_toy_commit_hook_enqueues_10_jobs(
     assert all(toy_id == new_toy_id for (toy_id, _, _) in stub_worker.enqueued)
 
 
+def test_toy_commit_hook_enqueues_when_composite_only(
+    vc_client: TestClient,
+    parent_headers: dict[str, str],
+    force_composite_only: None,
+    stub_worker: _StubWorker,
+) -> None:
+    """F.5-3a: composite-only capability still enqueues all 10 jobs.
+
+    The worker dispatches each job to the Tier C path internally; the
+    REST layer's commit hook just enqueues. Only ENV_DISABLED skips.
+    """
+    staging_id = _upload_and_get_staging_id(vc_client, parent_headers, color=(70, 80, 90))
+    confirm = vc_client.post(
+        "/api/toys",
+        json={
+            "staging_id": staging_id,
+            "display_name": "Composite Toy",
+            "tags": [],
+            "persona_id": None,
+        },
+        headers=parent_headers,
+    )
+    assert confirm.status_code == 201, confirm.text
+    assert len(stub_worker.enqueued) == 10
+
+
 def test_toy_commit_hook_skips_enqueue_when_disabled(
     vc_client: TestClient,
     parent_headers: dict[str, str],
@@ -532,10 +649,8 @@ def test_toy_commit_hook_skips_enqueue_when_disabled(
     stub_worker: _StubWorker,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Toy create still succeeds; nothing enqueued; INFO logged."""
-    staging_id = _upload_and_get_staging_id(
-        vc_client, parent_headers, color=(50, 60, 70)
-    )
+    """ENV_DISABLED still skips the commit-hook enqueue; INFO logged."""
+    staging_id = _upload_and_get_staging_id(vc_client, parent_headers, color=(50, 60, 70))
     with caplog.at_level(logging.INFO, logger="toybox.api.toys"):
         confirm = vc_client.post(
             "/api/toys",
@@ -550,9 +665,7 @@ def test_toy_commit_hook_skips_enqueue_when_disabled(
     assert confirm.status_code == 201, confirm.text
     assert stub_worker.enqueued == []
     # Log should mention "skipping enqueue" + the reason.
-    matching = [
-        rec for rec in caplog.records if "skipping enqueue" in rec.getMessage()
-    ]
+    matching = [rec for rec in caplog.records if "skipping enqueue" in rec.getMessage()]
     assert matching, f"expected a 'skipping enqueue' log; got {caplog.text!r}"
     assert any("test-disabled" in rec.getMessage() for rec in matching)
 
@@ -565,9 +678,7 @@ def test_toy_commit_hook_skips_when_worker_not_running(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Toy create still succeeds when the worker isn't started."""
-    staging_id = _upload_and_get_staging_id(
-        vc_client, parent_headers, color=(80, 90, 100)
-    )
+    staging_id = _upload_and_get_staging_id(vc_client, parent_headers, color=(80, 90, 100))
     with caplog.at_level(logging.INFO, logger="toybox.api.toys"):
         confirm = vc_client.post(
             "/api/toys",
@@ -580,11 +691,7 @@ def test_toy_commit_hook_skips_when_worker_not_running(
             headers=parent_headers,
         )
     assert confirm.status_code == 201, confirm.text
-    matching = [
-        rec
-        for rec in caplog.records
-        if "image-gen worker not running" in rec.getMessage()
-    ]
+    matching = [rec for rec in caplog.records if "image-gen worker not running" in rec.getMessage()]
     assert matching, f"expected worker-not-running log; got {caplog.text!r}"
 
 
@@ -599,9 +706,7 @@ def test_toy_commit_hook_logs_warning_on_enqueue_failure(
     boom = _StubWorker(raise_exc=RuntimeError("queue is wedged"))
     monkeypatch.setattr(worker_module, "_worker", boom, raising=False)
 
-    staging_id = _upload_and_get_staging_id(
-        vc_client, parent_headers, color=(110, 120, 130)
-    )
+    staging_id = _upload_and_get_staging_id(vc_client, parent_headers, color=(110, 120, 130))
     with caplog.at_level(logging.WARNING, logger="toybox.api.toys"):
         confirm = vc_client.post(
             "/api/toys",
@@ -614,9 +719,7 @@ def test_toy_commit_hook_logs_warning_on_enqueue_failure(
             headers=parent_headers,
         )
     assert confirm.status_code == 201, confirm.text
-    matching = [
-        rec for rec in caplog.records if "enqueue failed" in rec.getMessage()
-    ]
+    matching = [rec for rec in caplog.records if "enqueue failed" in rec.getMessage()]
     assert matching, f"expected enqueue-failed warning; got {caplog.text!r}"
     assert any(rec.levelno == logging.WARNING for rec in matching)
 
@@ -653,5 +756,3 @@ def test_new_endpoints_forbid_child_token(
     headers = {"Authorization": f"Bearer {child_token}"}
     resp = vc_client.request(method, path, headers=headers)
     assert resp.status_code == 403
-
-

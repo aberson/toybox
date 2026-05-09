@@ -30,7 +30,7 @@ import time
 import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Final
 
 from fastapi import (
     APIRouter,
@@ -51,7 +51,7 @@ from ..ai.toy_vision import (
 )
 from ..core.auth import TokenScope
 from ..db import connect, resolve_db_path
-from ..image_gen.capability import is_image_gen_capable
+from ..image_gen.capability import CapabilityReason, is_image_gen_capable
 from ..image_gen.models import ACTION_SLOTS, ToyActionStatus
 from ..image_gen.worker import get_image_gen_worker
 from ..storage.images import (
@@ -329,12 +329,20 @@ class ToyActionsResponse(BaseModel):
     :data:`toybox.image_gen.models.ACTION_SLOTS` order — slots without
     a DB row are synthesized as ``not_started`` placeholders by
     :func:`toybox.storage.toy_actions.list_for_toy`.
+
+    ``mode`` is ``"composite_only"`` when the capability gate returned
+    False with a non-env-disabled reason (no CUDA / low VRAM / missing
+    checkpoints) — the worker is dispatching the Tier C composite
+    fallback rather than the full Tier B diffusion pipeline. The parent
+    UI surfaces this as a "running in composite-only mode" banner.
+    Otherwise ``mode`` is ``None``.
     """
 
     model_config = ConfigDict(frozen=True)
 
     actions: list[ToyActionResponse]
     capability: CapabilityInfo
+    mode: str | None = None
 
 
 class RegenerateResponse(BaseModel):
@@ -344,11 +352,16 @@ class RegenerateResponse(BaseModel):
     ``POST /api/toys/{id}/actions/regenerate`` it equals
     :data:`ACTION_SLOTS` (all 10); for the per-slot variant it is a
     one-element list ``[slot]``.
+
+    ``mode`` is ``"composite_only"`` when the capability gate returned
+    False with a non-env-disabled reason (Tier C fallback active);
+    otherwise ``None``. See :class:`ToyActionsResponse`.
     """
 
     model_config = ConfigDict(frozen=True)
 
     queued: list[str]
+    mode: str | None = None
 
 
 # ---------------------------------------------------------------------
@@ -763,8 +776,12 @@ async def _maybe_enqueue_action_jobs_for_toy(toy_id: str) -> None:
             toy_id,
         )
         return
-    capable, reason = is_image_gen_capable(check_free_vram=False)
-    if not capable:
+    capable, reason_enum, reason = is_image_gen_capable(check_free_vram=False)
+    # ENV_DISABLED is the only branch that suppresses enqueue. The
+    # other False branches (NO_CUDA / LOW_VRAM / MISSING_CHECKPOINTS)
+    # still enqueue — the worker dispatches to the Tier C composite
+    # path per F.5-3a.
+    if not capable and reason_enum is CapabilityReason.ENV_DISABLED:
         _logger.info(
             "toy %s: image-gen disabled (%s); skipping enqueue",
             toy_id,
@@ -786,9 +803,7 @@ async def _maybe_enqueue_action_jobs_for_toy(toy_id: str) -> None:
             exc_info=True,
         )
         return
-    _logger.info(
-        "toy %s: enqueued %d image-gen jobs", toy_id, len(ACTION_SLOTS)
-    )
+    _logger.info("toy %s: enqueued %d image-gen jobs", toy_id, len(ACTION_SLOTS))
 
 
 # ---------------------------------------------------------------------
@@ -968,7 +983,8 @@ async def post_replace_image(
             old_disk.unlink(missing_ok=True)
         except (ValueError, OSError):
             _logger.warning(
-                "replace: failed to unlink old image %s", old_image_path,
+                "replace: failed to unlink old image %s",
+                old_image_path,
                 exc_info=True,
             )
 
@@ -1055,26 +1071,55 @@ def get_toy_actions(
     # disabled banner, and a flickering "VRAM 1.5GB < 6GB" reason while
     # a sprite gen is mid-flight is misleading. See is_image_gen_capable
     # docstring for the full rationale.
-    capable, reason = is_image_gen_capable(check_free_vram=False)
+    capable, reason_enum, reason = is_image_gen_capable(check_free_vram=False)
     return ToyActionsResponse(
         actions=[_action_row_to_response(r) for r in rows],
         capability=CapabilityInfo(capable=capable, reason=reason),
+        mode=_mode_for_reason(capable, reason_enum),
     )
 
 
-def _check_capability_or_409() -> None:
-    """Raise 409 ``image_gen_disabled`` when the gate is closed."""
-    # Skip the live-VRAM branch at request time: SDXL peaks at ~6 GB
-    # mid-gen on the 8 GB host, which drops free VRAM below the 6 GB
-    # floor while a sprite is being generated. Re-checking here would
-    # 409 every regenerate click that lands during another slot's run.
-    # Real OOM is caught + breaker-tripped inside the worker.
-    capable, reason = is_image_gen_capable(check_free_vram=False)
-    if not capable:
+_COMPOSITE_ONLY_MODE: Final[str] = "composite_only"
+
+
+def _mode_for_reason(capable: bool, reason_enum: CapabilityReason) -> str | None:
+    """Return the response-body ``mode`` value for one capability state.
+
+    F.5-3a wire contract: ``"composite_only"`` when the gate returned
+    False with a non-env-disabled reason (Tier C fallback active);
+    ``None`` otherwise (capable, or env-disabled which 409s instead).
+    """
+    if capable:
+        return None
+    if reason_enum is CapabilityReason.ENV_DISABLED:
+        return None
+    return _COMPOSITE_ONLY_MODE
+
+
+def _check_capability_or_409() -> CapabilityReason:
+    """Enforce the F.5-3a capability gate; return the resolved enum.
+
+    * ``CapabilityReason.CAPABLE`` → no-op; caller proceeds normally.
+    * ``CapabilityReason.ENV_DISABLED`` → 409 ``image_gen_disabled``
+      (operator explicitly off; no Tier C either).
+    * Any other False reason (NO_CUDA / LOW_VRAM / MISSING_CHECKPOINTS)
+      → no-op; the worker will dispatch to Tier C composite. Caller
+      uses the returned enum to decide whether to set
+      ``mode="composite_only"`` on the response.
+
+    Skip the live-VRAM branch at request time: SDXL peaks at ~6 GB
+    mid-gen on the 8 GB host, which drops free VRAM below the 6 GB
+    floor while a sprite is being generated. Re-checking here would
+    409 every regenerate click that lands during another slot's run.
+    Real OOM is caught + breaker-tripped inside the worker.
+    """
+    capable, reason_enum, reason = is_image_gen_capable(check_free_vram=False)
+    if not capable and reason_enum is CapabilityReason.ENV_DISABLED:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={"code": "image_gen_disabled", "reason": reason},
         )
+    return reason_enum
 
 
 def _require_worker_or_503() -> Any:
@@ -1103,14 +1148,23 @@ async def regenerate_all_actions(
     conn: Annotated[sqlite3.Connection, Depends(get_toys_db)],
     _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
 ) -> RegenerateResponse:
-    """Enqueue all 10 :data:`ACTION_SLOTS` jobs for ``toy_id``."""
+    """Enqueue all 10 :data:`ACTION_SLOTS` jobs for ``toy_id``.
+
+    Returns 200 + queued list. F.5-3a: when the capability gate is
+    closed for a non-env-disabled reason, the response also carries
+    ``mode="composite_only"`` so the parent UI can render a banner;
+    the worker dispatches to the Tier C composite path.
+    """
     _validate_toy_id_or_404(toy_id)
     _fetch_toy_row(conn, toy_id)  # 404 if missing.
-    _check_capability_or_409()
+    reason_enum = _check_capability_or_409()
     worker = _require_worker_or_503()
     for slot in ACTION_SLOTS:
         await worker.enqueue(toy_id, slot)
-    return RegenerateResponse(queued=list(ACTION_SLOTS))
+    return RegenerateResponse(
+        queued=list(ACTION_SLOTS),
+        mode=_mode_for_reason(reason_enum is CapabilityReason.CAPABLE, reason_enum),
+    )
 
 
 @router.post(
@@ -1123,7 +1177,11 @@ async def regenerate_one_action(
     conn: Annotated[sqlite3.Connection, Depends(get_toys_db)],
     _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
 ) -> RegenerateResponse:
-    """Enqueue one slot — supersede semantics handled by the worker."""
+    """Enqueue one slot — supersede semantics handled by the worker.
+
+    F.5-3a: same composite-only mode signalling as
+    :func:`regenerate_all_actions`.
+    """
     _validate_toy_id_or_404(toy_id)
     _fetch_toy_row(conn, toy_id)
     if slot not in ACTION_SLOTS:
@@ -1134,10 +1192,13 @@ async def regenerate_one_action(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"code": "slot_not_in_vocab", "slot": slot},
         )
-    _check_capability_or_409()
+    reason_enum = _check_capability_or_409()
     worker = _require_worker_or_503()
     await worker.enqueue(toy_id, slot)
-    return RegenerateResponse(queued=[slot])
+    return RegenerateResponse(
+        queued=[slot],
+        mode=_mode_for_reason(reason_enum is CapabilityReason.CAPABLE, reason_enum),
+    )
 
 
 __all__ = [

@@ -21,6 +21,7 @@ from toybox.image_gen.capability import (
     ENABLED_ENV,
     MODEL_DIR_ENV,
     REQUIRED_CHECKPOINTS,
+    CapabilityReason,
     ImageGenBreaker,
     _probe_cuda_and_vram,
     get_image_gen_breaker,
@@ -50,20 +51,22 @@ def test_disabled_via_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> No
     monkeypatch.setenv(MODEL_DIR_ENV, str(tmp_path))
     _seed_all_checkpoints(tmp_path)
 
-    capable, reason = is_image_gen_capable()
+    capable, reason_enum, detail = is_image_gen_capable()
 
     assert capable is False
-    assert "TOYBOX_IMAGE_GEN_ENABLED" in reason
+    assert reason_enum is CapabilityReason.ENV_DISABLED
+    assert "TOYBOX_IMAGE_GEN_ENABLED" in detail
 
 
 def test_no_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv(ENABLED_ENV, raising=False)
     monkeypatch.setattr(capability, "_probe_cuda_and_vram", lambda: (False, 0.0))
 
-    capable, reason = is_image_gen_capable()
+    capable, reason_enum, detail = is_image_gen_capable()
 
     assert capable is False
-    assert reason == "CUDA not available"
+    assert reason_enum is CapabilityReason.NO_CUDA
+    assert detail == "CUDA not available"
 
 
 def test_probe_returns_false_when_torch_not_installed(
@@ -95,11 +98,12 @@ def test_low_vram(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv(MODEL_DIR_ENV, str(tmp_path))
     _seed_all_checkpoints(tmp_path)
 
-    capable, reason = is_image_gen_capable()
+    capable, reason_enum, detail = is_image_gen_capable()
 
     assert capable is False
-    assert "VRAM" in reason
-    assert "floor" in reason
+    assert reason_enum is CapabilityReason.LOW_VRAM
+    assert "VRAM" in detail
+    assert "floor" in detail
 
 
 def test_missing_checkpoints(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -108,10 +112,11 @@ def test_missing_checkpoints(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
     # Empty model dir → all checkpoints missing.
     monkeypatch.setenv(MODEL_DIR_ENV, str(tmp_path))
 
-    capable, reason = is_image_gen_capable()
+    capable, reason_enum, detail = is_image_gen_capable()
 
     assert capable is False
-    assert reason.startswith("checkpoints missing:")
+    assert reason_enum is CapabilityReason.MISSING_CHECKPOINTS
+    assert detail.startswith("checkpoints missing:")
 
 
 def test_capable_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -121,10 +126,11 @@ def test_capable_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv(MODEL_DIR_ENV, str(tmp_path))
     _seed_all_checkpoints(tmp_path)
 
-    capable, reason = is_image_gen_capable()
+    capable, reason_enum, detail = is_image_gen_capable()
 
     assert capable is True
-    assert reason == "capable"
+    assert reason_enum is CapabilityReason.CAPABLE
+    assert detail == "capable"
 
 
 def test_breaker_records_failures_and_opens(monkeypatch: pytest.MonkeyPatch) -> None:

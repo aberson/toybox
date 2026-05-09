@@ -25,7 +25,10 @@ import pytest
 from toybox.core.pubsub import PubSub
 from toybox.db.connection import connect
 from toybox.db.migrations import run_migrations
-from toybox.image_gen.capability import reset_image_gen_breaker_for_tests
+from toybox.image_gen.capability import (
+    CapabilityReason,
+    reset_image_gen_breaker_for_tests,
+)
 from toybox.image_gen.worker import (
     reset_image_gen_worker_for_tests,
     start_image_gen_worker,
@@ -84,6 +87,11 @@ def configured_paths(
     return db
 
 
+def _capable_probe() -> tuple[bool, CapabilityReason, str]:
+    """Pin capability to CAPABLE so the worker dispatches to the pipeline."""
+    return True, CapabilityReason.CAPABLE, "capable"
+
+
 async def test_full_lifecycle_via_app_lifespan(
     configured_paths: Path,
     tmp_path: Path,
@@ -102,8 +110,12 @@ async def test_full_lifecycle_via_app_lifespan(
     def _conn_factory() -> object:
         return connect(configured_paths, check_same_thread=False)
 
-    # Use the real (stubbed) pipeline path — no override.
-    worker = await start_image_gen_worker(_conn_factory, _emit)
+    # Use the real (stubbed) pipeline path — no override. Pin
+    # capability to CAPABLE so the F.5-3a dispatch routes to the
+    # diffusion pipeline (i.e. the stub) rather than the composite
+    # path; on a CI host without torch, the real capability gate
+    # otherwise reports NO_CUDA.
+    worker = await start_image_gen_worker(_conn_factory, _emit, capability_probe=_capable_probe)
     try:
         # Subscribe BEFORE enqueue so the ``queued`` envelope isn't
         # missed.
@@ -134,9 +146,7 @@ async def test_full_lifecycle_via_app_lifespan(
     done = collected[-1]
     assert done.payload["toy_id"] == _TOY_ID
     assert done.payload["slot"] == "idle"
-    assert done.payload["image_path"] == (
-        f"data/images/toy_actions/{_TOY_ID}/idle.png"
-    )
+    assert done.payload["image_path"] == (f"data/images/toy_actions/{_TOY_ID}/idle.png")
     assert done.payload["error"] is None
 
     # PNG actually written by the stub pipeline.
@@ -151,8 +161,7 @@ async def test_full_lifecycle_via_app_lifespan(
     conn = connect(configured_paths)
     try:
         row = conn.execute(
-            "SELECT status, image_path FROM toy_actions "
-            "WHERE toy_id = ? AND slot = ?",
+            "SELECT status, image_path FROM toy_actions WHERE toy_id = ? AND slot = ?",
             (_TOY_ID, "idle"),
         ).fetchone()
     finally:
@@ -160,3 +169,126 @@ async def test_full_lifecycle_via_app_lifespan(
     assert row is not None
     assert row["status"] == "done"
     assert row["image_path"] == f"data/images/toy_actions/{_TOY_ID}/idle.png"
+
+
+def _composite_only_probe() -> tuple[bool, CapabilityReason, str]:
+    """Pin capability so the worker dispatches the Tier C composite path."""
+    return False, CapabilityReason.MISSING_CHECKPOINTS, "test-missing"
+
+
+async def test_composite_dispatch_via_app_lifespan(
+    configured_paths: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F.5-3a: capability-False routes to the Tier C composite path.
+
+    Builds a real fixture template dir (one ``idle.png`` + manifest)
+    and stubs ``rembg`` so the worker can run end-to-end without ONNX.
+    Uses the real :func:`composite.composite_action` (no override) so
+    the lazy-import + paste code is actually exercised.
+    """
+    import io
+    import json
+    import sys
+    import types
+
+    from PIL import Image
+
+    # Stub rembg so the composite path doesn't need ONNX runtime.
+    def _new_session(*, model_name: str, providers: list[str]) -> object:
+        return object()
+
+    def _remove(input_bytes: bytes, *, session: object) -> bytes:
+        img = Image.open(io.BytesIO(input_bytes)).convert("RGBA")
+        out = io.BytesIO()
+        img.save(out, format="PNG")
+        return out.getvalue()
+
+    fake = types.ModuleType("rembg")
+    fake.new_session = _new_session  # type: ignore[attr-defined]
+    fake.remove = _remove  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "rembg", fake)
+
+    # Build a fixture templates dir and point the composite module at it.
+    templates_root = tmp_path / "composite_templates"
+    templates_root.mkdir()
+    template_img = Image.new("RGBA", (256, 256), (0, 200, 0, 255))
+    template_img.save(templates_root / "idle.png", format="PNG")
+    (templates_root / "manifest.json").write_text(
+        json.dumps({"idle": {"toy_box": [40, 40, 200, 200], "behind": False}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("TOYBOX_SPRITE_TEMPLATES_DIR", str(templates_root))
+    # Also drop the composite module's per-process caches so a prior
+    # test's templates dir doesn't bleed in.
+    from toybox.image_gen.composite import reset_caches_for_tests
+
+    reset_caches_for_tests()
+
+    # Replace the seeded JPEG with a real Pillow JPEG so rembg's stub
+    # can decode it (the byte-prefix in the autouse fixture isn't a
+    # valid full JPEG — fine for the Tier B stub which ignores it).
+    photo = tmp_path / "images" / "toys" / "bunny.jpg"
+    photo.parent.mkdir(parents=True, exist_ok=True)
+    raw_img = Image.new("RGB", (32, 32), (200, 100, 50))
+    out = io.BytesIO()
+    raw_img.save(out, format="JPEG", quality=85)
+    photo.write_bytes(out.getvalue())
+
+    pubsub = PubSub(coalesce_window_ms=0)
+
+    async def _emit(topic: Topic, payload: dict[str, object]) -> None:
+        pubsub.publish(build_envelope(topic=topic, payload=payload))
+
+    def _conn_factory() -> object:
+        return connect(configured_paths, check_same_thread=False)
+
+    worker = await start_image_gen_worker(
+        _conn_factory, _emit, capability_probe=_composite_only_probe
+    )
+    try:
+        sub = pubsub.subscribe([Topic.toy_actions])
+        try:
+            await worker.enqueue(_TOY_ID, "idle", seed=999)
+            collected: list[Envelope] = []
+
+            async def _collect_until_done() -> None:
+                async with asyncio.timeout(10.0):
+                    while True:
+                        env = await sub.get()
+                        if env.topic is not Topic.toy_actions:
+                            continue
+                        collected.append(env)
+                        if env.payload.get("status") in ("done", "failed"):
+                            return
+
+            await _collect_until_done()
+        finally:
+            sub.close()
+    finally:
+        await stop_image_gen_worker()
+
+    statuses = [env.payload["status"] for env in collected]
+    assert statuses[-1] == "done", statuses
+
+    out_path = tmp_path / "images" / "toy_actions" / _TOY_ID / "idle.png"
+    assert out_path.is_file()
+    raw = out_path.read_bytes()
+    assert raw[:8] == b"\x89PNG\r\n\x1a\n"
+    # The composite output is sized to 128x128 RGBA per spec.
+    composite_img = Image.open(io.BytesIO(raw))
+    assert composite_img.mode == "RGBA"
+    assert composite_img.size == (128, 128)
+
+    conn = connect(configured_paths)
+    try:
+        row = conn.execute(
+            "SELECT status, error_msg FROM toy_actions WHERE toy_id = ? AND slot = ?",
+            (_TOY_ID, "idle"),
+        ).fetchone()
+    finally:
+        conn.close()
+    assert row is not None
+    assert row["status"] == "done"
+    assert row["error_msg"] is None

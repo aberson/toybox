@@ -21,6 +21,7 @@ import pytest
 from toybox.db.connection import connect
 from toybox.db.migrations import run_migrations
 from toybox.image_gen.capability import (
+    CapabilityReason,
     ImageGenBreaker,
     get_image_gen_breaker,
     reset_image_gen_breaker_for_tests,
@@ -46,6 +47,41 @@ def _reset_breaker() -> None:
     reset_image_gen_breaker_for_tests()
     yield
     reset_image_gen_breaker_for_tests()
+
+
+def _capable_probe() -> tuple[bool, CapabilityReason, str]:
+    """Return the canonical capable tuple — pin most tests to Tier B."""
+    return True, CapabilityReason.CAPABLE, "capable"
+
+
+def _composite_only_probe() -> tuple[bool, CapabilityReason, str]:
+    """Pin capability to a non-env-disabled False reason → Tier C dispatch."""
+    return False, CapabilityReason.MISSING_CHECKPOINTS, "test-missing"
+
+
+def _env_disabled_probe() -> tuple[bool, CapabilityReason, str]:
+    """Pin capability to ENV_DISABLED → hard-off, no composite."""
+    return False, CapabilityReason.ENV_DISABLED, "test-env-disabled"
+
+
+@pytest.fixture(autouse=True)
+def _pin_capability_probe(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Default existing tests to the CAPABLE branch.
+
+    Without this, ``ImageGenWorker._probe_capability`` would fall
+    through to the real :func:`is_image_gen_capable`, which on a CI
+    host returns ``(False, NO_CUDA, ...)`` and routes every job to
+    the composite path — breaking the existing Tier-B-focused tests.
+    Tests that want a different branch construct the worker with an
+    explicit ``capability_probe=`` kwarg.
+    """
+    from toybox.image_gen import worker as worker_module
+
+    monkeypatch.setattr(
+        worker_module,
+        "is_image_gen_capable",
+        lambda **_kw: _capable_probe(),
+    )
 
 
 @pytest.fixture
@@ -113,9 +149,7 @@ async def test_full_lifecycle_running_then_done(
     """One job flows: enqueue → running → done. WS envelopes captured."""
     captured, emit = _capture_emit()
 
-    async def _stub(
-        reference_bytes: bytes, slot: str, seed: int, ctx: GenerationContext
-    ) -> bytes:
+    async def _stub(reference_bytes: bytes, slot: str, seed: int, ctx: GenerationContext) -> bytes:
         return b"\x89PNG\r\n\x1a\nFAKE-OUTPUT"
 
     worker = ImageGenWorker(_conn_factory(db_path), emit, pipeline=_stub)
@@ -125,9 +159,7 @@ async def test_full_lifecycle_running_then_done(
         # Wait for the queue to drain.
         for _ in range(200):
             await asyncio.sleep(0.01)
-            if worker.queue_size == 0 and any(
-                p.get("status") == "done" for _, p in captured
-            ):
+            if worker.queue_size == 0 and any(p.get("status") == "done" for _, p in captured):
                 break
     finally:
         await worker.stop()
@@ -140,9 +172,7 @@ async def test_full_lifecycle_running_then_done(
     # ``done`` envelope carries the image_path; ``failed``/``running``
     # carry None.
     done_payload = next(p for _, p in captured if p["status"] == "done")
-    assert done_payload["image_path"] == (
-        f"data/images/toy_actions/{_TOY_ID}/idle.png"
-    )
+    assert done_payload["image_path"] == (f"data/images/toy_actions/{_TOY_ID}/idle.png")
     assert done_payload["error"] is None
     running_payload = next(p for _, p in captured if p["status"] == "running")
     assert running_payload["image_path"] is None
@@ -355,10 +385,7 @@ async def test_runtime_supersede_via_new_enqueue_seed_mismatch(
         # Wait for the second job to commit.
         for _ in range(400):
             await asyncio.sleep(0.01)
-            if any(
-                p["status"] == "done" and p.get("image_path")
-                for _, p in captured
-            ):
+            if any(p["status"] == "done" and p.get("image_path") for _, p in captured):
                 seed_done.set()
                 break
     finally:
@@ -374,8 +401,7 @@ async def test_runtime_supersede_via_new_enqueue_seed_mismatch(
     conn = connect(db_path)
     try:
         row = conn.execute(
-            "SELECT status, seed FROM toy_actions "
-            "WHERE toy_id = ? AND slot = ?",
+            "SELECT status, seed FROM toy_actions WHERE toy_id = ? AND slot = ?",
             (_TOY_ID, "waving"),
         ).fetchone()
     finally:
@@ -445,20 +471,14 @@ async def test_cancellation_marks_inflight_failed(
         proceed.set()
 
     # A ``failed`` envelope was emitted with the cancellation reason.
-    failed_payloads = [
-        p for _, p in captured if p["status"] == "failed"
-    ]
-    assert any(
-        p.get("error") == "interrupted by shutdown"
-        for p in failed_payloads
-    ), captured
+    failed_payloads = [p for _, p in captured if p["status"] == "failed"]
+    assert any(p.get("error") == "interrupted by shutdown" for p in failed_payloads), captured
 
     # DB row is ``failed`` with the cancellation error_msg.
     conn = connect(db_path)
     try:
         row = conn.execute(
-            "SELECT status, error_msg FROM toy_actions "
-            "WHERE toy_id = ? AND slot = ?",
+            "SELECT status, error_msg FROM toy_actions WHERE toy_id = ? AND slot = ?",
             (_TOY_ID, "idle"),
         ).fetchone()
     finally:
@@ -516,8 +536,7 @@ async def test_restart_recovery_marks_queued_rows_failed(
     conn = connect(db_path)
     try:
         rows = conn.execute(
-            "SELECT slot, status, error_msg, seed FROM toy_actions "
-            "WHERE toy_id = ? ORDER BY slot",
+            "SELECT slot, status, error_msg, seed FROM toy_actions WHERE toy_id = ? ORDER BY slot",
             (_TOY_ID,),
         ).fetchall()
     finally:
@@ -566,12 +585,7 @@ async def test_concurrent_enqueues_are_atomic(
     await worker.start()
     try:
         # 5 concurrent enqueues for the same (toy_id, slot).
-        await asyncio.gather(
-            *[
-                worker.enqueue(_TOY_ID, "thinking", seed=i)
-                for i in range(5)
-            ]
-        )
+        await asyncio.gather(*[worker.enqueue(_TOY_ID, "thinking", seed=i) for i in range(5)])
 
         # Exactly one DB row for the slot — PK enforces this, but the
         # status must be a sane terminal-ish value (queued for the
@@ -579,8 +593,7 @@ async def test_concurrent_enqueues_are_atomic(
         conn = connect(db_path)
         try:
             rows = conn.execute(
-                "SELECT status, seed FROM toy_actions "
-                "WHERE toy_id = ? AND slot = ?",
+                "SELECT status, seed FROM toy_actions WHERE toy_id = ? AND slot = ?",
                 (_TOY_ID, "thinking"),
             ).fetchall()
         finally:
@@ -640,9 +653,7 @@ async def test_breaker_opens_after_three_capacity_errors(
         await worker.enqueue(_TOY_ID, "jumping", seed=4)
         for _ in range(300):
             await asyncio.sleep(0.01)
-            errors = [
-                p.get("error") for _, p in captured if p["status"] == "failed"
-            ]
+            errors = [p.get("error") for _, p in captured if p["status"] == "failed"]
             if "image-gen breaker open" in errors:
                 break
     finally:
@@ -751,8 +762,7 @@ async def test_restart_recovery_marks_running_rows_failed(
     conn = connect(db_path)
     try:
         row = conn.execute(
-            "SELECT status, error_msg, seed FROM toy_actions "
-            "WHERE toy_id = ? AND slot = ?",
+            "SELECT status, error_msg, seed FROM toy_actions WHERE toy_id = ? AND slot = ?",
             (_TOY_ID, "idle"),
         ).fetchone()
     finally:
@@ -848,3 +858,250 @@ async def test_singleton_start_stop(
     finally:
         await worker_module.stop_image_gen_worker()
     assert worker_module.get_image_gen_worker() is None
+
+
+# ----------------------------------------------------------------------
+# F.5-3a: capability dispatch — Tier B vs Tier C vs hard-off
+# ----------------------------------------------------------------------
+
+
+async def test_dispatch_env_disabled_marks_failed_no_composite(
+    db_path: Path,
+) -> None:
+    """``ENV_DISABLED`` → row marked ``failed`` with the canonical
+    ``"image_gen_disabled"`` error; the composite stub is NOT called.
+
+    Hard-off semantics per the spec: if the operator explicitly
+    disabled image-gen via ``TOYBOX_IMAGE_GEN_ENABLED=false``, do
+    NOT route to composite either.
+    """
+    captured, emit = _capture_emit()
+    composite_calls: list[tuple[str, int]] = []
+
+    async def _composite_stub(
+        reference_bytes: bytes,
+        slot: str,
+        seed: int,
+        ctx: GenerationContext,
+    ) -> bytes:
+        composite_calls.append((slot, seed))
+        return b"\x89PNG\r\n\x1a\nCOMPOSITE"
+
+    async def _pipeline_stub(
+        reference_bytes: bytes,
+        slot: str,
+        seed: int,
+        ctx: GenerationContext,
+    ) -> bytes:
+        return b"\x89PNG\r\n\x1a\nPIPELINE"
+
+    worker = ImageGenWorker(
+        _conn_factory(db_path),
+        emit,
+        pipeline=_pipeline_stub,
+        composite=_composite_stub,
+        capability_probe=_env_disabled_probe,
+    )
+    await worker.start()
+    try:
+        await worker.enqueue(_TOY_ID, "idle", seed=1)
+        for _ in range(300):
+            await asyncio.sleep(0.01)
+            if any(p["status"] == "failed" for _, p in captured):
+                break
+    finally:
+        await worker.stop()
+
+    assert composite_calls == []
+    failed = [p for _, p in captured if p["status"] == "failed"]
+    assert len(failed) == 1
+    assert failed[0]["error"] == "image_gen_disabled"
+
+    conn = connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT status, error_msg FROM toy_actions WHERE toy_id = ? AND slot = ?",
+            (_TOY_ID, "idle"),
+        ).fetchone()
+    finally:
+        conn.close()
+    assert row is not None
+    assert row["status"] == "failed"
+    assert row["error_msg"] == "image_gen_disabled"
+
+
+async def test_dispatch_missing_checkpoints_routes_to_composite(
+    db_path: Path,
+    tmp_path: Path,
+) -> None:
+    """``MISSING_CHECKPOINTS`` → composite called; success path no error_msg.
+
+    Matches the F.5-3a contract: capability gate False with a non-env-
+    disabled reason routes to the composite path. On success, the
+    row reaches ``done`` with no ``error_msg``.
+    """
+    captured, emit = _capture_emit()
+    composite_calls: list[tuple[str, int]] = []
+    pipeline_calls: list[tuple[str, int]] = []
+
+    async def _composite_stub(
+        reference_bytes: bytes,
+        slot: str,
+        seed: int,
+        ctx: GenerationContext,
+    ) -> bytes:
+        composite_calls.append((slot, seed))
+        return b"\x89PNG\r\n\x1a\nCOMPOSITE-OK"
+
+    async def _pipeline_stub(
+        reference_bytes: bytes,
+        slot: str,
+        seed: int,
+        ctx: GenerationContext,
+    ) -> bytes:
+        pipeline_calls.append((slot, seed))
+        return b"\x89PNG\r\n\x1a\nPIPELINE-OK"
+
+    worker = ImageGenWorker(
+        _conn_factory(db_path),
+        emit,
+        pipeline=_pipeline_stub,
+        composite=_composite_stub,
+        capability_probe=_composite_only_probe,
+    )
+    await worker.start()
+    try:
+        await worker.enqueue(_TOY_ID, "idle", seed=42)
+        for _ in range(300):
+            await asyncio.sleep(0.01)
+            if any(p["status"] == "done" for _, p in captured):
+                break
+    finally:
+        await worker.stop()
+
+    # Composite ran exactly once; the diffusion pipeline did NOT run.
+    assert composite_calls == [("idle", 42)]
+    assert pipeline_calls == []
+
+    # Success: PNG written, row in ``done`` with no error_msg.
+    out_path = tmp_path / "images" / "toy_actions" / _TOY_ID / "idle.png"
+    assert out_path.is_file()
+    assert out_path.read_bytes() == b"\x89PNG\r\n\x1a\nCOMPOSITE-OK"
+
+    conn = connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT status, error_msg FROM toy_actions WHERE toy_id = ? AND slot = ?",
+            (_TOY_ID, "idle"),
+        ).fetchone()
+    finally:
+        conn.close()
+    assert row is not None
+    assert row["status"] == "done"
+    assert row["error_msg"] is None
+
+
+async def test_dispatch_composite_failure_marks_image_gen_composite_only(
+    db_path: Path,
+) -> None:
+    """Composite raises → row failed with ``error_msg="image_gen_composite_only"``.
+
+    Both the Tier C ``ImageGenCapacityError`` (missing template) AND
+    a generic exception map to the same canonical ``error_msg`` on
+    the composite path so the parent UI's per-cell tooltip renders a
+    coherent reason.
+    """
+    captured, emit = _capture_emit()
+
+    async def _composite_stub(
+        reference_bytes: bytes,
+        slot: str,
+        seed: int,
+        ctx: GenerationContext,
+    ) -> bytes:
+        from toybox.image_gen.models import ImageGenCapacityError
+
+        raise ImageGenCapacityError(f"composite template missing for slot={slot}")
+
+    worker = ImageGenWorker(
+        _conn_factory(db_path),
+        emit,
+        composite=_composite_stub,
+        capability_probe=_composite_only_probe,
+    )
+    await worker.start()
+    try:
+        await worker.enqueue(_TOY_ID, "idle", seed=7)
+        for _ in range(300):
+            await asyncio.sleep(0.01)
+            if any(p["status"] == "failed" for _, p in captured):
+                break
+    finally:
+        await worker.stop()
+
+    failed = [p for _, p in captured if p["status"] == "failed"]
+    assert len(failed) == 1
+    assert failed[0]["error"] == "image_gen_composite_only"
+
+    conn = connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT status, error_msg FROM toy_actions WHERE toy_id = ? AND slot = ?",
+            (_TOY_ID, "idle"),
+        ).fetchone()
+    finally:
+        conn.close()
+    assert row is not None
+    assert row["status"] == "failed"
+    assert row["error_msg"] == "image_gen_composite_only"
+
+
+async def test_dispatch_capable_routes_to_pipeline(
+    db_path: Path,
+) -> None:
+    """``CAPABLE`` → pipeline called; composite stub NOT called.
+
+    Regression check that the default branch is unchanged from the
+    pre-F.5-3a worker.
+    """
+    captured, emit = _capture_emit()
+    composite_calls: list[tuple[str, int]] = []
+    pipeline_calls: list[tuple[str, int]] = []
+
+    async def _composite_stub(
+        reference_bytes: bytes,
+        slot: str,
+        seed: int,
+        ctx: GenerationContext,
+    ) -> bytes:
+        composite_calls.append((slot, seed))
+        return b"COMPOSITE"
+
+    async def _pipeline_stub(
+        reference_bytes: bytes,
+        slot: str,
+        seed: int,
+        ctx: GenerationContext,
+    ) -> bytes:
+        pipeline_calls.append((slot, seed))
+        return b"\x89PNG\r\n\x1a\nPIPELINE-OK"
+
+    worker = ImageGenWorker(
+        _conn_factory(db_path),
+        emit,
+        pipeline=_pipeline_stub,
+        composite=_composite_stub,
+        capability_probe=_capable_probe,
+    )
+    await worker.start()
+    try:
+        await worker.enqueue(_TOY_ID, "idle", seed=99)
+        for _ in range(300):
+            await asyncio.sleep(0.01)
+            if any(p["status"] == "done" for _, p in captured):
+                break
+    finally:
+        await worker.stop()
+
+    assert pipeline_calls == [("idle", 99)]
+    assert composite_calls == []
