@@ -454,22 +454,55 @@ class ImageGenWorker:
             )
             return
 
-        # Per-pipeline breaker check. If open, mark the row failed and
-        # skip — the plan's "enqueues during open state are accepted
-        # but immediately marked failed" semantics. We re-check after
-        # a short sleep so the breaker can transition to half-open
-        # without us spinning.
         breaker = get_image_gen_breaker()
-        if breaker.is_open():
-            await asyncio.sleep(_BREAKER_RECHECK_SEC)
-        if breaker.is_open():
+
+        # F.5-3a: probe capability up front so the breaker check below
+        # only fires for the Tier B branch. Tier C composite is
+        # structural (templates / manifest), not a GPU/pipeline-health
+        # signal, so it neither trips the breaker nor is gated by it.
+        try:
+            capable, reason_enum, _detail = self._probe_capability()
+        except Exception as exc:  # noqa: BLE001 -- defensive
+            _logger.exception(
+                "image_gen worker: capability probe raised for toy_id=%s slot=%s",
+                toy_id,
+                slot,
+            )
             await self._mark_failed(
                 toy_id,
                 slot,
                 seed,
-                error="image-gen breaker open",
+                error=str(exc)[:200],
             )
             return
+
+        if not capable and reason_enum is CapabilityReason.env_disabled:
+            await self._mark_failed(
+                toy_id,
+                slot,
+                seed,
+                error="image_gen_disabled",
+            )
+            return
+
+        composite_path = not capable
+
+        # Per-pipeline breaker check. Tier B only — Tier C ignores the
+        # breaker entirely since composite failures are structural,
+        # not transient pipeline-health signals. We re-check after a
+        # short sleep so the breaker can transition to half-open
+        # without us spinning.
+        if not composite_path:
+            if breaker.is_open():
+                await asyncio.sleep(_BREAKER_RECHECK_SEC)
+            if breaker.is_open():
+                await self._mark_failed(
+                    toy_id,
+                    slot,
+                    seed,
+                    error="image-gen breaker open",
+                )
+                return
 
         # Mark running + emit WS.
         await self._upsert(
@@ -505,7 +538,6 @@ class ImageGenWorker:
             )
             return
         except ValueError as exc:
-            # Validation error (e.g., bad tags JSON) — data issue.
             _logger.warning(
                 "image_gen worker: validation error loading context for toy_id=%s slot=%s: %s",
                 toy_id,
@@ -525,7 +557,8 @@ class ImageGenWorker:
                 toy_id,
                 slot,
             )
-            breaker.check_and_record(success=False)
+            if not composite_path:
+                breaker.check_and_record(success=False)
             await self._mark_failed(
                 toy_id,
                 slot,
@@ -534,62 +567,10 @@ class ImageGenWorker:
             )
             return
 
-        # F.5-3a: dispatch on the capability gate.
-        #
-        # * CAPABLE → Tier B diffusion pipeline (existing path).
-        # * ENV_DISABLED → operator hard-off; mark failed with
-        #   ``"image_gen_disabled"`` and skip both pipelines.
-        # * NO_CUDA / LOW_VRAM / MISSING_CHECKPOINTS → Tier C
-        #   composite fallback. Same DB-write + WS-emit path; on
-        #   composite failure the row is marked failed with
-        #   ``"image_gen_composite_only"`` (so parent UI can
-        #   distinguish "GPU pipeline + composite both unavailable"
-        #   from a Tier B OOM).
-        #
-        # No prefix-string matching anywhere — the dispatch is a
-        # straight enum compare.
-        try:
-            capable, reason_enum, _detail = self._probe_capability()
-        except Exception as exc:  # noqa: BLE001 -- defensive
-            _logger.exception(
-                "image_gen worker: capability probe raised for toy_id=%s slot=%s",
-                toy_id,
-                slot,
-            )
-            await self._mark_failed(
-                toy_id,
-                slot,
-                seed,
-                error=str(exc)[:200],
-            )
-            return
-
-        if not capable and reason_enum is CapabilityReason.ENV_DISABLED:
-            # Hard-off. Operator explicitly turned image-gen off; do
-            # NOT route to composite either. Match the historical
-            # error_msg so existing parent-UI consumers see the same
-            # value they did pre-F.5.
-            await self._mark_failed(
-                toy_id,
-                slot,
-                seed,
-                error="image_gen_disabled",
-            )
-            return
-
-        composite_path = not capable
-
-        # Run the chosen pipeline. Errors map to specific ``error_msg``
-        # strings per the build-step brief.
         pipeline = self._resolve_composite() if composite_path else self._resolve_pipeline()
         try:
             png_bytes = await pipeline(reference_bytes, slot, seed, ctx)
         except ImageGenCapacityError as exc:
-            breaker.check_and_record(success=False)
-            # On the composite path, ``ImageGenCapacityError`` means a
-            # template / manifest is missing — a structural Tier C
-            # problem, not a GPU OOM. Use a distinct ``error_msg`` so
-            # consumers can distinguish.
             if composite_path:
                 _logger.warning(
                     "image_gen worker: composite raised for toy_id=%s slot=%s: %s",
@@ -604,6 +585,7 @@ class ImageGenWorker:
                     error="image_gen_composite_only",
                 )
                 return
+            breaker.check_and_record(success=False)
             await self._mark_failed(
                 toy_id,
                 slot,
@@ -612,6 +594,14 @@ class ImageGenWorker:
             )
             return
         except ImageGenTimeoutError:
+            if composite_path:
+                await self._mark_failed(
+                    toy_id,
+                    slot,
+                    seed,
+                    error="image_gen_composite_only",
+                )
+                return
             breaker.check_and_record(success=False)
             await self._mark_failed(
                 toy_id,
@@ -627,10 +617,6 @@ class ImageGenWorker:
                 toy_id,
                 slot,
             )
-            breaker.check_and_record(success=False)
-            # Composite-path failures get the canonical
-            # ``"image_gen_composite_only"`` error_msg so the parent
-            # UI's per-cell tooltip surfaces a coherent reason.
             if composite_path:
                 await self._mark_failed(
                     toy_id,
@@ -639,6 +625,7 @@ class ImageGenWorker:
                     error="image_gen_composite_only",
                 )
                 return
+            breaker.check_and_record(success=False)
             await self._mark_failed(
                 toy_id,
                 slot,
@@ -655,9 +642,6 @@ class ImageGenWorker:
         try:
             await asyncio.to_thread(self._write_png, out_path, png_bytes)
         except (FileNotFoundError, PermissionError, OSError) as exc:
-            # Filesystem-layer failures are environment / data issues
-            # (full disk, ACL, missing parent), not GPU/pipeline
-            # issues — don't trip the breaker.
             _logger.exception(
                 "image_gen worker: failed to write PNG for %s/%s",
                 toy_id,
@@ -676,7 +660,8 @@ class ImageGenWorker:
                 toy_id,
                 slot,
             )
-            breaker.check_and_record(success=False)
+            if not composite_path:
+                breaker.check_and_record(success=False)
             await self._mark_failed(
                 toy_id,
                 slot,
@@ -720,7 +705,8 @@ class ImageGenWorker:
             ToyActionStatus.done,
             image_path=stored_path,
         )
-        breaker.check_and_record(success=True)
+        if not composite_path:
+            breaker.check_and_record(success=True)
 
     async def _mark_cancelled_best_effort(
         self,

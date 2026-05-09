@@ -781,7 +781,7 @@ async def _maybe_enqueue_action_jobs_for_toy(toy_id: str) -> None:
     # other False branches (NO_CUDA / LOW_VRAM / MISSING_CHECKPOINTS)
     # still enqueue — the worker dispatches to the Tier C composite
     # path per F.5-3a.
-    if not capable and reason_enum is CapabilityReason.ENV_DISABLED:
+    if not capable and reason_enum is CapabilityReason.env_disabled:
         _logger.info(
             "toy %s: image-gen disabled (%s); skipping enqueue",
             toy_id,
@@ -1091,21 +1091,25 @@ def _mode_for_reason(capable: bool, reason_enum: CapabilityReason) -> str | None
     """
     if capable:
         return None
-    if reason_enum is CapabilityReason.ENV_DISABLED:
+    if reason_enum is CapabilityReason.env_disabled:
         return None
     return _COMPOSITE_ONLY_MODE
 
 
-def _check_capability_or_409() -> CapabilityReason:
-    """Enforce the F.5-3a capability gate; return the resolved enum.
+def _check_capability_or_409() -> tuple[bool, CapabilityReason, str]:
+    """Enforce the F.5-3a capability gate; return the full probe tuple.
 
-    * ``CapabilityReason.CAPABLE`` → no-op; caller proceeds normally.
-    * ``CapabilityReason.ENV_DISABLED`` → 409 ``image_gen_disabled``
+    * ``CapabilityReason.capable`` → no-op; caller proceeds normally.
+    * ``CapabilityReason.env_disabled`` → 409 ``image_gen_disabled``
       (operator explicitly off; no Tier C either).
-    * Any other False reason (NO_CUDA / LOW_VRAM / MISSING_CHECKPOINTS)
+    * Any other False reason (no_cuda / low_vram / missing_checkpoints)
       → no-op; the worker will dispatch to Tier C composite. Caller
-      uses the returned enum to decide whether to set
-      ``mode="composite_only"`` on the response.
+      uses the returned ``(capable, reason_enum)`` to decide whether
+      to set ``mode="composite_only"`` on the response.
+
+    Returns ``(capable, reason_enum, reason)`` to mirror
+    :func:`is_image_gen_capable`'s shape so callers don't have to
+    reconstruct the bool from the enum.
 
     Skip the live-VRAM branch at request time: SDXL peaks at ~6 GB
     mid-gen on the 8 GB host, which drops free VRAM below the 6 GB
@@ -1114,12 +1118,12 @@ def _check_capability_or_409() -> CapabilityReason:
     Real OOM is caught + breaker-tripped inside the worker.
     """
     capable, reason_enum, reason = is_image_gen_capable(check_free_vram=False)
-    if not capable and reason_enum is CapabilityReason.ENV_DISABLED:
+    if not capable and reason_enum is CapabilityReason.env_disabled:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={"code": "image_gen_disabled", "reason": reason},
         )
-    return reason_enum
+    return capable, reason_enum, reason
 
 
 def _require_worker_or_503() -> Any:
@@ -1157,13 +1161,13 @@ async def regenerate_all_actions(
     """
     _validate_toy_id_or_404(toy_id)
     _fetch_toy_row(conn, toy_id)  # 404 if missing.
-    reason_enum = _check_capability_or_409()
+    capable, reason_enum, _reason = _check_capability_or_409()
     worker = _require_worker_or_503()
     for slot in ACTION_SLOTS:
         await worker.enqueue(toy_id, slot)
     return RegenerateResponse(
         queued=list(ACTION_SLOTS),
-        mode=_mode_for_reason(reason_enum is CapabilityReason.CAPABLE, reason_enum),
+        mode=_mode_for_reason(capable, reason_enum),
     )
 
 
@@ -1192,12 +1196,12 @@ async def regenerate_one_action(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"code": "slot_not_in_vocab", "slot": slot},
         )
-    reason_enum = _check_capability_or_409()
+    capable, reason_enum, _reason = _check_capability_or_409()
     worker = _require_worker_or_503()
     await worker.enqueue(toy_id, slot)
     return RegenerateResponse(
         queued=[slot],
-        mode=_mode_for_reason(reason_enum is CapabilityReason.CAPABLE, reason_enum),
+        mode=_mode_for_reason(capable, reason_enum),
     )
 
 

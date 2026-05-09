@@ -88,6 +88,13 @@ _TEMPLATE_CACHE: dict[tuple[str, str], bytes] = {}
 _MANIFEST_CACHE: dict[str, dict[str, dict[str, Any]]] = {}
 _CACHE_LOCK = threading.Lock()
 
+# Cached rembg ONNX runtime session. ``new_session`` constructs an
+# InferenceSession at ~10-100 ms+ per call; on a 10-sprite ingest
+# that's wasted overhead. Caching at module level avoids the
+# rebuild cost. The session is thread-safe per onnxruntime's docs.
+_REMBG_SESSION: Any | None = None
+_REMBG_SESSION_LOCK = threading.Lock()
+
 
 def _templates_dir() -> Path:
     """Return the configured templates dir, honouring the env override."""
@@ -159,10 +166,33 @@ def _load_manifest(templates_dir: Path) -> dict[str, dict[str, Any]]:
 
 
 def reset_caches_for_tests() -> None:
-    """Drop the cached templates + manifest. Used by test fixtures."""
+    """Drop the cached templates + manifest + rembg session. Used by test fixtures."""
     with _CACHE_LOCK:
         _TEMPLATE_CACHE.clear()
         _MANIFEST_CACHE.clear()
+    reset_rembg_session_for_tests()
+
+
+def reset_rembg_session_for_tests() -> None:
+    """Drop the cached rembg session so a test fixture can rebuild it."""
+    global _REMBG_SESSION
+    with _REMBG_SESSION_LOCK:
+        _REMBG_SESSION = None
+
+
+def _get_rembg_session() -> Any:
+    global _REMBG_SESSION
+    if _REMBG_SESSION is not None:
+        return _REMBG_SESSION
+    with _REMBG_SESSION_LOCK:
+        if _REMBG_SESSION is None:
+            from rembg import new_session  # type: ignore[import-not-found]
+
+            _REMBG_SESSION = new_session(
+                model_name="u2net",
+                providers=["CPUExecutionProvider"],
+            )
+    return _REMBG_SESSION
 
 
 def _composite_sync(
@@ -186,7 +216,7 @@ def _composite_sync(
     # Lazy imports keep the module import cheap (no rembg / Pillow at
     # collection time on hosts without the image_gen extras).
     from PIL import Image
-    from rembg import new_session, remove  # type: ignore[import-not-found]
+    from rembg import remove
 
     manifest = _load_manifest(templates_dir)
     entry = manifest.get(slot)
@@ -209,12 +239,12 @@ def _composite_sync(
     template_bytes = _load_template_bytes(templates_dir, slot)
     template = Image.open(io.BytesIO(template_bytes)).convert("RGBA")
 
-    # rembg cutout — u2net on CPU. ``new_session`` builds the
-    # ONNX runtime session per call; the underlying model file is
-    # mmap'd by onnxruntime so subsequent calls within the same
-    # process are cheap. We forward CPU explicitly so a host with a
-    # CUDA-onnxruntime build doesn't accidentally allocate VRAM here.
-    session = new_session(model_name="u2net", providers=["CPUExecutionProvider"])
+    # rembg cutout — u2net on CPU. The InferenceSession is cached at
+    # module level (~10-100 ms saved per call after the first); the
+    # underlying model file is mmap'd by onnxruntime. CPU is forwarded
+    # explicitly so a host with a CUDA-onnxruntime build doesn't
+    # accidentally allocate VRAM here.
+    session = _get_rembg_session()
     cutout_bytes = remove(reference_bytes, session=session)
     if not isinstance(cutout_bytes, (bytes, bytearray)):
         # rembg can also return a PIL image / numpy array depending
@@ -286,4 +316,5 @@ __all__ = [
     "TEMPLATES_DIR_ENV",
     "composite_action",
     "reset_caches_for_tests",
+    "reset_rembg_session_for_tests",
 ]

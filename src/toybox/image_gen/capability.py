@@ -38,17 +38,17 @@ class CapabilityReason(StrEnum):
     Phase F.5-3a: the worker dispatch + REST endpoints branch on this
     enum instead of prefix-matching the human-readable detail string.
     Each member maps 1:1 to one of the four "False" arms of
-    :func:`is_image_gen_capable` (plus :attr:`CAPABLE` for the
+    :func:`is_image_gen_capable` (plus :attr:`capable` for the
     success arm):
 
-    * :attr:`CAPABLE` — gate is open; full Tier B pipeline runs.
-    * :attr:`ENV_DISABLED` — operator explicitly set
+    * :attr:`capable` — gate is open; full Tier B pipeline runs.
+    * :attr:`env_disabled` — operator explicitly set
       ``TOYBOX_IMAGE_GEN_ENABLED=false``. Hard-off; no Tier C either.
-    * :attr:`NO_CUDA` — torch / CUDA driver not available. Tier C
+    * :attr:`no_cuda` — torch / CUDA driver not available. Tier C
       composite is the fallback.
-    * :attr:`LOW_VRAM` — free VRAM below the configured floor. Tier C
+    * :attr:`low_vram` — free VRAM below the configured floor. Tier C
       composite is the fallback.
-    * :attr:`MISSING_CHECKPOINTS` — one or more required checkpoint
+    * :attr:`missing_checkpoints` — one or more required checkpoint
       files absent on disk. Tier C composite is the fallback.
 
     The bool component of :func:`is_image_gen_capable`'s return tuple
@@ -57,11 +57,11 @@ class CapabilityReason(StrEnum):
     display.
     """
 
-    CAPABLE = "capable"
-    ENV_DISABLED = "env_disabled"
-    NO_CUDA = "no_cuda"
-    LOW_VRAM = "low_vram"
-    MISSING_CHECKPOINTS = "missing_checkpoints"
+    capable = "capable"
+    env_disabled = "env_disabled"
+    no_cuda = "no_cuda"
+    low_vram = "low_vram"
+    missing_checkpoints = "missing_checkpoints"
 
 
 # Env-var names mirror the operator runbook §"Env-var reference".
@@ -200,41 +200,36 @@ def is_image_gen_capable(*, check_free_vram: bool = True) -> tuple[bool, Capabil
     if _env_bool_disabled(ENABLED_ENV):
         return (
             False,
-            CapabilityReason.ENV_DISABLED,
+            CapabilityReason.env_disabled,
             "image-gen disabled via TOYBOX_IMAGE_GEN_ENABLED",
         )
 
     cuda_available, free_gb = _probe_cuda_and_vram()
     if not cuda_available:
-        return False, CapabilityReason.NO_CUDA, "CUDA not available"
+        return False, CapabilityReason.no_cuda, "CUDA not available"
 
     if check_free_vram:
         floor_gb = _min_vram_gb()
         if free_gb < floor_gb:
-            # Format VRAM with one decimal place so 7.4 GB doesn't render
-            # as "7GB" and look like the floor was exactly hit.
             return (
                 False,
-                CapabilityReason.LOW_VRAM,
+                CapabilityReason.low_vram,
                 f"VRAM {free_gb:.1f}GB < floor {floor_gb:.1f}GB",
             )
 
     model_dir = _model_dir()
     missing = _missing_checkpoints(model_dir)
     if missing:
-        # Cap the reason length so a wholesale missing dir doesn't
-        # produce a 1KB banner; first 3 file names are enough to
-        # tell the operator what's wrong.
         sample = ", ".join(missing[:3])
         if len(missing) > 3:
             sample += f", ... ({len(missing)} total)"
         return (
             False,
-            CapabilityReason.MISSING_CHECKPOINTS,
+            CapabilityReason.missing_checkpoints,
             f"checkpoints missing: {sample}",
         )
 
-    return True, CapabilityReason.CAPABLE, "capable"
+    return True, CapabilityReason.capable, "capable"
 
 
 # ---------------------------------------------------------------------

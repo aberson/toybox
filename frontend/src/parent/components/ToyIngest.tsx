@@ -281,12 +281,13 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
   const handleRegenerateAll = useCallback(
     async (toyId: string): Promise<void> => {
       try {
-        await api.regenerateAllActions(toyId, {
+        const resp = await api.regenerateAllActions(toyId, {
           signal: aborterRef.current?.signal,
         });
-        // The worker will emit ws envelopes; the store updates as
-        // they arrive. We don't need to refetch — the envelopes are
-        // the authoritative progress signal.
+        setToyModes((prev) => ({
+          ...prev,
+          [toyId]: resp.mode ?? null,
+        }));
       } catch (err) {
         if (isAbortError(err)) return;
         const message =
@@ -302,9 +303,13 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
   const handleRegenerateSlot = useCallback(
     async (toyId: string, slot: string): Promise<void> => {
       try {
-        await api.regenerateActionSlot(toyId, slot, {
+        const resp = await api.regenerateActionSlot(toyId, slot, {
           signal: aborterRef.current?.signal,
         });
+        setToyModes((prev) => ({
+          ...prev,
+          [toyId]: resp.mode ?? null,
+        }));
       } catch (err) {
         if (isAbortError(err)) return;
         const message =

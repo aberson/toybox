@@ -54,7 +54,7 @@ def test_disabled_via_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> No
     capable, reason_enum, detail = is_image_gen_capable()
 
     assert capable is False
-    assert reason_enum is CapabilityReason.ENV_DISABLED
+    assert reason_enum is CapabilityReason.env_disabled
     assert "TOYBOX_IMAGE_GEN_ENABLED" in detail
 
 
@@ -65,7 +65,7 @@ def test_no_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
     capable, reason_enum, detail = is_image_gen_capable()
 
     assert capable is False
-    assert reason_enum is CapabilityReason.NO_CUDA
+    assert reason_enum is CapabilityReason.no_cuda
     assert detail == "CUDA not available"
 
 
@@ -101,7 +101,7 @@ def test_low_vram(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     capable, reason_enum, detail = is_image_gen_capable()
 
     assert capable is False
-    assert reason_enum is CapabilityReason.LOW_VRAM
+    assert reason_enum is CapabilityReason.low_vram
     assert "VRAM" in detail
     assert "floor" in detail
 
@@ -115,7 +115,7 @@ def test_missing_checkpoints(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
     capable, reason_enum, detail = is_image_gen_capable()
 
     assert capable is False
-    assert reason_enum is CapabilityReason.MISSING_CHECKPOINTS
+    assert reason_enum is CapabilityReason.missing_checkpoints
     assert detail.startswith("checkpoints missing:")
 
 
@@ -129,7 +129,7 @@ def test_capable_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     capable, reason_enum, detail = is_image_gen_capable()
 
     assert capable is True
-    assert reason_enum is CapabilityReason.CAPABLE
+    assert reason_enum is CapabilityReason.capable
     assert detail == "capable"
 
 

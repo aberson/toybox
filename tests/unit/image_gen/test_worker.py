@@ -51,17 +51,17 @@ def _reset_breaker() -> None:
 
 def _capable_probe() -> tuple[bool, CapabilityReason, str]:
     """Return the canonical capable tuple — pin most tests to Tier B."""
-    return True, CapabilityReason.CAPABLE, "capable"
+    return True, CapabilityReason.capable, "capable"
 
 
 def _composite_only_probe() -> tuple[bool, CapabilityReason, str]:
     """Pin capability to a non-env-disabled False reason → Tier C dispatch."""
-    return False, CapabilityReason.MISSING_CHECKPOINTS, "test-missing"
+    return False, CapabilityReason.missing_checkpoints, "test-missing"
 
 
 def _env_disabled_probe() -> tuple[bool, CapabilityReason, str]:
     """Pin capability to ENV_DISABLED → hard-off, no composite."""
-    return False, CapabilityReason.ENV_DISABLED, "test-env-disabled"
+    return False, CapabilityReason.env_disabled, "test-env-disabled"
 
 
 @pytest.fixture(autouse=True)
@@ -1056,17 +1056,81 @@ async def test_dispatch_composite_failure_marks_image_gen_composite_only(
     assert row["error_msg"] == "image_gen_composite_only"
 
 
-async def test_dispatch_capable_routes_to_pipeline(
+async def test_composite_failures_do_not_trip_breaker(
     db_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``CAPABLE`` → pipeline called; composite stub NOT called.
+    """3 composite failures on a no-CUDA host do NOT trip the breaker.
 
-    Regression check that the default branch is unchanged from the
-    pre-F.5-3a worker.
+    Composite failures are structural (missing template / malformed
+    manifest), not transient pipeline-health signals. They must not
+    consume breaker budget; otherwise a no-CUDA host where every job
+    routes Tier C would trip after 3 failures and subsequent jobs
+    would get ``error_msg="image-gen breaker open"`` instead of the
+    actionable ``"image_gen_composite_only"``.
+    """
+    captured, emit = _capture_emit()
+
+    async def _failing_composite(
+        reference_bytes: bytes,
+        slot: str,
+        seed: int,
+        ctx: GenerationContext,
+    ) -> bytes:
+        raise ImageGenCapacityError(f"composite template missing for slot={slot}")
+
+    monkeypatch.setenv("TOYBOX_IMAGE_GEN_BREAKER_THRESHOLD", "3")
+    monkeypatch.setenv("TOYBOX_IMAGE_GEN_BREAKER_OPEN_SEC", "60")
+    reset_image_gen_breaker_for_tests()
+    breaker = get_image_gen_breaker()
+
+    worker = ImageGenWorker(
+        _conn_factory(db_path),
+        emit,
+        composite=_failing_composite,
+        capability_probe=_composite_only_probe,
+    )
+    await worker.start()
+    try:
+        for slot in ("idle", "pointing", "looking"):
+            await worker.enqueue(_TOY_ID, slot, seed=hash(slot) & 0xFFFF)
+
+        for _ in range(400):
+            await asyncio.sleep(0.01)
+            failed = [p for _, p in captured if p["status"] == "failed"]
+            if len(failed) >= 3:
+                break
+
+        assert breaker.is_open() is False, (
+            "composite failures must not consume breaker budget"
+        )
+
+        await worker.enqueue(_TOY_ID, "jumping", seed=4)
+        for _ in range(300):
+            await asyncio.sleep(0.01)
+            failed = [p for _, p in captured if p["status"] == "failed"]
+            if len(failed) >= 4:
+                break
+    finally:
+        await worker.stop()
+
+    errors = [p.get("error") for _, p in captured if p["status"] == "failed"]
+    assert errors.count("image_gen_composite_only") == 4
+    assert "image-gen breaker open" not in errors
+
+
+async def test_composite_path_ignores_open_breaker(
+    db_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An already-open breaker does NOT short-circuit Tier C dispatch.
+
+    The breaker is about Tier B health. With the breaker open, a
+    composite-only-capable job must still route to composite — the
+    early breaker check applies only to Tier B dispatch.
     """
     captured, emit = _capture_emit()
     composite_calls: list[tuple[str, int]] = []
-    pipeline_calls: list[tuple[str, int]] = []
 
     async def _composite_stub(
         reference_bytes: bytes,
@@ -1075,27 +1139,24 @@ async def test_dispatch_capable_routes_to_pipeline(
         ctx: GenerationContext,
     ) -> bytes:
         composite_calls.append((slot, seed))
-        return b"COMPOSITE"
+        return b"\x89PNG\r\n\x1a\nCOMPOSITE-OK"
 
-    async def _pipeline_stub(
-        reference_bytes: bytes,
-        slot: str,
-        seed: int,
-        ctx: GenerationContext,
-    ) -> bytes:
-        pipeline_calls.append((slot, seed))
-        return b"\x89PNG\r\n\x1a\nPIPELINE-OK"
+    monkeypatch.setenv("TOYBOX_IMAGE_GEN_BREAKER_THRESHOLD", "1")
+    monkeypatch.setenv("TOYBOX_IMAGE_GEN_BREAKER_OPEN_SEC", "300")
+    reset_image_gen_breaker_for_tests()
+    breaker = get_image_gen_breaker()
+    breaker.check_and_record(success=False)
+    assert breaker.is_open() is True
 
     worker = ImageGenWorker(
         _conn_factory(db_path),
         emit,
-        pipeline=_pipeline_stub,
         composite=_composite_stub,
-        capability_probe=_capable_probe,
+        capability_probe=_composite_only_probe,
     )
     await worker.start()
     try:
-        await worker.enqueue(_TOY_ID, "idle", seed=99)
+        await worker.enqueue(_TOY_ID, "idle", seed=42)
         for _ in range(300):
             await asyncio.sleep(0.01)
             if any(p["status"] == "done" for _, p in captured):
@@ -1103,5 +1164,49 @@ async def test_dispatch_capable_routes_to_pipeline(
     finally:
         await worker.stop()
 
-    assert pipeline_calls == [("idle", 99)]
-    assert composite_calls == []
+    assert composite_calls == [("idle", 42)]
+    errors = [p.get("error") for _, p in captured if p["status"] == "failed"]
+    assert "image-gen breaker open" not in errors
+
+
+async def test_composite_success_does_not_reset_breaker(
+    db_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Tier C success leaves the breaker counters alone — Tier B is what it tracks."""
+    captured, emit = _capture_emit()
+
+    async def _composite_stub(
+        reference_bytes: bytes,
+        slot: str,
+        seed: int,
+        ctx: GenerationContext,
+    ) -> bytes:
+        return b"\x89PNG\r\n\x1a\nCOMPOSITE-OK"
+
+    monkeypatch.setenv("TOYBOX_IMAGE_GEN_BREAKER_THRESHOLD", "3")
+    monkeypatch.setenv("TOYBOX_IMAGE_GEN_BREAKER_OPEN_SEC", "300")
+    reset_image_gen_breaker_for_tests()
+    breaker = get_image_gen_breaker()
+    breaker.check_and_record(success=False)
+    breaker.check_and_record(success=False)
+    cb = breaker.circuit_breaker
+
+    worker = ImageGenWorker(
+        _conn_factory(db_path),
+        emit,
+        composite=_composite_stub,
+        capability_probe=_composite_only_probe,
+    )
+    await worker.start()
+    try:
+        await worker.enqueue(_TOY_ID, "idle", seed=1)
+        for _ in range(300):
+            await asyncio.sleep(0.01)
+            if any(p["status"] == "done" for _, p in captured):
+                break
+    finally:
+        await worker.stop()
+
+    # Failure counter unchanged: composite success must not reset it.
+    assert cb._consecutive_failures == 2  # noqa: SLF001 -- contract under test

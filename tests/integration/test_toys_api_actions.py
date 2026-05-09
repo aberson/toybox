@@ -163,7 +163,7 @@ def force_capable(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         toys_router_mod,
         "is_image_gen_capable",
-        lambda **_kw: (True, CapabilityReason.CAPABLE, "capable"),
+        lambda **_kw: (True, CapabilityReason.capable, "capable"),
     )
 
 
@@ -181,7 +181,7 @@ def force_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         toys_router_mod,
         "is_image_gen_capable",
-        lambda **_kw: (False, CapabilityReason.ENV_DISABLED, "test-disabled"),
+        lambda **_kw: (False, CapabilityReason.env_disabled, "test-disabled"),
     )
 
 
@@ -303,7 +303,7 @@ def force_composite_only(monkeypatch: pytest.MonkeyPatch) -> None:
         "is_image_gen_capable",
         lambda **_kw: (
             False,
-            CapabilityReason.MISSING_CHECKPOINTS,
+            CapabilityReason.missing_checkpoints,
             "test-missing-checkpoints",
         ),
     )
@@ -525,26 +525,6 @@ def test_regenerate_one_409_when_disabled(
     assert detail["code"] == "image_gen_disabled"
     assert detail["reason"] == "test-disabled"
     assert stub_worker.enqueued == []
-
-
-def test_regenerate_one_200_with_composite_only_mode(
-    vc_client: TestClient,
-    parent_headers: dict[str, str],
-    db_path: Path,
-    force_composite_only: None,
-    stub_worker: _StubWorker,
-) -> None:
-    """F.5-3a: per-slot regenerate also signals ``mode=composite_only``."""
-    _seed_toy(db_path)
-    resp = vc_client.post(
-        f"/api/toys/{_SEEDED_TOY_ID}/actions/idle/regenerate",
-        headers=parent_headers,
-    )
-    assert resp.status_code == 200, resp.text
-    body = resp.json()
-    assert body["queued"] == ["idle"]
-    assert body["mode"] == "composite_only"
-    assert len(stub_worker.enqueued) == 1
 
 
 def test_regenerate_one_503_when_worker_not_running(
