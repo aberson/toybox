@@ -13,8 +13,12 @@
 //      Buttons are disabled while a slot is in-flight (queued /
 //      running) so a double-click can't enqueue a duplicate.
 //   3. Top of grid: "regenerate all" + "N/10 done" count.
-//   4. ``disabledReason`` (capability gate closed) renders an
-//      operator-actionable banner and disables every button.
+//   4. ``disabledReason`` (capability gate closed for ENV_DISABLED)
+//      renders an operator-actionable banner and disables every button.
+//   5. F.5-3a: ``compositeOnlyMode`` (capability gate closed for
+//      NO_CUDA / LOW_VRAM / MISSING_CHECKPOINTS) renders a softer
+//      banner explaining sprites will be lower fidelity; buttons
+//      stay enabled (the worker dispatches to the composite path).
 
 import type { JSX } from "react";
 
@@ -47,6 +51,12 @@ export interface ToyActionGridProps {
   // canonical caller. Existing ``done`` rows still render normally —
   // capability is only load-bearing for *new* generation requests.
   disabledReason?: string;
+  // F.5-3a: when ``true``, the capability gate is closed for a
+  // non-env-disabled reason (no CUDA / low VRAM / missing checkpoints)
+  // and the worker is dispatching the Tier C composite fallback.
+  // Renders a softer info banner; buttons stay enabled because
+  // composite generation IS available.
+  compositeOnlyMode?: boolean;
 }
 
 // Per-cell render branch. Returns the sprite for ``done``, a status
@@ -143,6 +153,7 @@ export function ToyActionGrid(props: ToyActionGridProps): JSX.Element {
     onRegenerateSlot,
     onRegenerateAll,
     disabledReason,
+    compositeOnlyMode,
   } = props;
 
   // Build the canonical-order display rows. We index by slot so out-
@@ -226,6 +237,23 @@ export function ToyActionGrid(props: ToyActionGridProps): JSX.Element {
           }}
         >
           Image generation disabled: {disabledReason}
+        </p>
+      )}
+
+      {!isDisabled && compositeOnlyMode === true && (
+        <p
+          data-testid="toy-action-grid-composite-only-banner"
+          role="status"
+          style={{
+            background: "#e8f4f8",
+            border: "1px solid #b6dce8",
+            padding: 8,
+            borderRadius: 4,
+            fontSize: 12,
+            margin: "0 0 8px",
+          }}
+        >
+          running in composite-only mode — sprites will be lower fidelity
         </p>
       )}
 

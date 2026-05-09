@@ -205,6 +205,51 @@ describe("ToyActionGrid", () => {
     }
   });
 
+  it("compositeOnlyMode renders the composite-only banner", () => {
+    render(
+      <ToyActionGrid
+        toyId="toy-1"
+        actions={[]}
+        onRegenerateAll={noop}
+        onRegenerateSlot={noop}
+        compositeOnlyMode={true}
+      />,
+    );
+    const banner = screen.getByText(/running in composite-only mode/i);
+    expect(banner).toBeTruthy();
+  });
+
+  it("no banner renders when compositeOnlyMode is false and disabledReason is unset", () => {
+    render(
+      <ToyActionGrid
+        toyId="toy-1"
+        actions={[]}
+        onRegenerateAll={noop}
+        onRegenerateSlot={noop}
+        compositeOnlyMode={false}
+      />,
+    );
+    expect(screen.queryByTestId("toy-action-grid-composite-only-banner"))
+      .toBeNull();
+    expect(screen.queryByTestId("toy-action-grid-disabled-banner")).toBeNull();
+  });
+
+  it("compositeOnlyMode + disabledReason: only the disabled banner renders (mutually exclusive)", () => {
+    render(
+      <ToyActionGrid
+        toyId="toy-1"
+        actions={[]}
+        onRegenerateAll={noop}
+        onRegenerateSlot={noop}
+        compositeOnlyMode={true}
+        disabledReason="GPU not available"
+      />,
+    );
+    expect(screen.getByTestId("toy-action-grid-disabled-banner")).toBeTruthy();
+    expect(screen.queryByTestId("toy-action-grid-composite-only-banner"))
+      .toBeNull();
+  });
+
   it("count summary reports N/10 done correctly", () => {
     render(
       <ToyActionGrid

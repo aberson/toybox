@@ -25,7 +25,7 @@ from toybox.image_gen.pipeline import (
 
 
 def _has_capable_gpu() -> bool:
-    capable, _reason = is_image_gen_capable()
+    capable, _reason_enum, _detail = is_image_gen_capable()
     return capable
 
 

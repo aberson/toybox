@@ -181,6 +181,9 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
   const [toyCapabilities, setToyCapabilities] = useState<
     Record<string, ToyActionsCapability>
   >({});
+  // F.5-3a: per-toy ``mode`` field from the actions endpoint.
+  // ``"composite_only"`` → render the Tier C banner on the grid.
+  const [toyModes, setToyModes] = useState<Record<string, string | null>>({});
 
   // Selector: pull the per-toy slot map out of the zustand store so
   // grid cells re-render as ws envelopes arrive. ``shallow``-style
@@ -262,6 +265,10 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
           ...prev,
           [toyId]: resp.capability,
         }));
+        setToyModes((prev) => ({
+          ...prev,
+          [toyId]: resp.mode ?? null,
+        }));
       } catch (err) {
         if (isAbortError(err)) return;
         // Non-fatal — the grid still renders from whatever ws push
@@ -274,12 +281,13 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
   const handleRegenerateAll = useCallback(
     async (toyId: string): Promise<void> => {
       try {
-        await api.regenerateAllActions(toyId, {
+        const resp = await api.regenerateAllActions(toyId, {
           signal: aborterRef.current?.signal,
         });
-        // The worker will emit ws envelopes; the store updates as
-        // they arrive. We don't need to refetch — the envelopes are
-        // the authoritative progress signal.
+        setToyModes((prev) => ({
+          ...prev,
+          [toyId]: resp.mode ?? null,
+        }));
       } catch (err) {
         if (isAbortError(err)) return;
         const message =
@@ -295,9 +303,13 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
   const handleRegenerateSlot = useCallback(
     async (toyId: string, slot: string): Promise<void> => {
       try {
-        await api.regenerateActionSlot(toyId, slot, {
+        const resp = await api.regenerateActionSlot(toyId, slot, {
           signal: aborterRef.current?.signal,
         });
+        setToyModes((prev) => ({
+          ...prev,
+          [toyId]: resp.mode ?? null,
+        }));
       } catch (err) {
         if (isAbortError(err)) return;
         const message =
@@ -790,9 +802,13 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
             onRegenerateSlot={(slot) =>
               handleRegenerateSlot(justCommittedToyId, slot)
             }
+            compositeOnlyMode={
+              toyModes[justCommittedToyId] === "composite_only"
+            }
             disabledReason={
               toyCapabilities[justCommittedToyId] !== undefined &&
-              !toyCapabilities[justCommittedToyId]!.capable
+              !toyCapabilities[justCommittedToyId]!.capable &&
+              toyModes[justCommittedToyId] !== "composite_only"
                 ? toyCapabilities[justCommittedToyId]!.reason
                 : undefined
             }
@@ -1070,9 +1086,13 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
                         onRegenerateSlot={(slot) =>
                           handleRegenerateSlot(t.id, slot)
                         }
+                        compositeOnlyMode={
+                          toyModes[t.id] === "composite_only"
+                        }
                         disabledReason={
                           toyCapabilities[t.id] !== undefined &&
-                          !toyCapabilities[t.id]!.capable
+                          !toyCapabilities[t.id]!.capable &&
+                          toyModes[t.id] !== "composite_only"
                             ? toyCapabilities[t.id]!.reason
                             : undefined
                         }

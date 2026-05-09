@@ -25,7 +25,10 @@ import pytest
 from toybox.core.pubsub import PubSub
 from toybox.db.connection import connect
 from toybox.db.migrations import run_migrations
-from toybox.image_gen.capability import reset_image_gen_breaker_for_tests
+from toybox.image_gen.capability import (
+    CapabilityReason,
+    reset_image_gen_breaker_for_tests,
+)
 from toybox.image_gen.worker import (
     reset_image_gen_worker_for_tests,
     start_image_gen_worker,
@@ -84,6 +87,11 @@ def configured_paths(
     return db
 
 
+def _capable_probe() -> tuple[bool, CapabilityReason, str]:
+    """Pin capability to CAPABLE so the worker dispatches to the pipeline."""
+    return True, CapabilityReason.capable, "capable"
+
+
 async def test_full_lifecycle_via_app_lifespan(
     configured_paths: Path,
     tmp_path: Path,
@@ -102,8 +110,12 @@ async def test_full_lifecycle_via_app_lifespan(
     def _conn_factory() -> object:
         return connect(configured_paths, check_same_thread=False)
 
-    # Use the real (stubbed) pipeline path — no override.
-    worker = await start_image_gen_worker(_conn_factory, _emit)
+    # Use the real (stubbed) pipeline path — no override. Pin
+    # capability to CAPABLE so the F.5-3a dispatch routes to the
+    # diffusion pipeline (i.e. the stub) rather than the composite
+    # path; on a CI host without torch, the real capability gate
+    # otherwise reports NO_CUDA.
+    worker = await start_image_gen_worker(_conn_factory, _emit, capability_probe=_capable_probe)
     try:
         # Subscribe BEFORE enqueue so the ``queued`` envelope isn't
         # missed.
@@ -134,9 +146,7 @@ async def test_full_lifecycle_via_app_lifespan(
     done = collected[-1]
     assert done.payload["toy_id"] == _TOY_ID
     assert done.payload["slot"] == "idle"
-    assert done.payload["image_path"] == (
-        f"data/images/toy_actions/{_TOY_ID}/idle.png"
-    )
+    assert done.payload["image_path"] == (f"data/images/toy_actions/{_TOY_ID}/idle.png")
     assert done.payload["error"] is None
 
     # PNG actually written by the stub pipeline.
@@ -151,8 +161,7 @@ async def test_full_lifecycle_via_app_lifespan(
     conn = connect(configured_paths)
     try:
         row = conn.execute(
-            "SELECT status, image_path FROM toy_actions "
-            "WHERE toy_id = ? AND slot = ?",
+            "SELECT status, image_path FROM toy_actions WHERE toy_id = ? AND slot = ?",
             (_TOY_ID, "idle"),
         ).fetchone()
     finally:
@@ -160,3 +169,5 @@ async def test_full_lifecycle_via_app_lifespan(
     assert row is not None
     assert row["status"] == "done"
     assert row["image_path"] == f"data/images/toy_actions/{_TOY_ID}/idle.png"
+
+

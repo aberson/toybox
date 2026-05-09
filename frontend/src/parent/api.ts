@@ -268,15 +268,23 @@ export interface ToyActionsCapability {
 
 // Envelope for ``GET /api/toys/{id}/actions``. ``actions`` always
 // carries exactly 10 rows in :data:`ACTION_SLOTS` order.
+//
+// F.5-3a: ``mode`` is ``"composite_only"`` when the capability gate is
+// closed for a non-env-disabled reason (Tier C composite fallback);
+// the parent UI renders a "running in composite-only mode" banner.
+// ``null`` / undefined otherwise.
 export interface ToyActionsResponse {
   actions: ToyActionRow[];
   capability: ToyActionsCapability;
+  mode?: string | null;
 }
 
 // Envelope for the two regenerate POST endpoints. ``queued`` is the
-// list of slot keys the worker just enqueued.
+// list of slot keys the worker just enqueued. ``mode`` mirrors the
+// shape on :class:`ToyActionsResponse`.
 export interface ToyActionsRegenerateResponse {
   queued: string[];
+  mode?: string | null;
 }
 
 // The 10 action slot keys, in canonical order. Mirrors

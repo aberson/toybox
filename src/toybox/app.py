@@ -84,7 +84,7 @@ def create_app() -> FastAPI:
     # crash app boot. We log a WARNING with the exception class so ops
     # can still see what happened.
     try:
-        capable, reason = is_image_gen_capable()
+        capable, _reason_enum, reason = is_image_gen_capable()
     except Exception as exc:  # noqa: BLE001 -- boot resilience: never let image-gen probe crash app
         capable, reason = False, f"probe raised {type(exc).__name__}"
         _logger.warning(
