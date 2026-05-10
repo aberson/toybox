@@ -633,6 +633,308 @@
           "action_slot": "cheering"
         }
       ]
+    },
+    {
+      "id": "request_story_soak_secret_door_21",
+      "title": "The door behind the {prop}",
+      "buckets": ["always"],
+      "steps": [
+        {
+          "id": "open",
+          "text": "{toy} found a hidden door behind the {prop} in {room}. It only opened when you whispered.",
+          "action_slot": "looking",
+          "choices": [
+            { "label": "Whisper a wish", "next": "wish" },
+            { "label": "Whisper a question", "next": "question" },
+            { "label": "Whisper a name", "next": "name" }
+          ]
+        },
+        {
+          "id": "wish",
+          "text": "The door swung open onto a sunlit garden where every flower glowed. {toy} stepped inside, careful not to wake the bees.",
+          "action_slot": "looking",
+          "next": "inside"
+        },
+        {
+          "id": "question",
+          "text": "The door creaked and showed a long hallway lined with books. Each one knew the answer to something.",
+          "action_slot": "thinking",
+          "next": "inside"
+        },
+        {
+          "id": "name",
+          "text": "The door opened on a quiet room where someone {toy} had not seen in a long time was waiting with cocoa.",
+          "action_slot": "waving",
+          "next": "inside"
+        },
+        {
+          "id": "inside",
+          "text": "Whatever lay inside, it was meant for {toy}. The door always finds the right somewhere. The end.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_seacave_22",
+      "title": "The sea cave",
+      "buckets": ["afternoon"],
+      "steps": [
+        {
+          "id": "open",
+          "text": "Low tide opened a secret sea cave below the cliffs. {toy} climbed down with a tide chart and a sense of wonder.",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Follow the glowing pool", "next": "pool" },
+            { "label": "Follow the singing wind", "next": "wind" }
+          ]
+        },
+        {
+          "id": "pool",
+          "text": "The pool sparkled with little fish that shone like stars. They circled {toy}'s reflection like a constellation.",
+          "action_slot": "looking",
+          "next": "treasure"
+        },
+        {
+          "id": "wind",
+          "text": "The wind carried a song that the cave made by itself, with no instrument. {toy} hummed along.",
+          "action_slot": "thinking",
+          "next": "treasure"
+        },
+        {
+          "id": "treasure",
+          "text": "Both paths met at a small wooden chest. Inside: a single perfect shell, smooth as a tooth.",
+          "action_slot": "looking"
+        },
+        { "text": "{toy} held the shell to its ear. The sea whispered: come back any time. The end.", "action_slot": "sleeping" }
+      ]
+    },
+    {
+      "id": "request_story_soak_three_doors_23",
+      "title": "Three doors, one home",
+      "buckets": ["always", "evening"],
+      "steps": [
+        {
+          "id": "open",
+          "text": "Tired and a little lost, {toy} stood before three doors in a strange village.",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "The blue door", "next": "blue" },
+            { "label": "The green door", "next": "green" },
+            { "label": "The yellow door", "next": "yellow" }
+          ]
+        },
+        {
+          "id": "blue",
+          "text": "Behind the blue door: a kitchen full of the smell of bread. An old voice said: come in, come in.",
+          "action_slot": "waving",
+          "next": "table"
+        },
+        {
+          "id": "green",
+          "text": "Behind the green door: a garden of moonflowers nodding open. A cat waved with one slow paw.",
+          "action_slot": "looking",
+          "next": "table"
+        },
+        {
+          "id": "yellow",
+          "text": "Behind the yellow door: a room of soft cushions and a lamp turned low. Someone was already saving a seat.",
+          "action_slot": "thinking",
+          "next": "table"
+        },
+        {
+          "id": "table",
+          "text": "Whichever door {toy} chose, it led to the same warm table — and the same kindly host who knew {toy}'s name. The end.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_short_pebble_24",
+      "title": "Pebble in the pond",
+      "buckets": ["always"],
+      "steps": [
+        {
+          "id": "start",
+          "text": "{toy} found a smooth flat pebble and stood by the pond, deciding what to do.",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Skip it across", "next": "skip" },
+            { "label": "Drop it gently", "next": "drop" }
+          ]
+        },
+        {
+          "id": "skip",
+          "text": "Plink, plink, plink — three skips! The pond clapped quietly with little ripples. The end.",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "drop",
+          "text": "The pebble sank slow and soft, and the rings spread out like a sleepy hello. The end.",
+          "action_slot": "thinking"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_short_yawn_25",
+      "title": "The yawn that traveled",
+      "buckets": ["wind_down"],
+      "steps": [
+        { "text": "{toy} yawned. The cat across the room yawned. The owl outside yawned too.", "action_slot": "sleeping" },
+        {
+          "id": "fork",
+          "text": "Where does the yawn go next?",
+          "choices": [
+            { "label": "Out to the moon", "next": "moon" },
+            { "label": "Down to the river", "next": "river" }
+          ]
+        },
+        {
+          "id": "moon",
+          "text": "The moon caught the yawn and tucked it into its smile. Goodnight. The end.",
+          "action_slot": "sleeping"
+        },
+        {
+          "id": "river",
+          "text": "The river carried the yawn out to sea, where every wave nodded off. The end.",
+          "action_slot": "sleeping"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_short_button_26",
+      "title": "The button that wished",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "{toy} found a small {adjective} button on the floor of {room}. It seemed to wink.", "action_slot": "looking" },
+        {
+          "id": "fork",
+          "text": "What does {toy} wish?",
+          "choices": [
+            { "label": "Wish for a snack", "next": "snack" },
+            { "label": "Wish for a song", "next": "song" }
+          ]
+        },
+        {
+          "id": "snack",
+          "text": "A tiny crumb of cake appeared in {toy}'s palm. Just enough. {toy} grinned. The end.",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "song",
+          "text": "A short hum, three notes long, danced through the room. {toy} hummed it back. The end.",
+          "action_slot": "thinking"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_short_cloud_27",
+      "title": "The cloud that came home",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "A small cloud got lost from its sky and bumped softly against {toy}'s window.", "action_slot": "looking" },
+        { "text": "{toy} cracked the window open. The cloud floated in, shy and damp.", "action_slot": "thinking" },
+        {
+          "id": "fork",
+          "text": "How does {toy} help the cloud get home?",
+          "choices": [
+            { "label": "Open all the windows", "next": "windows" },
+            { "label": "Sing a sky-song", "next": "sing" }
+          ]
+        },
+        {
+          "id": "windows",
+          "text": "A breeze rolled through and the cloud rose up, waved a soft puff goodbye, and drifted home. The end.",
+          "action_slot": "waving"
+        },
+        {
+          "id": "sing",
+          "text": "{toy} sang gently. The cloud lifted, listened, and floated back to the sky humming along. The end.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_short_mitten_28",
+      "title": "The lost mitten",
+      "buckets": ["morning"],
+      "steps": [
+        { "text": "{toy} lost one mitten on the way to the porch. Only one tiny {body_part} stayed warm.", "action_slot": "confused" },
+        {
+          "id": "fork",
+          "text": "Where does {toy} look?",
+          "choices": [
+            { "label": "Under the {prop}", "next": "under" },
+            { "label": "Behind the door", "next": "door" }
+          ]
+        },
+        {
+          "id": "under",
+          "text": "The mitten was tucked beneath the {prop}, perfectly folded. A mouse had used it as a sleeping bag. The end.",
+          "action_slot": "thinking"
+        },
+        {
+          "id": "door",
+          "text": "The mitten waited behind the door, pretending to nap. {toy} put it on with a happy hum. The end.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_slot_bodypart_29",
+      "title": "When {body_part} held the key",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "Once a small puzzle box appeared on {toy}'s shelf. It would not open for hands.", "action_slot": "looking" },
+        { "text": "It would not open for keys. It would not open for words.", "action_slot": "confused" },
+        { "text": "But the box softened when {toy} pressed it gently with a {body_part}.", "action_slot": "thinking" },
+        { "text": "Inside lay a small note: 'You knew the answer all along — listen with your whole self.'", "action_slot": "looking" },
+        {
+          "id": "fork",
+          "text": "What does {toy} do with the note?",
+          "choices": [
+            { "label": "Tuck it under the pillow", "next": "pillow" },
+            { "label": "Read it aloud one more time", "next": "aloud" }
+          ]
+        },
+        {
+          "id": "pillow",
+          "text": "{toy} slept with the note close. In dreams, the box opened a hundred more times, each holding a softer secret. The end.",
+          "action_slot": "sleeping"
+        },
+        {
+          "id": "aloud",
+          "text": "Saying the words made them feel true. {toy} folded the note neatly and went out into the world a little braver. The end.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_slot_count_30",
+      "title": "The {count} candles",
+      "buckets": ["evening", "wind_down"],
+      "steps": [
+        { "text": "On a quiet hill stood a small chapel with exactly {count} candles flickering in its windows.", "action_slot": "looking" },
+        { "text": "Each candle was lit by a different friend. Each carried a wish.", "action_slot": "thinking" },
+        { "text": "{toy} climbed the hill with a candle of its own to add.", "action_slot": "thinking" },
+        {
+          "id": "fork",
+          "text": "What is {toy}'s wish?",
+          "choices": [
+            { "label": "A wish for tomorrow", "next": "tomorrow" },
+            { "label": "A wish for someone else", "next": "other" }
+          ]
+        },
+        {
+          "id": "tomorrow",
+          "text": "{toy} placed the candle with the others. Its flame leaned toward the sunrise, ready. The end.",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "other",
+          "text": "The flame burned softer than the rest, but warmer somehow. Somewhere far away, a friend felt unexpectedly held. The end.",
+          "action_slot": "sleeping"
+        }
+      ]
     }
   ]
 }
