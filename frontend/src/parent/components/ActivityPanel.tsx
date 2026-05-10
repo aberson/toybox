@@ -7,6 +7,7 @@ export interface ActivityPanelBusy {
   end: boolean;
   didntWork: boolean;
   thumbsUp: boolean;
+  stepBack: boolean;
 }
 
 export interface ActivityPanelProps {
@@ -17,6 +18,9 @@ export interface ActivityPanelProps {
   // Step 15: thumbs-up writes parent_signal=+1 to the labeled_events row.
   // Optional so older callers compile; when absent the button is hidden.
   onThumbsUp?: () => Promise<void>;
+  // Roll the kiosk back one step. Optional so older callers compile;
+  // when absent the button is hidden.
+  onStepBack?: () => Promise<void>;
   // Optional in-flight flags. Same idea as SuggestionCard's busy: keep
   // a rapid second click from racing the first with the same version.
   busy?: ActivityPanelBusy;
@@ -25,13 +29,19 @@ export interface ActivityPanelProps {
 const END_CONFIRM_MESSAGE = "End the activity?";
 
 export function ActivityPanel(props: ActivityPanelProps): JSX.Element {
-  const { activity, onRegenerate, onEnd, onDidntWork, onThumbsUp } = props;
+  const { activity, onRegenerate, onEnd, onDidntWork, onThumbsUp, onStepBack } = props;
   const busy: ActivityPanelBusy = props.busy ?? {
     regenerate: false,
     end: false,
     didntWork: false,
     thumbsUp: false,
+    stepBack: false,
   };
+  const currentSeq = activity.steps.find((s) => s.current)?.seq;
+  const stepBackEnabled =
+    currentSeq !== undefined &&
+    currentSeq >= 2 &&
+    (activity.state === "running" || activity.state === "paused");
   const title = activity.title ?? activity.summary ?? "Activity";
   const personaMeta = (activity.metadata as Record<string, unknown>)["persona"];
   const personaName =
@@ -105,6 +115,18 @@ export function ActivityPanel(props: ActivityPanelProps): JSX.Element {
             }}
           >
             {busy.thumbsUp ? "..." : "thumbs up"}
+          </button>
+        )}
+        {onStepBack !== undefined && (
+          <button
+            type="button"
+            data-testid="step-back-button"
+            disabled={busy.stepBack || !stepBackEnabled}
+            onClick={() => {
+              void onStepBack();
+            }}
+          >
+            {busy.stepBack ? "stepping back..." : "step back"}
           </button>
         )}
         <button

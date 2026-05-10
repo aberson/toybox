@@ -340,9 +340,198 @@ def test_proposed_queue_drops_oldest(
         sub.close()
 
 
+def _approve_and_advance_to_seq(
+    client: TestClient,
+    parent_headers: dict[str, str],
+    *,
+    target_seq: int,
+) -> dict[str, Any]:
+    """Helper: propose, approve, advance ``target_seq`` times. Returns last activity body."""
+    activity = _propose(client, parent_headers)
+    aid = activity["id"]
+    approve = client.post(
+        f"/api/activities/{aid}/approve",
+        json={},
+        headers={**parent_headers, "If-Match-Version": "1"},
+    )
+    assert approve.status_code == 200, approve.text
+    state = approve.json()
+    for _ in range(target_seq):
+        adv = client.post(
+            f"/api/activities/{aid}/advance",
+            headers={**parent_headers, "If-Match-Version": str(state["version"])},
+        )
+        assert adv.status_code == 200, adv.text
+        state = adv.json()
+    return state
+
+
+def _current_seq(activity: dict[str, Any]) -> int:
+    for step in activity["steps"]:
+        if step["current"]:
+            return int(step["seq"])
+    raise AssertionError("no current step")
+
+
+def test_step_back_decrements_current_and_increments_version(
+    client: TestClient,
+    parent_headers: dict[str, str],
+) -> None:
+    state = _approve_and_advance_to_seq(client, parent_headers, target_seq=3)
+    assert state["state"] == "running"
+    assert _current_seq(state) == 3
+    pre_version = state["version"]
+
+    response = client.post(
+        f"/api/activities/{state['id']}/step-back",
+        headers={**parent_headers, "If-Match-Version": str(pre_version)},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["state"] == "running"
+    assert body["version"] == pre_version + 1
+    assert _current_seq(body) == 2
+
+
+def test_step_back_at_first_step_rejects(
+    client: TestClient,
+    parent_headers: dict[str, str],
+) -> None:
+    state = _approve_and_advance_to_seq(client, parent_headers, target_seq=1)
+    assert _current_seq(state) == 1
+    response = client.post(
+        f"/api/activities/{state['id']}/step-back",
+        headers={**parent_headers, "If-Match-Version": str(state["version"])},
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "no_prior_step"
+
+
+def test_step_back_from_approved_rejects(
+    client: TestClient,
+    parent_headers: dict[str, str],
+) -> None:
+    activity = _propose(client, parent_headers)
+    approve = client.post(
+        f"/api/activities/{activity['id']}/approve",
+        json={},
+        headers={**parent_headers, "If-Match-Version": "1"},
+    )
+    assert approve.status_code == 200
+    response = client.post(
+        f"/api/activities/{activity['id']}/step-back",
+        headers={
+            **parent_headers,
+            "If-Match-Version": str(approve.json()["version"]),
+        },
+    )
+    assert response.status_code == 409
+    detail = response.json()["detail"]
+    assert detail["code"] == "invalid_transition"
+    assert detail["current_state"] == "approved"
+
+
+def test_step_back_from_completed_rejects(
+    client: TestClient,
+    parent_headers: dict[str, str],
+) -> None:
+    state = _approve_and_advance_to_seq(client, parent_headers, target_seq=5)
+    # One more advance flips to completed.
+    final = client.post(
+        f"/api/activities/{state['id']}/advance",
+        headers={**parent_headers, "If-Match-Version": str(state["version"])},
+    )
+    assert final.status_code == 200
+    assert final.json()["state"] == "completed"
+    response = client.post(
+        f"/api/activities/{state['id']}/step-back",
+        headers={
+            **parent_headers,
+            "If-Match-Version": str(final.json()["version"]),
+        },
+    )
+    assert response.status_code == 409
+    detail = response.json()["detail"]
+    assert detail["code"] == "invalid_transition"
+    assert detail["current_state"] == "completed"
+
+
+def test_step_back_from_paused_succeeds(
+    client: TestClient,
+    parent_headers: dict[str, str],
+) -> None:
+    """paused state allows step-back; activity stays paused, seq decrements."""
+    state = _approve_and_advance_to_seq(client, parent_headers, target_seq=2)
+    assert state["state"] == "running"
+    assert _current_seq(state) == 2
+
+    pause = client.post(
+        f"/api/activities/{state['id']}/pause",
+        headers={**parent_headers, "If-Match-Version": str(state["version"])},
+    )
+    assert pause.status_code == 200, pause.text
+    assert pause.json()["state"] == "paused"
+    pause_version = pause.json()["version"]
+
+    response = client.post(
+        f"/api/activities/{state['id']}/step-back",
+        headers={**parent_headers, "If-Match-Version": str(pause_version)},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["state"] == "paused"
+    assert body["version"] >= pause_version + 1
+    assert _current_seq(body) == 1
+    seq_to_current = {step["seq"]: step["current"] for step in body["steps"]}
+    assert seq_to_current[1] is True
+    assert seq_to_current[2] is False
+
+
+def test_step_back_version_conflict_rejects(
+    client: TestClient,
+    parent_headers: dict[str, str],
+) -> None:
+    state = _approve_and_advance_to_seq(client, parent_headers, target_seq=3)
+    stale_version = state["version"] - 1
+    response = client.post(
+        f"/api/activities/{state['id']}/step-back",
+        headers={**parent_headers, "If-Match-Version": str(stale_version)},
+    )
+    assert response.status_code == 409
+    detail = response.json()["detail"]
+    assert detail["code"] == "version_conflict"
+    assert detail["current_version"] == state["version"]
+    assert detail["current_state"] == "running"
+
+
+def test_step_back_publishes_activity_state_envelope(
+    client: TestClient,
+    parent_headers: dict[str, str],
+    pubsub: PubSub,
+) -> None:
+    state = _approve_and_advance_to_seq(client, parent_headers, target_seq=3)
+    sub = pubsub.subscribe([Topic.activity_state])
+    try:
+        response = client.post(
+            f"/api/activities/{state['id']}/step-back",
+            headers={**parent_headers, "If-Match-Version": str(state["version"])},
+        )
+        assert response.status_code == 200
+        envelope = sub.get_nowait()
+        assert envelope.topic is Topic.activity_state
+        assert envelope.payload["id"] == state["id"]
+        # Payload mirrors the REST response so the kiosk re-renders the
+        # rolled-back step from the steps[] array.
+        steps = envelope.payload["steps"]
+        current = next(s for s in steps if s["current"])
+        assert current["seq"] == 2
+    finally:
+        sub.close()
+
+
 @pytest.mark.parametrize(
     "missing_step",
-    ["approve", "dismiss", "regenerate", "advance", "end", "didnt-work"],
+    ["approve", "dismiss", "regenerate", "advance", "step-back", "end", "didnt-work"],
 )
 def test_mutations_require_if_match_header(
     client: TestClient,

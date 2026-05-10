@@ -1437,6 +1437,74 @@ def post_advance(
     return response
 
 
+@router.post("/{activity_id}/step-back", response_model=ActivityResponse)
+def post_step_back(
+    activity_id: str,
+    conn: Annotated[sqlite3.Connection, Depends(get_activities_db)],
+    pubsub: Annotated[PubSub, Depends(get_pubsub)],
+    expected_version: Annotated[int, Depends(if_match_version_dependency)],
+    _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
+) -> ActivityResponse:
+    """Roll the current step back by one (kid hit Next prematurely on the kiosk).
+
+    Mirror of :func:`post_advance` but in reverse — flips ``current=1`` from
+    the current step to the prior one and bumps the activity version. Only
+    valid from ``running``/``paused`` (other states have no current step to
+    roll back from); also rejects when the current step is already ``seq=1``.
+    """
+    row = _fetch_activity_row(conn, activity_id)
+    current_state = str(row["state"])
+    current_version = int(row["version"])
+    if current_state not in {STATE_RUNNING, STATE_PAUSED}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "invalid_transition",
+                "current_state": current_state,
+                "target_state": current_state,
+            },
+        )
+    if current_version != expected_version:
+        raise VersionConflictError(current_version, current_state)
+
+    steps = conn.execute(
+        "SELECT id, seq, current FROM activity_steps WHERE activity_id = ? ORDER BY seq ASC",
+        (activity_id,),
+    ).fetchall()
+    current_index = next((i for i, s in enumerate(steps) if int(s["current"]) == 1), -1)
+    if current_index <= 0:
+        # current_index == -1: no current step (shouldn't happen in
+        # running/paused, but defend against a malformed row).
+        # current_index == 0: already on seq=1, nothing to roll back to.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "no_prior_step", "id": activity_id},
+        )
+
+    ok, row = _attempt_transition(
+        conn,
+        activity_id=activity_id,
+        expected_version=expected_version,
+        new_state=current_state,
+    )
+    if not ok:
+        raise VersionConflictError(int(row["version"]), str(row["state"]))
+    prev_seq = int(steps[current_index - 1]["seq"])
+    cur_seq = int(steps[current_index]["seq"])
+    with conn:
+        conn.execute(
+            "UPDATE activity_steps SET current = 0 WHERE activity_id = ? AND seq = ?",
+            (activity_id, cur_seq),
+        )
+        conn.execute(
+            "UPDATE activity_steps SET current = 1 WHERE activity_id = ? AND seq = ?",
+            (activity_id, prev_seq),
+        )
+    response = _row_to_response(conn, row)
+    _emit_state(pubsub, response)
+    return response
+
+
 @router.post("/{activity_id}/pause", response_model=ActivityResponse)
 def post_pause(
     activity_id: str,

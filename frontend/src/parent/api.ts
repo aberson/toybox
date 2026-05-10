@@ -768,6 +768,22 @@ export class ApiClient {
     });
   }
 
+  // Roll the kiosk back one step (kid hit Next prematurely). Mirror of
+  // ``advance``: optimistic-version checked, returns the updated activity
+  // with version incremented. Backend rejects with 409 when the activity
+  // is at seq=1 or the state is not running/paused.
+  async stepBack(
+    id: string,
+    version: number,
+    opts: RequestOptions = {},
+  ): Promise<Activity> {
+    return this.request<Activity>(`/api/activities/${encodeURIComponent(id)}/step-back`, {
+      method: "POST",
+      ifMatchVersion: version,
+      signal: opts.signal,
+    });
+  }
+
   // Step 23: pause/resume the live activity. Both are idempotent on
   // the backend — pausing an already-paused activity returns 200 with
   // the same version, no envelope emit. The version supplied here MUST

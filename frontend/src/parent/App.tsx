@@ -350,6 +350,7 @@ export function App(): JSX.Element {
     end: false,
     didntWork: false,
     thumbsUp: false,
+    stepBack: false,
   });
 
   type BusyKey = keyof typeof busy;
@@ -520,6 +521,24 @@ export function App(): JSX.Element {
     [activity, api, runGuarded],
   );
 
+  const handleStepBack = useCallback(
+    () =>
+      runGuarded("stepBack", async () => {
+        if (activity === null) return;
+        const result = await withConflictHandler({
+          mutation: () => api.stepBack(activity.id, activity.version),
+          refetch: () => refetchActivity(activity.id),
+          onConflict: (conflict, fresh) => {
+            useParentStore.getState().applyVersionConflict(conflict, fresh);
+          },
+        });
+        if (result !== null) {
+          useParentStore.getState().applyMutationResult(result);
+        }
+      }),
+    [activity, api, refetchActivity, runGuarded],
+  );
+
   const handleDidntWork = useCallback(
     () =>
       runGuarded("didntWork", async () => {
@@ -686,11 +705,13 @@ export function App(): JSX.Element {
             onEnd={handleEnd}
             onDidntWork={handleDidntWork}
             onThumbsUp={handleThumbsUp}
+            onStepBack={handleStepBack}
             busy={{
               regenerate: busy.regenerate,
               end: busy.end,
               didntWork: busy.didntWork,
               thumbsUp: busy.thumbsUp,
+              stepBack: busy.stepBack,
             }}
           />
         )}

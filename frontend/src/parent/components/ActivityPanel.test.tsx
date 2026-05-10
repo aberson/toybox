@@ -44,6 +44,80 @@ beforeEach(() => {
   vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 
+function fakeActivityAtSeq(
+  seq: number,
+  overrides: Partial<Activity> = {},
+): Activity {
+  const steps = [1, 2, 3, 4, 5].map((i) => ({
+    seq: i,
+    body: `Step ${i}`,
+    sfx: null,
+    expected_action: null,
+    current: i === seq,
+  }));
+  return fakeActivity({ steps, ...overrides });
+}
+
+describe("ActivityPanel Step Back", () => {
+  it("renders the Step Back button when onStepBack is supplied", () => {
+    render(
+      <ActivityPanel
+        activity={fakeActivityAtSeq(2)}
+        onRegenerate={async () => undefined}
+        onEnd={async () => undefined}
+        onDidntWork={async () => undefined}
+        onStepBack={async () => undefined}
+      />,
+    );
+    const btn = screen.getByTestId("step-back-button") as HTMLButtonElement;
+    expect(btn).toBeTruthy();
+    expect(btn.disabled).toBe(false);
+  });
+
+  it("clicking Step Back fires onStepBack", () => {
+    const onStepBack = vi.fn(async (): Promise<void> => undefined);
+    render(
+      <ActivityPanel
+        activity={fakeActivityAtSeq(3)}
+        onRegenerate={async () => undefined}
+        onEnd={async () => undefined}
+        onDidntWork={async () => undefined}
+        onStepBack={onStepBack}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("step-back-button"));
+    expect(onStepBack).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables Step Back when current seq is 1", () => {
+    render(
+      <ActivityPanel
+        activity={fakeActivityAtSeq(1)}
+        onRegenerate={async () => undefined}
+        onEnd={async () => undefined}
+        onDidntWork={async () => undefined}
+        onStepBack={async () => undefined}
+      />,
+    );
+    const btn = screen.getByTestId("step-back-button") as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+  });
+
+  it("disables Step Back when activity state is approved", () => {
+    render(
+      <ActivityPanel
+        activity={fakeActivityAtSeq(2, { state: "approved" })}
+        onRegenerate={async () => undefined}
+        onEnd={async () => undefined}
+        onDidntWork={async () => undefined}
+        onStepBack={async () => undefined}
+      />,
+    );
+    const btn = screen.getByTestId("step-back-button") as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+  });
+});
+
 describe("ActivityPanel End confirm", () => {
   it("clicking End opens a confirm dialog", () => {
     const onEnd = vi.fn(async (): Promise<void> => undefined);
