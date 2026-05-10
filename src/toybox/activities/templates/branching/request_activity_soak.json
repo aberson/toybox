@@ -370,6 +370,372 @@
           "action_slot": "cheering"
         }
       ]
+    },
+    {
+      "id": "request_activity_soak_rocketship_11",
+      "title": "Build a {adjective} rocket ship",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "Find a tall cardboard box, paper-towel tube, or stacked cushions to be your rocket body.", "action_slot": "looking" },
+        { "text": "Tape or balance a paper triangle on top as the nose cone.", "action_slot": "thinking" },
+        { "text": "Add three paper rectangles around the base as fins.", "action_slot": "thinking" },
+        { "text": "Strap {toy} into the rocket as the brave astronaut.", "action_slot": "pointing" },
+        { "text": "Count down from ten with one finger raised per number.", "action_slot": "cheering" },
+        {
+          "id": "destination",
+          "text": "Where does the rocket fly today?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Moon with bouncy craters", "next": "moon_end" },
+            { "label": "Planet of giant flowers", "next": "flower_end" }
+          ]
+        },
+        {
+          "id": "moon_end",
+          "text": "Bounce around {room} on tip-toe like low gravity. Plant a paper flag wherever you land.",
+          "action_slot": "jumping"
+        },
+        {
+          "id": "flower_end",
+          "text": "Crouch low, then stretch up tall like blooming. Tell {toy} which giant flower is friendliest.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_marblerun_12",
+      "title": "Marble run with paper tubes",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "Collect paper-towel tubes, books, and a small ball or marble.", "action_slot": "looking" },
+        { "text": "Lean two books to make a ramp from a chair down to the floor.", "action_slot": "thinking" },
+        { "text": "Lay one tube along the ramp so the marble can roll through it.", "action_slot": "thinking" },
+        {
+          "id": "ending_zone",
+          "text": "Where should the marble land at the bottom?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Into a paper-cup goal", "next": "cup_path" },
+            { "label": "Onto a soft pillow target", "next": "pillow_path" }
+          ]
+        },
+        {
+          "id": "cup_path",
+          "text": "Tape a paper cup at the end of the tube. Aim carefully and roll the marble in.",
+          "action_slot": "thinking",
+          "next": "test_drops"
+        },
+        {
+          "id": "pillow_path",
+          "text": "Place a pillow under the tube's end. Watch the marble bounce-soft and stop.",
+          "action_slot": "thinking",
+          "next": "test_drops"
+        },
+        {
+          "id": "test_drops",
+          "text": "Drop the marble three times in a row and count how many times it lands cleanly.",
+          "action_slot": "looking"
+        },
+        { "text": "Tell {toy} the number out loud and high-five for the best run.", "action_slot": "cheering" }
+      ]
+    },
+    {
+      "id": "request_activity_soak_naturetable_13",
+      "title": "Set up a nature display",
+      "buckets": ["morning", "afternoon"],
+      "steps": [
+        { "text": "Find a small flat surface — a tray, a windowsill, a low shelf — for the display.", "action_slot": "looking" },
+        { "text": "Walk through {room} (or near a window) and gather {count} natural-feeling things: leaves, pebbles, pinecones, feathers.", "action_slot": "looking" },
+        { "text": "Lay everything out on the surface in any order.", "action_slot": "pointing" },
+        { "text": "Pick your favorite find and place it in the very center.", "action_slot": "thinking" },
+        {
+          "id": "label_or_story",
+          "text": "How should we share the display with {toy}?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Make a tiny label for each", "next": "label_end" },
+            { "label": "Tell a story for each", "next": "story_end" }
+          ]
+        },
+        {
+          "id": "label_end",
+          "text": "Tear small paper squares and write or draw a label per item. Place each label beside its find.",
+          "action_slot": "thinking"
+        },
+        {
+          "id": "story_end",
+          "text": "Pick up each item one at a time and tell {toy} a one-sentence story about where it came from.",
+          "action_slot": "pointing"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_dancecard_14",
+      "title": "Make a dance-move card deck",
+      "buckets": ["morning", "afternoon"],
+      "steps": [
+        { "text": "Tear paper into four small cards. Sit on the floor with {toy} and a crayon.", "action_slot": "idle" },
+        { "text": "Draw a different dance move on each card — a spin, a hop, a wiggle, a freeze.", "action_slot": "thinking" },
+        {
+          "id": "music_pick",
+          "text": "What kind of music plays while you dance?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Fast jumpy music", "next": "fast_path" },
+            { "label": "Slow floaty music", "next": "slow_path" },
+            { "label": "Silent — clap your beat", "next": "clap_path" }
+          ]
+        },
+        {
+          "id": "fast_path",
+          "text": "Hum or sing fast bouncy tune. Flip a card and do the move.",
+          "action_slot": "jumping",
+          "next": "do_all_four"
+        },
+        {
+          "id": "slow_path",
+          "text": "Hum a slow floaty tune. Flip a card and do the move slooowly.",
+          "action_slot": "thinking",
+          "next": "do_all_four"
+        },
+        {
+          "id": "clap_path",
+          "text": "Clap a steady beat. Flip a card and match the move to your claps.",
+          "action_slot": "cheering",
+          "next": "do_all_four"
+        },
+        {
+          "id": "do_all_four",
+          "text": "Flip the rest of the cards one by one until you have danced every move.",
+          "action_slot": "jumping"
+        },
+        { "text": "Bow to {toy} and stack the cards into a tidy deck for next time.", "action_slot": "waving" }
+      ]
+    },
+    {
+      "id": "request_activity_soak_bookzoo_15",
+      "title": "Build a book-stack zoo",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "Bring four picture books and place them open in a half-circle in {room}.", "action_slot": "pointing" },
+        { "text": "Set one stuffed animal or {toy} inside each open book — those are the habitats.", "action_slot": "thinking" },
+        { "text": "Walk in a slow loop around the zoo and announce each habitat by name.", "action_slot": "pointing" },
+        { "text": "Pick the animal that looks hungriest and pretend to feed them three pretend snacks.", "action_slot": "thinking" },
+        {
+          "id": "zoo_event",
+          "text": "What special zoo event happens next?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "A parade through the zoo", "next": "parade_end" },
+            { "label": "A nap-time hush", "next": "nap_end" }
+          ]
+        },
+        {
+          "id": "parade_end",
+          "text": "Carry {toy} on your shoulder and march past every habitat clapping and cheering.",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "nap_end",
+          "text": "Tip-toe past every habitat whispering goodnight. Tuck {toy} on top of the last book.",
+          "action_slot": "sleeping"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_papercitybuild_16",
+      "title": "Build a paper-cup city",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "Collect six paper cups, plastic cups, or yogurt pots and rinse-clean them if needed.", "action_slot": "looking" },
+        { "text": "Set the cups upside-down in a {room} corner. Those are the buildings.", "action_slot": "pointing" },
+        {
+          "id": "city_kind",
+          "text": "What kind of city is this?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "A busy downtown", "next": "downtown_path" },
+            { "label": "A sleepy seaside town", "next": "seaside_path" },
+            { "label": "A space-station city", "next": "space_path" }
+          ]
+        },
+        {
+          "id": "downtown_path",
+          "text": "Cluster the cups close together in a tight grid. Add tiny paper-square doors.",
+          "action_slot": "thinking",
+          "next": "add_streets"
+        },
+        {
+          "id": "seaside_path",
+          "text": "Line the cups in two long rows with a 'beach' (a folded blue cloth) between.",
+          "action_slot": "thinking",
+          "next": "add_streets"
+        },
+        {
+          "id": "space_path",
+          "text": "Stack cups in a pyramid. Tape paper antennas on top of the highest one.",
+          "action_slot": "thinking",
+          "next": "add_streets"
+        },
+        {
+          "id": "add_streets",
+          "text": "Lay strips of paper or string between buildings as roads or paths.",
+          "action_slot": "pointing",
+          "next": "tour"
+        },
+        {
+          "id": "tour",
+          "text": "Walk {toy} along the streets like a tour guide and name three buildings out loud.",
+          "action_slot": "pointing"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_shadowtrace_17",
+      "title": "Trace a {adjective} shadow",
+      "buckets": ["morning", "afternoon"],
+      "steps": [
+        { "text": "Find a sunny spot near a window in {room} with paper and a crayon.", "action_slot": "looking" },
+        { "text": "Stand a small object — a cup, a {prop}, a toy — on the paper so its shadow falls on the page.", "action_slot": "pointing" },
+        { "text": "Hold the object steady and trace its shadow with the crayon.", "action_slot": "thinking" },
+        { "text": "Move the object and try a different angle, then trace again.", "action_slot": "thinking" },
+        {
+          "id": "shadow_use",
+          "text": "What should the shadow drawing become?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "A monster face", "next": "monster_finish" },
+            { "label": "A secret coded letter", "next": "code_finish" }
+          ]
+        },
+        {
+          "id": "monster_finish",
+          "text": "Add eyes, fangs, and ears inside the shadow outline. Show {toy} the new monster.",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "code_finish",
+          "text": "Write one tiny letter inside each shadow outline. Hand the page to a grown-up to decode.",
+          "action_slot": "thinking"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_recipecard_18",
+      "title": "Invent a pretend snack recipe",
+      "buckets": ["always"],
+      "steps": [
+        {
+          "id": "snack_type",
+          "text": "What kind of pretend snack are we making with {toy}?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Smoothie of the day", "next": "smoothie_path" },
+            { "label": "Sandwich tower", "next": "sandwich_path" }
+          ]
+        },
+        {
+          "id": "smoothie_path",
+          "text": "Pretend to drop three colors of fruit into a blender cup. Make whirring sounds with your mouth.",
+          "action_slot": "thinking",
+          "next": "name_recipe"
+        },
+        {
+          "id": "sandwich_path",
+          "text": "Pretend to stack three layers — bread, jelly, more bread — patting each layer flat.",
+          "action_slot": "thinking",
+          "next": "name_recipe"
+        },
+        {
+          "id": "name_recipe",
+          "text": "Give the snack a silly name. Say it three times so {toy} can remember.",
+          "action_slot": "cheering",
+          "next": "draw_card"
+        },
+        {
+          "id": "draw_card",
+          "text": "Draw the snack on a paper card and write the silly name underneath.",
+          "action_slot": "thinking"
+        },
+        { "text": "Hand the recipe card to {toy} for the cookbook.", "action_slot": "waving" }
+      ]
+    },
+    {
+      "id": "request_activity_soak_animalstack_19",
+      "title": "Stack the {adjective} animal pile",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "Gather all the stuffed animals you can carry into one pile in {room}.", "action_slot": "pointing" },
+        { "text": "Sit cross-legged with {toy} on top of the pile as the leader.", "action_slot": "thinking" },
+        {
+          "id": "stack_method",
+          "text": "How should the animals be stacked?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Tallest tower we can build", "next": "tower_path" },
+            { "label": "A tidy pyramid", "next": "pyramid_path" },
+            { "label": "A cozy puppy pile", "next": "pile_path" }
+          ]
+        },
+        {
+          "id": "tower_path",
+          "text": "Stack one animal at a time as high as you dare. Hold your breath at the wobbly part.",
+          "action_slot": "thinking",
+          "next": "name_them"
+        },
+        {
+          "id": "pyramid_path",
+          "text": "Set three on the bottom, two in the middle, one on top. Step back and check the shape.",
+          "action_slot": "thinking",
+          "next": "name_them"
+        },
+        {
+          "id": "pile_path",
+          "text": "Pile every animal into a snuggly heap. Wiggle in the middle yourself.",
+          "action_slot": "sleeping",
+          "next": "name_them"
+        },
+        {
+          "id": "name_them",
+          "text": "Touch each animal and say its name out loud — invent one for any stranger.",
+          "action_slot": "pointing"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_balloonball_20",
+      "title": "Indoor balloon-ball game",
+      "buckets": ["morning", "afternoon"],
+      "steps": [
+        { "text": "Find a balloon (or a rolled-up sock) for the indoor ball.", "action_slot": "looking" },
+        { "text": "Mark two goals — one on each side of {room} — using shoes or pillows.", "action_slot": "pointing" },
+        { "text": "{toy} drops the ball at center floor. Crouch ready on opposite sides.", "action_slot": "thinking" },
+        {
+          "id": "rule_choice",
+          "text": "What is the rule for moving the ball?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Only with your feet", "next": "feet_play" },
+            { "label": "Only with your hands", "next": "hands_play" },
+            { "label": "Only by blowing on it", "next": "blow_play" }
+          ]
+        },
+        {
+          "id": "feet_play",
+          "text": "Kick gently — the first goal scored ends the round.",
+          "action_slot": "running"
+        },
+        {
+          "id": "hands_play",
+          "text": "Bat softly — the first goal scored ends the round.",
+          "action_slot": "jumping"
+        },
+        {
+          "id": "blow_play",
+          "text": "Crawl and blow — the first goal scored ends the round.",
+          "action_slot": "thinking"
+        }
+      ]
     }
   ]
 }
