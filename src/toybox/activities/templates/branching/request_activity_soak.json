@@ -1,0 +1,375 @@
+{
+  "intent": "request_activity",
+  "templates": [
+    {
+      "id": "request_activity_soak_fortbuild_01",
+      "title": "Build a {adjective} fort with {toy}",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "Clear a square of floor in {room} big enough for you and {toy}.", "action_slot": "pointing" },
+        { "text": "Gather four pillows and two blankets and stack them in your spot.", "action_slot": "looking" },
+        { "text": "Stand the pillows on edge to make four fort walls.", "action_slot": "thinking" },
+        { "text": "Drape one blanket across the top for the roof.", "action_slot": "pointing" },
+        {
+          "id": "fork",
+          "text": "What kind of fort is this for {toy}?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "A secret reading nook", "next": "nook_end" },
+            { "label": "A brave lookout tower", "next": "lookout_end" }
+          ]
+        },
+        {
+          "id": "nook_end",
+          "text": "Tuck a book and a flashlight inside. Crawl in with {toy} and read one page out loud.",
+          "action_slot": "sleeping"
+        },
+        {
+          "id": "lookout_end",
+          "text": "Cut a peephole between two pillows. Take turns spying out with {toy} and call out three things you see.",
+          "action_slot": "looking"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_paperplane_02",
+      "title": "Paper plane workshop",
+      "buckets": ["afternoon", "morning"],
+      "steps": [
+        { "text": "Gather two sheets of paper and one crayon. Sit at a flat surface with {toy}.", "action_slot": "idle" },
+        { "text": "Fold the first sheet in half the long way, then unfold it.", "action_slot": "thinking" },
+        { "text": "Fold both top corners down to meet the center crease.", "action_slot": "thinking" },
+        { "text": "Fold the slanted edges down again to make a sharp nose.", "action_slot": "thinking" },
+        {
+          "id": "shape_fork",
+          "text": "What kind of plane is this?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "A long-glide arrow", "next": "arrow_path" },
+            { "label": "A loopy stunt plane", "next": "stunt_path" }
+          ]
+        },
+        {
+          "id": "arrow_path",
+          "text": "Fold the wings flat and crisp the creases with your thumbnail.",
+          "action_slot": "thinking",
+          "next": "decorate"
+        },
+        {
+          "id": "stunt_path",
+          "text": "Bend the back wing tips up a little so the plane wants to climb.",
+          "action_slot": "thinking",
+          "next": "decorate"
+        },
+        {
+          "id": "decorate",
+          "text": "Color a number on each wing — that is your plane's flight number.",
+          "action_slot": "pointing",
+          "next": "launch"
+        },
+        {
+          "id": "launch",
+          "text": "Hold the plane behind your ear, point at {toy}, and let it fly. Cheer when it lands!",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_colorhunt_03",
+      "title": "{adjective} color hunt in {room}",
+      "buckets": ["always"],
+      "steps": [
+        {
+          "id": "pick_color",
+          "text": "{toy} wants to play a color hunt. Pick a color to chase first.",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Hunt for red things", "next": "red_path" },
+            { "label": "Hunt for blue things", "next": "blue_path" },
+            { "label": "Hunt for yellow things", "next": "yellow_path" }
+          ]
+        },
+        {
+          "id": "red_path",
+          "text": "Walk slowly around {room} looking for red. Touch each red thing and count out loud.",
+          "action_slot": "looking",
+          "next": "gather"
+        },
+        {
+          "id": "blue_path",
+          "text": "Walk slowly around {room} looking for blue. Touch each blue thing and count out loud.",
+          "action_slot": "looking",
+          "next": "gather"
+        },
+        {
+          "id": "yellow_path",
+          "text": "Walk slowly around {room} looking for yellow. Touch each yellow thing and count out loud.",
+          "action_slot": "looking",
+          "next": "gather"
+        },
+        {
+          "id": "gather",
+          "text": "Bring {count} of your favorites back and lay them in a line in front of {toy}.",
+          "action_slot": "pointing"
+        },
+        { "text": "Tell {toy} which one was the easiest to find and which was the trickiest.", "action_slot": "thinking" }
+      ]
+    },
+    {
+      "id": "request_activity_soak_pebblegarden_04",
+      "title": "Build a tiny pebble garden",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "Find a tray, plate, or shoebox lid to be your garden frame.", "action_slot": "looking" },
+        { "text": "Collect six small pebbles, beads, or buttons and pour them in.", "action_slot": "pointing" },
+        { "text": "Add one leaf, one twig, or one folded paper triangle as a tree.", "action_slot": "thinking" },
+        { "text": "Push the pebbles around to make a path winding through the middle.", "action_slot": "thinking" },
+        {
+          "id": "garden_fork",
+          "text": "What lives in this garden with {toy}?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "A tiny dragon", "next": "dragon_end" },
+            { "label": "A family of mice", "next": "mice_end" }
+          ]
+        },
+        {
+          "id": "dragon_end",
+          "text": "Pile three pebbles into a dragon hill at the path's end. Place {toy} as the dragon's friend.",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "mice_end",
+          "text": "Make four small pebble nests off the path. Tuck {toy} in as the kindly grandmouse.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_sortbysize_05",
+      "title": "Sort the {prop} pile",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "Gather {count} small objects from {room} into a messy pile near {toy}.", "action_slot": "pointing" },
+        {
+          "id": "sort_method",
+          "text": "How should we sort the pile?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "By size — smallest to biggest", "next": "size_sort" },
+            { "label": "By color — light to dark", "next": "color_sort" },
+            { "label": "By texture — soft to hard", "next": "texture_sort" }
+          ]
+        },
+        {
+          "id": "size_sort",
+          "text": "Line everything up smallest on the left, biggest on the right.",
+          "action_slot": "thinking",
+          "next": "show"
+        },
+        {
+          "id": "color_sort",
+          "text": "Line everything up palest on the left, darkest on the right.",
+          "action_slot": "thinking",
+          "next": "show"
+        },
+        {
+          "id": "texture_sort",
+          "text": "Line everything up softest on the left, hardest on the right.",
+          "action_slot": "thinking",
+          "next": "show"
+        },
+        {
+          "id": "show",
+          "text": "Walk {toy} along the line and announce each thing in order.",
+          "action_slot": "pointing"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_drawmonster_06",
+      "title": "Design a {adjective} monster",
+      "buckets": ["afternoon", "evening"],
+      "steps": [
+        { "text": "Lay paper and three crayons in front of you. {toy} is the art director.", "action_slot": "idle" },
+        { "text": "Draw a big round body in the middle of the page.", "action_slot": "thinking" },
+        { "text": "Add {count} eyes anywhere on the body.", "action_slot": "thinking" },
+        { "text": "Give the monster four legs — straight, wiggly, or zig-zag, your call.", "action_slot": "thinking" },
+        {
+          "id": "monster_fork",
+          "text": "What does your monster eat?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Only purple snacks", "next": "purple_eat" },
+            { "label": "Only round things", "next": "round_eat" }
+          ]
+        },
+        {
+          "id": "purple_eat",
+          "text": "Draw three purple snacks floating near the monster's mouth.",
+          "action_slot": "thinking",
+          "next": "name_it"
+        },
+        {
+          "id": "round_eat",
+          "text": "Draw three perfectly round snacks floating near the monster's mouth.",
+          "action_slot": "thinking",
+          "next": "name_it"
+        },
+        {
+          "id": "name_it",
+          "text": "Whisper the monster's name to {toy}, then say it loud and proud.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_obstacle_07",
+      "title": "Living-room obstacle course",
+      "buckets": ["morning", "afternoon"],
+      "steps": [
+        { "text": "Stand in {room} with {toy} and look at the open floor.", "action_slot": "looking" },
+        {
+          "id": "course_style",
+          "text": "What kind of course should we build?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Crawl-and-jump course", "next": "crawl_course" },
+            { "label": "Tip-toe-and-balance course", "next": "balance_course" }
+          ]
+        },
+        {
+          "id": "crawl_course",
+          "text": "Set two pillows as crawl-under tunnels and one rolled blanket as a jump bar.",
+          "action_slot": "pointing",
+          "next": "test_run"
+        },
+        {
+          "id": "balance_course",
+          "text": "Lay a long string or belt on the floor as a wobbly tightrope and place a book at each end.",
+          "action_slot": "pointing",
+          "next": "test_run"
+        },
+        {
+          "id": "test_run",
+          "text": "Walk the course slowly first to remember every station.",
+          "action_slot": "thinking",
+          "next": "speed_run"
+        },
+        {
+          "id": "speed_run",
+          "text": "Run the course as fast as you can while {toy} cheers from the sidelines.",
+          "action_slot": "running"
+        },
+        { "text": "Take a bow. Tell {toy} the hardest part and the easiest part.", "action_slot": "cheering" }
+      ]
+    },
+    {
+      "id": "request_activity_soak_potion_08",
+      "title": "Mix a pretend potion",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "Find a cup, a bowl, or a jar to be your cauldron.", "action_slot": "looking" },
+        { "text": "Add three pretend ingredients from {room} — a sock, a paper scrap, a crayon stub.", "action_slot": "pointing" },
+        { "text": "Stir slowly with a spoon or stick while you whisper the recipe to {toy}.", "action_slot": "thinking" },
+        {
+          "id": "potion_kind",
+          "text": "What does this potion do?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Makes you super fast", "next": "fast_potion" },
+            { "label": "Makes you invisible", "next": "invisible_potion" },
+            { "label": "Makes plants grow giant", "next": "plant_potion" }
+          ]
+        },
+        {
+          "id": "fast_potion",
+          "text": "Pretend to drink it, then run a victory lap around {room}.",
+          "action_slot": "running"
+        },
+        {
+          "id": "invisible_potion",
+          "text": "Pretend to drink it, then crouch behind a {prop} and giggle while {toy} 'looks' for you.",
+          "action_slot": "thinking"
+        },
+        {
+          "id": "plant_potion",
+          "text": "Pretend to pour it on a houseplant, then slowly stand tall with arms out like branches.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_treasuremap_09",
+      "title": "Make a treasure map of {room}",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "Sit on the floor with paper, a crayon, and {toy} the cartographer.", "action_slot": "idle" },
+        { "text": "Draw the outline of {room} as a big rectangle on the page.", "action_slot": "thinking" },
+        { "text": "Add the door, the window, and one piece of furniture as boxes inside.", "action_slot": "thinking" },
+        { "text": "Pick a hiding spot in {room} and hide a small {prop} there.", "action_slot": "pointing" },
+        { "text": "Draw a big X on the map at the hiding spot.", "action_slot": "thinking" },
+        {
+          "id": "map_fork",
+          "text": "How does the treasure hunter find the X?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Follow numbered footsteps", "next": "footsteps_end" },
+            { "label": "Solve a one-word riddle", "next": "riddle_end" }
+          ]
+        },
+        {
+          "id": "footsteps_end",
+          "text": "Draw {count} numbered footprints from the door to the X. Hand the map to a grown-up to follow.",
+          "action_slot": "pointing"
+        },
+        {
+          "id": "riddle_end",
+          "text": "Write one clue word at the top of the map. Hand the map to a grown-up and watch them puzzle it out.",
+          "action_slot": "thinking"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_kitchenchef_10",
+      "title": "Pretend kitchen with {toy}",
+      "buckets": ["morning", "afternoon"],
+      "steps": [
+        { "text": "Set up a pretend stovetop on a low table or chair seat with {toy} as the customer.", "action_slot": "pointing" },
+        { "text": "Gather four pretend ingredients — pebbles, paper balls, leaves, anything.", "action_slot": "looking" },
+        {
+          "id": "menu_choice",
+          "text": "What is on the menu today?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Soup of the day", "next": "soup_path" },
+            { "label": "Stack of pancakes", "next": "pancake_path" }
+          ]
+        },
+        {
+          "id": "soup_path",
+          "text": "Drop the ingredients into a pretend pot. Stir slowly and hum a cooking tune.",
+          "action_slot": "thinking",
+          "next": "plate_up"
+        },
+        {
+          "id": "pancake_path",
+          "text": "Press the ingredients flat onto a pretend pan. Flip each one with a big wrist toss.",
+          "action_slot": "thinking",
+          "next": "plate_up"
+        },
+        {
+          "id": "plate_up",
+          "text": "Slide your dish onto a small plate or paper square in front of {toy}.",
+          "action_slot": "pointing",
+          "next": "review"
+        },
+        {
+          "id": "review",
+          "text": "Take {toy}'s order review — five stars or four? Bow to the chef!",
+          "action_slot": "cheering"
+        }
+      ]
+    }
+  ]
+}
