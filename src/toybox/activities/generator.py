@@ -767,7 +767,14 @@ def generate(
     available_rooms: Sequence[ResolvedRoom] = (),
     resolved_children: ResolvedChildren | None = None,
 ) -> Activity:
-    """Generate a deterministic 5-step :class:`Activity`.
+    """Generate a deterministic :class:`Activity`.
+
+    Phase G: ``Activity.steps`` length matches the picked template's
+    step count (3-20 nodes per the relaxed Pydantic constraint),
+    NOT a fixed 5. The runtime row count in ``activity_steps``
+    decouples from the template step count under G2's lazy
+    insertion path (only ``steps[0]`` is INSERTed at activity
+    creation; subsequent rows land via G3's advance handler).
 
     Args:
         intent: One of :data:`SUPPORTED_INTENTS`. Unknown intents are
@@ -816,8 +823,9 @@ def generate(
             reading-level guidance is appended at the call site.
 
     Returns:
-        An immutable :class:`Activity` with exactly five
-        :class:`ActivityStep` items.
+        An immutable :class:`Activity` whose ``steps`` length matches
+        the picked template's step count (3-20 entries per the
+        Phase G Pydantic constraint).
 
     Raises:
         ValueError: if ``hour`` is outside ``0..23``.
@@ -878,6 +886,22 @@ def generate(
     for idx, step_tpl in enumerate(template.steps):
         body, step_slots = _substitute(step_tpl.text, slot_values)
         used_slots.extend(step_slots)
+        # Phase G: render choice labels with the SAME slot fills used
+        # for the body. The rendered tuple is what the kiosk shows AND
+        # what ``chosen_label`` records on advance — so a label like
+        # ``"Sneak past {toy}"`` becomes ``"Sneak past Penguin"``
+        # before it ever leaves the generator. Slot values used inside
+        # choice labels also contribute to ``used_slots`` so the
+        # signature reflects branching templates that mention
+        # signature-contributing slots only inside choices.
+        choices_rendered: tuple[str, ...] | None = None
+        if step_tpl.choices is not None:
+            rendered: list[str] = []
+            for label, _next_id in step_tpl.choices:
+                rendered_label, label_slots = _substitute(label, slot_values)
+                used_slots.extend(label_slots)
+                rendered.append(rendered_label)
+            choices_rendered = tuple(rendered)
         steps.append(
             ActivityStep(
                 step_index=idx,
@@ -888,6 +912,13 @@ def generate(
                 # the offline template. Validated against ACTION_SLOTS
                 # at template-load time, so this is always valid here.
                 action_slot=step_tpl.action_slot,
+                # Phase G: thread the optional template step id and
+                # the rendered choice labels through to the runtime
+                # row so the persistence layer can write
+                # ``step_template_id`` and ``choices_json`` without
+                # needing the template back.
+                step_id=step_tpl.id,
+                choices_rendered=choices_rendered,
             )
         )
 
@@ -918,6 +949,17 @@ def generate(
         # future ``generate()`` calls that produce the same template +
         # slot fills will match it.
         "signature": compute_signature(template.id, slot_values_tuple),
+        # Phase G G2: full resolved slot map (slot-name → value) so the
+        # persistence layer can write ``activities.slot_fills_json``
+        # and the lazy advance handler in G3 can render later step
+        # bodies + choice labels with the SAME fills as step 1.
+        # Distinct from ``slot_values`` (the dedup-and-sort tuple used
+        # by anti-signal): ``slot_fills`` is a dict keyed by slot
+        # name, includes EVERY resolved fill (both signature-
+        # contributing slots like ``{toy}`` and word-list slots like
+        # ``{adjective}``), and preserves the slot-name → value
+        # mapping that the renderer needs.
+        "slot_fills": dict(slot_values),
     }
 
     return Activity(

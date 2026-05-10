@@ -1,0 +1,53 @@
+-- Phase G Step G2 — branching gameplay: per-step choice metadata.
+--
+-- See documentation/plan/phase-g-branching-gameplay.md §G2 + §"How
+-- choices reach the kiosk". A step that branches renders one button
+-- per `choices[i].label` on the kiosk. Labels are rendered with the
+-- activity's persisted slot fills at the time the choice-bearing
+-- step is INSERTED into ``activity_steps`` (not at template-load
+-- time, not at kiosk-fetch time) — once written, ``choices_json`` is
+-- the source of truth for both what the kid sees and what
+-- ``chosen_label`` records on advance. Storing rendered labels
+-- per-step (rather than re-rendering on every read) matches today's
+-- pattern of pre-rendering ``body`` at insert time and keeps
+-- in-flight activities stable across template edits.
+--
+-- Forward-only; no rollback path (invariant 10). Existing rows from
+-- before this migration default NULL on all three columns; the GET
+-- and WS read paths surface NULL ``choices_json`` as ``choices=null``
+-- on the activity-step payload, which the kiosk renders identically
+-- to today's pre-Phase-G linear shape (no choice buttons).
+--
+-- The columns are very low cardinality (most rows are linear-step
+-- NULLs) so no index is needed; advance-time reads are always by
+-- ``activity_id`` + ``seq`` which are already covered by the table's
+-- existing access pattern.
+--
+-- Columns added (all on ``activity_steps``):
+--
+--   * ``chosen_label`` — TEXT NULL. Label of the choice the kid
+--     picked at this step, if any; NULL means linear advance or
+--     terminal step. Recorded on advance so the parent UI can show
+--     the path the kid took.
+--
+--   * ``choices_json`` — TEXT NULL. JSON array of rendered choice-
+--     button labels for this step (e.g.
+--     ``["Sneak past Penguin", "Charge in"]``). NULL when the step
+--     has no choices (linear step). Rendered with the activity's
+--     persisted slot fills at INSERT time and never re-rendered.
+--
+--   * ``step_template_id`` — TEXT NULL. Phase G template step id
+--     (the new optional ``Step.id`` field). Recorded per row so the
+--     lazy advance handler in G3 can resolve the next step via
+--     ``next`` / ``choices[i].next`` lookups against the template
+--     without needing to recover the index by matching rendered
+--     body text. NULL on rows whose template step had no ``id``
+--     (most legacy linear steps); G3 falls back to array-index
+--     lookup for those rows. Tighter than the template id pattern
+--     (max 32 chars per ``_schema.json``); enforced by Pydantic +
+--     JSON-schema at template-load time, not by a CHECK constraint
+--     here so old rows can stay NULL without any backfill.
+
+ALTER TABLE activity_steps ADD COLUMN chosen_label TEXT;
+ALTER TABLE activity_steps ADD COLUMN choices_json TEXT;
+ALTER TABLE activity_steps ADD COLUMN step_template_id TEXT;

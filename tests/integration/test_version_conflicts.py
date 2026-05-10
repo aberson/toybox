@@ -217,6 +217,19 @@ def test_concurrent_advance_one_wins_one_409s(
     with TestClient(app) as client:
         activity = _propose(client, headers)
         activity_id = activity["id"]
+        # Phase G G2: backfill steps 2..5 onto the lazy-inserted row
+        # so the concurrent advance race below has somewhere to go
+        # (without the backfill, the only step is steps[0] and the
+        # second advance trips the terminal branch instead of the
+        # version-conflict branch we're testing). This mirrors the
+        # in-flight pre-G2 activity shape.
+        from tests.fixtures.lazy_insert import backfill_legacy_steps
+
+        backfill_conn = connect(db_path)
+        try:
+            backfill_legacy_steps(backfill_conn, activity_id)
+        finally:
+            backfill_conn.close()
         # Drive into ``running`` so concurrent advance is valid for
         # both racers. After approve+advance the activity is on step 1
         # at version=3.

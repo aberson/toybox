@@ -136,6 +136,20 @@ class ActivityStep(BaseModel):
     one of the 10 fixed action vocabulary keys (or ``None`` to render
     no sprite). ``current`` lives at runtime, not on generated output,
     and is therefore omitted here.
+
+    Phase G additions (load-bearing for G2 lazy insertion + G3 advance):
+
+    * ``step_id`` — the template-time :attr:`Step.id` for this step
+      when it has one (NULL on legacy linear steps with no id).
+      Persisted to ``activity_steps.step_template_id`` so the lazy
+      advance handler in G3 can resolve ``next`` / ``choices[i].next``
+      targets via template lookup without having to recover the
+      array index from rendered body text.
+    * ``choices_rendered`` — the per-choice button labels for this
+      step, already rendered with the activity's slot fills (so the
+      list is byte-identical to what the kiosk shows). NULL when the
+      template step has no ``choices``. Persisted to
+      ``activity_steps.choices_json`` as a JSON array of strings.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -145,6 +159,18 @@ class ActivityStep(BaseModel):
     sfx: str | None = None
     expected_action: str | None = None
     action_slot: Annotated[str | None, AfterValidator(_validate_action_slot)] = None
+    # Phase G: template step id (when present in the template). NULL
+    # on legacy linear steps that have no `id`. Pattern + length match
+    # ``Step.id`` exactly.
+    step_id: Annotated[
+        str | None,
+        Field(default=None, pattern=_STEP_ID_PATTERN, max_length=_STEP_ID_MAX_LENGTH),
+    ] = None
+    # Phase G: rendered choice-button labels. Each entry is a label
+    # string with all ``{slot}`` placeholders already substituted via
+    # the activity's slot fills, so the runtime label is the EXACT
+    # string the kid sees. ``None`` for steps that have no choices.
+    choices_rendered: tuple[str, ...] | None = None
 
 
 class Activity(BaseModel):

@@ -237,8 +237,9 @@ def test_empty_catalog_falls_back_to_placeholder_toy(
     assert user_payload["available_rooms"] == []
     # No-child case: child_profile is None.
     assert user_payload["child_profile"] is None
-    # The step text was generated successfully (5 steps).
-    assert len(activity["steps"]) == 5
+    # Phase G G2: lazy insertion → propose response carries only steps[0].
+    # The step text on the persisted row was generated successfully.
+    assert len(activity["steps"]) == 1
     assert step_text_blob
 
 
@@ -414,7 +415,8 @@ def test_propose_with_unknown_child_id_does_not_crash(
         parent_headers,
         context={"child_ids": ["does-not-exist"]},
     )
-    assert len(activity["steps"]) == 5
+    # Phase G G2: lazy insertion → propose response carries only steps[0].
+    assert len(activity["steps"]) == 1
     row = _read_labeled(db_path, activity["id"])
     assert row is not None
 
@@ -432,6 +434,7 @@ def test_existing_intents_still_work_with_real_content(
     _seed_toys(db_path, [("t-a", "Apollo")])
     for intent in ("request_play", "request_story", "request_activity", "boredom"):
         activity = _propose(client, parent_headers, intent=intent, seed=1)
-        assert len(activity["steps"]) == 5
+        # Phase G G2: lazy insertion → propose response carries only steps[0].
+        assert len(activity["steps"]) == 1
         row = _read_labeled(db_path, activity["id"])
         assert row is not None

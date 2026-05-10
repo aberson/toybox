@@ -1,0 +1,31 @@
+{
+  "intent": "boredom",
+  "templates": [
+    {
+      "id": "fixture_slot_substituted_choices",
+      "title": "Adventure in {room}",
+      "buckets": ["always"],
+      "steps": [
+        {
+          "id": "open",
+          "text": "{toy} wakes up in {room} and spots something curious.",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Sneak past {toy}", "next": "sneak_ending" },
+            { "label": "Charge into {room}", "next": "charge_ending" }
+          ]
+        },
+        {
+          "id": "sneak_ending",
+          "text": "You tiptoe quietly and {toy} never even notices.",
+          "action_slot": "looking"
+        },
+        {
+          "id": "charge_ending",
+          "text": "You barrel through {room} and {toy} cheers you on.",
+          "action_slot": "cheering"
+        }
+      ]
+    }
+  ]
+}
