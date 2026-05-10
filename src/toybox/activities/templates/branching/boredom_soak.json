@@ -717,6 +717,181 @@
         { "text": "Step ashore and plant your flag in the sand.", "action_slot": "pointing" },
         { "text": "{toy} writes your name in the captain's logbook.", "action_slot": "thinking" }
       ]
+    },
+    {
+      "id": "boredom_soak_snowfort_41",
+      "title": "Indoor snow fort",
+      "buckets": ["wind_down"],
+      "steps": [
+        { "text": "{toy} declares {room} a snowy mountain pass.", "action_slot": "thinking" },
+        { "text": "Pile {count} blankets into a fluffy snowdrift.", "action_slot": "thinking" },
+        { "text": "Carve a doorway and crawl inside.", "action_slot": "running" },
+        { "text": "Place a {prop} as the warming lantern.", "action_slot": "pointing" },
+        { "text": "A blizzard howls outside. Pick what to do.", "action_slot": "confused", "id": "blizzard_pick", "choices": [
+          { "label": "Tell {toy} a winter tale", "next": "tale_end" },
+          { "label": "Sip pretend cocoa together", "next": "cocoa_end" }
+        ] },
+        { "id": "tale_end", "text": "Your story ends with snow turning to stars. {toy} is wide-eyed and snug.", "action_slot": "thinking" },
+        { "id": "cocoa_end", "text": "You sip slowly and the storm fades. Warm and {adjective} inside.", "action_slot": "sleeping" }
+      ]
+    },
+    {
+      "id": "boredom_soak_letter_42",
+      "title": "Write a letter to your future self",
+      "buckets": ["evening"],
+      "steps": [
+        { "text": "{toy} hands you an invisible pen and tiny envelope.", "action_slot": "thinking" },
+        { "text": "Think about one thing you are proud of today.", "action_slot": "thinking" },
+        { "text": "Say it out loud as if writing it down.", "action_slot": "thinking" },
+        { "text": "Add a wish for tomorrow.", "action_slot": "thinking" },
+        { "text": "Now seal the letter. How?", "action_slot": "thinking", "id": "seal_pick", "choices": [
+          { "label": "With a {adjective} stamp", "next": "stamp_end" },
+          { "label": "With a kiss from your {body_part}", "next": "kiss_end" }
+        ] },
+        { "id": "stamp_end", "text": "{toy} files it in the secret time-vault. See you next year, you!", "action_slot": "waving" },
+        { "id": "kiss_end", "text": "{toy} promises to deliver it on a future day. Off it goes.", "action_slot": "waving" }
+      ]
+    },
+    {
+      "id": "boredom_soak_marketstall_43",
+      "title": "Open a stall at the market",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "{toy} unfolds a tiny tablecloth in {room}. Market day!", "action_slot": "thinking" },
+        { "text": "Pick what your stall sells.", "action_slot": "thinking", "id": "stall_pick", "choices": [
+          { "label": "Magic potions", "next": "potion_stall" },
+          { "label": "Funny hats", "next": "hat_stall" },
+          { "label": "Talking pebbles", "next": "pebble_stall" }
+        ] },
+        { "id": "potion_stall", "text": "Line up {count} pretend bottles, each a different color.", "action_slot": "thinking", "next": "first_customer" },
+        { "id": "hat_stall", "text": "Stack {count} silly hats on top of each other.", "action_slot": "thinking", "next": "first_customer" },
+        { "id": "pebble_stall", "text": "Arrange {count} small stones in a neat row.", "action_slot": "thinking", "next": "first_customer" },
+        { "id": "first_customer", "text": "{toy} approaches as your first customer.", "action_slot": "waving" },
+        { "text": "Make your sales pitch with great drama.", "action_slot": "pointing" },
+        { "text": "{toy} pays in pretend coins and walks off thrilled.", "action_slot": "cheering" }
+      ]
+    },
+    {
+      "id": "boredom_soak_minigolf_44",
+      "title": "Living-room mini golf",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "{toy} surveys the course in {room}.", "action_slot": "looking" },
+        { "text": "Pick your obstacle for hole one.", "action_slot": "thinking", "id": "hole_one", "choices": [
+          { "label": "Through a chair-leg tunnel", "next": "tunnel_path" },
+          { "label": "Around a pillow mountain", "next": "mountain_path" }
+        ] },
+        { "id": "tunnel_path", "text": "Roll a soft {prop} carefully through.", "action_slot": "pointing", "next": "hole_two" },
+        { "id": "mountain_path", "text": "Tap it gently up and around.", "action_slot": "pointing", "next": "hole_two" },
+        { "id": "hole_two", "text": "Hole two: {action_verb} the ball with your {body_part} as the club.", "action_slot": "jumping" },
+        { "text": "Sink the final putt with a flourish.", "action_slot": "cheering" },
+        { "text": "{toy} hands you a tiny gold trophy.", "action_slot": "cheering" }
+      ]
+    },
+    {
+      "id": "boredom_soak_skylab_45",
+      "title": "Sky observatory",
+      "buckets": ["evening"],
+      "steps": [
+        { "text": "{toy} aims an imaginary telescope through the {room} ceiling.", "action_slot": "looking" },
+        { "text": "Spot {count} bright stars and name each one.", "action_slot": "looking" },
+        { "text": "A comet streaks past!", "action_slot": "confused" },
+        { "text": "Quickly: pick what to record.", "action_slot": "thinking", "id": "record_pick", "choices": [
+          { "label": "Sketch its tail", "next": "sketch_end" },
+          { "label": "Sing its color", "next": "sing_end" }
+        ] },
+        { "id": "sketch_end", "text": "You trace the {adjective} arc on a paper sky. {toy} files it in the archive.", "action_slot": "thinking" },
+        { "id": "sing_end", "text": "Your hum rises and falls with the comet. {toy} taps along, dreamy.", "action_slot": "sleeping" }
+      ]
+    },
+    {
+      "id": "boredom_soak_friendclub_46",
+      "title": "Found a tiny club",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "{toy} stands at attention. Today we found a club!", "action_slot": "cheering" },
+        { "text": "Pick the club's theme.", "action_slot": "thinking", "id": "theme_pick", "choices": [
+          { "label": "Sock collectors", "next": "sock" },
+          { "label": "Cloud spotters", "next": "cloud" },
+          { "label": "Whisper-tellers", "next": "whisper" }
+        ] },
+        { "id": "sock", "text": "Lay out {count} socks. The collection begins.", "action_slot": "thinking", "next": "ceremony" },
+        { "id": "cloud", "text": "Lie on your back and describe {count} cloud shapes.", "action_slot": "looking", "next": "ceremony" },
+        { "id": "whisper", "text": "Whisper {count} secrets only the club may know.", "action_slot": "thinking", "next": "ceremony" },
+        { "id": "ceremony", "text": "Now invent the secret club handshake.", "action_slot": "waving" },
+        { "text": "Shake on it. The club is official.", "action_slot": "cheering" }
+      ]
+    },
+    {
+      "id": "boredom_soak_dreamworkshop_47",
+      "title": "Dream-builder workshop",
+      "buckets": ["wind_down"],
+      "steps": [
+        { "text": "{toy} dims the lights. Tonight we build a dream.", "action_slot": "thinking" },
+        { "text": "Pick the setting.", "action_slot": "thinking", "id": "dream_setting", "choices": [
+          { "label": "Floating sky garden", "next": "garden_path" },
+          { "label": "Cozy moonlit cottage", "next": "cottage_path" }
+        ] },
+        { "id": "garden_path", "text": "Paint flowers in your mind that grow from {prop}s.", "action_slot": "thinking", "next": "tuck_in" },
+        { "id": "cottage_path", "text": "Picture warm windows and a cat curled on a {prop}.", "action_slot": "sleeping", "next": "tuck_in" },
+        { "id": "tuck_in", "text": "Add {count} more {adjective} details that only you can see.", "action_slot": "thinking" },
+        { "text": "Lie back and step inside the dream.", "action_slot": "sleeping" },
+        { "text": "{toy} closes its eyes too. Goodnight, dream-builder.", "action_slot": "sleeping" }
+      ]
+    },
+    {
+      "id": "boredom_soak_factory_48",
+      "title": "Tiny toy factory",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "{toy} hits a giant red button. The factory in {room} powers up!", "action_slot": "pointing" },
+        { "text": "Pick the toy line for today.", "action_slot": "thinking", "id": "line_pick", "choices": [
+          { "label": "Bouncy balls", "next": "ball_line" },
+          { "label": "Tiny robots", "next": "robot_line" },
+          { "label": "Squishy plushies", "next": "plush_line" }
+        ] },
+        { "id": "ball_line", "text": "Roll {count} pretend balls down the conveyor belt.", "action_slot": "running", "next": "qc" },
+        { "id": "robot_line", "text": "Click together {count} pretend robots on the assembly line.", "action_slot": "thinking", "next": "qc" },
+        { "id": "plush_line", "text": "Stuff {count} pretend plushies with imaginary fluff.", "action_slot": "thinking", "next": "qc" },
+        { "id": "qc", "text": "Inspect each one with a serious squint.", "action_slot": "looking" },
+        { "text": "Stamp APPROVED with your {body_part}.", "action_slot": "pointing" },
+        { "text": "{toy} declares the shift over. Whew!", "action_slot": "cheering" }
+      ]
+    },
+    {
+      "id": "boredom_soak_questboard_49",
+      "title": "Pick a quest from the board",
+      "buckets": ["morning", "afternoon"],
+      "steps": [
+        { "text": "{toy} taps a tiny notice board in {room}. Quests await!", "action_slot": "pointing" },
+        { "text": "Choose your mission.", "action_slot": "thinking", "id": "quest_pick", "choices": [
+          { "label": "Find the lost {prop}", "next": "lost_prop" },
+          { "label": "Tame the wild rug beast", "next": "rug_beast" },
+          { "label": "Climb the tallest peak", "next": "tall_peak" }
+        ] },
+        { "id": "lost_prop", "text": "Search every corner. Use your sharpest looking eyes.", "action_slot": "looking", "next": "victory" },
+        { "id": "rug_beast", "text": "Approach slowly. Whisper {count} kind words.", "action_slot": "thinking", "next": "victory" },
+        { "id": "tall_peak", "text": "Climb the cushion summit. Plant your flag.", "action_slot": "jumping", "next": "victory" },
+        { "id": "victory", "text": "Quest complete! {toy} stamps your hero passport.", "action_slot": "cheering" },
+        { "text": "Return to the board. Pick tomorrow's quest in your head.", "action_slot": "thinking" }
+      ]
+    },
+    {
+      "id": "boredom_soak_thunderstorm_50",
+      "title": "Indoor thunderstorm",
+      "buckets": ["afternoon", "evening"],
+      "steps": [
+        { "text": "{toy} sniffs the air. A storm is rolling into {room}!", "action_slot": "thinking" },
+        { "text": "Make rain by tapping {count} fingertips on a {prop}.", "action_slot": "thinking" },
+        { "text": "Add wind by whooshing softly with your mouth.", "action_slot": "thinking" },
+        { "text": "Now the lightning! Flash a hand up and freeze.", "action_slot": "jumping" },
+        { "text": "Ready for the thunder?", "action_slot": "thinking", "id": "thunder_pick", "choices": [
+          { "label": "Stomp once, very loud", "next": "stomp_end" },
+          { "label": "Roll a {adjective} growl", "next": "growl_end" }
+        ] },
+        { "id": "stomp_end", "text": "BOOM! The whole storm cracks at once. {toy} jumps and laughs.", "action_slot": "cheering" },
+        { "id": "growl_end", "text": "A long low rumble fills the room. {toy} listens with eyes wide.", "action_slot": "looking" }
+      ]
     }
   ]
 }
