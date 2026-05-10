@@ -585,3 +585,117 @@ def test_advance_response_chosen_label_after_choice(
     # The first choice in slot_substituted_choices.json is
     # "Sneak past {toy}" — the rendered label must contain the toy.
     assert fills["toy"] in expected_label
+
+
+# ---------------------------------------------------------------------------
+# Phase G G6 fix: step-back across a choice point must rewind cleanly so
+# the next /advance doesn't trip the "next row exists" legacy path with
+# 400 ``choice_not_allowed``. UAT-bug repro: kid picks a choice, operator
+# hits step-back, kid taps a choice button → 400 wedges the activity.
+# ---------------------------------------------------------------------------
+
+
+def _step_back(
+    client: TestClient,
+    parent_headers: dict[str, str],
+    activity_id: str,
+    version: int,
+) -> dict[str, Any]:
+    resp = client.post(
+        f"/api/activities/{activity_id}/step-back",
+        headers={**parent_headers, "If-Match-Version": str(version)},
+    )
+    assert resp.status_code == 200, resp.text
+    return cast("dict[str, Any]", resp.json())
+
+
+def test_step_back_across_choice_then_advance_same_choice_works(
+    client: TestClient,
+    parent_headers: dict[str, str],
+    db_path: Path,
+    valid_branching_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Repro of the G6 UAT bug: kid picks a choice, operator hits
+    step-back, kid taps the SAME choice again. After the fix, the
+    activity rewinds cleanly and the second choice succeeds —
+    activity_steps now has rows [1, 2] again with the same chosen
+    target re-inserted.
+    """
+    _set_branching_templates_dir(monkeypatch, valid_branching_dir)
+
+    body = _propose_branching(client, parent_headers)
+    activity_id = body["id"]
+    state = _approve(client, parent_headers, activity_id, body["version"])
+    state = _advance(client, parent_headers, activity_id, state["version"])
+    # Pick choice 0 — inserts seq=2 (the "sneak" target).
+    state = _advance(client, parent_headers, activity_id, state["version"], choice_index=0)
+    assert sorted(s["seq"] for s in state["steps"]) == [1, 2]
+
+    # Step-back: rewinds across the choice point. seq=2 should be
+    # deleted; seq=1 becomes current again with chosen_label cleared.
+    state = _step_back(client, parent_headers, activity_id, state["version"])
+    seqs_after_back = sorted(s["seq"] for s in state["steps"])
+    assert seqs_after_back == [1], (
+        f"step-back across a choice point must DELETE seq>{1}, got seqs={seqs_after_back}"
+    )
+    cur = next(s for s in state["steps"] if s["current"])
+    assert cur["seq"] == 1
+    assert cur["chosen_label"] is None, (
+        "chosen_label must be cleared on rewind so the choice slate is fresh"
+    )
+    assert cur["choices"] is not None and len(cur["choices"]) == 2
+
+    # Tap the SAME choice again — must succeed (was 400 before the fix).
+    state = _advance(client, parent_headers, activity_id, state["version"], choice_index=0)
+    assert sorted(s["seq"] for s in state["steps"]) == [1, 2]
+    new = next(s for s in state["steps"] if s["seq"] == 2)
+    assert new["current"] is True
+    prev = next(s for s in state["steps"] if s["seq"] == 1)
+    assert prev["chosen_label"] == "Sneak closer quietly"
+
+
+def test_step_back_across_choice_then_advance_different_choice_works(
+    client: TestClient,
+    parent_headers: dict[str, str],
+    db_path: Path,
+    valid_branching_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Operator-UX win: after step-back across a choice point, the kid
+    can pick a DIFFERENT branch and the activity proceeds down the new
+    path (not stuck on the previously-chosen target).
+    """
+    _set_branching_templates_dir(monkeypatch, valid_branching_dir)
+
+    body = _propose_branching(client, parent_headers)
+    activity_id = body["id"]
+    state = _approve(client, parent_headers, activity_id, body["version"])
+    state = _advance(client, parent_headers, activity_id, state["version"])
+    # Pick choice 0 → "sneak"
+    state = _advance(client, parent_headers, activity_id, state["version"], choice_index=0)
+    state = _step_back(client, parent_headers, activity_id, state["version"])
+
+    # Now pick choice 1 → "announce" (a DIFFERENT branch).
+    state = _advance(client, parent_headers, activity_id, state["version"], choice_index=1)
+    assert sorted(s["seq"] for s in state["steps"]) == [1, 2]
+    new = next(s for s in state["steps"] if s["seq"] == 2)
+    assert new["current"] is True
+    prev = next(s for s in state["steps"] if s["seq"] == 1)
+    assert prev["chosen_label"] == "Announce yourself bravely"
+
+    # Spot-check the DB: the seq=2 row's step_template_id is the "announce"
+    # target, NOT the "sneak" target the kid had picked the first time.
+    conn = connect(db_path, check_same_thread=False)
+    try:
+        row = conn.execute(
+            "SELECT step_template_id FROM activity_steps "
+            "WHERE activity_id = ? AND seq = 2",
+            (activity_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+    assert str(row["step_template_id"]) == "announce", (
+        "step-back+different-choice must rewrite the chosen target, "
+        f"got step_template_id={row['step_template_id']!r}"
+    )

@@ -2079,7 +2079,8 @@ def post_step_back(
         raise VersionConflictError(current_version, current_state)
 
     steps = conn.execute(
-        "SELECT id, seq, current FROM activity_steps WHERE activity_id = ? ORDER BY seq ASC",
+        "SELECT id, seq, current, choices_json "
+        "FROM activity_steps WHERE activity_id = ? ORDER BY seq ASC",
         (activity_id,),
     ).fetchall()
     current_index = next((i for i, s in enumerate(steps) if int(s["current"]) == 1), -1)
@@ -2102,15 +2103,45 @@ def post_step_back(
         raise VersionConflictError(int(row["version"]), str(row["state"]))
     prev_seq = int(steps[current_index - 1]["seq"])
     cur_seq = int(steps[current_index]["seq"])
+    # Phase G G6 fix: if the step we're rolling BACK to is a
+    # choice-bearing step (post-G2 branching template), an unflip-only
+    # rollback would leave seq>prev_seq in the table with the kid's
+    # already-chosen path. The kiosk re-renders the choice buttons,
+    # the kid taps one, and the advance handler's legacy "next row
+    # exists" branch rejects ``choice_index`` with ``choice_not_allowed``
+    # — wedging the activity with a 400 the kiosk surfaces as
+    # ``advance: api error 400``. Fix: rewind the chosen path entirely
+    # — DELETE rows with seq > prev_seq (so the lazy-insert path fires
+    # on the next advance) and clear ``chosen_label`` on prev_seq (so
+    # the choice slate is fresh; G3's _insert_next_step will rewrite
+    # it on the new choice).
+    #
+    # Pre-G2 in-flight activities (5 rows pre-seeded, no choices_json
+    # anywhere) keep the existing unflip-only behavior — deleting
+    # their rows would lose body content that the lazy-insert path
+    # can't reconstruct (their slot_fills_json defaults to '{}').
+    prev_row_choices = steps[current_index - 1]["choices_json"]
+    rolling_back_across_choice = prev_row_choices is not None
     with conn:
-        conn.execute(
-            "UPDATE activity_steps SET current = 0 WHERE activity_id = ? AND seq = ?",
-            (activity_id, cur_seq),
-        )
-        conn.execute(
-            "UPDATE activity_steps SET current = 1 WHERE activity_id = ? AND seq = ?",
-            (activity_id, prev_seq),
-        )
+        if rolling_back_across_choice:
+            conn.execute(
+                "DELETE FROM activity_steps WHERE activity_id = ? AND seq > ?",
+                (activity_id, prev_seq),
+            )
+            conn.execute(
+                "UPDATE activity_steps SET current = 1, chosen_label = NULL "
+                "WHERE activity_id = ? AND seq = ?",
+                (activity_id, prev_seq),
+            )
+        else:
+            conn.execute(
+                "UPDATE activity_steps SET current = 0 WHERE activity_id = ? AND seq = ?",
+                (activity_id, cur_seq),
+            )
+            conn.execute(
+                "UPDATE activity_steps SET current = 1 WHERE activity_id = ? AND seq = ?",
+                (activity_id, prev_seq),
+            )
     response = _row_to_response(conn, row)
     _emit_state(pubsub, response)
     return response
