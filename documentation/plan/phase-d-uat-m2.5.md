@@ -1,6 +1,8 @@
-# Manual M2.5 — v1 bundled UI smoke (release gate before Phase E)
+# Manual M2.5 — v1 bundled UI smoke (RETIRED gate, kept as reference)
 
-> **Scope:** the v1 release gate. A fresh-pair-of-hands operator UAT covering Phase C steps 16/17/18 and Phase D steps 21/22/23/24. Read this only when running the gate or auditing what got verified for v1. Step descriptions live in [phase-c.md](phase-c.md) + [phase-d.md](phase-d.md).
+> **Status:** RETIRED 2026-05-10 as a release gate. Happy paths for steps 16/17/18/21/22/23/24 were de-facto validated through every phase B-G operator session (PIN gate, child profiles, toy/room ingest, "why this?" panel, transcripts, metrics dashboard all exercised in normal use). The remaining checks unique to this script are edge cases — dedup 409, bulk-cap 51-photo rejection, wipe-all PIN re-prompt, ws→REST metrics fallback. Run them ad-hoc if you suspect a regression in one of those specific paths; do not block Phase E on them.
+>
+> **Scope (historical):** the v1 release gate. A fresh-pair-of-hands operator UAT covering Phase C steps 16/17/18 and Phase D steps 21/22/23/24. Read this only when running an ad-hoc edge-case check or auditing what got verified for v1. Step descriptions live in [phase-c.md](phase-c.md) + [phase-d.md](phase-d.md).
 
 **Why bundled:** per the autonomous-build operating mode (see [`feedback_autonomous_build_bundled_ui.md`](../../../.claude/projects/c--Users-abero-dev/memory/feedback_autonomous_build_bundled_ui.md)) steps 16, 17, 18, 21, 22, 23, 24 ran with `--reviewers code` (no runtime `--ui` reviewer). Their `Status:` notes each defer "visual UI verification pending bundled test pass". M2.5 is that pass — the v1 release gate before Phase E begins.
 
