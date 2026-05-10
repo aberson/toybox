@@ -298,7 +298,7 @@ G1 lands first — everyone reads the schema + Pydantic + pydantic-to-ts codegen
 - **Type:** code
 - **Issue:** #74
 - **Flags:** `--reviewers code` (UI evidence intentionally bundled to G6 per [`feedback_autonomous_build_bundled_ui.md`](../../../.claude/projects/c--Users-abero-dev/memory/feedback_autonomous_build_bundled_ui.md))
-- **Status:** NOT STARTED
+- **Status:** DONE (2026-05-09)
 - **Depends on:** Step G1 / #71 (TypeScript types for `Step.choices` + `Choice` come from pydantic-to-ts codegen on G1's models). Soft coupling with Step G3 / #73 — frontend reads this plan-doc for the `AdvanceRequest` request shape AND the activity-step response shape (`choices: [{label, choice_index}] | null`); both are codified by pydantic-to-ts.
 - **Parallel-safe with:** Step G2 / #72 + Step G3 / #73 (disjoint file sets — backend owns `src/`, frontend owns `frontend/src/`; API contract is pinned in this plan-doc and codified by codegen). Step G5 / #75 (templates) is also parallel-safe — pure JSON, no code overlap.
 - **Done when:** `ChoiceButton.tsx` ships with component-level tests covering all four states (idle, in-flight disabled, 4xx re-enable, 409 refetch); `StepCard.tsx` renders both branches per `step.choices` presence; "step N of 5" denominator dropped (or confirmed absent in components, with grep result recorded in commit); pydantic-to-ts codegen clean; tsc + Vitest green; pre-commit hook clean (no codegen drift).
