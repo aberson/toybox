@@ -213,13 +213,29 @@ def test_branching_template_renders_choices_on_steps_zero(
 
 def test_linear_template_step_id_and_choices_default_to_none(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
-    """The 4 shipped production templates have NO ``id`` / ``next`` /
-    ``choices`` (existing fall-through behavior). The generator's
-    runtime ``ActivityStep`` rows for those templates MUST surface
-    ``step_id=None`` and ``choices_rendered=None`` — otherwise the
-    persistence layer would write garbage into the new G2 columns.
+    """A linear template (no ``id`` / ``next`` / ``choices`` per step)
+    must produce runtime ``ActivityStep`` rows with ``step_id=None``
+    and ``choices_rendered=None`` — otherwise the persistence layer
+    would write garbage into the new G2 columns.
+
+    Pins to a fresh templates dir containing ONLY one of the 4 shipped
+    production linear templates (``boredom.json``) so the seeded picker
+    can't land on a soak branching template.
     """
+    src_root = Path(__file__).resolve().parents[3] / "src" / "toybox" / "activities" / "templates"
+    isolated = tmp_path / "templates"
+    isolated.mkdir()
+    (isolated / "_schema.json").write_text(
+        (src_root / "_schema.json").read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    (isolated / "boredom.json").write_text(
+        (src_root / "boredom.json").read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    monkeypatch.setattr("toybox.activities.generator.TEMPLATES_DIR", isolated)
+    clear_template_cache()
+
     activity = generate(
         intent="boredom",
         slot=None,

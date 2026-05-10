@@ -140,3 +140,63 @@ def child_token(db_path: Path) -> str:
 @pytest.fixture
 def parent_headers(parent_token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {parent_token}"}
+
+
+# ---------------------------------------------------------------------------
+# Phase G G5: the production templates directory now contains 200+ soak
+# branching templates under ``templates/branching/`` (intentionally —
+# this is the variety boost Phase G unlocked). However, many integration
+# tests pre-date this content addition and pin specific (intent, hour,
+# seed) → template_id outcomes, or assume "all templates are 5-step
+# linear". Activating the soak content broke 30 such tests because the
+# seeded picker now lands on a different (often branching, often non-5-
+# step) template.
+#
+# This autouse fixture isolates every integration test to a fresh
+# templates dir containing ONLY the 4 shipped production templates +
+# the schema (no ``branching/`` subdir). Tests that exercise the new
+# branching features have their own ``valid_branching_dir`` /
+# ``mixed_linear_branching_dir`` / ``branching_templates_dir`` fixtures
+# that monkeypatch ``generator.TEMPLATES_DIR`` themselves; those overrides
+# apply on top of this autouse setup and win during the test body.
+#
+# Production deploys load ``src/toybox/activities/templates/`` directly
+# (no monkeypatch), so the soak templates are live in the actual app —
+# only the test environment is sandboxed to the original 4.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _isolate_to_production_templates(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Point generator.TEMPLATES_DIR at a fresh dir with just the 4
+    shipped production templates + the schema, so integration tests
+    don't see the 200 soak templates. Per-test branching fixtures may
+    override via their own monkeypatch.
+    """
+    from shutil import copy2
+
+    from toybox.activities import generator
+
+    src_root = (
+        Path(__file__).resolve().parent.parent.parent
+        / "src"
+        / "toybox"
+        / "activities"
+        / "templates"
+    )
+    isolated = tmp_path / "templates_production_only"
+    isolated.mkdir()
+    copy2(src_root / "_schema.json", isolated / "_schema.json")
+    for intent_file in (
+        "boredom.json",
+        "request_play.json",
+        "request_story.json",
+        "request_activity.json",
+    ):
+        copy2(src_root / intent_file, isolated / intent_file)
+
+    monkeypatch.setattr(generator, "TEMPLATES_DIR", isolated)
+    generator.clear_template_cache()
