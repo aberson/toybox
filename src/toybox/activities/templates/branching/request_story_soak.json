@@ -1255,6 +1255,371 @@
           "action_slot": "cheering"
         }
       ]
+    },
+    {
+      "id": "request_story_soak_conv_pet_41",
+      "title": "The lost pet of {room}",
+      "buckets": ["afternoon"],
+      "steps": [
+        {
+          "id": "open",
+          "text": "Mrs. Periwinkle's pet went missing in {room}. {toy} agreed to help search.",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Check behind the {prop}", "next": "behind" },
+            { "label": "Check up high", "next": "high" },
+            { "label": "Check by the food bowl", "next": "bowl" }
+          ]
+        },
+        {
+          "id": "behind",
+          "text": "Behind the {prop}, {toy} found tiny prints leading toward a vent. The trail was warm.",
+          "action_slot": "looking",
+          "next": "found"
+        },
+        {
+          "id": "high",
+          "text": "On a high shelf, two yellow eyes blinked at {toy} from a pile of soft sweaters.",
+          "action_slot": "pointing",
+          "next": "found"
+        },
+        {
+          "id": "bowl",
+          "text": "By the food bowl, the pet had simply been napping the whole time, ear twitching.",
+          "action_slot": "thinking",
+          "next": "found"
+        },
+        {
+          "id": "found",
+          "text": "{toy} carried the pet back to Mrs. Periwinkle, who was overjoyed. She gave {toy} a slice of pie. The end.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_conv_lantern_42",
+      "title": "The lantern festival",
+      "buckets": ["evening"],
+      "steps": [
+        {
+          "id": "open",
+          "text": "On the night of the lantern festival, every house gave {toy} one paper lantern to release.",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Release from the bridge", "next": "bridge" },
+            { "label": "Release from the hill", "next": "hill" }
+          ]
+        },
+        {
+          "id": "bridge",
+          "text": "From the bridge, the lantern joined a hundred others drifting along the river, glowing soft and steady.",
+          "action_slot": "waving",
+          "next": "wish"
+        },
+        {
+          "id": "hill",
+          "text": "From the hill, the lantern rose into the dark sky, climbing slowly until it joined the stars.",
+          "action_slot": "looking",
+          "next": "wish"
+        },
+        {
+          "id": "wish",
+          "text": "Wherever it went, {toy}'s wish went with it. The night smelled like honey and woodsmoke. The end.",
+          "action_slot": "sleeping"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_conv_squirrel_43",
+      "title": "The squirrel's contest",
+      "buckets": ["morning", "afternoon"],
+      "steps": [
+        {
+          "id": "open",
+          "text": "Three squirrels held a contest each year. This year, {toy} was invited to be the judge.",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Most acorns gathered", "next": "acorns" },
+            { "label": "Tallest jump", "next": "jump" },
+            { "label": "Best secret hiding place", "next": "hide" }
+          ]
+        },
+        {
+          "id": "acorns",
+          "text": "The squirrels lined up their piles. The biggest pile belonged to the smallest squirrel — Beanie. {toy} clapped.",
+          "action_slot": "cheering",
+          "next": "ribbon"
+        },
+        {
+          "id": "jump",
+          "text": "One squirrel leapt from a low branch. Another from a high one. A third just leapt straight up. All three wobbled and grinned.",
+          "action_slot": "jumping",
+          "next": "ribbon"
+        },
+        {
+          "id": "hide",
+          "text": "Each squirrel showed {toy} a hiding spot. {toy} promised to keep all three secret, even from the wind.",
+          "action_slot": "thinking",
+          "next": "ribbon"
+        },
+        {
+          "id": "ribbon",
+          "text": "{toy} gave every squirrel a tiny ribbon. 'Three winners,' {toy} declared. The squirrels chittered with joy. The end.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_conv_riddle_44",
+      "title": "The riddle of the well",
+      "buckets": ["afternoon"],
+      "steps": [
+        {
+          "id": "open",
+          "text": "An old well in the meadow only gave water to those who solved its daily riddle. Today's riddle: a {adjective} thing that grows when shared.",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "A fire", "next": "fire" },
+            { "label": "Laughter", "next": "laughter" },
+            { "label": "A song", "next": "song" }
+          ]
+        },
+        {
+          "id": "fire",
+          "text": "The well bubbled and said, 'Yes — and also.' It accepted the answer kindly.",
+          "action_slot": "thinking",
+          "next": "draw"
+        },
+        {
+          "id": "laughter",
+          "text": "The well laughed back, water splashing high. 'A clever one,' it murmured.",
+          "action_slot": "cheering",
+          "next": "draw"
+        },
+        {
+          "id": "song",
+          "text": "The well hummed in agreement. 'A musician's well today, then.'",
+          "action_slot": "thinking",
+          "next": "draw"
+        },
+        {
+          "id": "draw",
+          "text": "{toy} drew up a bucket of cool, clear water and shared it with thirsty friends back home. The end.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_conv_garden_45",
+      "title": "The midnight garden",
+      "buckets": ["evening", "wind_down"],
+      "steps": [
+        {
+          "id": "open",
+          "text": "After dark, the garden behind {room} woke up. The flowers walked. {toy} had to choose where to wander.",
+          "action_slot": "looking",
+          "choices": [
+            { "label": "The roses' tea party", "next": "tea" },
+            { "label": "The sunflower's lecture", "next": "lecture" }
+          ]
+        },
+        {
+          "id": "tea",
+          "text": "The roses poured tiny dewdrop teas. {toy} sipped one and felt very fancy.",
+          "action_slot": "thinking",
+          "next": "moonset"
+        },
+        {
+          "id": "lecture",
+          "text": "The sunflower gave a long speech on the proper angle of leaves. {toy} took polite notes on a leaf.",
+          "action_slot": "thinking",
+          "next": "moonset"
+        },
+        {
+          "id": "moonset",
+          "text": "Just before the moon set, all the flowers bowed and froze still. {toy} crept back to bed, smiling. The end.",
+          "action_slot": "sleeping"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_conv_balloon46_46",
+      "title": "Three balloons, one wish",
+      "buckets": ["always"],
+      "steps": [
+        {
+          "id": "open",
+          "text": "A traveling wish-seller offered {toy} three balloons. Only one held a true wish.",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "The red balloon", "next": "red" },
+            { "label": "The yellow balloon", "next": "yellow" },
+            { "label": "The blue balloon", "next": "blue" }
+          ]
+        },
+        {
+          "id": "red",
+          "text": "Red was warm and bright. {toy} held it carefully and felt its small weight.",
+          "action_slot": "looking",
+          "next": "release"
+        },
+        {
+          "id": "yellow",
+          "text": "Yellow was light and quick. {toy} held its string and felt the breeze tug.",
+          "action_slot": "looking",
+          "next": "release"
+        },
+        {
+          "id": "blue",
+          "text": "Blue was cool and quiet. {toy} held it and felt strangely seen.",
+          "action_slot": "thinking",
+          "next": "release"
+        },
+        {
+          "id": "release",
+          "text": "When {toy} released the balloon, the sky brightened with one tiny new star. The wish-seller winked. They were all true, after all. The end.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_conv_letter_47",
+      "title": "The letter that arrived early",
+      "buckets": ["morning"],
+      "steps": [
+        {
+          "id": "open",
+          "text": "A letter addressed to {toy} arrived a full day early. The postmark was tomorrow's.",
+          "action_slot": "confused",
+          "choices": [
+            { "label": "Open it now", "next": "now" },
+            { "label": "Wait until tomorrow", "next": "wait" }
+          ]
+        },
+        {
+          "id": "now",
+          "text": "Inside was a note: 'You will be brave today.' {toy} squared its shoulders, ready for whatever came.",
+          "action_slot": "thinking",
+          "next": "afternoon"
+        },
+        {
+          "id": "wait",
+          "text": "{toy} placed the letter under the lamp and went about the day. The waiting felt patient and warm.",
+          "action_slot": "thinking",
+          "next": "afternoon"
+        },
+        {
+          "id": "afternoon",
+          "text": "By afternoon, {toy} understood: the bravery was in choosing what to do with a note from the future. Either way was right. The end.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_conv_lullaby_48",
+      "title": "The lullaby thief",
+      "buckets": ["wind_down"],
+      "steps": [
+        {
+          "id": "open",
+          "text": "Somebody was stealing lullabies from the village. By bedtime, no one could remember a single tune.",
+          "action_slot": "confused",
+          "choices": [
+            { "label": "Set a hum trap", "next": "trap" },
+            { "label": "Stay up and listen", "next": "listen" }
+          ]
+        },
+        {
+          "id": "trap",
+          "text": "{toy} hummed a brand new tune very softly. A small velvet creature crept out and tried to gather it up.",
+          "action_slot": "looking",
+          "next": "meet"
+        },
+        {
+          "id": "listen",
+          "text": "Past midnight, {toy} heard the softest rustling and saw a small velvet creature scooping up an old lullaby like a leaf.",
+          "action_slot": "looking",
+          "next": "meet"
+        },
+        {
+          "id": "meet",
+          "text": "The creature wasn't stealing — it had been collecting lost ones to bring back. It returned every tune by morning. The end.",
+          "action_slot": "sleeping"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_conv_train_49",
+      "title": "The train that only ran on Tuesdays",
+      "buckets": ["always"],
+      "steps": [
+        {
+          "id": "open",
+          "text": "A small train arrived at the platform every Tuesday afternoon and only on Tuesdays. {toy} climbed aboard.",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Sit by the window", "next": "window" },
+            { "label": "Sit in the dining car", "next": "dining" }
+          ]
+        },
+        {
+          "id": "window",
+          "text": "Outside the window, the world slowly turned to a watercolor — soft and just a little blurred. {toy} pressed its nose to the glass.",
+          "action_slot": "looking",
+          "next": "stop"
+        },
+        {
+          "id": "dining",
+          "text": "In the dining car, a fox waiter served tea and a slice of clouds-and-cream pie. {toy} took small grateful bites.",
+          "action_slot": "thinking",
+          "next": "stop"
+        },
+        {
+          "id": "stop",
+          "text": "The train stopped at a sunlit village neither on any map. {toy} stepped out and waved as it pulled away. The end.",
+          "action_slot": "waving"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_conv_dragontea_50",
+      "title": "Tea with the friendly dragon",
+      "buckets": ["afternoon", "evening"],
+      "steps": [
+        {
+          "id": "open",
+          "text": "A polite dragon named Saskia invited {toy} to tea at the top of a hill. {toy} brought a small gift.",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "A jar of jam", "next": "jam" },
+            { "label": "A book of poems", "next": "poems" },
+            { "label": "A sprig of mint", "next": "mint" }
+          ]
+        },
+        {
+          "id": "jam",
+          "text": "Saskia spread the jam on a piece of dragon toast. 'You have excellent taste,' she rumbled, pleased.",
+          "action_slot": "cheering",
+          "next": "tea"
+        },
+        {
+          "id": "poems",
+          "text": "Saskia read three poems aloud, her voice deep and slow. {toy} listened with both ears wide open.",
+          "action_slot": "thinking",
+          "next": "tea"
+        },
+        {
+          "id": "mint",
+          "text": "Saskia tucked the mint into her teapot. 'A perfect afternoon needs a perfect garnish,' she said.",
+          "action_slot": "thinking",
+          "next": "tea"
+        },
+        {
+          "id": "tea",
+          "text": "They sat together as the sun lowered, sipping tea and watching the valley turn gold. {toy} promised to come again. The end.",
+          "action_slot": "cheering"
+        }
+      ]
     }
   ]
 }
