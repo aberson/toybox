@@ -281,7 +281,7 @@ G1 lands first — everyone reads the schema + Pydantic + pydantic-to-ts codegen
 - **Type:** code
 - **Issue:** #73
 - **Flags:** `--reviewers code`
-- **Status:** NOT STARTED
+- **Status:** DONE (2026-05-10)
 - **Depends on:** Step G2 / #72 (lazy-insertion contract + `chosen_label` + `choices_json` + `slot_fills_json` columns required)
 - **Parallel-safe with:** Step G4 / #74 — frontend reads this plan-doc for the `AdvanceRequest` request shape AND the activity-step response shape (`choices: [{label, choice_index}] | null`); pydantic-to-ts codegen formalizes both. G5 / #75 (templates) is parallel-safe with G3 — disjoint file sets
 - **Done when:** `/advance` accepts optional `choice_index`; all four edge rules implemented and unit-tested; all three 400 error codes returned correctly; `chosen_label` recorded on previous step's row when a choice was made and matches the rendered label the kid saw; activity-step response/WS payload extended with `choices: [{label, choice_index}] | null`; idempotency test passes (stale `If-Match-Version` retry → 409 + no row inserted); integration test covers two paths through one branching template; pydantic-to-ts codegen reflects both the new request body shape and the new response field; ruff + mypy strict clean.
