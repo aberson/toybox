@@ -28,6 +28,7 @@ Runs entirely on home hardware. Internet is optional — Claude is reached over 
 | **D** — polish | anti-signal feedback, parent PIN gate, transcripts, "why this?", metrics | ✅ COMPLETE 2026-05-03 |
 | **D** — UAT release gate (M2.5) | bundled human UI verification of steps 16/17/18/21/22/23/24 | OUTSTANDING (run before Phase E) |
 | **iPad-Kiosk** | child kiosk on iPad PWA | iK1–iK4 ✅ 2026-05-04; iK5 (operator doc + on-device UAT) outstanding |
+| **G** — branching gameplay | multi-option choice steps + variable-length activities (offline templates only) | NOT STARTED |
 | **E** — local model + tool-loop + non-linear gameplay (post-v1) | swap Claude OAuth for SFT'd local model, then tool-loop | NOT STARTED — prereq: ≥1 mo telemetry |
 
 ## Stack
@@ -85,6 +86,7 @@ Each phase doc carries the per-step `**Problem:**/**Type:**/**Issue:**/**Flags:*
 | [plan/phase-e.md](plan/phase-e.md) — local model + tool-loop + non-linear gameplay | NOT STARTED |
 | [plan/archive/phase-f-toy-action-sprites.md](plan/archive/phase-f-toy-action-sprites.md) — toy action sprites (SDXL pipeline) | ARCHIVED 2026-05-09 — F1-F8 ✅ 2026-05-06; F9 ❌ 2026-05-07 (c10.dll crash, [#61](https://github.com/aberson/toybox/issues/61)); superseded by Phase F.5 |
 | [plan/phase-f-5-sprite-cartoon-redo.md](plan/phase-f-5-sprite-cartoon-redo.md) — sprite pipeline cartoon redo (SD 1.5 + LCM-LoRA + Tier C composite) | ✅ DONE 2026-05-09 — all 5 steps shipped, [#61](https://github.com/aberson/toybox/issues/61) closed via F.5-5 soft-pass |
+| [plan/phase-g-branching-gameplay.md](plan/phase-g-branching-gameplay.md) — branching gameplay (multi-option steps + variable length) | NOT STARTED — schema + Pydantic + DB migration + API + frontend + 4 branching templates + UAT |
 
 ### Other planning docs
 
