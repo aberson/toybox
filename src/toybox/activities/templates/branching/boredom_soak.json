@@ -362,6 +362,182 @@
         { "id": "candy_end", "text": "You drift over peaks of marshmallow. {toy} pretends to nibble a cloud and grins.", "action_slot": "cheering" },
         { "id": "sea_end", "text": "Wide blue stretches below. The breeze is hush-quiet. {toy} dozes on your shoulder.", "action_slot": "sleeping" }
       ]
+    },
+    {
+      "id": "boredom_soak_balance_21",
+      "title": "Balance the {prop} on your {body_part}",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "{toy} announces a balancing challenge in {room}!", "action_slot": "cheering" },
+        { "text": "Place a soft {prop} on top of your {body_part}.", "action_slot": "thinking" },
+        { "text": "Stand still for {count} slow breaths without dropping it.", "action_slot": "idle" },
+        { "text": "Feeling brave? Pick the next round.", "action_slot": "thinking", "id": "balance_choice", "choices": [
+          { "label": "Walk in a slow circle", "next": "walk_end" },
+          { "label": "Try a gentle spin", "next": "spin_end" }
+        ] },
+        { "id": "walk_end", "text": "You glide around like a circus star. {toy} applauds with two tiny paws.", "action_slot": "waving" },
+        { "id": "spin_end", "text": "WHOOSH! It tumbles, but you laugh and catch it. {toy} declares it the best try.", "action_slot": "cheering" }
+      ]
+    },
+    {
+      "id": "boredom_soak_shadow_22",
+      "title": "Shadow puppet duet",
+      "buckets": ["evening"],
+      "steps": [
+        { "text": "{toy} dims the lights in {room}. Time for shadows!", "action_slot": "thinking" },
+        { "text": "Hold up your {body_part} and watch its shadow stretch tall.", "action_slot": "looking" },
+        { "text": "Make {count} different animal shapes with your hands.", "action_slot": "thinking" },
+        { "text": "Pick a shadow story to act out.", "action_slot": "thinking", "id": "shadow_story", "choices": [
+          { "label": "A bunny meets a wolf", "next": "bunny_end" },
+          { "label": "A bird teaches a fish to fly", "next": "bird_end" }
+        ] },
+        { "id": "bunny_end", "text": "The bunny offers the wolf a {prop}. They become best friends. {toy} sniffles happily.", "action_slot": "cheering" },
+        { "id": "bird_end", "text": "Together they soar over {room}. The fish glows with joy. Beautiful ending.", "action_slot": "cheering" }
+      ]
+    },
+    {
+      "id": "boredom_soak_handshake_23",
+      "title": "Invent a secret handshake",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "Pick the foundation for your handshake with {toy}.", "action_slot": "thinking", "id": "shake_base", "choices": [
+          { "label": "Tap your {body_part} {count} times", "next": "tap_build" },
+          { "label": "Touch a {prop} between you", "next": "prop_build" }
+        ] },
+        { "id": "tap_build", "text": "Now add a wiggle and a high-pitched yip.", "action_slot": "jumping", "next": "rehearse" },
+        { "id": "prop_build", "text": "Now add a big swooping wave at the end.", "action_slot": "waving", "next": "rehearse" },
+        { "id": "rehearse", "text": "Practice it {count} times in a row with {toy}.", "action_slot": "cheering" },
+        { "text": "Speed it up! Now even faster!", "action_slot": "running" },
+        { "text": "Final round: do it perfectly slow and serious.", "action_slot": "thinking" },
+        { "text": "{toy} declares the handshake official. Top secret!", "action_slot": "waving" }
+      ]
+    },
+    {
+      "id": "boredom_soak_yoga_24",
+      "title": "{toy} leads animal yoga",
+      "buckets": ["wind_down"],
+      "steps": [
+        { "text": "{toy} sits cross-legged in {room}. Welcome to gentle yoga.", "action_slot": "idle" },
+        { "text": "Pick the first pose.", "action_slot": "thinking", "id": "pose_pick", "choices": [
+          { "label": "Sleepy turtle", "next": "turtle_pose" },
+          { "label": "Brave lion", "next": "lion_pose" },
+          { "label": "Floating jellyfish", "next": "jelly_pose" }
+        ] },
+        { "id": "turtle_pose", "text": "Tuck your {body_part} in close. Hold for {count} slow breaths.", "action_slot": "sleeping", "next": "transition" },
+        { "id": "lion_pose", "text": "Stretch tall and roar quietly through your nose.", "action_slot": "thinking", "next": "transition" },
+        { "id": "jelly_pose", "text": "Wiggle every {body_part} you can. Soft and floppy.", "action_slot": "thinking", "next": "transition" },
+        { "id": "transition", "text": "Now flow into a tall tree pose with arms up.", "action_slot": "idle" },
+        { "text": "Rest one hand on your chest. Feel it rise and fall.", "action_slot": "sleeping" },
+        { "text": "Whisper goodnight to {toy}. Yoga complete.", "action_slot": "sleeping" }
+      ]
+    },
+    {
+      "id": "boredom_soak_messenger_25",
+      "title": "Carrier mission across {room}",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "{toy} hands you a tiny message rolled into a {prop}.", "action_slot": "pointing" },
+        { "text": "You must {action_verb} across {room} without dropping it.", "action_slot": "running" },
+        { "text": "Choose your route.", "action_slot": "thinking", "id": "route_pick", "choices": [
+          { "label": "Hop over the cushion canyon", "next": "canyon" },
+          { "label": "Crawl under the chair tunnel", "next": "tunnel" },
+          { "label": "Skip across the rug river", "next": "river" }
+        ] },
+        { "id": "canyon", "text": "You leap with {count} brave hops.", "action_slot": "jumping", "next": "drop_off" },
+        { "id": "tunnel", "text": "You shimmy through, {body_part} first.", "action_slot": "running", "next": "drop_off" },
+        { "id": "river", "text": "Each rug-stone wobbles but you stay upright.", "action_slot": "jumping", "next": "drop_off" },
+        { "id": "drop_off", "text": "Deliver the message to the far corner of {room}.", "action_slot": "pointing" },
+        { "text": "{toy} unrolls it and gasps. Mission complete!", "action_slot": "cheering" }
+      ]
+    },
+    {
+      "id": "boredom_soak_inventor_26",
+      "title": "Inventor's workshop",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "{toy} flips open a notebook. What shall we invent today?", "action_slot": "thinking", "id": "invent_pick", "choices": [
+          { "label": "A device that {action_verb}s {prop}s", "next": "verb_machine" },
+          { "label": "A hat that reads minds", "next": "mind_hat" },
+          { "label": "A pillow that hums lullabies", "next": "hum_pillow" }
+        ] },
+        { "id": "verb_machine", "text": "Sketch it on the air with your {body_part}. Add {count} buttons.", "action_slot": "thinking", "next": "build" },
+        { "id": "mind_hat", "text": "Place an invisible hat on {toy}'s head and tighten the strap.", "action_slot": "thinking", "next": "build" },
+        { "id": "hum_pillow", "text": "Fluff a pillow and hum a soft tune into it.", "action_slot": "thinking", "next": "build" },
+        { "id": "build", "text": "Now build a working prototype using whatever is in {room}.", "action_slot": "looking" },
+        { "text": "Test it carefully. Does it work?", "action_slot": "thinking" },
+        { "text": "{toy} declares the patent yours. Invention named and signed!", "action_slot": "cheering" }
+      ]
+    },
+    {
+      "id": "boredom_soak_morningstretch_27",
+      "title": "Wake-up parade",
+      "buckets": ["morning"],
+      "steps": [
+        { "text": "{toy} stretches both arms wide. The wake-up parade begins in {room}!", "action_slot": "cheering" },
+        { "text": "March in place lifting your knees high. {count} big steps.", "action_slot": "running" },
+        { "text": "Wiggle every {body_part} you can name out loud.", "action_slot": "jumping" },
+        { "text": "Grab a {prop} and use it as a parade banner.", "action_slot": "waving" },
+        { "text": "Ready for the grand finale?", "action_slot": "thinking", "id": "finale", "choices": [
+          { "label": "A {adjective} dance freeze", "next": "freeze_end" },
+          { "label": "A loud cheer to the ceiling", "next": "cheer_end" }
+        ] },
+        { "id": "freeze_end", "text": "Stop mid-pose and hold it! {toy} cracks up. Day officially started.", "action_slot": "thinking" },
+        { "id": "cheer_end", "text": "HOORAY! {toy} echoes back. The morning belongs to you.", "action_slot": "cheering" }
+      ]
+    },
+    {
+      "id": "boredom_soak_zoo_28",
+      "title": "Backyard zoo tour",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "{toy} hands you a clipboard. You are today's zookeeper of {room}.", "action_slot": "pointing" },
+        { "text": "Pick which exhibit to visit first.", "action_slot": "thinking", "id": "zoo_pick", "choices": [
+          { "label": "The cushion penguins", "next": "penguin" },
+          { "label": "The pillow elephants", "next": "elephant" },
+          { "label": "The lamp giraffes", "next": "giraffe" }
+        ] },
+        { "id": "penguin", "text": "Waddle close on stiff legs. Feed them an imaginary fish from your {body_part}.", "action_slot": "thinking", "next": "tour_middle" },
+        { "id": "elephant", "text": "Bow low and offer a {prop} as a gentle gift.", "action_slot": "thinking", "next": "tour_middle" },
+        { "id": "giraffe", "text": "Stretch tall on tiptoe to greet them at eye level.", "action_slot": "looking", "next": "tour_middle" },
+        { "id": "tour_middle", "text": "Note {count} interesting things in your zookeeper journal.", "action_slot": "thinking" },
+        { "text": "Tour the rest of the zoo at a slow stroll.", "action_slot": "idle" },
+        { "text": "{toy} signs your zookeeper badge. You earned it!", "action_slot": "cheering" }
+      ]
+    },
+    {
+      "id": "boredom_soak_seedling_29",
+      "title": "Plant a magic seedling",
+      "buckets": ["wind_down"],
+      "steps": [
+        { "text": "{toy} cups an imaginary seed in its tiny paws.", "action_slot": "thinking" },
+        { "text": "Find a soft spot in {room} to plant it.", "action_slot": "looking" },
+        { "text": "Pat the ground with your {body_part} and whisper a wish.", "action_slot": "thinking" },
+        { "text": "Water it with a pretend {prop}.", "action_slot": "pointing" },
+        { "text": "What kind of plant grows up?", "action_slot": "thinking", "id": "plant_kind", "choices": [
+          { "label": "A tree of glowing fruit", "next": "tree_end" },
+          { "label": "A flower that hums lullabies", "next": "flower_end" }
+        ] },
+        { "id": "tree_end", "text": "It grows tall and sparkles softly above you. {toy} picks one fruit and shares it.", "action_slot": "cheering" },
+        { "id": "flower_end", "text": "It blooms and hums you both calm. {toy} closes its eyes happily.", "action_slot": "sleeping" }
+      ]
+    },
+    {
+      "id": "boredom_soak_radiostation_30",
+      "title": "Pirate radio from {room}",
+      "buckets": ["evening"],
+      "steps": [
+        { "text": "{toy} flips a switch on an imaginary control board. We are LIVE from {room}.", "action_slot": "pointing" },
+        { "text": "Pick the show format.", "action_slot": "thinking", "id": "show_pick", "choices": [
+          { "label": "Mystery hour", "next": "mystery" },
+          { "label": "Joke parade", "next": "jokes" },
+          { "label": "Calm story slow-down", "next": "calm" }
+        ] },
+        { "id": "mystery", "text": "Hold a {prop} as the microphone and tell a creepy {adjective} tale.", "action_slot": "thinking", "next": "callin" },
+        { "id": "jokes", "text": "Hold a {prop} as the microphone and tell {count} silly jokes.", "action_slot": "cheering", "next": "callin" },
+        { "id": "calm", "text": "Hold a {prop} as the microphone and read in a soft slow voice.", "action_slot": "sleeping", "next": "callin" },
+        { "id": "callin", "text": "A caller dials in! {toy} pretends to be a fan from far away.", "action_slot": "waving" },
+        { "text": "Sign off with your station's catchphrase.", "action_slot": "waving" }
+      ]
     }
   ]
 }
