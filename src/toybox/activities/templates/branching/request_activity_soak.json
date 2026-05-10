@@ -736,6 +736,352 @@
           "action_slot": "thinking"
         }
       ]
+    },
+    {
+      "id": "request_activity_soak_paperdoll_21",
+      "title": "Make a paper-doll friend",
+      "buckets": ["afternoon", "evening"],
+      "steps": [
+        { "text": "Fold a piece of paper in half. Sit beside {toy} the design assistant.", "action_slot": "idle" },
+        { "text": "Draw half a person along the fold — head, body, one arm, one leg.", "action_slot": "thinking" },
+        { "text": "Cut along the outline (with help if scissors are tricky), then unfold.", "action_slot": "thinking" },
+        { "text": "Color the doll's face with eyes, nose, and a smile.", "action_slot": "thinking" },
+        {
+          "id": "outfit_pick",
+          "text": "What is this paper friend wearing today?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "A superhero cape", "next": "cape_end" },
+            { "label": "A garden-party dress", "next": "dress_end" }
+          ]
+        },
+        {
+          "id": "cape_end",
+          "text": "Tear a small triangle of paper, color it, and tape it to the doll's shoulders.",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "dress_end",
+          "text": "Draw flowers and ruffles down the doll's body. Pick a name and tell {toy}.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_secrethandshake_22",
+      "title": "Invent a secret handshake",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "Stand face to face with {toy} (or a grown-up) in the middle of {room}.", "action_slot": "pointing" },
+        { "text": "Pick a starting move — a regular high-five works great.", "action_slot": "thinking" },
+        { "text": "Add a second move: maybe a low-five or a fist bump.", "action_slot": "thinking" },
+        { "text": "Add a third move: a spin, a jump, a wiggle — anything!", "action_slot": "jumping" },
+        {
+          "id": "finisher",
+          "text": "Pick a big finishing move for the handshake.",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Double clap and shout", "next": "clap_finish" },
+            { "label": "Slow-motion bow", "next": "bow_finish" }
+          ]
+        },
+        {
+          "id": "clap_finish",
+          "text": "Run the whole handshake start to end three times. End each time with the loud clap-and-shout.",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "bow_finish",
+          "text": "Run the whole handshake start to end three times. End each time with the slow bow.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_pillowmountain_23",
+      "title": "Map a pillow mountain expedition",
+      "buckets": ["morning", "afternoon"],
+      "steps": [
+        { "text": "Pile every pillow you can find into one big mountain in {room}.", "action_slot": "pointing" },
+        { "text": "Plant a paper flag (a folded sheet on a pencil) at the very top.", "action_slot": "thinking" },
+        { "text": "Walk slowly around the mountain three times to scout the climb.", "action_slot": "looking" },
+        { "text": "Pick a 'base camp' on one side and place {toy} there.", "action_slot": "pointing" },
+        { "text": "Climb (or scoot) carefully from base camp toward the flag.", "action_slot": "thinking" },
+        {
+          "id": "summit_act",
+          "text": "What do you do when you reach the summit?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Plant a victory roar", "next": "roar_end" },
+            { "label": "Slide back down on your bottom", "next": "slide_end" }
+          ]
+        },
+        {
+          "id": "roar_end",
+          "text": "Stand tall, beat your chest, and let out one giant ROAR. {toy} cheers from base camp.",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "slide_end",
+          "text": "Sit down on the top pillow and slide-tumble back to {toy}, giggling the whole way.",
+          "action_slot": "running"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_botanyjar_24",
+      "title": "Build a pretend bug jar",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "Find an empty cup, jar, or bowl to be your collecting jar.", "action_slot": "looking" },
+        { "text": "Tear paper into ten small pieces and crumple them into pretend leaves.", "action_slot": "thinking" },
+        { "text": "Drop the pretend leaves into the jar with {toy} as the field assistant.", "action_slot": "pointing" },
+        { "text": "Cut three tiny paper bugs — a beetle, a worm, a ladybug — and tuck them in.", "action_slot": "thinking" },
+        {
+          "id": "lid_pick",
+          "text": "How will you cover the bug jar?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "A breathable paper-towel lid", "next": "paper_lid" },
+            { "label": "A plastic-wrap window lid", "next": "wrap_lid" }
+          ]
+        },
+        {
+          "id": "paper_lid",
+          "text": "Tear a square of paper towel and rest it gently on top. Show {toy} how the bugs can breathe.",
+          "action_slot": "pointing"
+        },
+        {
+          "id": "wrap_lid",
+          "text": "Lay a square of plastic wrap (or tissue paper) on top. Watch the bugs through the window with {toy}.",
+          "action_slot": "looking"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_sockrace_25",
+      "title": "Sock-ball relay race",
+      "buckets": ["morning", "afternoon"],
+      "steps": [
+        { "text": "Roll three pairs of clean socks into three soft balls in {room}.", "action_slot": "pointing" },
+        {
+          "id": "course_choice",
+          "text": "How should the relay course look?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Straight sprint to {toy}", "next": "sprint_path" },
+            { "label": "Zig-zag around pillow cones", "next": "zigzag_path" },
+            { "label": "Crawl-tunnel under a chair", "next": "crawl_path" }
+          ]
+        },
+        {
+          "id": "sprint_path",
+          "text": "Line the sock-balls up at the start. Carry one at a time to {toy} as fast as you can.",
+          "action_slot": "running",
+          "next": "count_results"
+        },
+        {
+          "id": "zigzag_path",
+          "text": "Set three pillows in a zig-zag. Weave each sock-ball through to {toy}.",
+          "action_slot": "running",
+          "next": "count_results"
+        },
+        {
+          "id": "crawl_path",
+          "text": "Set up a chair tunnel. Push each sock-ball under it on your hands and knees.",
+          "action_slot": "running",
+          "next": "count_results"
+        },
+        {
+          "id": "count_results",
+          "text": "Count the sock-balls now sitting with {toy}. Cheer your finishing time.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_dollhouse_26",
+      "title": "Set up a one-room dollhouse",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "Pick a shoebox, a drawer, or an open book as the dollhouse frame.", "action_slot": "looking" },
+        {
+          "id": "room_pick",
+          "text": "What kind of room is this?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "A cozy bedroom", "next": "bedroom_path" },
+            { "label": "A busy kitchen", "next": "kitchen_path" },
+            { "label": "A tiny art studio", "next": "studio_path" }
+          ]
+        },
+        {
+          "id": "bedroom_path",
+          "text": "Fold a tissue into a tiny bed. Add a pencil-eraser pillow.",
+          "action_slot": "thinking",
+          "next": "add_resident"
+        },
+        {
+          "id": "kitchen_path",
+          "text": "Stand a bottle cap on its side as a stove. Tear paper triangles for pizza slices.",
+          "action_slot": "thinking",
+          "next": "add_resident"
+        },
+        {
+          "id": "studio_path",
+          "text": "Roll a paper square into a tiny canvas. Set crayon-stub paint pots beside it.",
+          "action_slot": "thinking",
+          "next": "add_resident"
+        },
+        {
+          "id": "add_resident",
+          "text": "Move {toy} (or a small toy) into the room as the resident.",
+          "action_slot": "pointing",
+          "next": "tour"
+        },
+        {
+          "id": "tour",
+          "text": "Give a tour out loud — three things {toy} can see from inside.",
+          "action_slot": "pointing"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_weatherjar_27",
+      "title": "Make a {adjective} weather jar",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "Find a clear cup or jar and a piece of cotton (or torn tissue) for clouds.", "action_slot": "looking" },
+        { "text": "Tear blue paper into tiny rain-drop scraps and a yellow paper sun.", "action_slot": "thinking" },
+        { "text": "Layer the cotton 'cloud' near the top, sun on one side, rain scraps below.", "action_slot": "thinking" },
+        {
+          "id": "weather_kind",
+          "text": "What kind of weather is brewing in this jar?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "A bright sunny day", "next": "sunny_end" },
+            { "label": "A big thunderstorm", "next": "storm_end" }
+          ]
+        },
+        {
+          "id": "sunny_end",
+          "text": "Push the sun to the front and the cloud to the side. Tell {toy} the picnic plan.",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "storm_end",
+          "text": "Push the cloud to the front. Tap the jar like raindrops while {toy} hides under a pillow umbrella.",
+          "action_slot": "thinking"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_libraryday_28",
+      "title": "Set up a tiny lending library",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "Stack five small books on a low shelf or floor patch with {toy}.", "action_slot": "pointing" },
+        { "text": "Make a paper sign that says LIBRARY and tape it above the stack.", "action_slot": "thinking" },
+        { "text": "Tear five paper squares as borrower cards — one per book.", "action_slot": "thinking" },
+        {
+          "id": "library_event",
+          "text": "What special library event happens today?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "A read-aloud story hour", "next": "story_hour" },
+            { "label": "A best-cover-art contest", "next": "art_contest" }
+          ]
+        },
+        {
+          "id": "story_hour",
+          "text": "Pick one book, sit {toy} beside you, and read or tell the first page out loud.",
+          "action_slot": "pointing"
+        },
+        {
+          "id": "art_contest",
+          "text": "Line the books up cover-out. Have {toy} pick the best cover and award it a paper ribbon.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_freezeframe_29",
+      "title": "Freeze-frame photo studio",
+      "buckets": ["morning", "afternoon"],
+      "steps": [
+        { "text": "Stand in a clear corner of {room} with {toy} as the photographer.", "action_slot": "idle" },
+        { "text": "Pretend to hold up a camera and say 'CLICK' to start a pose.", "action_slot": "pointing" },
+        {
+          "id": "pose_theme",
+          "text": "What is the photo theme today?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Superhero poses", "next": "hero_path" },
+            { "label": "Animal poses", "next": "animal_path" },
+            { "label": "Funny-face poses", "next": "face_path" }
+          ]
+        },
+        {
+          "id": "hero_path",
+          "text": "Hold three different superhero poses. Freeze for three seconds each.",
+          "action_slot": "cheering",
+          "next": "review"
+        },
+        {
+          "id": "animal_path",
+          "text": "Pose as three different animals. Freeze and make the animal sound.",
+          "action_slot": "thinking",
+          "next": "review"
+        },
+        {
+          "id": "face_path",
+          "text": "Make three of the silliest faces you can. Freeze long enough for {toy} to 'click'.",
+          "action_slot": "confused",
+          "next": "review"
+        },
+        {
+          "id": "review",
+          "text": "Pretend to scroll through the photos with {toy} and pick the best one.",
+          "action_slot": "thinking"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_origamisearch_30",
+      "title": "Origami treasure quest",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "Sit at a flat surface with paper, {toy}, and a calm minute.", "action_slot": "idle" },
+        { "text": "Fold a paper square diagonally to make a triangle.", "action_slot": "thinking" },
+        { "text": "Fold the two side corners up to meet at the top — that's a paper boat-ish shape.", "action_slot": "thinking" },
+        { "text": "Open the bottom flap and pinch into a small cup.", "action_slot": "thinking" },
+        {
+          "id": "treasure_kind",
+          "text": "What goes in your origami cup?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Three small treasures from {room}", "next": "treasure_path" },
+            { "label": "A folded paper note for {toy}", "next": "note_path" }
+          ]
+        },
+        {
+          "id": "treasure_path",
+          "text": "Hunt for three pocket-size treasures and drop them in the cup.",
+          "action_slot": "looking",
+          "next": "present"
+        },
+        {
+          "id": "note_path",
+          "text": "Write or draw a tiny message on a paper scrap and fold it into the cup.",
+          "action_slot": "thinking",
+          "next": "present"
+        },
+        {
+          "id": "present",
+          "text": "Hold the cup with two hands and present it to {toy} like a royal gift.",
+          "action_slot": "cheering"
+        }
+      ]
     }
   ]
 }
