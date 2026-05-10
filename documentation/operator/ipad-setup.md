@@ -20,10 +20,19 @@ Before touching the iPad:
    place. Confirm by hitting `GET /api/auth/parent/status` from the home
    machine and seeing `{"pin_set": true}`. If not, complete first-run PIN
    setup in the parent UI first.
-2. **Backend is bound to `0.0.0.0`.** Default `localhost` binding is
-   unreachable from the iPad even on the same Wi-Fi.
+2. **Backend is bound to `0.0.0.0` AND `TOYBOX_LAN_IP` is exported in
+   the same shell.** Default `localhost` binding is unreachable from the
+   iPad. Independent of binding, the WS Origin allow-list defaults to
+   loopback only, so the iPad's `http://<lan-ip>:4000` Origin gets
+   rejected with HTTP 403 on the WS handshake (you'll see
+   `"WebSocket /ws" 403 — connection rejected (403 Forbidden)` in the
+   backend log on every kiosk page load). Set `TOYBOX_LAN_IP` in the
+   same PowerShell session **before** launching the backend — the
+   allow-list is computed at request time from the process's
+   environment.
 
    ```powershell
+   $env:TOYBOX_LAN_IP = "192.168.x.x"   # your LAN IPv4 from ipconfig
    uv run python -m toybox.main --host 0.0.0.0 --port 8000
    ```
 3. **Frontend dev server is running with `--host 0.0.0.0`.** Without it,
@@ -88,7 +97,7 @@ Access are the parts that genuinely require hardware.
 | Symptom | What to check |
 |---|---|
 | `audio silent on first transition` | iPad audio unlocks on the first PIN tap (iK4). If a cached token caused the kiosk to skip the PIN screen, audio will be silent on the first transition; subsequent transitions recover after the child's first interaction (any tap is a sufficient user-gesture for iOS to relax autoplay). To prime audio explicitly, sign out and re-enter the PIN once. |
-| `WS won't connect` | Confirm the LAN IP in the URL bar matches `ipconfig` output. Confirm the backend Origin policy allow-lists `http://<lan-ip>:4000` (the LAN-IP origin, not `localhost`). Check that the iPad isn't on a VPN or behind a content filter that rewrites local hostnames. **Confirm iPad and home machine are on the same SSID** — this is the single most common failure mode; guest networks and AP isolation silently drop client-to-client traffic. |
+| `WS won't connect` / `parent approve doesn't sync to kiosk` / backend log shows `"WebSocket /ws" 403 — connection rejected (403 Forbidden)` on every kiosk page load | The kiosk loaded over HTTP fine, but the WS handshake failed because `TOYBOX_LAN_IP` was not set when the backend started, so the iPad's `http://<lan-ip>:4000` Origin isn't in the allow-list. PowerShell does NOT inherit env vars across sessions — set it in the same shell that launches the backend: `$env:TOYBOX_LAN_IP = "192.168.x.x"; uv run python -m toybox.main --host 0.0.0.0 --port 8000`. Also confirm the LAN IP in the URL bar matches `ipconfig`, the iPad isn't on a VPN / content filter that rewrites hostnames, and **iPad and home machine are on the same SSID** — guest networks and AP isolation silently drop client-to-client traffic. |
 | `iPad sleeps mid-activity` | Confirm iPadOS is ≥16.4 — Wake Lock (iK3) requires it and silently no-ops on older versions. On older iPads, set Settings → Display & Brightness → Auto-Lock → Never as the manual fallback. |
 | `add-to-home-screen icon disappears` | iPad treats the home-screen icon as ephemeral — it can be evicted when storage is wiped, when Safari data is cleared, or after some iPadOS major upgrades. Re-add from Safari using the steps above. |
 

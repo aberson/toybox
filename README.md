@@ -85,6 +85,34 @@ cd frontend; npm run dev
 
 Vite pins `server.port: 4000, strictPort: true` and proxies `/api` + `/ws` to the backend at `:8000`.
 
+## Run on iPad (kiosk)
+
+The child kiosk runs on a real iPad over the home Wi-Fi LAN — no proxy, no cloud, no app-store install. Full procedure with troubleshooting is in [`documentation/operator/ipad-setup.md`](documentation/operator/ipad-setup.md). Quick path:
+
+**Prereqs (on the home machine):**
+- Parent PIN is set (LAN binding is gated on this — confirm via `GET /api/auth/parent/status`).
+- Find the home machine's LAN IP (`ipconfig`, IPv4 under the Wi-Fi adapter — not Ethernet, not Hyper-V/Docker/WSL virtual switches).
+- **Set `TOYBOX_LAN_IP` and bind backend to `0.0.0.0` in the same shell** — without this env var the backend's WS Origin allow-list is loopback-only and the iPad's WS handshake will be rejected with HTTP 403:
+  ```powershell
+  $env:TOYBOX_LAN_IP = "192.168.x.x"   # your LAN IP from ipconfig
+  uv run python -m toybox.main --host 0.0.0.0 --port 8000
+  ```
+- Frontend dev server bound to `0.0.0.0`:
+  ```powershell
+  cd frontend; npm run dev -- --host 0.0.0.0
+  ```
+- iPad is on the **same Wi-Fi SSID** as the home machine. Guest networks, AP-isolated SSIDs, and corporate networks that block client-to-client traffic do **not** work.
+
+**On the iPad:**
+1. Open Safari → navigate to `http://<lan-ip>:4000/child`.
+2. Enter the parent PIN once. This confirms LAN reachability and primes iOS audio unlock.
+3. Share button → **Add to Home Screen** → name it `toybox` → Add.
+4. (Recommended) Lock the kiosk to a single app: Settings → Accessibility → Guided Access → toggle On + set a passcode. Open the home-screen icon, then triple-click the side button to start Guided Access. Triple-click + passcode to exit.
+
+**Dev iteration tip:** desktop Safari → Develop → Enter Responsive Design Mode → pick an iPad preset. Catches viewport / orientation / touch issues without a real iPad in front of you. Audio unlock and Guided Access do require the real device.
+
+If something doesn't work (silent audio, WS won't connect, iPad sleeps mid-activity, home-screen icon disappears), the troubleshooting matrix is in [`documentation/operator/ipad-setup.md#troubleshooting`](documentation/operator/ipad-setup.md#troubleshooting).
+
 ## Quality gates
 
 ```powershell
