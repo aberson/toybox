@@ -227,7 +227,7 @@ G1 lands first — everyone reads the schema + Pydantic + pydantic-to-ts codegen
 - **Type:** code
 - **Issue:** #71
 - **Flags:** `--reviewers code`
-- **Status:** NOT STARTED
+- **Status:** DONE (2026-05-09)
 - **Depends on:** none (kicks off Phase G)
 - **Parallel-safe with:** none — strictly first; G2/G3/G4/G5 all read the schema or the Pydantic shape
 - **Done when:** Schema extended; Pydantic models updated; `validate_template_graph()` ships and is wired into `load_templates()`; orphan/cycle/missing-target/ambiguous/choice-count fixtures all rejected with clear errors naming the template; all existing production templates still load; pydantic-to-ts codegen clean; ruff + mypy strict clean.
