@@ -121,11 +121,15 @@ def test_v1_default_path_is_byte_identical(
     assert proposed["id"] == baseline_activity.id
     assert proposed["title"] == baseline_activity.title
 
-    # Step bodies are byte-identical (offline generator's ActivityStep
-    # .text === wire-shape body).
+    # Phase G G2: under lazy insertion the propose response only
+    # carries ``steps[0]`` (subsequent steps are inserted by G3's
+    # advance handler), so we assert the FIRST step body matches the
+    # offline generator's first step. The full template-step list
+    # round-trip is captured in ``activity_json`` below.
     baseline_step_texts = [s.text for s in baseline_activity.steps]
     propose_step_texts = [s["body"] for s in proposed["steps"]]
-    assert propose_step_texts == baseline_step_texts
+    assert len(propose_step_texts) == 1
+    assert propose_step_texts[0] == baseline_step_texts[0]
 
     # signature + hour_bucket + slot_values in metadata also pin the same.
     # signature is the load-bearing hash — if it diverges, downstream
@@ -153,7 +157,10 @@ def test_v1_default_path_is_byte_identical(
     assert persisted_step_texts == baseline_step_texts
 
     # Activity-shape sanity (cheap follow-on assertions).
-    assert len(proposed["steps"]) == 5
+    # Phase G G2: lazy insertion → response has only steps[0]; the
+    # full 5-step template list lives on the persisted Activity model
+    # carried in ``labeled_events.activity_json`` (asserted above).
+    assert len(proposed["steps"]) == 1
     assert proposed["state"] == "proposed"
 
 

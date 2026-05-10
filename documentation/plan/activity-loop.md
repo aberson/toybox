@@ -88,6 +88,10 @@ The Claude-authored template generation work (see Future enhancements: "AI-autho
 
 > **NOTE (Group 2 refinement):** child screen content (avatar + step text + sfx) is the v1 default. Pre-recorded persona voice clips and richer per-step assets are tracked as a Phase D+ refinement. Live parent controls (pause/skip/regenerate/end/"didn't work") are the agreed v1 set; richer mid-activity authoring is a future refinement.
 
+### Lazy step insertion + slot-fill persistence (Phase G G2)
+
+Phase G G2 changed activity creation from inserting all 5 steps up-front to inserting only `steps[0]` into `activity_steps`. The resolved slot map is persisted on `activities.slot_fills_json` (set at creation, encoded with `sort_keys=True`) so the lazy advance handler (G3) can render subsequent step bodies + choice labels with the same fills as step 1 — keeping `{toy}`, `{room}`, `{adjective}` consistent across the kid's whole playthrough. When `steps[0]` has `choices`, the persistence layer renders each `choices[i].label` using the slot fills and writes the JSON-encoded list to `activity_steps.choices_json`; the template's optional `Step.id` lands on the new `activity_steps.step_template_id` column so G3's advance can resolve `next` / `choices[i].next` targets via template lookup. In-flight pre-G2 activities (5 rows pre-seeded, empty `slot_fills_json` from the migration default) keep advancing through the existing linear-fall-through `post_advance` handler unchanged — Phase G is forward-only and additive, no backfill required. Anti-signal signature computation is unaffected: it still hashes `{template_id}:{slot_fingerprint}` from the post-substitution `slot_values` tuple in `Activity.metadata`, NOT from the persisted `slot_fills_json`.
+
 ## Claude path (modes 3+)
 
 Single Claude call with structured-output schema:

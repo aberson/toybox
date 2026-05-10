@@ -168,6 +168,7 @@ Library-source personas cannot be deleted (only edited or hidden).
 | `created_at` | TEXT | |
 | `started_at` | TEXT | nullable |
 | `ended_at` | TEXT | nullable |
+| `slot_fills_json` | TEXT NOT NULL DEFAULT `'{}'` | Phase G G2: JSON-encoded resolved slot map (e.g. `{"toy": "Penguin", "room": "kitchen", "adjective": "sparkly"}`); set at activity creation; read by the lazy advance handler in G3 to render subsequent step bodies + choice labels with the same fills as step 1. Default `'{}'` covers in-flight pre-G2 activities (their pre-seeded step bodies already have rendered fills, so an empty map is correct). |
 
 Mutating activity endpoints accept an `If-Match-Version` header; mismatched versions return HTTP 409 with the current state. Prevents two parent tabs from racing approve/dismiss.
 
@@ -183,6 +184,12 @@ Mutating activity endpoints accept an `If-Match-Version` header; mismatched vers
 | `sfx` | TEXT | sfx tag, e.g. `transition`, `success` |
 | `expected_action` | TEXT | parent coaching hint, not shown to child |
 | `current` | INTEGER (0/1) | one row true at a time per activity |
+| `action_slot` | TEXT | Phase F F6: per-step action vocabulary key for sprite render (one of the 10 `ACTION_SLOTS` or NULL) |
+| `chosen_label` | TEXT | Phase G G2: label of the choice the kid picked at this step, if any; NULL means linear advance or terminal |
+| `choices_json` | TEXT | Phase G G2: JSON array of rendered choice-button labels for this step (e.g. `["Sneak past Penguin", "Charge in"]`); NULL when step has no choices |
+| `step_template_id` | TEXT | Phase G G2: the template's `Step.id` for this step when present; NULL on legacy linear steps. Lets the lazy advance handler resolve `next` / `choices[i].next` targets via template lookup without recovering the array index from rendered body text. |
+
+Phase G G2 lazy insertion: only `steps[0]` is INSERTed into `activity_steps` at activity creation. Subsequent rows land via G3's advance handler, rendered with the activity's persisted `slot_fills_json` so all steps share the same `{toy}`/`{room}`/`{adjective}` fills. In-flight pre-G2 activities (5 rows pre-seeded, empty `slot_fills_json`) keep advancing through the existing linear-fall-through handler unchanged.
 
 ### `sessions`
 | Column | Type | Notes |

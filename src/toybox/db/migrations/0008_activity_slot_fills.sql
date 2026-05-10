@@ -1,0 +1,38 @@
+-- Phase G Step G2 — branching gameplay: persisted slot-fill map.
+--
+-- See documentation/plan/phase-g-branching-gameplay.md §G2 +
+-- §"Slot-fill persistence". Today the offline generator resolves
+-- every ``{slot}`` placeholder ONCE per activity (deterministic from
+-- seed) and embeds the rendered string directly into each
+-- pre-seeded step's ``body``. That worked while the generator
+-- pre-seeded all 5 steps at activity creation, but G2 switches to
+-- lazy step insertion (only ``steps[0]`` lands in
+-- ``activity_steps`` at creation; subsequent steps are inserted by
+-- G3's advance handler). The advance handler MUST render later
+-- step bodies + choice labels with the SAME slot fills as step 1
+-- so the kid's experience is coherent — hence this column,
+-- populated at activity creation by the generator path in
+-- ``api.activities._persist_activity``.
+--
+-- Shape: JSON object map of slot-name → resolved-value, e.g.
+-- ``{"toy": "Penguin", "room": "kitchen", "adjective": "sparkly"}``.
+-- Encoded with ``sort_keys=True`` so byte-identity holds across
+-- reads (matches the canonical-JSON convention used elsewhere in
+-- the propose flow's summary envelope).
+--
+-- Default ``'{}'`` covers in-flight activities that predate this
+-- migration: their pre-seeded step bodies already have rendered
+-- fills, so an empty map is correct (the lazy advance handler is
+-- never called on them — all their steps already exist). New
+-- activities populated by the post-G2 generator path always have
+-- a non-empty map when the picked template uses any slot.
+--
+-- Anti-signal feedback (toybox.activities.feedback) does NOT read
+-- this column — its signature is hashed from ``slot_values``
+-- (post-substitution tuple) on the Activity model and persists
+-- inside the ``activities.summary`` JSON envelope. Adding this
+-- column does not change feedback semantics.
+--
+-- Forward-only; no rollback path (invariant 10).
+
+ALTER TABLE activities ADD COLUMN slot_fills_json TEXT NOT NULL DEFAULT '{}';

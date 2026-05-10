@@ -57,7 +57,9 @@ def test_propose_persists_and_emits_action_slot(
         body = cast("dict[str, Any]", response.json())
 
         # --- REST contract: every step has a valid slot ----------------
-        assert len(body["steps"]) == 5
+        # Phase G G2: lazy insertion → propose response has only steps[0].
+        # Subsequent steps land via G3's advance handler.
+        assert len(body["steps"]) == 1
         for step in body["steps"]:
             slot = step["action_slot"]
             # The seeded boredom + always-pool template hand-authors a
@@ -83,7 +85,8 @@ def test_propose_persists_and_emits_action_slot(
             ).fetchall()
         finally:
             conn.close()
-        assert len(rows) == 5
+        # Phase G G2: lazy insertion → only steps[0] persisted at creation.
+        assert len(rows) == 1
         rest_by_seq = {int(s["seq"]): s["action_slot"] for s in body["steps"]}
         for r in rows:
             seq = int(r["seq"])
@@ -99,7 +102,8 @@ def test_propose_persists_and_emits_action_slot(
         assert envelope.topic is Topic.activity_state
         assert envelope.payload["id"] == activity_id
         ws_steps = envelope.payload["steps"]
-        assert len(ws_steps) == 5
+        # Phase G G2: WS payload mirrors DB → only steps[0] until G3 advances.
+        assert len(ws_steps) == 1
         ws_by_seq = {int(s["seq"]): s["action_slot"] for s in ws_steps}
         assert ws_by_seq == rest_by_seq
     finally:
@@ -130,7 +134,8 @@ def test_propose_action_slot_round_trips_through_get(
     )
     assert follow_up.status_code == 200
     get_steps = follow_up.json()["steps"]
-    assert len(get_steps) == 5
+    # Phase G G2: lazy insertion → only steps[0] visible through GET.
+    assert len(get_steps) == 1
     for ps, gs in zip(propose_steps, get_steps, strict=True):
         assert ps["action_slot"] == gs["action_slot"]
         assert gs["action_slot"] in ACTION_SLOTS

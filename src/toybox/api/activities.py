@@ -552,6 +552,18 @@ def _row_to_response(
     raw_reasoning = metadata.get("persona_reasoning")
     if isinstance(raw_reasoning, str) and raw_reasoning:
         persona_reasoning = raw_reasoning
+    # Phase G G2 (iter-2): ``slot_fills`` is persistence-only telemetry
+    # (the lazy advance handler in G3 reads it from
+    # ``activities.slot_fills_json``, NOT from the wire) — no UI consumes
+    # the raw slot map. Strip it here so neither the REST GET nor the WS
+    # ``activity.state`` envelope (which derives from this same response
+    # via ``_emit_state``) leaks it. ``room`` can carry parent-authored
+    # names (e.g. "Mom's office"); future slots like ``child_name`` would
+    # auto-leak to the child kiosk without code change. Stripping at this
+    # one chokepoint covers both surfaces — the model_dump in
+    # ``_emit_state`` sees the already-cleaned metadata, and there's no
+    # second read path that bypasses ``_row_to_response``.
+    metadata = {k: v for k, v in metadata.items() if k != "slot_fills"}
     return ActivityResponse(
         id=activity_id,
         state=str(row["state"]),
@@ -614,16 +626,45 @@ def _persist_activity(
     steps: list[dict[str, Any]],
     state: str,
     toy_ids: Sequence[str] = (),
+    slot_fills: dict[str, str] | None = None,
 ) -> None:
+    """Insert one ``activities`` row plus ONLY the first step row.
+
+    Phase G G2: this is the lazy-insertion path. ``steps`` is the
+    full list of template steps (so the propose flow can keep
+    delivering byte-identical Activity envelopes), but only
+    ``steps[0]`` is actually written to ``activity_steps``. The row
+    is marked ``current=1`` so the advance handler can flip it to
+    the next template step on the first ``/advance`` POST. Subsequent
+    template steps are inserted lazily by G3's advance handler,
+    rendered with the persisted ``activities.slot_fills_json`` so
+    the kid's experience stays coherent (same ``{toy}``, same
+    ``{adjective}``, same ``{room}`` across all steps).
+
+    The new ``slot_fills`` argument carries the resolved slot map
+    (slot-name → value, e.g.
+    ``{"toy": "Penguin", "room": "kitchen", "adjective": "sparkly"}``)
+    that the generator computed at creation time. Encoded with
+    ``sort_keys=True`` so byte-identity holds across reads. Defaults
+    to ``None`` → empty ``'{}'`` for callers that don't have a
+    resolver in the loop (smoke / fixture / test paths) — matches
+    the migration default for in-flight pre-G2 activities.
+    """
     summary_blob = json.dumps(summary_payload, sort_keys=True)
+    # Phase G: persist the resolved slot map. ``sort_keys=True`` is
+    # load-bearing — multiple generator runs with the same template
+    # + seed should produce byte-identical ``slot_fills_json`` so a
+    # downstream byte-comparison test (e.g. activity-id determinism)
+    # does not flap on dict-iteration order.
+    slot_fills_blob = json.dumps(slot_fills or {}, sort_keys=True)
     created_at = _now_iso()
     toy_ids_blob = json.dumps(list(toy_ids)) if toy_ids else None
     with conn:
         conn.execute(
             "INSERT INTO activities "
             "(id, session_id, state, version, summary, persona_id, child_ids, room_ids, "
-            " toy_ids, intent_source, created_at, started_at, ended_at) "
-            "VALUES (?, ?, ?, 1, ?, ?, ?, NULL, ?, ?, ?, NULL, NULL)",
+            " toy_ids, intent_source, created_at, started_at, ended_at, slot_fills_json) "
+            "VALUES (?, ?, ?, 1, ?, ?, ?, NULL, ?, ?, ?, NULL, NULL, ?)",
             (
                 activity_id,
                 session_id,
@@ -634,24 +675,49 @@ def _persist_activity(
                 toy_ids_blob,
                 intent_source,
                 created_at,
+                slot_fills_blob,
             ),
         )
-        for step in steps:
+        # Phase G G2 — lazy step insertion. We INSERT only ``steps[0]``;
+        # the advance handler in G3 inserts subsequent steps as the
+        # kid progresses. The first step is marked ``current=1`` so
+        # the kiosk has something to render the moment the activity
+        # is approved. ``choices_json`` and ``step_template_id`` are
+        # populated when the template carries them on this step.
+        if steps:
+            first = steps[0]
+            choices_rendered = first.get("choices_rendered")
+            choices_blob: str | None
+            if choices_rendered is None:
+                choices_blob = None
+            else:
+                # Always encode as a JSON list of strings; sort_keys
+                # is irrelevant for arrays but kept off so tests can
+                # pin the exact label ordering the kiosk renders.
+                choices_blob = json.dumps(list(choices_rendered))
             conn.execute(
                 "INSERT INTO activity_steps "
-                "(id, activity_id, seq, body, sfx, expected_action, current, action_slot) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "(id, activity_id, seq, body, sfx, expected_action, current, action_slot, "
+                " choices_json, step_template_id) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     str(uuid.uuid4()),
                     activity_id,
-                    step["seq"],
-                    step["body"],
-                    step.get("sfx"),
-                    step.get("expected_action"),
-                    1 if step.get("current") else 0,
+                    first["seq"],
+                    first["body"],
+                    first.get("sfx"),
+                    first.get("expected_action"),
+                    # Phase G: the inserted row is the kid's starting
+                    # step. Mark it ``current=1`` regardless of what
+                    # the caller passed — under lazy insertion there
+                    # is exactly ONE row at creation and it must be
+                    # current for the kiosk to render anything.
+                    1,
                     # Phase F Step F6: per-step action slot. None for
                     # legacy callers / templates that don't set it.
-                    step.get("action_slot"),
+                    first.get("action_slot"),
+                    choices_blob,
+                    first.get("step_id"),
                 ),
             )
 
@@ -1061,9 +1127,27 @@ def _do_propose(
             # the generator output through the persistence layer to
             # the kiosk WS envelope.
             "action_slot": step.action_slot,
+            # Phase G G2: thread the template step id and rendered
+            # choice labels through to the persistence layer so the
+            # first-step INSERT can populate ``step_template_id`` +
+            # ``choices_json`` columns. Both are ``None`` on legacy
+            # linear templates.
+            "step_id": step.step_id,
+            "choices_rendered": step.choices_rendered,
         }
         for idx, step in enumerate(activity.steps)
     ]
+    # Phase G G2: pull the resolved slot map off ``metadata["slot_fills"]``
+    # (set by the generator) so the persistence layer can write
+    # ``activities.slot_fills_json``. Defensive default to ``{}`` for
+    # callers that bypass the generator (tests, ad-hoc fixtures).
+    raw_slot_fills = metadata.get("slot_fills", {})
+    if isinstance(raw_slot_fills, dict):
+        slot_fills_arg: dict[str, str] = {
+            str(k): str(v) for k, v in raw_slot_fills.items()
+        }
+    else:
+        slot_fills_arg = {}
     _persist_activity(
         conn,
         activity_id=activity.id,
@@ -1074,6 +1158,7 @@ def _do_propose(
         steps=steps,
         state=PROPOSED_STATE,
         toy_ids=list(activity.toy_ids),
+        slot_fills=slot_fills_arg,
     )
 
     # Phase C step 15: write a labeled_events row BEFORE returning the

@@ -2,6 +2,18 @@
 
 Pins state-machine transitions, the wire shape of the ``activity.state``
 ws envelope, and the proposed-queue cap (5).
+
+Phase G G2 note: post-G2 the propose flow inserts ONLY ``steps[0]``
+into ``activity_steps`` (lazy insertion). G3 ships the lazy-advance
+handler that inserts subsequent steps as the kid progresses. To
+preserve coverage of multi-step state transitions in this lifecycle
+suite (which predates the lazy split), tests that exercise advance
+through 5 steps backfill the legacy 5-row shape via
+``backfill_legacy_steps`` — this simulates the in-flight pre-G2
+activity that the migration explicitly preserves and exercises the
+existing ``post_advance`` linear-fall-through path. New
+single-step lazy semantics are covered by dedicated unit tests in
+``tests/unit/activities/test_generator.py``.
 """
 
 from __future__ import annotations
@@ -12,7 +24,9 @@ from typing import Any, cast
 import pytest
 from fastapi.testclient import TestClient
 
+from tests.fixtures.lazy_insert import backfill_legacy_steps
 from toybox.core.pubsub import PubSub
+from toybox.db.connection import connect
 from toybox.ws.topics import Topic
 
 PROPOSE_BODY: dict[str, Any] = {
@@ -33,14 +47,48 @@ def _propose(client: TestClient, headers: dict[str, str]) -> dict[str, Any]:
     return cast("dict[str, Any]", response.json())
 
 
+def _propose_with_legacy_5_rows(
+    client: TestClient,
+    headers: dict[str, str],
+    db_path: Path,
+) -> dict[str, Any]:
+    """Propose, then backfill steps 2..5 directly so the resulting row
+    set matches the pre-G2 in-flight activity shape.
+
+    Returns the freshly re-fetched activity body so callers see the
+    full 5-step list (the propose response itself only carries
+    ``steps[0]`` per the G2 lazy-insertion contract).
+    """
+    proposed = _propose(client, headers)
+    conn = connect(db_path, check_same_thread=False)
+    try:
+        backfill_legacy_steps(conn, proposed["id"])
+    finally:
+        conn.close()
+    refetched = client.get(f"/api/activities/{proposed['id']}", headers=headers)
+    assert refetched.status_code == 200, refetched.text
+    return cast("dict[str, Any]", refetched.json())
+
+
 def test_propose_returns_proposed_activity(
     client: TestClient,
     parent_headers: dict[str, str],
 ) -> None:
+    """Phase G G2: propose response carries ONE step row (lazy insertion).
+
+    Pre-G2 propose returned all 5 template steps in the response.
+    Post-G2 only ``steps[0]`` is INSERTed at activity creation; the
+    remaining template steps are inserted lazily by G3's advance
+    handler. The propose response shape mirrors the DB rows, so it
+    has exactly one step.
+    """
     body = _propose(client, parent_headers)
     assert body["state"] == "proposed"
     assert body["version"] == 1
-    assert len(body["steps"]) == 5
+    assert len(body["steps"]) == 1
+    # The single inserted row is steps[0]: seq=1 with current=1.
+    assert body["steps"][0]["seq"] == 1
+    assert body["steps"][0]["current"] is True
 
 
 def test_propose_emits_state_envelope(
@@ -62,8 +110,19 @@ def test_propose_emits_state_envelope(
 def test_approve_then_advance_to_completed(
     client: TestClient,
     parent_headers: dict[str, str],
+    db_path: Path,
 ) -> None:
-    activity = _propose(client, parent_headers)
+    """Phase G regression: a pre-G2 in-flight 5-row activity advances
+    proposed → approved → running × 5 → completed unchanged.
+
+    Phase G G2 mandates: "old activities (pre-G2 fixture rows with
+    empty ``slot_fills_json``) still advance correctly". This test
+    backfills the legacy 5-row shape on top of the propose
+    response so the existing ``post_advance`` linear-fall-through
+    handler walks the full sequence — exactly the path an
+    in-flight activity at upgrade time exercises.
+    """
+    activity = _propose_with_legacy_5_rows(client, parent_headers, db_path)
     activity_id = activity["id"]
 
     approve = client.post(
@@ -294,8 +353,6 @@ def test_proposed_queue_drops_oldest(
     pubsub: PubSub,
     db_path: Path,
 ) -> None:
-    from toybox.db.connection import connect
-
     proposed_ids: list[str] = []
     for seed in range(1, 6):
         body = client.post(
@@ -345,9 +402,17 @@ def _approve_and_advance_to_seq(
     parent_headers: dict[str, str],
     *,
     target_seq: int,
+    db_path: Path,
 ) -> dict[str, Any]:
-    """Helper: propose, approve, advance ``target_seq`` times. Returns last activity body."""
-    activity = _propose(client, parent_headers)
+    """Helper: propose, backfill legacy 5-row shape, approve, advance ``target_seq`` times.
+
+    Phase G G2: backfills steps 2..5 directly so the existing
+    ``post_advance`` linear-fall-through handler can walk past
+    seq=1 (post-G2 propose only inserts ``steps[0]``). Mirrors the
+    pre-G2 in-flight activity that the migration explicitly
+    preserves.
+    """
+    activity = _propose_with_legacy_5_rows(client, parent_headers, db_path)
     aid = activity["id"]
     approve = client.post(
         f"/api/activities/{aid}/approve",
@@ -376,8 +441,11 @@ def _current_seq(activity: dict[str, Any]) -> int:
 def test_step_back_decrements_current_and_increments_version(
     client: TestClient,
     parent_headers: dict[str, str],
+    db_path: Path,
 ) -> None:
-    state = _approve_and_advance_to_seq(client, parent_headers, target_seq=3)
+    state = _approve_and_advance_to_seq(
+        client, parent_headers, target_seq=3, db_path=db_path
+    )
     assert state["state"] == "running"
     assert _current_seq(state) == 3
     pre_version = state["version"]
@@ -396,8 +464,11 @@ def test_step_back_decrements_current_and_increments_version(
 def test_step_back_at_first_step_rejects(
     client: TestClient,
     parent_headers: dict[str, str],
+    db_path: Path,
 ) -> None:
-    state = _approve_and_advance_to_seq(client, parent_headers, target_seq=1)
+    state = _approve_and_advance_to_seq(
+        client, parent_headers, target_seq=1, db_path=db_path
+    )
     assert _current_seq(state) == 1
     response = client.post(
         f"/api/activities/{state['id']}/step-back",
@@ -434,8 +505,11 @@ def test_step_back_from_approved_rejects(
 def test_step_back_from_completed_rejects(
     client: TestClient,
     parent_headers: dict[str, str],
+    db_path: Path,
 ) -> None:
-    state = _approve_and_advance_to_seq(client, parent_headers, target_seq=5)
+    state = _approve_and_advance_to_seq(
+        client, parent_headers, target_seq=5, db_path=db_path
+    )
     # One more advance flips to completed.
     final = client.post(
         f"/api/activities/{state['id']}/advance",
@@ -459,9 +533,12 @@ def test_step_back_from_completed_rejects(
 def test_step_back_from_paused_succeeds(
     client: TestClient,
     parent_headers: dict[str, str],
+    db_path: Path,
 ) -> None:
     """paused state allows step-back; activity stays paused, seq decrements."""
-    state = _approve_and_advance_to_seq(client, parent_headers, target_seq=2)
+    state = _approve_and_advance_to_seq(
+        client, parent_headers, target_seq=2, db_path=db_path
+    )
     assert state["state"] == "running"
     assert _current_seq(state) == 2
 
@@ -490,8 +567,11 @@ def test_step_back_from_paused_succeeds(
 def test_step_back_version_conflict_rejects(
     client: TestClient,
     parent_headers: dict[str, str],
+    db_path: Path,
 ) -> None:
-    state = _approve_and_advance_to_seq(client, parent_headers, target_seq=3)
+    state = _approve_and_advance_to_seq(
+        client, parent_headers, target_seq=3, db_path=db_path
+    )
     stale_version = state["version"] - 1
     response = client.post(
         f"/api/activities/{state['id']}/step-back",
@@ -508,8 +588,11 @@ def test_step_back_publishes_activity_state_envelope(
     client: TestClient,
     parent_headers: dict[str, str],
     pubsub: PubSub,
+    db_path: Path,
 ) -> None:
-    state = _approve_and_advance_to_seq(client, parent_headers, target_seq=3)
+    state = _approve_and_advance_to_seq(
+        client, parent_headers, target_seq=3, db_path=db_path
+    )
     sub = pubsub.subscribe([Topic.activity_state])
     try:
         response = client.post(
