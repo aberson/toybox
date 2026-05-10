@@ -20,6 +20,29 @@ export type ActivityState =
   | "dismissed"
   | "didnt_work";
 
+// Phase G G4: runtime activity-step choice option. The kiosk receives
+// one of these per branch when the current step is a choice point;
+// derived by the API serializer from ``activity_steps.choices_json``
+// (a JSON array of pre-rendered label strings) — array index becomes
+// ``choice_index``. The shared template-time ``Choice`` shape (with a
+// ``next`` field) lives in ``shared/types.ts``; the kiosk does NOT
+// consume that one — it only reads pre-rendered labels + indices.
+//
+// Defined locally here (vs. regenerated into ``shared/types.ts``)
+// because: (a) G3 is the authoritative source for the runtime
+// activity-step response shape and may evolve the field; (b) the
+// kiosk's ``ActivityStep`` already lives in this file, so colocating
+// the choice option keeps the kiosk's runtime types in one place;
+// (c) ``shared/types.ts`` documents on lines 36-40 that runtime
+// shapes belong in ``frontend/src/child/api.ts``. When G3's codegen
+// lands the runtime ``ActivityStep`` upstream, this interface and
+// the ``choices`` field can be replaced by an import — no other
+// kiosk file needs to change.
+export interface ChoiceOption {
+  label: string;
+  choice_index: number;
+}
+
 export interface ActivityStep {
   seq: number;
   body: string;
@@ -32,6 +55,13 @@ export interface ActivityStep {
   // to the step body. Optional on the wire so legacy envelopes /
   // pre-F6 fixtures continue to typecheck without an explicit null.
   action_slot?: string | null;
+  // Phase G G4: when non-null and non-empty, this step is a branch
+  // point — the kiosk renders one ``<ChoiceButton>`` per entry and
+  // posts ``{choice_index}`` to ``/advance`` instead of the bare
+  // ``<NextStepButton>``. Optional + nullable so pre-G3 wire payloads
+  // (which omit the field entirely) continue to typecheck and render
+  // the linear-advance path.
+  choices?: ChoiceOption[] | null;
 }
 
 export interface Activity {
@@ -208,17 +238,28 @@ export class ApiClient {
     });
   }
 
+  // Phase G G4: ``choiceIndex`` is the optional choice the kid picked
+  // when the current step has ``choices``. Posted in the body as
+  // ``{choice_index}`` so the backend's edge resolver can pick the
+  // right successor (G3). Linear advance steps (no choices) call this
+  // without ``choiceIndex`` and the body is omitted, matching the
+  // pre-G3 wire shape.
   async advance(
     id: string,
     version: number,
-    opts: RequestOptions = {},
+    opts: RequestOptions & { choiceIndex?: number } = {},
   ): Promise<Activity> {
+    const body =
+      opts.choiceIndex !== undefined
+        ? JSON.stringify({ choice_index: opts.choiceIndex })
+        : undefined;
     return this.request<Activity>(
       `/api/activities/${encodeURIComponent(id)}/advance`,
       {
         method: "POST",
         ifMatchVersion: version,
         signal: opts.signal,
+        body,
       },
     );
   }

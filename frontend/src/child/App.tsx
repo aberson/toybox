@@ -9,8 +9,8 @@ import {
   withConflictHandler,
 } from "./api";
 import type { Activity } from "./api";
+import type { ChoiceResult } from "./components/ChoiceButton";
 import { KioskPinPrompt } from "./components/KioskPinPrompt";
-import { NextStepButton } from "./components/NextStepButton";
 import { PersonaAvatar } from "./components/PersonaAvatar";
 import { StepCard } from "./components/StepCard";
 import { playSfx, preloadSfx } from "./sfx";
@@ -181,6 +181,19 @@ export function App(): JSX.Element {
   const prevTerminalSeenRef = useRef<boolean>(false);
   const prevTerminalRef = useRef<boolean>(false);
   const [busyAdvance, setBusyAdvance] = useState(false);
+  // Phase G G4: which choice button (if any) currently has a POST in
+  // flight. The ``choosingIndex`` STATE drives the post-commit visual
+  // gate (drilled through StepCard to each ChoiceButton's ``disabled``
+  // prop, so siblings render disabled while one is in flight). The
+  // ``choosingRef`` is the SYNCHRONOUS gate — handleChoose checks +
+  // sets the ref before any await, so a second tap on a different
+  // button within the same tick (before React commits the disabled
+  // re-render) still bails on the ref check. Belt-and-braces: the
+  // ChoiceButton component holds its own internal ref guard too, but
+  // the App-level ref handles the cross-button case where two SIBLING
+  // buttons each read their own busy-state as false in the same frame.
+  const [choosingIndex, setChoosingIndex] = useState<number | null>(null);
+  const choosingRef = useRef<number | null>(null);
   // Step 21 dev-shim: when no valid PIN is configured (or the cached
   // value is rejected by the backend), render KioskPinPrompt instead of
   // toasting. ``bootCounter`` re-runs the bootstrap effect after the
@@ -456,6 +469,70 @@ export function App(): JSX.Element {
     }
   }, [activity, api, busyAdvance, refetchActivity]);
 
+  // Phase G G4: choice-driven advance. Mirrors handleAdvance but
+  // posts ``{choice_index}`` so the backend can resolve the right
+  // successor on a branching step. Returns "ok"/"conflict" so the
+  // ChoiceButton can clear its local in-flight state without having
+  // to know about VersionConflictError. Re-raises non-409 errors so
+  // the button's local error indicator surfaces — the App-level
+  // toast still fires for visibility too (mirrors handleAdvance's
+  // top-level catch).
+  const handleChoose = useCallback(
+    async (choiceIndex: number): Promise<ChoiceResult> => {
+      if (activity === null) {
+        // The button can't be rendered without an activity, but TS
+        // can't see that — fail fast rather than silently no-op so a
+        // future regression where the button is mounted without an
+        // activity surfaces in tests.
+        throw new Error("no activity");
+      }
+      // Synchronous gate: if a previous choice is still in flight,
+      // this tap landed in the gap between StepCard receiving the
+      // ``disabled`` prop and React committing the disabled-button
+      // render. Bail without firing a competing POST. We treat this
+      // as "conflict" from the button's POV: no error indicator, the
+      // first POST is still resolving and will route through the
+      // store. (Throwing here would surface a misleading error
+      // indicator on the second-tapped sibling.)
+      if (choosingRef.current !== null) return "conflict";
+      // Set ref + state BEFORE any await. The ref is the synchronous
+      // cross-button gate (see comment on ``choosingRef``); the state
+      // drives the post-commit ``disabled`` prop on each ChoiceButton
+      // for the visible gate.
+      choosingRef.current = choiceIndex;
+      setChoosingIndex(choiceIndex);
+      try {
+        const result = await withConflictHandler({
+          mutation: () =>
+            api.advance(activity.id, activity.version, { choiceIndex }),
+          refetch: () => refetchActivity(activity.id),
+          onConflict: (conflict, fresh) => {
+            useChildStore.getState().applyVersionConflict(conflict, fresh);
+          },
+        });
+        if (result !== null) {
+          useChildStore.getState().applyMutationResult(result);
+          return "ok";
+        }
+        // ``withConflictHandler`` returns null on a 409 it caught —
+        // the refetch + applyVersionConflict already fired through
+        // ``onConflict``. Tell the button so it can clear in-flight.
+        return "conflict";
+      } catch (err) {
+        // Non-conflict failure (4xx / 5xx / network). Surface the
+        // global toast like handleAdvance does AND re-throw so the
+        // ChoiceButton's local error indicator surfaces.
+        const message = err instanceof Error ? err.message : "advance failed";
+        useChildStore.getState().pushToast("error", `advance: ${message}`);
+        throw err;
+      } finally {
+        choosingRef.current = null;
+        setChoosingIndex(null);
+      }
+    },
+    [activity, api, refetchActivity],
+  );
+
   const showAllDone = activity !== null && isTerminalState(activity.state);
   const showActive = isActiveKioskActivity(activity);
 
@@ -501,8 +578,13 @@ export function App(): JSX.Element {
               letter={avatarLetter(activity)}
               size={240}
             />
-            <StepCard activity={activity} />
-            <NextStepButton onClick={handleAdvance} busy={busyAdvance} />
+            <StepCard
+              activity={activity}
+              onAdvance={handleAdvance}
+              onChoose={handleChoose}
+              advanceBusy={busyAdvance}
+              choosingIndex={choosingIndex}
+            />
           </>
         )}
         {showAllDone && activity !== null && (
