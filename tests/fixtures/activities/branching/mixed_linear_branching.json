@@ -1,0 +1,32 @@
+{
+  "intent": "boredom",
+  "templates": [
+    {
+      "id": "fixture_mixed_linear_branching",
+      "title": "Quest in {room}",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "{toy} wakes up in {room} feeling adventurous." },
+        { "text": "You stretch and look around for something to {action_verb}." },
+        { "text": "A mysterious {prop} catches your eye in the corner." },
+        { "text": "You walk closer to inspect the {adjective} object." },
+        {
+          "id": "fork",
+          "text": "What do you do with the {prop}?",
+          "choices": [
+            { "label": "Pick it up gently", "next": "pick_ending" },
+            { "label": "Run away giggling", "next": "run_ending" }
+          ]
+        },
+        {
+          "id": "pick_ending",
+          "text": "It hums softly — {toy} smiles and you both share a quiet moment."
+        },
+        {
+          "id": "run_ending",
+          "text": "You bolt across {room} laughing — {toy} cheers behind you."
+        }
+      ]
+    }
+  ]
+}

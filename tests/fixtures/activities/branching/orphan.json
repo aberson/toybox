@@ -1,0 +1,15 @@
+{
+  "intent": "boredom",
+  "templates": [
+    {
+      "id": "fixture_orphan",
+      "title": "Orphan branch fixture",
+      "buckets": ["always"],
+      "steps": [
+        { "id": "start", "text": "Step A — explicitly jumps over the orphan.", "next": "ending" },
+        { "id": "ghost", "text": "Step B — never referenced and skipped by `next`." },
+        { "id": "ending", "text": "Step C — final." }
+      ]
+    }
+  ]
+}

@@ -74,13 +74,13 @@ def _intent() -> Intent:
         "not json at all",
         # Valid JSON, wrong shape (missing required fields).
         '{"hello": "world"}',
-        # Valid JSON Activity-shaped but only 3 steps (schema requires 5).
+        # Valid JSON Activity-shaped but only 2 steps (schema relaxed
+        # from 5 to a 3..20 range in Phase G G1; 2 still under-shoots).
         (
             '{"id": "00000000-0000-4000-8000-000000000099",'
             '"template_id": "claude_dynamic", "title": "x",'
             '"steps": [{"step_index": 0, "text": "a"},'
-            '{"step_index": 1, "text": "b"},'
-            '{"step_index": 2, "text": "c"}]}'
+            '{"step_index": 1, "text": "b"}]}'
         ),
     ],
     ids=["non_json", "wrong_shape", "wrong_step_count"],

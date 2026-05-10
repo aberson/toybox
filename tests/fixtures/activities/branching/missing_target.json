@@ -1,0 +1,15 @@
+{
+  "intent": "boredom",
+  "templates": [
+    {
+      "id": "fixture_missing_target",
+      "title": "Missing-target fixture",
+      "buckets": ["always"],
+      "steps": [
+        { "id": "start", "text": "Step A.", "next": "nonexistent" },
+        { "id": "middle", "text": "Step B." },
+        { "id": "end", "text": "Step C." }
+      ]
+    }
+  ]
+}

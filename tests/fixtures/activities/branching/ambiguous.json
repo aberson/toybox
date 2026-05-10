@@ -1,0 +1,23 @@
+{
+  "intent": "boredom",
+  "templates": [
+    {
+      "id": "fixture_ambiguous",
+      "title": "Ambiguous next+choices fixture",
+      "buckets": ["always"],
+      "steps": [
+        {
+          "id": "open",
+          "text": "Step A — illegally has BOTH next and choices.",
+          "next": "tail",
+          "choices": [
+            { "label": "Option one", "next": "tail" },
+            { "label": "Option two", "next": "tail" }
+          ]
+        },
+        { "id": "tail", "text": "Step B." },
+        { "id": "ending", "text": "Step C." }
+      ]
+    }
+  ]
+}

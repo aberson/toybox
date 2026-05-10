@@ -332,12 +332,13 @@ def test_parametric_template_yields_variety_across_seeds() -> None:
 
     toys = (
         ResolvedToy(
-            id="t1", display_name="Bluey", tags=("dog",), last_used_at=None,
+            id="t1",
+            display_name="Bluey",
+            tags=("dog",),
+            last_used_at=None,
         ),
     )
-    rooms = (
-        ResolvedRoom(id="r1", display_name="Living Room", features=()),
-    )
+    rooms = (ResolvedRoom(id="r1", display_name="Living Room", features=()),)
 
     # Force the parametric template by filtering activities to it. The
     # picker is weighted-random across eligible templates, so we
@@ -346,8 +347,13 @@ def test_parametric_template_yields_variety_across_seeds() -> None:
     titles: set[str] = set()
     for seed in range(200):
         a = generate(
-            "request_play", "freeplay", None, 22, seed,
-            available_toys=toys, available_rooms=rooms,
+            "request_play",
+            "freeplay",
+            None,
+            22,
+            seed,
+            available_toys=toys,
+            available_rooms=rooms,
         )
         if a.template_id == target_template:
             titles.add(a.title)
@@ -371,19 +377,25 @@ def test_parametric_template_signature_is_stable_across_word_fills() -> None:
 
     toys = (
         ResolvedToy(
-            id="t1", display_name="Bluey", tags=("dog",), last_used_at=None,
+            id="t1",
+            display_name="Bluey",
+            tags=("dog",),
+            last_used_at=None,
         ),
     )
-    rooms = (
-        ResolvedRoom(id="r1", display_name="Living Room", features=()),
-    )
+    rooms = (ResolvedRoom(id="r1", display_name="Living Room", features=()),)
     target_template = "play_anytime_silly_walk"
     sigs: set[str] = set()
     titles_seen: set[str] = set()
     for seed in range(200):
         a = generate(
-            "request_play", "freeplay", None, 22, seed,
-            available_toys=toys, available_rooms=rooms,
+            "request_play",
+            "freeplay",
+            None,
+            22,
+            seed,
+            available_toys=toys,
+            available_rooms=rooms,
         )
         if a.template_id == target_template:
             sigs.add(a.metadata["signature"])
@@ -575,29 +587,35 @@ def test_invalid_template_file_is_skipped(tmp_path: Path, monkeypatch: pytest.Mo
 
 
 # ---------------------------------------------------------------------------
-# 5-step invariant: file-level + model-level
+# Step-count invariant: file-level + model-level
+# (Phase G: relaxed from the historical 5-step constraint to a
+# 3..20 range; the four shipped *linear* template files are still
+# 5 steps each, so the file-level contract is unchanged for them.
+# Branching templates added in Phase G G5 may have different counts
+# and live under ``templates/branching/``.)
 # ---------------------------------------------------------------------------
 
 
-def test_every_shipped_template_file_has_5_step_arrays() -> None:
-    """Pin the 5-step contract at the FILE level by reading each shipped
-    template JSON directly (not via ``generate``). If the schema regex
-    drifts (or someone edits a file by hand and bypasses CI), this is the
-    last line of defence."""
+def test_every_shipped_linear_template_file_still_has_5_step_arrays() -> None:
+    """Pin: the four linear templates that pre-date Phase G keep their
+    5-step shape. Branching templates added in Phase G live in a
+    subdirectory and are intentionally exempt from this regression check.
+    If a Phase G author later wants to refactor an existing template
+    into a branching shape, they should move it under ``branching/``."""
     for intent in SUPPORTED_INTENTS:
         path = TEMPLATES_DIR / f"{intent}.json"
         payload = json.loads(path.read_text(encoding="utf-8"))
         for tpl in payload["templates"]:
             assert len(tpl["steps"]) == 5, (
                 f"{intent}.json template {tpl.get('id')!r} has "
-                f"{len(tpl['steps'])} steps; must be exactly 5"
+                f"{len(tpl['steps'])} steps; linear templates must be exactly 5"
             )
 
 
-@pytest.mark.parametrize("step_count", [4, 6])
-def test_activity_model_rejects_non_5_step_lists(step_count: int) -> None:
-    """Pin the ``min_length=5, max_length=5`` constraint on the
-    ``Activity.steps`` field directly. If a future refactor loosens this
+@pytest.mark.parametrize("step_count", [2, 21])
+def test_activity_model_rejects_step_counts_outside_3_to_20(step_count: int) -> None:
+    """Pin the Phase G ``min_length=3, max_length=20`` constraint on
+    ``Activity.steps``. If a future refactor loosens or tightens this
     on the model, this test fails before any callers can ship a
     non-conforming activity."""
     from pydantic import ValidationError
@@ -616,6 +634,25 @@ def test_activity_model_rejects_non_5_step_lists(step_count: int) -> None:
             version=1,
             metadata={},
         )
+
+
+@pytest.mark.parametrize("step_count", [3, 5, 20])
+def test_activity_model_accepts_step_counts_in_range(step_count: int) -> None:
+    """Phase G: the in-range corners (3, mid, 20) all build cleanly."""
+    steps = [
+        ActivityStep(step_index=i, text=f"step {i}", sfx=None, expected_action=None)
+        for i in range(step_count)
+    ]
+    activity = Activity(
+        id="00000000-0000-4000-8000-000000000000",
+        template_id="x",
+        persona_id=None,
+        title="t",
+        steps=steps,
+        version=1,
+        metadata={},
+    )
+    assert len(activity.steps) == step_count
 
 
 # ---------------------------------------------------------------------------

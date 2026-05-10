@@ -48,8 +48,8 @@
         },
         "steps": {
           "type": "array",
-          "minItems": 5,
-          "maxItems": 5,
+          "minItems": 3,
+          "maxItems": 20,
           "items": { "$ref": "#/$defs/step" }
         }
       }
@@ -58,6 +58,14 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["text"],
+      "not": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": ["next", "choices"]
+          }
+        ]
+      },
       "properties": {
         "text": {
           "type": "string",
@@ -76,6 +84,39 @@
         "action_slot": {
           "type": ["string", "null"],
           "description": "Phase F Step F6 action vocabulary key. One of the 10 fixed slots in toybox.image_gen.models.ACTION_SLOTS, or null to render no sprite. The actual vocabulary enforcement lives in toybox.activities.generator._parse_template so a typo fails LOUDLY (the JSON-schema layer here intentionally leaves the value free-form so the parse layer is the single source of truth — keeping the enum in two places risks drift)."
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$",
+          "maxLength": 32,
+          "description": "Phase G: stable identifier for branch targeting; required only on steps referenced as a branch target. Lowercase alphanumerics and underscores; first character alphanumeric. Validator (toybox.activities._validator) enforces uniqueness within a template."
+        },
+        "next": {
+          "type": "string",
+          "description": "Phase G: explicit successor step id. Mutually exclusive with `choices` (validated by JSON-schema `not` constraint above plus the load-time graph validator). When neither `next` nor `choices` is set, the runtime falls through to the next step in the array (or terminates at the last step)."
+        },
+        "choices": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4,
+          "description": "Phase G: branching choice point. The kiosk renders one button per entry; `next` resolves to the chosen successor's step id. Mutually exclusive with `next`.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["label", "next"],
+            "properties": {
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "description": "Button text shown to the kid. Supports the same slot placeholders as `text`."
+              },
+              "next": {
+                "type": "string",
+                "description": "Step id this branch advances to."
+              }
+            }
+          }
         }
       }
     }

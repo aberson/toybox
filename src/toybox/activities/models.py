@@ -12,9 +12,16 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
 from ..image_gen.models import ACTION_SLOTS
+
+# Phase G: pattern + max length for step ids used as branch targets.
+# Tighter than template ids (which allow up to 64 chars) because step ids
+# appear inline as `next` / `choices[].next` values inside JSON and the
+# author should be nudged toward short identifiers.
+_STEP_ID_PATTERN: str = r"^[a-z0-9][a-z0-9_]*$"
+_STEP_ID_MAX_LENGTH: int = 32
 
 
 def _validate_action_slot(v: str | None) -> str | None:
@@ -30,14 +37,96 @@ def _validate_action_slot(v: str | None) -> str | None:
     if v is None:
         return v
     if v not in ACTION_SLOTS:
-        raise ValueError(
-            f"action_slot must be one of {ACTION_SLOTS!r} or None, got {v!r}"
-        )
+        raise ValueError(f"action_slot must be one of {ACTION_SLOTS!r} or None, got {v!r}")
     return v
 
 
+class Choice(BaseModel):
+    """One branch in a step's :attr:`Step.choices` list (Phase G).
+
+    Authored at template-definition time. The kiosk consumes a
+    *runtime* shape (``{label, choice_index}``) that the API serializer
+    derives from the persisted ``activity_steps.choices_json`` column;
+    that runtime shape is intentionally distinct from this
+    template-time shape so an in-flight activity is stable across
+    template edits.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    label: str = Field(min_length=1, max_length=200)
+    next: str = Field(min_length=1)
+
+
+def _validate_choice_count(v: list[Choice] | None) -> list[Choice] | None:
+    """Pin ``len(choices) in (2, 3, 4)`` when ``choices`` is set.
+
+    Phase G: a step that branches must offer at least 2 options (else
+    it is not a choice) and at most 4 (per the choice-count design
+    decision in the Phase G plan — fits iPad portrait at 44pt touch
+    targets without scrolling). The JSON-schema layer enforces the
+    same range; defense-in-depth here so callers building Activities
+    in tests / fixtures cannot construct a malformed shape.
+    """
+    if v is None:
+        return v
+    if not 2 <= len(v) <= 4:
+        raise ValueError(f"choices must have between 2 and 4 entries, got {len(v)}")
+    return v
+
+
+class Step(BaseModel):
+    """Template-time step definition (Phase G).
+
+    Mirrors ``$defs/step`` in
+    ``src/toybox/activities/templates/_schema.json``. Authored by hand
+    in the per-intent template JSON files. The *runtime* counterpart
+    (one row in ``activity_steps``) is :class:`ActivityStep` — it
+    carries the rendered (slot-filled) body and the runtime
+    ``current`` flag that this model does not.
+
+    Phase G additions: ``id``, ``next``, ``choices``. All optional and
+    backward-compatible: existing templates that have none of these
+    fields rely on the implicit fall-through edge rule (advance to
+    the next array position).
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    text: str = Field(min_length=1, max_length=600)
+    sfx: str | None = Field(default=None, max_length=64)
+    expected_action: str | None = Field(default=None, max_length=64)
+    action_slot: Annotated[str | None, AfterValidator(_validate_action_slot)] = None
+    # Phase G: stable identifier for branch targeting. Required only
+    # on steps referenced as a `next` / `choices[].next` target;
+    # the load-time graph validator catches missing-target / orphan
+    # cases. Pattern + length matched to ``_schema.json``.
+    id: Annotated[
+        str | None,
+        Field(default=None, pattern=_STEP_ID_PATTERN, max_length=_STEP_ID_MAX_LENGTH),
+    ] = None
+    # Phase G: explicit successor step id. Mutually exclusive with
+    # ``choices`` (enforced by ``_check_next_xor_choices`` below).
+    next: str | None = Field(default=None, min_length=1)
+    # Phase G: branching choice point. ``len(choices) in (2,3,4)``.
+    choices: Annotated[list[Choice] | None, AfterValidator(_validate_choice_count)] = None
+
+    @model_validator(mode="after")
+    def _check_next_xor_choices(self) -> Step:
+        """Reject steps that set BOTH ``next`` and ``choices``.
+
+        The runtime would otherwise have to pick a winner — confusing
+        for authors. The JSON-schema layer enforces the same constraint
+        via a ``not`` clause; this validator is defense-in-depth for
+        callers that bypass the schema (tests, in-memory fixtures).
+        """
+        if self.next is not None and self.choices is not None:
+            raise ValueError(f"step id={self.id!r} sets both `next` and `choices`; pick one")
+        return self
+
+
 class ActivityStep(BaseModel):
-    """One step in a 5-step linear activity.
+    """Runtime step in an activity (one row in ``activity_steps``).
 
     Mirrors the ``activity_steps`` columns: ``seq`` (1-indexed in the
     DB, but we use ``step_index`` in-memory and 0-index it because
@@ -93,10 +182,16 @@ class Activity(BaseModel):
     template_id: str = Field(min_length=1)
     persona_id: str | None = None
     title: str = Field(min_length=1)
-    steps: list[ActivityStep] = Field(min_length=5, max_length=5)
+    # Phase G: relaxed from `min_length=5, max_length=5` to
+    # `min_length=3, max_length=20` so templates can be short
+    # (3-step micro-quests) or long (multi-branch missions). The
+    # generator still seeds the runtime activity with all template
+    # steps; G2 introduces lazy DB insertion that decouples the DB
+    # row count from the template step count.
+    steps: list[ActivityStep] = Field(min_length=3, max_length=20)
     version: int = Field(default=1, ge=1)
     metadata: dict[str, Any] = Field(default_factory=dict)
     toy_ids: tuple[str, ...] = Field(default_factory=tuple)
 
 
-__all__ = ["Activity", "ActivityStep"]
+__all__ = ["Activity", "ActivityStep", "Choice", "Step"]

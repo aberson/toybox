@@ -1,0 +1,25 @@
+{
+  "intent": "boredom",
+  "templates": [
+    {
+      "id": "fixture_choice_high",
+      "title": "Choice-count-too-high fixture",
+      "buckets": ["always"],
+      "steps": [
+        {
+          "id": "open",
+          "text": "Step A — has 5 choices (must be <= 4).",
+          "choices": [
+            { "label": "Option 1", "next": "tail" },
+            { "label": "Option 2", "next": "tail" },
+            { "label": "Option 3", "next": "tail" },
+            { "label": "Option 4", "next": "tail" },
+            { "label": "Option 5", "next": "tail" }
+          ]
+        },
+        { "id": "tail", "text": "Step B." },
+        { "id": "ending", "text": "Step C." }
+      ]
+    }
+  ]
+}

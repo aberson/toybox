@@ -71,8 +71,10 @@ from typing import Any, Final
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
+from pydantic import ValidationError as PydanticValidationError
 
 from ..image_gen.models import ACTION_SLOTS
+from ._validator import TemplateGraphError, validate_template_graph
 from .content_resolver import (
     SAFE_DEFAULT_TEMPLATE,
     ResolvedChildren,
@@ -82,7 +84,7 @@ from .content_resolver import (
     apply_banned_themes_filter,
 )
 from .feedback import Candidate, compute_signature, consult_and_select
-from .models import Activity, ActivityStep
+from .models import Activity, ActivityStep, Step
 from .slots import SIGNATURE_CONTRIBUTING_SLOTS, SlotRegistry
 from .time_of_day import ALWAYS_BUCKET, hour_bucket, is_eligible
 
@@ -119,6 +121,13 @@ class _StepTemplate:
     # out-of-vocab values at boot so a typo'd template fails LOUDLY
     # rather than silently degrading the kiosk render path.
     action_slot: str | None
+    # Phase G additions (all optional, backward-compatible). Carried
+    # through to G2/G3 so the runtime can: persist ``id`` per row,
+    # resolve ``next`` / ``choices`` server-side at advance time, and
+    # render choice labels with the activity's slot fills.
+    id: str | None = None
+    next: str | None = None
+    choices: tuple[tuple[str, str], ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,10 +169,22 @@ def _parse_template(raw: dict[str, Any], *, source: str = "<inline>") -> _Templa
     rather than silently degrading on the kiosk path. ``source`` is
     a label (filename or in-memory marker) used in the error message
     so operators can find the offending file fast.
+
+    Phase G: each step is also Pydantic-validated as a :class:`Step`
+    (catches malformed ``id`` patterns, ``next``/``choices`` mutual
+    exclusion, choice-count range), and the resulting list is then
+    passed to :func:`validate_template_graph` which enforces the
+    template-wide graph invariants (unique ids, resolved targets,
+    reachability, no cycles, terminal-reachable). Either layer
+    raising bubbles up to the caller so the template is dropped
+    with a logged WARNING — except graph violations, which the
+    Phase G plan specifies as a hard load-time failure that surfaces
+    via the :class:`TemplateGraphError` class to the caller.
     """
     template_id = str(raw["id"])
     steps_raw = raw["steps"]
     parsed_steps: list[_StepTemplate] = []
+    pydantic_steps: list[Step] = []
     for s in steps_raw:
         slot = s.get("action_slot")
         if slot is not None and slot not in ACTION_SLOTS:
@@ -171,14 +192,31 @@ def _parse_template(raw: dict[str, Any], *, source: str = "<inline>") -> _Templa
                 f"template {template_id!r} in {source}: step action_slot={slot!r} "
                 f"is not in ACTION_SLOTS={ACTION_SLOTS!r}"
             )
+        # Pydantic validation: catches bad ``id`` pattern, max-length
+        # violations, choice-count range, and the next/choices XOR.
+        # Errors bubble up — the caller logs + skips the file.
+        step_model = Step.model_validate(s)
+        pydantic_steps.append(step_model)
+        choices_tuple: tuple[tuple[str, str], ...] | None = None
+        if step_model.choices is not None:
+            choices_tuple = tuple((c.label, c.next) for c in step_model.choices)
         parsed_steps.append(
             _StepTemplate(
                 text=str(s["text"]),
                 sfx=s.get("sfx"),
                 expected_action=s.get("expected_action"),
                 action_slot=slot,
+                id=step_model.id,
+                next=step_model.next,
+                choices=choices_tuple,
             )
         )
+    # Phase G graph validation. Raises TemplateGraphError on any
+    # violation. We let it propagate so a graph-invalid template
+    # is a hard load-time error per the Phase G plan; the caller
+    # in ``_load_intent_templates`` is responsible for whether to
+    # surface that as a fatal startup error or a logged skip.
+    validate_template_graph(template_id, pydantic_steps)
     return _Template(
         id=template_id,
         title=str(raw["title"]),
@@ -187,8 +225,44 @@ def _parse_template(raw: dict[str, Any], *, source: str = "<inline>") -> _Templa
     )
 
 
+def _discover_intent_template_files(intent: str) -> list[Path]:
+    """Walk ``TEMPLATES_DIR`` recursively for files named ``{intent}.json``.
+
+    Phase G: branching templates live under
+    ``src/toybox/activities/templates/branching/<intent>.json``
+    alongside the existing top-level per-intent files. Multiple files
+    per intent are loaded and merged so authors can group templates
+    by shape (linear vs. branching) without changing per-file shape.
+
+    Files are returned in deterministic order (top-level first, then
+    subdirectories sorted by relative path) so downstream sorting by
+    template id stays stable across runs.
+    """
+    out: list[Path] = []
+    top_level = TEMPLATES_DIR / f"{intent}.json"
+    if top_level.is_file():
+        out.append(top_level)
+    # Recurse one level deep into immediate subdirectories. Use rglob so
+    # nested groupings (e.g. ``templates/branching/<intent>.json``)
+    # match without hard-coding the subdirectory name. Sorted by
+    # relative path so file-order is deterministic.
+    nested = sorted(
+        (p for p in TEMPLATES_DIR.rglob(f"{intent}.json") if p != top_level and p.is_file()),
+        key=lambda p: p.relative_to(TEMPLATES_DIR).as_posix(),
+    )
+    out.extend(nested)
+    return out
+
+
 def _load_intent_templates(intent: str) -> list[_Template]:
-    """Load and validate templates for ``intent``. Caches per-(dir, intent)."""
+    """Load and validate templates for ``intent``. Caches per-(dir, intent).
+
+    Phase G: discovers ``{intent}.json`` recursively under
+    ``TEMPLATES_DIR`` (top-level + any subdirectory like ``branching/``)
+    and merges all matching files into a single intent pool. Per-file
+    schema / JSON parse errors are logged + skipped (existing behavior);
+    graph-validation errors raise unchanged.
+    """
     cache_key = (TEMPLATES_DIR, intent)
     cached = _TEMPLATE_CACHE.get(cache_key)
     if cached is not None:
@@ -200,42 +274,77 @@ def _load_intent_templates(intent: str) -> list[_Template]:
         _TEMPLATE_CACHE[cache_key] = []
         return []
 
-    path = TEMPLATES_DIR / f"{intent}.json"
-    if not path.is_file():
-        _logger.warning("intent template file missing: %s", path)
-        _TEMPLATE_CACHE[cache_key] = []
-        return []
-
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        _logger.warning("intent template JSON malformed, skipping: %s (%s)", path, exc)
+    paths = _discover_intent_template_files(intent)
+    if not paths:
+        _logger.warning(
+            "no intent template files found for intent=%r under %s",
+            intent,
+            TEMPLATES_DIR,
+        )
         _TEMPLATE_CACHE[cache_key] = []
         return []
 
     validator = _load_schema()
-    try:
-        validator.validate(payload)
-    except ValidationError as exc:
-        _logger.warning(
-            "intent template file failed schema validation, skipping: %s (%s)",
-            path,
-            exc.message,
-        )
-        _TEMPLATE_CACHE[cache_key] = []
-        return []
+    templates: list[_Template] = []
+    for path in paths:
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            _logger.warning("intent template JSON malformed, skipping: %s (%s)", path, exc)
+            continue
 
-    if payload["intent"] != intent:
-        _logger.warning(
-            "intent template file %s has mismatched intent %r (expected %r), skipping",
-            path,
-            payload["intent"],
-            intent,
-        )
-        _TEMPLATE_CACHE[cache_key] = []
-        return []
+        try:
+            validator.validate(payload)
+        except ValidationError as exc:
+            _logger.warning(
+                "intent template file failed schema validation, skipping: %s (%s)",
+                path,
+                exc.message,
+            )
+            continue
 
-    templates = [_parse_template(t, source=path.name) for t in payload["templates"]]
+        if payload["intent"] != intent:
+            _logger.warning(
+                "intent template file %s has mismatched intent %r (expected %r), skipping",
+                path,
+                payload["intent"],
+                intent,
+            )
+            continue
+
+        # We iterate the per-template list explicitly (rather than as a
+        # genexpr fed to extend) so a single bad template can be
+        # warned-and-skipped without losing its valid siblings in the
+        # same intent file. Three failure modes are distinguished:
+        #
+        # 1. ``TemplateGraphError`` — Phase G plan: hard load-time
+        #    failure. Surface unchanged so startup crashes with a
+        #    clear template_id + violation. (Operator must fix the file.)
+        # 2. ``pydantic.ValidationError`` — per-step shape error
+        #    (bad ``id`` regex, bad ``next``/``choices`` XOR via the
+        #    Pydantic model validator, choice-count out of [2, 4],
+        #    etc). The JSON-schema layer above already catches most
+        #    of these; this catches what slips through (e.g. fields
+        #    Pydantic enforces but jsonschema can't easily express).
+        #    Treat as the malformed-file case: warn + skip the file.
+        # 3. ``ValueError`` — raised by ``_parse_template`` when
+        #    ``action_slot`` is set but not in ``ACTION_SLOTS``.
+        #    Same handling as #2 — warn + skip.
+        for t in payload["templates"]:
+            try:
+                templates.append(_parse_template(t, source=path.name))
+            except TemplateGraphError:
+                raise
+            except (PydanticValidationError, ValueError) as exc:
+                tid = t.get("id", "<unknown>") if isinstance(t, dict) else "<unknown>"
+                _logger.warning(
+                    "intent template %r in %s failed step-shape validation, skipping: %s",
+                    tid,
+                    path,
+                    exc,
+                )
+                continue
+
     # Sort by id so that downstream selection is deterministic
     # regardless of file order.
     templates.sort(key=lambda t: t.id)

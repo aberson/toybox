@@ -1,0 +1,21 @@
+{
+  "intent": "boredom",
+  "templates": [
+    {
+      "id": "fixture_choice_low",
+      "title": "Choice-count-too-low fixture",
+      "buckets": ["always"],
+      "steps": [
+        {
+          "id": "open",
+          "text": "Step A — has only 1 choice (must be >= 2).",
+          "choices": [
+            { "label": "Only option", "next": "tail" }
+          ]
+        },
+        { "id": "tail", "text": "Step B." },
+        { "id": "ending", "text": "Step C." }
+      ]
+    }
+  ]
+}

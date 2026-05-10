@@ -19,6 +19,7 @@ The offline-template path is tested by:
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 import pytest
@@ -137,12 +138,20 @@ def test_offline_templates_all_have_valid_action_slot() -> None:
 
 
 def test_template_loader_rejects_bad_slot_at_boot(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Loading a template file whose step carries action_slot='banana'
-    raises :class:`ValueError` at parse time. Tests both the in-memory
-    parse path (``_parse_template``) and the file-driven loader path
-    (``_load_intent_templates``)."""
+    is treated as a malformed-template error. The in-memory parse path
+    (``_parse_template``) raises :class:`ValueError` directly, and the
+    file-driven loader path (``_load_intent_templates``) catches that
+    same ValueError, logs a WARNING that names the offending template
+    and the bad slot, and skips the template — Phase G plan contract:
+    bad-shape errors warn + skip rather than crash startup, so a
+    single bad hand-edited template can't take down the whole kiosk
+    boot.
+    """
     bad_template = {
         "id": "bad_one",
         "title": "Bad template",
@@ -151,14 +160,14 @@ def test_template_loader_rejects_bad_slot_at_boot(
             {"text": f"step {i}", "action_slot": "banana"} for i in range(5)
         ],
     }
+    # In-memory parse path still raises directly — tools/lint_templates
+    # and similar one-shot tools rely on this loud failure.
     with pytest.raises(ValueError, match="banana"):
         _parse_template(bad_template, source="<test>")
 
     # File-driven path: write a complete intent file with the bad
     # template, point TEMPLATES_DIR at the temp dir, and assert the
-    # loader raises. We must also copy the schema so the JSON-schema
-    # validator step passes (the loader logs+returns [] on schema
-    # failures, which would mask the slot rejection we want to pin).
+    # loader catches+skips with a WARNING (no crash).
     bad_dir = tmp_path / "bad_templates"
     bad_dir.mkdir()
     schema_src = TEMPLATES_DIR / "_schema.json"
@@ -170,8 +179,14 @@ def test_template_loader_rejects_bad_slot_at_boot(
 
     monkeypatch.setattr("toybox.activities.generator.TEMPLATES_DIR", bad_dir)
     clear_template_cache()
-    with pytest.raises(ValueError, match="banana"):
-        _load_intent_templates("boredom")
+    with caplog.at_level(logging.WARNING, logger="toybox.activities.generator"):
+        templates = _load_intent_templates("boredom")
+    # Bad template was skipped, not loaded.
+    assert all(t.id != "bad_one" for t in templates)
+    # WARNING log named the offending template id and the bad slot.
+    warning_messages = " ".join(rec.getMessage() for rec in caplog.records)
+    assert "bad_one" in warning_messages
+    assert "banana" in warning_messages
 
 
 # ---------------------------------------------------------------------------

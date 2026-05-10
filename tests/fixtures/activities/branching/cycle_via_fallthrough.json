@@ -1,0 +1,15 @@
+{
+  "intent": "boredom",
+  "templates": [
+    {
+      "id": "fixture_cycle_via_fallthrough",
+      "title": "Cycle-via-fallthrough fixture",
+      "buckets": ["always"],
+      "steps": [
+        { "id": "a", "text": "Step A — falls through to B implicitly." },
+        { "id": "b", "text": "Step B — explicit next back to A.", "next": "a" },
+        { "id": "c", "text": "Step C — terminal but unreachable; needed for minItems=3." }
+      ]
+    }
+  ]
+}

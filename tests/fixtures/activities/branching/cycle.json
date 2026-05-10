@@ -1,0 +1,15 @@
+{
+  "intent": "boredom",
+  "templates": [
+    {
+      "id": "fixture_cycle",
+      "title": "Cycle fixture",
+      "buckets": ["always"],
+      "steps": [
+        { "id": "a", "text": "Step A.", "next": "b" },
+        { "id": "b", "text": "Step B.", "next": "a" },
+        { "text": "Unreachable but lets us pass schema minItems=3." }
+      ]
+    }
+  ]
+}

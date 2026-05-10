@@ -1,0 +1,43 @@
+{
+  "intent": "boredom",
+  "templates": [
+    {
+      "id": "fixture_valid_branching",
+      "title": "Mystery in {room}",
+      "buckets": ["always"],
+      "steps": [
+        {
+          "id": "open",
+          "text": "{toy} hears a strange sound coming from the corner of {room}.",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Sneak closer quietly", "next": "sneak" },
+            { "label": "Announce yourself bravely", "next": "announce" }
+          ]
+        },
+        {
+          "id": "sneak",
+          "text": "You tiptoe across {room} and peek behind the {prop}.",
+          "action_slot": "looking",
+          "next": "snack_ending"
+        },
+        {
+          "id": "announce",
+          "text": "You shout {action_verb}-style and the room echoes!",
+          "action_slot": "cheering",
+          "next": "victory_ending"
+        },
+        {
+          "id": "snack_ending",
+          "text": "It was a tiny mouse — {toy} offers it a snack and you make a friend.",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "victory_ending",
+          "text": "The sound was a {adjective} echo — you took a bow and {toy} clapped.",
+          "action_slot": "cheering"
+        }
+      ]
+    }
+  ]
+}
