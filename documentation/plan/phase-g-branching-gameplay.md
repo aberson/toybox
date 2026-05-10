@@ -324,7 +324,7 @@ G1 lands first — everyone reads the schema + Pydantic + pydantic-to-ts codegen
 - **Type:** operator
 - **Issue:** #75
 - **Flags:** n/a (operator step; manual JSON authoring)
-- **Status:** NOT STARTED
+- **Status:** DONE (2026-05-10) — exceeded scope: 200 templates shipped instead of 4 (50 per intent) via overnight 4-parallel-agent soak; 0% validation failures; full report at `documentation/runs/2026-05-10-template-soak.md`
 - **Depends on:** Step G1 / #71 (schema + validator must be live so authoring iteration is fast feedback)
 - **Parallel-safe with:** Step G2 / #72, G3 / #73, G4 / #74 — pure JSON content, zero code overlap; runs on the third parallel branch after G1 (alongside backend G2→G3 and frontend G4)
 - **Done when:** 4 templates committed under `src/toybox/activities/templates/branching/`; each validates against `validate_template_graph` at boot; each has 2-4 choice points and 2+ endings; one-line design note per template in the G5 run-doc.
