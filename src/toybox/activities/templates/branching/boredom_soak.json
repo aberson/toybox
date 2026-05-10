@@ -538,6 +538,185 @@
         { "id": "callin", "text": "A caller dials in! {toy} pretends to be a fan from far away.", "action_slot": "waving" },
         { "text": "Sign off with your station's catchphrase.", "action_slot": "waving" }
       ]
+    },
+    {
+      "id": "boredom_soak_burst_freezedance_31",
+      "title": "60-second freeze dance",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "{toy} hits play on an invisible speaker.", "action_slot": "cheering" },
+        { "text": "Dance like nobody is watching!", "action_slot": "jumping", "id": "freeze_pick", "choices": [
+          { "label": "Freeze like a statue", "next": "statue_end" },
+          { "label": "Freeze like a noodle", "next": "noodle_end" }
+        ] },
+        { "id": "statue_end", "text": "Hold absolutely still. {toy} pokes you to test. You win!", "action_slot": "thinking" },
+        { "id": "noodle_end", "text": "Wobble in place all floppy. {toy} cracks up.", "action_slot": "confused" }
+      ]
+    },
+    {
+      "id": "boredom_soak_burst_silentstare_32",
+      "title": "Silent stare contest",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "Sit face to face with {toy} in {room}.", "action_slot": "looking" },
+        { "text": "Choose your tactic.", "action_slot": "thinking", "id": "stare_pick", "choices": [
+          { "label": "Stare deeply and seriously", "next": "deep_stare" },
+          { "label": "Make tiny silly faces", "next": "silly_face" }
+        ] },
+        { "id": "deep_stare", "text": "Lock eyes for {count} long seconds. {toy} blinks first!", "action_slot": "looking" },
+        { "id": "silly_face", "text": "Twitch your nose just a little. {toy} loses it. Victory!", "action_slot": "confused" }
+      ]
+    },
+    {
+      "id": "boredom_soak_burst_quickdraw_33",
+      "title": "Quick-draw a {adjective} thing",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "{toy} announces: draw something {adjective} in 10 seconds!", "action_slot": "thinking", "id": "draw_pick", "choices": [
+          { "label": "Use your finger in the air", "next": "air_end" },
+          { "label": "Mime it with your whole body", "next": "mime_end" }
+        ] },
+        { "id": "air_end", "text": "Trace it big and bold. {toy} guesses on the first try!", "action_slot": "pointing" },
+        { "id": "mime_end", "text": "You wiggle and pose. {toy} squeals the right answer.", "action_slot": "jumping" }
+      ]
+    },
+    {
+      "id": "boredom_soak_burst_threehigh_34",
+      "title": "Three high-fives",
+      "buckets": ["morning", "always"],
+      "steps": [
+        { "text": "Stand tall. {toy} holds up a paw.", "action_slot": "pointing" },
+        { "text": "Pick the high-five style.", "action_slot": "thinking", "id": "five_pick", "choices": [
+          { "label": "Slow and steady", "next": "slow_end" },
+          { "label": "Lightning fast", "next": "fast_end" }
+        ] },
+        { "id": "slow_end", "text": "Three gentle taps. {toy} smiles big.", "action_slot": "waving" },
+        { "id": "fast_end", "text": "Three slaps in a blur! {toy}'s paw is buzzing.", "action_slot": "cheering" }
+      ]
+    },
+    {
+      "id": "boredom_soak_burst_namethething_35",
+      "title": "Name the {prop}",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "{toy} grabs the nearest {prop}.", "action_slot": "pointing" },
+        { "text": "Give it a name on the spot!", "action_slot": "thinking", "id": "name_pick", "choices": [
+          { "label": "A noble fancy name", "next": "fancy_end" },
+          { "label": "A goofy nonsense name", "next": "goofy_end" }
+        ] },
+        { "id": "fancy_end", "text": "{toy} bows to Lord or Lady {prop}. Knighted at once!", "action_slot": "waving" },
+        { "id": "goofy_end", "text": "{toy} can barely say it without giggling. Perfect!", "action_slot": "cheering" }
+      ]
+    },
+    {
+      "id": "boredom_soak_long_castle_36",
+      "title": "Build and defend a {adjective} castle",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "{toy} unrolls blueprints in {room}. Today we build a castle!", "action_slot": "thinking" },
+        { "text": "Gather {count} pillows for the walls.", "action_slot": "looking" },
+        { "text": "Stack them carefully into a tall fortress.", "action_slot": "thinking" },
+        { "text": "Add a {prop} on top as the royal flag.", "action_slot": "pointing" },
+        { "text": "{toy} takes the throne. The kingdom is yours.", "action_slot": "cheering" },
+        { "text": "Suddenly invaders arrive! Pick your defense.", "action_slot": "confused", "id": "defense_pick", "choices": [
+          { "label": "Catapults of pillows", "next": "catapult" },
+          { "label": "A dazzling magic shield", "next": "shield" },
+          { "label": "Negotiate with snacks", "next": "snacks" }
+        ] },
+        { "id": "catapult", "text": "Toss a soft cushion gently across the room. Direct hit!", "action_slot": "jumping", "next": "victory" },
+        { "id": "shield", "text": "Wave your arms in a wide circle. The shield holds strong.", "action_slot": "waving", "next": "victory" },
+        { "id": "snacks", "text": "Offer pretend cookies. The invaders sit down and chat.", "action_slot": "thinking", "next": "victory" },
+        { "id": "victory", "text": "Peace returns to the castle. {toy} declares you Defender Royal.", "action_slot": "cheering" },
+        { "text": "Hold a small parade through the great hall.", "action_slot": "running" },
+        { "text": "Settle in for a quiet rest in your fortress.", "action_slot": "sleeping" }
+      ]
+    },
+    {
+      "id": "boredom_soak_long_safari_37",
+      "title": "All-day safari adventure",
+      "buckets": ["morning"],
+      "steps": [
+        { "text": "{toy} pulls on tiny binoculars. Safari day in {room} begins!", "action_slot": "looking" },
+        { "text": "Pack your safari kit: a {prop}, a snack, and courage.", "action_slot": "thinking" },
+        { "text": "Set out across the great savanna (rug).", "action_slot": "running" },
+        { "text": "Spot tracks! Tiny prints lead under the chair.", "action_slot": "looking" },
+        { "text": "Follow them quietly without crunching the grass.", "action_slot": "looking" },
+        { "text": "You spot a watering hole. Pick a hide.", "action_slot": "thinking", "id": "hide_pick", "choices": [
+          { "label": "Behind the cushion bushes", "next": "bushes" },
+          { "label": "Up a chair-tree", "next": "tree" }
+        ] },
+        { "id": "bushes", "text": "Crouch low with {toy}. Animals begin gathering.", "action_slot": "looking", "next": "wildlife" },
+        { "id": "tree", "text": "Climb up high. The view is incredible!", "action_slot": "looking", "next": "wildlife" },
+        { "id": "wildlife", "text": "You watch {count} imaginary creatures drink and play.", "action_slot": "looking" },
+        { "text": "{toy} taps your {body_part} — a rare animal appears!", "action_slot": "confused" },
+        { "text": "Note its features in your safari journal (out loud).", "action_slot": "thinking" },
+        { "text": "Trek back to camp. {toy} declares the day legendary.", "action_slot": "cheering" }
+      ]
+    },
+    {
+      "id": "boredom_soak_long_timetravel_38",
+      "title": "Time machine in {room}",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "{toy} hands you a {prop} — the time-machine controller.", "action_slot": "pointing" },
+        { "text": "Pick where to travel first.", "action_slot": "thinking", "id": "era_pick", "choices": [
+          { "label": "Dinosaur times", "next": "dino" },
+          { "label": "Distant future", "next": "future" },
+          { "label": "Pirate seas", "next": "pirate" }
+        ] },
+        { "id": "dino", "text": "ROAR! Tromp around with heavy steps. Spot {count} dinos.", "action_slot": "running", "next": "anomaly" },
+        { "id": "future", "text": "Robots zip past in flying cars. Wave to one.", "action_slot": "waving", "next": "anomaly" },
+        { "id": "pirate", "text": "Climb the rigging and shout 'land ho!' from the crow's nest.", "action_slot": "cheering", "next": "anomaly" },
+        { "id": "anomaly", "text": "The machine shudders. A glitch sends you somewhere new!", "action_slot": "confused" },
+        { "text": "You land in a {adjective} land you have never seen.", "action_slot": "looking" },
+        { "text": "Explore for {count} minutes, narrating everything.", "action_slot": "thinking" },
+        { "text": "Find a clue that helps you set the dial home.", "action_slot": "looking" },
+        { "text": "{toy} pulls the lever. Whoosh — back to {room}!", "action_slot": "jumping" },
+        { "text": "Write the date and place in the captain's log.", "action_slot": "thinking" }
+      ]
+    },
+    {
+      "id": "boredom_soak_long_bakery_39",
+      "title": "Grand opening of {toy}'s bakery",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "{toy} ties on an apron in {room}. The bakery opens today!", "action_slot": "cheering" },
+        { "text": "Set up the counter using a {prop} as the cash register.", "action_slot": "thinking" },
+        { "text": "Mix imaginary dough by punching the air {count} times.", "action_slot": "thinking" },
+        { "text": "Roll it flat and shape it into your specialty.", "action_slot": "thinking" },
+        { "text": "Slide the tray into the oven. Wait, peek, wait!", "action_slot": "looking" },
+        { "text": "DING! Pull it out steaming. What did you bake?", "action_slot": "thinking", "id": "bake_pick", "choices": [
+          { "label": "{adjective} cupcakes", "next": "cupcake" },
+          { "label": "A giant pretzel", "next": "pretzel" }
+        ] },
+        { "id": "cupcake", "text": "Frost each one carefully with your {body_part} as a piping tool.", "action_slot": "thinking", "next": "open_doors" },
+        { "id": "pretzel", "text": "Sprinkle imaginary salt across the top. Crunchy!", "action_slot": "thinking", "next": "open_doors" },
+        { "id": "open_doors", "text": "Open the doors. The first customer is {toy}.", "action_slot": "waving" },
+        { "text": "Serve with a flourish and a thank-you.", "action_slot": "cheering" },
+        { "text": "{toy} tastes it and gives you a gold-star review.", "action_slot": "cheering" },
+        { "text": "Flip the sign to CLOSED. Wipe down the counter. Bakery day done.", "action_slot": "idle" }
+      ]
+    },
+    {
+      "id": "boredom_soak_long_oceanvoyage_40",
+      "title": "Ocean voyage on the SS {toy}",
+      "buckets": ["afternoon", "evening"],
+      "steps": [
+        { "text": "{toy} captains the ship. {room} is now the open sea.", "action_slot": "pointing" },
+        { "text": "Hoist the sail using a {prop} for a flag.", "action_slot": "cheering" },
+        { "text": "Cast off! Wave goodbye to the harbor.", "action_slot": "waving" },
+        { "text": "Day {count}: spot a strange shape in the water.", "action_slot": "looking" },
+        { "text": "Pull out the spyglass made from your {body_part}.", "action_slot": "looking" },
+        { "text": "It's a sea monster! Friend or foe?", "action_slot": "confused", "id": "sea_pick", "choices": [
+          { "label": "Offer a song", "next": "song_path" },
+          { "label": "Offer a snack", "next": "snack_path" }
+        ] },
+        { "id": "song_path", "text": "It hums along and escorts you {count} more days.", "action_slot": "thinking", "next": "harbor" },
+        { "id": "snack_path", "text": "It munches happily and waves a tentacle goodbye.", "action_slot": "waving", "next": "harbor" },
+        { "id": "harbor", "text": "A new harbor appears at dawn. Drop anchor!", "action_slot": "looking" },
+        { "text": "Step ashore and plant your flag in the sand.", "action_slot": "pointing" },
+        { "text": "{toy} writes your name in the captain's logbook.", "action_slot": "thinking" }
+      ]
     }
   ]
 }
