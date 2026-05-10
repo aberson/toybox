@@ -1082,6 +1082,328 @@
           "action_slot": "cheering"
         }
       ]
+    },
+    {
+      "id": "request_activity_soak_bodypartbalance_31",
+      "title": "Balance {count} {prop} on your {body_part}",
+      "buckets": ["morning", "afternoon"],
+      "steps": [
+        { "text": "Find {count} small flat-ish things — books, coasters, paper plates — and a stretch of clear floor.", "action_slot": "looking" },
+        { "text": "Stand still in {room} with {toy} watching from a safe spot.", "action_slot": "idle" },
+        { "text": "Practice balancing the first item on your {body_part} for a count of three.", "action_slot": "thinking" },
+        {
+          "id": "stack_or_walk",
+          "text": "Now what? Stack more, or take a walk?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Stack all {count} in place", "next": "stack_path" },
+            { "label": "Walk one step at a time", "next": "walk_path" }
+          ]
+        },
+        {
+          "id": "stack_path",
+          "text": "Add the items one by one to your {body_part}. Hold steady until {toy} counts to {count}.",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "walk_path",
+          "text": "Take {count} slow steps with one item on your {body_part}. {toy} cheers each step.",
+          "action_slot": "running"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_actionverbchain_32",
+      "title": "{count}-step {action_verb} chain",
+      "buckets": ["morning", "afternoon"],
+      "steps": [
+        { "text": "Stand in {room} with {toy} as the chain leader.", "action_slot": "pointing" },
+        { "text": "Pick a starting spot and {action_verb} once in place.", "action_slot": "jumping" },
+        {
+          "id": "chain_pattern",
+          "text": "What pattern does the chain follow?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Straight line, {count} times", "next": "line_chain" },
+            { "label": "Big circle around {toy}", "next": "circle_chain" }
+          ]
+        },
+        {
+          "id": "line_chain",
+          "text": "{action_verb} {count} times in a straight line. Land each one a step further from where you started.",
+          "action_slot": "jumping",
+          "next": "finish"
+        },
+        {
+          "id": "circle_chain",
+          "text": "{action_verb} {count} times in a circle around {toy}. Each one in a new spot on the loop.",
+          "action_slot": "running",
+          "next": "finish"
+        },
+        {
+          "id": "finish",
+          "text": "Bow to {toy} and shout the number out loud — {count}!",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_propchaintale_33",
+      "title": "{prop} chain through {room}",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "Pick a starting {prop} and place it on the floor in one corner of {room}.", "action_slot": "pointing" },
+        { "text": "Find a second prop-like object and lay it beside the first, just touching.", "action_slot": "looking" },
+        { "text": "Keep adding objects in a long line — anything small and safe — for {count} pieces.", "action_slot": "thinking" },
+        { "text": "Walk slowly along the line beside {toy} and name each object out loud.", "action_slot": "pointing" },
+        {
+          "id": "chain_use",
+          "text": "What is the chain for?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "A path for {toy} to walk", "next": "walk_end" },
+            { "label": "A long story-line", "next": "story_end" }
+          ]
+        },
+        {
+          "id": "walk_end",
+          "text": "Carry {toy} along the chain in tiny hops, stopping once at every object.",
+          "action_slot": "jumping"
+        },
+        {
+          "id": "story_end",
+          "text": "Make up a one-sentence chapter for each object as you walk past. End with the last object as the big twist.",
+          "action_slot": "thinking"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_countingsetup_34",
+      "title": "{count} stations of {adjective} stuff",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "Pick {count} flat spots in {room} — corners, chairs, books on the floor.", "action_slot": "looking" },
+        { "text": "At each spot, place one object that feels {adjective}.", "action_slot": "pointing" },
+        { "text": "Walk {toy} from station to station and touch each object once.", "action_slot": "thinking" },
+        {
+          "id": "station_game",
+          "text": "What do we do at the stations?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Spin once at each", "next": "spin_path" },
+            { "label": "Whisper a secret at each", "next": "whisper_path" },
+            { "label": "Strike a pose at each", "next": "pose_path" }
+          ]
+        },
+        {
+          "id": "spin_path",
+          "text": "Spin one full turn at each station with {toy} held high.",
+          "action_slot": "jumping"
+        },
+        {
+          "id": "whisper_path",
+          "text": "Lean in and whisper one secret to {toy} at each station.",
+          "action_slot": "thinking"
+        },
+        {
+          "id": "pose_path",
+          "text": "Strike a different pose at each station and freeze for two seconds.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_actionverbcraft_35",
+      "title": "Craft something to {action_verb} with",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "Pick a paper, a tube, or a sock — your craft needs to help you {action_verb}.", "action_slot": "thinking" },
+        {
+          "id": "design_pick",
+          "text": "How will the craft work?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "A {prop}-style tool", "next": "prop_tool" },
+            { "label": "A wearable on your {body_part}", "next": "wearable_tool" }
+          ]
+        },
+        {
+          "id": "prop_tool",
+          "text": "Roll the paper into a hand-held tool. Tape it shut and decorate the grip.",
+          "action_slot": "thinking",
+          "next": "test"
+        },
+        {
+          "id": "wearable_tool",
+          "text": "Cut and tape a paper band that fits on your {body_part}. Add a little flair.",
+          "action_slot": "thinking",
+          "next": "test"
+        },
+        {
+          "id": "test",
+          "text": "Use your new craft to {action_verb} three times in front of {toy}.",
+          "action_slot": "running"
+        },
+        { "text": "Bow. Tell {toy} what to call this invention.", "action_slot": "cheering" }
+      ]
+    },
+    {
+      "id": "request_activity_soak_bodypartmuseum_36",
+      "title": "Museum of {body_part} prints",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "Lay paper down in {room}. {toy} is the curator.", "action_slot": "idle" },
+        { "text": "Press your {body_part} gently on a damp paper towel, then onto the dry paper to leave a print.", "action_slot": "thinking" },
+        { "text": "Make {count} prints in a row across the page.", "action_slot": "thinking" },
+        {
+          "id": "label_style",
+          "text": "How do we label the museum prints?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "With numbers 1 to {count}", "next": "numbers_end" },
+            { "label": "With invented monster names", "next": "monsters_end" }
+          ]
+        },
+        {
+          "id": "numbers_end",
+          "text": "Write a number under each print. Walk {toy} along the gallery and read each number aloud.",
+          "action_slot": "pointing"
+        },
+        {
+          "id": "monsters_end",
+          "text": "Invent a silly monster name for each print and write or whisper it to {toy}.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_propparade_37",
+      "title": "Parade of {count} {prop} for {toy}",
+      "buckets": ["morning", "afternoon"],
+      "steps": [
+        { "text": "Gather {count} prop-style objects in a pile in {room}.", "action_slot": "pointing" },
+        { "text": "Sit {toy} on a chair as the royal audience.", "action_slot": "thinking" },
+        {
+          "id": "parade_kind",
+          "text": "What kind of parade is this?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Loud and marchy", "next": "march_path" },
+            { "label": "Slow and graceful", "next": "graceful_path" }
+          ]
+        },
+        {
+          "id": "march_path",
+          "text": "Hold each prop high and march past {toy} stamping your feet. Cycle through all {count}.",
+          "action_slot": "running",
+          "next": "salute"
+        },
+        {
+          "id": "graceful_path",
+          "text": "Hold each prop with two hands and glide past {toy} on tip-toe. Cycle through all {count}.",
+          "action_slot": "thinking",
+          "next": "salute"
+        },
+        {
+          "id": "salute",
+          "text": "Stack the props in front of {toy} and give a royal salute.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_adjectivedrawing_38",
+      "title": "Draw {count} {adjective} pictures",
+      "buckets": ["afternoon", "evening"],
+      "steps": [
+        { "text": "Tear a sheet of paper into {count} smaller squares. Sit beside {toy}.", "action_slot": "idle" },
+        { "text": "On the first square, draw something that looks {adjective}.", "action_slot": "thinking" },
+        { "text": "On the second, draw something else that looks {adjective} — but in a different way.", "action_slot": "thinking" },
+        { "text": "Keep going until all {count} squares are full of {adjective} pictures.", "action_slot": "thinking" },
+        {
+          "id": "display_choice",
+          "text": "How do we display the pictures?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Tape them in a long row", "next": "row_end" },
+            { "label": "Fan them out around {toy}", "next": "fan_end" }
+          ]
+        },
+        {
+          "id": "row_end",
+          "text": "Tape the squares in a long row on a wall or floor. Walk {toy} along like a gallery tour.",
+          "action_slot": "pointing"
+        },
+        {
+          "id": "fan_end",
+          "text": "Fan the squares around {toy} in a half-circle. Spin slowly and call out which one is the {adjective}-est.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_roomsoundmap_39",
+      "title": "Sound map of {room}",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "Sit very still in the middle of {room} with {toy} and a pencil.", "action_slot": "idle" },
+        { "text": "Close your eyes for ten quiet seconds and listen.", "action_slot": "sleeping" },
+        { "text": "Open your eyes. Tell {toy} {count} sounds you heard.", "action_slot": "thinking" },
+        { "text": "Draw a quick map of {room} with a tiny picture for each sound's source.", "action_slot": "thinking" },
+        {
+          "id": "next_step",
+          "text": "What should the sound map become?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "A bedtime quiet-list", "next": "quiet_end" },
+            { "label": "A scavenger checklist", "next": "scavenger_end" }
+          ]
+        },
+        {
+          "id": "quiet_end",
+          "text": "Cross out the loudest sound. Whisper a goodnight to each remaining one with {toy}.",
+          "action_slot": "sleeping"
+        },
+        {
+          "id": "scavenger_end",
+          "text": "Tip-toe to each sound's source and tap it once. {toy} keeps score on the map.",
+          "action_slot": "looking"
+        }
+      ]
+    },
+    {
+      "id": "request_activity_soak_propandbody_40",
+      "title": "Move a {prop} using only your {body_part}",
+      "buckets": ["morning", "afternoon"],
+      "steps": [
+        { "text": "Pick a small soft prop — a sock, a paper ball, a small pillow.", "action_slot": "looking" },
+        { "text": "Set the prop on the floor in {room}. {toy} watches from the side.", "action_slot": "pointing" },
+        {
+          "id": "challenge",
+          "text": "How tricky should this be?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Roll it across the floor", "next": "roll_path" },
+            { "label": "Lift it onto a chair", "next": "lift_path" },
+            { "label": "Balance it then move", "next": "balance_path" }
+          ]
+        },
+        {
+          "id": "roll_path",
+          "text": "Use only your {body_part} to roll the prop across {room} to {toy}.",
+          "action_slot": "thinking"
+        },
+        {
+          "id": "lift_path",
+          "text": "Use only your {body_part} to lift the prop onto a chair near {toy}. No hands cheating!",
+          "action_slot": "thinking"
+        },
+        {
+          "id": "balance_path",
+          "text": "Balance the prop on your {body_part}, then move three steps without dropping it.",
+          "action_slot": "thinking"
+        }
+      ]
     }
   ]
 }
