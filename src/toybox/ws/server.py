@@ -381,6 +381,12 @@ def build_router() -> APIRouter:
             # 403 close before accept so unauthorized origins never see
             # an open socket. Starlette's ``send_denial_response``
             # produces the HTTP-level 403 we want.
+            _logger.warning(
+                "ws origin rejected: origin=%r allow_list=%r "
+                "(set TOYBOX_LAN_IP env var to add http://<lan-ip>:4000)",
+                origin,
+                allow_list,
+            )
             await ws.close(code=status.WS_1008_POLICY_VIOLATION)
             return
 
