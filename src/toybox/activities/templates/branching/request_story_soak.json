@@ -314,6 +314,325 @@
           "action_slot": "cheering"
         }
       ]
+    },
+    {
+      "id": "request_story_soak_lighthouse_11",
+      "title": "The lighthouse keeper's secret",
+      "buckets": ["evening"],
+      "steps": [
+        { "text": "Old Marlo was the keeper of a tiny seaside lighthouse. {toy} came to visit one foggy night.", "action_slot": "thinking" },
+        { "text": "Marlo's lantern was warm and bright, but the room was full of {adjective} clutter.", "action_slot": "looking" },
+        { "text": "On a high shelf sat a wooden box Marlo never opened. {toy} asked about it gently.", "action_slot": "pointing" },
+        { "text": "Marlo sighed. 'Inside is a song my mother taught me. I'm afraid I've forgotten it.'", "action_slot": "confused" },
+        { "text": "Together they reached for the box. The lid creaked open.", "sfx": "creak", "action_slot": "looking" },
+        {
+          "id": "fork",
+          "text": "What's inside?",
+          "choices": [
+            { "label": "A music box", "next": "music" },
+            { "label": "A folded letter", "next": "letter" }
+          ]
+        },
+        {
+          "id": "music",
+          "text": "A tiny crank turned and the song played itself. Marlo's eyes filled. 'There you are,' Marlo whispered. The end.",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "letter",
+          "text": "The letter held the lyrics. Marlo read them aloud and remembered the tune in the middle of the third line. The end.",
+          "action_slot": "thinking"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_threebridges_12",
+      "title": "Three bridges to the castle",
+      "buckets": ["afternoon"],
+      "steps": [
+        {
+          "id": "open",
+          "text": "{toy} stood before three bridges leading to a castle on a hill. Each bridge whispered a different promise.",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "The bridge of riddles", "next": "riddles" },
+            { "label": "The bridge of bells", "next": "bells" },
+            { "label": "The bridge of mirrors", "next": "mirrors" }
+          ]
+        },
+        {
+          "id": "riddles",
+          "text": "A friendly troll asked: what has hands but cannot wave? {toy} guessed: a clock! The troll laughed and stepped aside.",
+          "action_slot": "thinking",
+          "next": "gate"
+        },
+        {
+          "id": "bells",
+          "text": "Bells rang as {toy} stepped on each plank. By the end, {toy} was humming along with the bridge.",
+          "action_slot": "cheering",
+          "next": "gate"
+        },
+        {
+          "id": "mirrors",
+          "text": "Each mirror showed {toy} a little braver than the last. The final mirror smiled and said, 'Go on, then.'",
+          "action_slot": "waving",
+          "next": "gate"
+        },
+        {
+          "id": "gate",
+          "text": "All three bridges led to the same gate. The castle was warm inside, and full of friends waiting. The end.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_pebblepocket_13",
+      "title": "The pebble in the pocket",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "{toy} found a small smooth pebble that hummed when held tightly.", "action_slot": "thinking" },
+        { "text": "The pebble's hum changed depending on what {toy} thought about.", "action_slot": "looking" },
+        {
+          "id": "fork",
+          "text": "What does {toy} think about?",
+          "choices": [
+            { "label": "A faraway forest", "next": "forest" },
+            { "label": "An old friend", "next": "friend" }
+          ]
+        },
+        {
+          "id": "forest",
+          "text": "The pebble sang of pines and rain. {toy} closed its eyes and walked through tall green halls in its mind. The end.",
+          "action_slot": "sleeping"
+        },
+        {
+          "id": "friend",
+          "text": "The pebble hummed soft and slow, like a remembered laugh. {toy} smiled and tucked the pebble away. The end.",
+          "action_slot": "thinking"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_libraryowl_14",
+      "title": "The library owl",
+      "buckets": ["evening", "wind_down"],
+      "steps": [
+        { "text": "Past midnight, the library belonged to an old owl named Quill. {toy} had a special pass.", "action_slot": "thinking" },
+        { "text": "Quill led {toy} between the tall shelves. The books rustled softly, awake and listening.", "action_slot": "looking" },
+        { "text": "'Tonight,' said Quill, 'you may pick any one book to read. But choose with your heart.'", "action_slot": "thinking" },
+        {
+          "id": "fork",
+          "text": "Which book does {toy} pick?",
+          "choices": [
+            { "label": "The book that glowed", "next": "glow" },
+            { "label": "The book that sighed", "next": "sigh" }
+          ]
+        },
+        {
+          "id": "glow",
+          "text": "Inside were maps to places that didn't exist yet — places {toy} would invent in dreams. The end.",
+          "action_slot": "sleeping"
+        },
+        {
+          "id": "sigh",
+          "text": "It was a story of a tired bear who wanted to nap. By page three, {toy} was yawning along. The end.",
+          "action_slot": "sleeping"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_kitewind_15",
+      "title": "Where the kite went",
+      "buckets": ["morning", "afternoon"],
+      "steps": [
+        { "text": "{toy} flew a paper kite on a blustery hill. The string slipped — and the kite was gone.", "action_slot": "confused" },
+        {
+          "id": "fork",
+          "text": "Where does {toy} look first?",
+          "choices": [
+            { "label": "Up in a tall tree", "next": "tree" },
+            { "label": "Down by the pond", "next": "pond" },
+            { "label": "Across the wide field", "next": "field" }
+          ]
+        },
+        {
+          "id": "tree",
+          "text": "A squirrel had caught the kite and was using it as a blanket. The squirrel agreed to share — half the day each.",
+          "action_slot": "thinking",
+          "next": "home"
+        },
+        {
+          "id": "pond",
+          "text": "The kite floated like a tiny boat. A frog rode on top, happy as could be. {toy} waved hello.",
+          "action_slot": "waving",
+          "next": "home"
+        },
+        {
+          "id": "field",
+          "text": "The kite was tangled in tall grass. A rabbit was nibbling the string. {toy} thanked the rabbit politely.",
+          "action_slot": "thinking",
+          "next": "home"
+        },
+        {
+          "id": "home",
+          "text": "{toy} carried the kite home, not in a hurry. The wind blew gentle now, like it was tired too. The end.",
+          "action_slot": "sleeping"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_chimneymouse_16",
+      "title": "The chimney mouse",
+      "buckets": ["evening", "wind_down"],
+      "steps": [
+        { "text": "A small mouse named Ash lived in the chimney of {room}. He was very proud of his soot-grey coat.", "action_slot": "thinking" },
+        { "text": "One evening, Ash noticed something strange — his {body_part} was glowing.", "action_slot": "confused" },
+        { "text": "Not a lot. Just a little. Like a candle had been lit inside him.", "action_slot": "looking" },
+        {
+          "id": "fork",
+          "text": "What does Ash do?",
+          "choices": [
+            { "label": "Hide in the chimney", "next": "hide" },
+            { "label": "Show {toy}", "next": "show" }
+          ]
+        },
+        {
+          "id": "hide",
+          "text": "In the dark chimney, the glow lit up the whole flue. Ash was a tiny lighthouse. He felt brave. The end.",
+          "action_slot": "thinking"
+        },
+        {
+          "id": "show",
+          "text": "{toy} gasped softly. 'You're magic,' {toy} whispered. Ash felt nine feet tall, even though he was three inches. The end.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_lostshoe_17",
+      "title": "The lost shoe and the mountain",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "A traveler reached the foot of a tall mountain wearing only one shoe.", "action_slot": "looking" },
+        { "text": "The other shoe had been carried off by a magpie three valleys ago.", "action_slot": "confused" },
+        { "text": "{toy} met the traveler at a crossroads and offered to help.", "action_slot": "waving" },
+        {
+          "id": "fork",
+          "text": "How do they get up the mountain?",
+          "choices": [
+            { "label": "Find the magpie's nest", "next": "nest" },
+            { "label": "Hop together carefully", "next": "hop" }
+          ]
+        },
+        {
+          "id": "nest",
+          "text": "High on a ledge sat the nest, lined with shiny things — including the shoe. The magpie traded it for a button. The end.",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "hop",
+          "text": "{toy} and the traveler hopped one-shoe-style all the way up, laughing the whole climb. At the top: a beautiful view. The end.",
+          "action_slot": "jumping"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_singingsoup_18",
+      "title": "The singing soup",
+      "buckets": ["afternoon", "evening"],
+      "steps": [
+        {
+          "id": "open",
+          "text": "Grandmother said tonight's soup would sing — but only if the right things went in. {toy} chose first.",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Carrots and a {adjective} herb", "next": "carrot" },
+            { "label": "Onion and three peppercorns", "next": "onion" },
+            { "label": "Mushroom and a sprig of thyme", "next": "mushroom" }
+          ]
+        },
+        {
+          "id": "carrot",
+          "text": "The soup hummed orange and sweet, like an autumn afternoon. Grandmother nodded approval.",
+          "action_slot": "thinking",
+          "next": "table"
+        },
+        {
+          "id": "onion",
+          "text": "The soup whistled in three short notes — a tune Grandmother had not heard since she was small.",
+          "action_slot": "looking",
+          "next": "table"
+        },
+        {
+          "id": "mushroom",
+          "text": "The soup sang in a low, woody voice, like a tree at night. {toy} listened with eyes closed.",
+          "action_slot": "thinking",
+          "next": "table"
+        },
+        {
+          "id": "table",
+          "text": "All the soups taste like home, Grandmother said. {toy} understood: the song was made of love. The end.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_paperboat_19",
+      "title": "The paper boat",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "{toy} folded a tiny paper boat and set it in the gutter after a rainstorm.", "action_slot": "thinking" },
+        { "text": "The boat sailed away faster than expected. {toy} jogged alongside, watching.", "action_slot": "running" },
+        { "text": "At the corner, the boat met a leaf — and a tiny crew climbed aboard.", "action_slot": "looking" },
+        { "text": "Three ladybugs and one beetle. They saluted {toy} solemnly.", "action_slot": "waving" },
+        {
+          "id": "fork",
+          "text": "What happens at the storm drain?",
+          "choices": [
+            { "label": "{toy} catches the boat", "next": "catch" },
+            { "label": "{toy} lets it sail on", "next": "sail" }
+          ]
+        },
+        {
+          "id": "catch",
+          "text": "The crew disembarked, bowed, and marched off into the grass on important ladybug business. The end.",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "sail",
+          "text": "The boat slipped into the dark and away. {toy} imagined oceans for it. Maybe rivers. Maybe further. The end.",
+          "action_slot": "thinking"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_baker_dawn_20",
+      "title": "The baker who woke the sun",
+      "buckets": ["morning"],
+      "steps": [
+        { "text": "Long before sunrise, a baker named Pip kneaded dough in a warm dark kitchen.", "action_slot": "thinking" },
+        { "text": "Pip had a secret: every morning, the smell of baking bread woke the sun itself.", "action_slot": "looking" },
+        { "text": "But this morning, Pip overslept. The sun had not risen.", "action_slot": "confused" },
+        { "text": "{toy} ran to the bakery to help.", "action_slot": "running" },
+        {
+          "id": "fork",
+          "text": "What do they bake?",
+          "choices": [
+            { "label": "Cinnamon rolls", "next": "rolls" },
+            { "label": "Sourdough loaves", "next": "loaves" }
+          ]
+        },
+        {
+          "id": "rolls",
+          "text": "The smell rose up like a hug. The sun yawned, stretched, and climbed into the sky pink and pleased. The end.",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "loaves",
+          "text": "Crusty and golden — the sun woke gently and smiled at the world. {toy} got the first warm slice. The end.",
+          "action_slot": "cheering"
+        }
+      ]
     }
   ]
 }
