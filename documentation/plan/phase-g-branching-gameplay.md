@@ -251,7 +251,7 @@ G1 lands first — everyone reads the schema + Pydantic + pydantic-to-ts codegen
 - **Type:** code
 - **Issue:** #72
 - **Flags:** `--reviewers code`
-- **Status:** NOT STARTED
+- **Status:** DONE (2026-05-09)
 - **Depends on:** Step G1 / #71 (Pydantic shape required for the new step fields when persisting)
 - **Parallel-safe with:** Step G4 / #74 (frontend; disjoint files), Step G5 / #75 (templates; disjoint files). G3 sequences after G2.
 - **Done when:** Migrations 0007 + 0008 land and run cleanly forward; generator persists `slot_fills_json` at activity creation; generator inserts only `steps[0]` at creation; existing 5-step linear templates produce a 1-row `activity_steps` insert + populated `slot_fills_json`; branching templates with `choices` on `steps[0]` produce `choices_json` with no unresolved `{slot}` placeholders; old activities (pre-G2 fixture rows with empty `slot_fills_json`) still advance correctly; anti-signal signature stable across the change; grep audit complete and recorded in commit message; data-model.md + activity-loop.md updated; unit tests + regression test green; ruff + mypy strict clean.
