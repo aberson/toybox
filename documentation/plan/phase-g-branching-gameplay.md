@@ -351,7 +351,7 @@ G1 lands first — everyone reads the schema + Pydantic + pydantic-to-ts codegen
 - **Type:** operator
 - **Issue:** #76
 - **Flags:** n/a (operator-driven UAT; manual iPad interaction)
-- **Status:** NOT STARTED
+- **Status:** DONE (2026-05-10) — operator-confirmed PASS on all 6 punch-list rows; run-doc at `documentation/runs/2026-05-10-phase-g-uat.md`; bonus fix landed during UAT (WS-origin TOYBOX_LAN_IP env-var visibility in README + ipad-setup doc + diagnostic log)
 - **Depends on:** Steps G1-G5 / #71-#75 (everything must be live)
 - **Parallel-safe with:** none — strictly last
 - **Done when:** UAT run-doc lands at `documentation/runs/<date>-branching-gameplay-uat.md` with the 5-activity evidence; 5/5 pass or 4/5 + content-only soft-pass; Phase G closed with the run-doc commit message referencing this phase plan.
