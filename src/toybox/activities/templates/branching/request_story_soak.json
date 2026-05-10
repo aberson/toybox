@@ -1,0 +1,319 @@
+{
+  "intent": "request_story",
+  "templates": [
+    {
+      "id": "request_story_soak_dragon_01",
+      "title": "The dragon and the lantern",
+      "buckets": ["evening", "wind_down"],
+      "steps": [
+        { "text": "Long ago, a small dragon named Pim lived high above {room}. {toy} settles in to listen.", "action_slot": "thinking" },
+        { "text": "Pim could not breathe fire — only puffs of warm steam. The other dragons giggled.", "action_slot": "confused" },
+        { "text": "One night Pim saw a tiny lantern bobbing across the valley. Someone was lost.", "action_slot": "looking" },
+        { "text": "Pim's wings trembled. The valley was {adjective} and full of shadows.", "action_slot": "thinking" },
+        {
+          "id": "fork",
+          "text": "What does Pim do?",
+          "choices": [
+            { "label": "Fly down to help", "next": "fly" },
+            { "label": "Call the older dragons", "next": "call" }
+          ]
+        },
+        {
+          "id": "fly",
+          "text": "Pim flew down and puffed warm steam — a soft cloud the lost traveler could follow home.",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "call",
+          "text": "The older dragons came roaring, but Pim's tiny voice was the one the traveler heard first. The end.",
+          "action_slot": "waving"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_river_02",
+      "title": "Two paths to the river",
+      "buckets": ["afternoon", "always"],
+      "steps": [
+        {
+          "id": "open",
+          "text": "{toy} stands at the edge of a meadow. The old river song calls from far away.",
+          "action_slot": "looking",
+          "choices": [
+            { "label": "Take the orchard path", "next": "orchard" },
+            { "label": "Take the stone path", "next": "stones" }
+          ]
+        },
+        {
+          "id": "orchard",
+          "text": "The orchard smells like apples. A friendly fox tips its hat and points the way onward.",
+          "action_slot": "waving",
+          "next": "bridge"
+        },
+        {
+          "id": "stones",
+          "text": "The stones are cool and smooth. {toy} hops from one to the next, counting to {count}.",
+          "action_slot": "jumping",
+          "next": "bridge"
+        },
+        {
+          "id": "bridge",
+          "text": "Both paths meet at a wooden bridge. The river hums underneath, sleepy and slow.",
+          "action_slot": "thinking"
+        },
+        { "text": "{toy} sits on the bridge and listens. The river's song says: thank you for coming. The end.", "action_slot": "sleeping" }
+      ]
+    },
+    {
+      "id": "request_story_soak_lostkey_03",
+      "title": "The lost key",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "{toy} found a {adjective} door at the back of {room}. It needed a key.", "action_slot": "looking" },
+        { "text": "An old turtle whispered: the key is hidden where laughter is loudest.", "action_slot": "thinking" },
+        { "text": "{toy} listened. From the kitchen came a giggle. From the garden came a shout.", "action_slot": "looking" },
+        { "text": "Both places were full of friends. Both were full of noise.", "action_slot": "confused" },
+        {
+          "id": "fork",
+          "text": "Which way does {toy} go?",
+          "choices": [
+            { "label": "Toward the giggle", "next": "kitchen" },
+            { "label": "Toward the shout", "next": "garden" }
+          ]
+        },
+        {
+          "id": "kitchen",
+          "text": "In the kitchen, a baby mouse held the key in its tiny paws. It traded the key for a crumb of bread.",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "garden",
+          "text": "In the garden, the key dangled from a sunflower. {toy} thanked the flower with a bow. The end.",
+          "action_slot": "waving"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_thiefcake_04",
+      "title": "The very polite thief",
+      "buckets": ["afternoon", "evening"],
+      "steps": [
+        {
+          "id": "open",
+          "text": "Someone has been taking one slice of cake every night. {toy} decides to investigate.",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Hide behind the {prop}", "next": "hide" },
+            { "label": "Stay up near the window", "next": "window" },
+            { "label": "Set out a note", "next": "note" }
+          ]
+        },
+        {
+          "id": "hide",
+          "text": "From behind the {prop}, {toy} sees a small badger tiptoe in, bow politely, and pick up a slice.",
+          "action_slot": "looking",
+          "next": "meet"
+        },
+        {
+          "id": "window",
+          "text": "Near the window, {toy} sees a small badger arrive, pause to wipe its paws on the mat, and step inside.",
+          "action_slot": "looking",
+          "next": "meet"
+        },
+        {
+          "id": "note",
+          "text": "The note says 'please share' — and in the morning, {toy} finds a tiny thank-you drawn in crumbs.",
+          "action_slot": "thinking",
+          "next": "meet"
+        },
+        {
+          "id": "meet",
+          "text": "The badger isn't a thief at all — it's a baker bringing samples to taste. They share a slice together. The end.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_starwhale_05",
+      "title": "The whale who carried stars",
+      "buckets": ["evening", "wind_down"],
+      "steps": [
+        { "text": "Far above the clouds swam a whale named Drift. On her back, she carried a basket of stars.", "action_slot": "thinking" },
+        { "text": "Each night Drift placed one star in the sky. Tonight her basket was almost empty.", "action_slot": "looking" },
+        { "text": "Only one star was left — and it was the smallest, shyest one of all.", "action_slot": "thinking" },
+        { "text": "The little star whispered: 'I'm too small. No one will see me.'", "action_slot": "confused" },
+        { "text": "Drift smiled. 'The smallest stars,' she said, 'are the ones children wish on.'", "action_slot": "waving" },
+        {
+          "id": "fork",
+          "text": "Where does Drift place the little star?",
+          "choices": [
+            { "label": "Right above {room}", "next": "home" },
+            { "label": "Above the deepest forest", "next": "forest" }
+          ]
+        },
+        {
+          "id": "home",
+          "text": "The star settled above {room} and twinkled softly. {toy} saw it through the window and made a wish. The end.",
+          "action_slot": "sleeping"
+        },
+        {
+          "id": "forest",
+          "text": "Deep in the forest, all the sleepy animals looked up and smiled at the new little light. The end.",
+          "action_slot": "sleeping"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_quietsong_06",
+      "title": "A quiet little song",
+      "buckets": ["wind_down"],
+      "steps": [
+        { "text": "{toy} couldn't sleep. The night was too quiet.", "action_slot": "thinking" },
+        { "text": "A moth landed on the windowsill. 'I know a song for quiet nights,' it whispered.", "action_slot": "looking" },
+        {
+          "id": "fork",
+          "text": "Does {toy} learn the song?",
+          "choices": [
+            { "label": "Yes, hum along", "next": "hum" },
+            { "label": "Just listen", "next": "listen" }
+          ]
+        },
+        {
+          "id": "hum",
+          "text": "{toy} hummed and the moth hummed back. The room filled with a soft, sleepy buzz. The end.",
+          "action_slot": "sleeping"
+        },
+        {
+          "id": "listen",
+          "text": "{toy} listened with eyes closing slowly. The moth sang until {toy} dreamed of warm sunlight. The end.",
+          "action_slot": "sleeping"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_marketmouse_07",
+      "title": "Market day with {toy}",
+      "buckets": ["morning", "afternoon"],
+      "steps": [
+        {
+          "id": "open",
+          "text": "It's market day! {toy} has three coins and a list of one item: a {adjective} something for a friend.",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Visit the cheese mouse", "next": "cheese" },
+            { "label": "Visit the ribbon shop", "next": "ribbon" },
+            { "label": "Visit the puzzle stall", "next": "puzzle" }
+          ]
+        },
+        {
+          "id": "cheese",
+          "text": "The cheese mouse offers a wedge that smells like sunshine. But it costs all three coins.",
+          "action_slot": "thinking",
+          "next": "fountain"
+        },
+        {
+          "id": "ribbon",
+          "text": "The ribbon shop has every color. {toy} picks a {adjective} ribbon for two coins.",
+          "action_slot": "looking",
+          "next": "fountain"
+        },
+        {
+          "id": "puzzle",
+          "text": "The puzzle stall has a tiny wooden box that clicks when you {action_verb} it. One coin only.",
+          "action_slot": "thinking",
+          "next": "fountain"
+        },
+        {
+          "id": "fountain",
+          "text": "{toy} sits by the fountain and wraps the gift carefully. A friend will be very happy. The end.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_attic_08",
+      "title": "The attic door",
+      "buckets": ["afternoon", "evening"],
+      "steps": [
+        { "text": "{toy} discovered an attic door above {room} that no one had opened in years.", "action_slot": "looking" },
+        { "text": "Dust hung in the air like floating sugar. The ladder creaked.", "sfx": "creak", "action_slot": "thinking" },
+        { "text": "Inside the attic, {toy} found three boxes labeled 'memories,' 'maybe-someday,' and 'do not open.'", "action_slot": "confused" },
+        {
+          "id": "fork",
+          "text": "Which box does {toy} open?",
+          "choices": [
+            { "label": "The memories box", "next": "memories" },
+            { "label": "The maybe-someday box", "next": "someday" }
+          ]
+        },
+        {
+          "id": "memories",
+          "text": "Inside were photos of a younger {toy} and a tiny note: 'Remember to be brave.' {toy} smiled and tucked the note in a pocket. The end.",
+          "action_slot": "thinking"
+        },
+        {
+          "id": "someday",
+          "text": "Inside was a folded paper kite, never flown. 'Today,' {toy} decided, 'is someday.' The end.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_snowfox_09",
+      "title": "The fox who counted snowflakes",
+      "buckets": ["wind_down", "evening"],
+      "steps": [
+        { "text": "A small white fox lived where the snow never melted. Her favorite thing was counting flakes.", "action_slot": "looking" },
+        { "text": "Tonight, the sky dropped flakes faster than her paws could count. She got to {count} and lost track.", "action_slot": "confused" },
+        { "text": "{toy} arrived bundled in a scarf and offered to help count.", "action_slot": "waving" },
+        { "text": "Together they counted slowly, two by two, until their voices got drowsy.", "action_slot": "thinking" },
+        {
+          "id": "fork",
+          "text": "What happens when they reach the last flake?",
+          "choices": [
+            { "label": "They make a tiny snow nest", "next": "nest" },
+            { "label": "They go inside for cocoa", "next": "cocoa" }
+          ]
+        },
+        {
+          "id": "nest",
+          "text": "They built a soft nest of snow and curled up under the stars. The fox dreamed of summer. The end.",
+          "action_slot": "sleeping"
+        },
+        {
+          "id": "cocoa",
+          "text": "Steam from the cocoa fogged their noses. The fox fell asleep mid-sip, paw still wrapped around the cup. The end.",
+          "action_slot": "sleeping"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_robotgarden_10",
+      "title": "The robot in the garden",
+      "buckets": ["morning", "afternoon"],
+      "steps": [
+        { "text": "{toy} found a small robot crouched between the tomato plants. It was not moving.", "action_slot": "looking" },
+        { "text": "On its chest blinked a tiny red light. Beside it lay a {prop} it had been holding.", "action_slot": "thinking" },
+        { "text": "{toy} read the side of the robot. It said: 'GENTLE HANDS ONLY.'", "action_slot": "confused" },
+        {
+          "id": "fork",
+          "text": "How does {toy} help?",
+          "choices": [
+            { "label": "Wipe off the dirt softly", "next": "wipe" },
+            { "label": "Press the red light", "next": "press" }
+          ]
+        },
+        {
+          "id": "wipe",
+          "text": "The dirt came off in soft clouds. The robot's eyes lit up green and it bowed gently. 'Friend,' it said. The end.",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "press",
+          "text": "The light turned blue and a tiny voice sang 'thank you.' The robot stood up and watered the tomatoes. The end.",
+          "action_slot": "cheering"
+        }
+      ]
+    }
+  ]
+}
