@@ -178,6 +178,190 @@
         { "id": "wave_end", "text": "Boo waves back and floats a little loop. {toy} declares Boo officially adopted.", "action_slot": "waving" },
         { "id": "five_end", "text": "Boo's hand passes through yours with a giggle. You both crack up. Best new pal.", "action_slot": "cheering" }
       ]
+    },
+    {
+      "id": "boredom_soak_detective_11",
+      "title": "Detective {toy} and the missing snack",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "{toy} adjusts a tiny detective hat. A snack has gone missing from {room}!", "action_slot": "thinking" },
+        { "text": "Pick a starting clue.", "action_slot": "thinking", "id": "first_clue", "choices": [
+          { "label": "Inspect the {prop}", "next": "prop_clue" },
+          { "label": "Question the cushions", "next": "cushion_clue" },
+          { "label": "Dust for fingerprints", "next": "fingerprint_clue" }
+        ] },
+        { "id": "prop_clue", "text": "You find a single crumb on the {prop}. Suspicious!", "action_slot": "looking", "next": "case_break" },
+        { "id": "cushion_clue", "text": "A cushion confesses with a soft squeak. Eyewitness obtained!", "action_slot": "looking", "next": "case_break" },
+        { "id": "fingerprint_clue", "text": "You find one tiny print shaped exactly like {toy}'s {body_part}.", "action_slot": "looking", "next": "case_break" },
+        { "id": "case_break", "text": "All clues point one way. {toy} looks guilty and shrugs.", "action_slot": "confused" },
+        { "text": "Case closed! What's the verdict?", "action_slot": "thinking", "id": "verdict_pick", "choices": [
+          { "label": "Forgive {toy} with a hug", "next": "forgive_end" },
+          { "label": "Sentence to share future snacks", "next": "share_end" }
+        ] },
+        { "id": "forgive_end", "text": "{toy} sighs in relief and promises to ask next time. Justice served warmly.", "action_slot": "cheering" },
+        { "id": "share_end", "text": "{toy} solemnly agrees to a sharing pact. The kingdom of snacks is fair again.", "action_slot": "cheering" }
+      ]
+    },
+    {
+      "id": "boredom_soak_weather_12",
+      "title": "Weather forecast from {room}",
+      "buckets": ["morning"],
+      "steps": [
+        { "text": "{toy} grabs a {prop} as a microphone. Live from {room}, weather time!", "action_slot": "pointing" },
+        { "text": "Stand on the tallest safe spot to be seen by viewers.", "action_slot": "thinking" },
+        { "text": "Announce today's pretend weather in your most serious voice.", "action_slot": "thinking" },
+        { "text": "Suddenly the forecast turns wild!", "action_slot": "confused", "id": "wild_weather", "choices": [
+          { "label": "Spaghetti rain", "next": "spaghetti_end" },
+          { "label": "Rainbow snow", "next": "rainbow_end" }
+        ] },
+        { "id": "spaghetti_end", "text": "Ducked under a {prop} as noodles fell from the ceiling. {toy} catches some on its head.", "action_slot": "confused" },
+        { "id": "rainbow_end", "text": "Soft colorful flakes drift down. You and {toy} dance through the {adjective} flurry.", "action_slot": "jumping" }
+      ]
+    },
+    {
+      "id": "boredom_soak_artgallery_13",
+      "title": "Art gallery opening night",
+      "buckets": ["evening"],
+      "steps": [
+        { "text": "{toy} rolls out a velvet rope. Welcome to the gallery in {room}!", "action_slot": "waving" },
+        { "text": "Pick {count} ordinary things and arrange them into a sculpture.", "action_slot": "thinking" },
+        { "text": "Give your masterpiece a {adjective} title.", "action_slot": "thinking" },
+        { "text": "{toy} walks around it like a tiny art critic.", "action_slot": "looking" },
+        { "text": "{toy} nods seriously and asks: what is the price?", "action_slot": "thinking", "id": "price_choice", "choices": [
+          { "label": "One trillion hugs", "next": "hug_price" },
+          { "label": "A single perfect giggle", "next": "giggle_price" }
+        ] },
+        { "id": "hug_price", "text": "{toy} pays in a long squishy hug. The piece is sold!", "action_slot": "cheering" },
+        { "id": "giggle_price", "text": "{toy} giggles loudly. Sale complete. The gallery is a hit.", "action_slot": "cheering" }
+      ]
+    },
+    {
+      "id": "boredom_soak_train_14",
+      "title": "All aboard the cushion express",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "Choose your role on the great cushion express.", "action_slot": "thinking", "id": "role_pick", "choices": [
+          { "label": "Be the conductor", "next": "conductor_setup" },
+          { "label": "Be the engineer", "next": "engineer_setup" }
+        ] },
+        { "id": "conductor_setup", "text": "Punch pretend tickets with your fingers. {toy} is your first passenger.", "action_slot": "pointing", "next": "departure" },
+        { "id": "engineer_setup", "text": "Climb to the front and grip the imaginary throttle.", "action_slot": "thinking", "next": "departure" },
+        { "id": "departure", "text": "All aboard! Toot toot!", "action_slot": "cheering" },
+        { "text": "The train chugs out of the station and through {room}.", "action_slot": "running" },
+        { "text": "Halfway there, a wobbly bridge appears!", "action_slot": "confused" },
+        { "text": "How do you cross?", "action_slot": "thinking", "id": "bridge_choice", "choices": [
+          { "label": "Full speed ahead", "next": "speed_end" },
+          { "label": "Tiptoe across slowly", "next": "tiptoe_end" }
+        ] },
+        { "id": "speed_end", "text": "WHOOSH! The bridge wobbles but holds. You arrive a hero. {toy} cheers.", "action_slot": "cheering" },
+        { "id": "tiptoe_end", "text": "Each plank creaks. You exhale on the far side. {toy} pats your shoulder proudly.", "action_slot": "waving" }
+      ]
+    },
+    {
+      "id": "boredom_soak_underwater_15",
+      "title": "Underwater tea party",
+      "buckets": ["wind_down"],
+      "steps": [
+        { "text": "{toy} blows imaginary bubbles. You both sink down into a {adjective} ocean inside {room}.", "action_slot": "thinking" },
+        { "text": "Pick {count} pretend sea snacks for the tea party.", "action_slot": "looking" },
+        { "text": "Set them on top of a {prop} that doubles as your underwater table.", "action_slot": "thinking" },
+        { "text": "Float into your seat. Move slowly — water is heavy!", "action_slot": "idle" },
+        { "text": "A curious fish swims up.", "action_slot": "confused", "id": "fish_choice", "choices": [
+          { "label": "Invite it for tea", "next": "fish_tea" },
+          { "label": "Wave it on its way", "next": "fish_wave" }
+        ] },
+        { "id": "fish_tea", "text": "The fish nibbles a snack and tells a quiet story. You all yawn together.", "action_slot": "sleeping" },
+        { "id": "fish_wave", "text": "It wiggles past, tail tickling your nose. The tea is calm and perfect.", "action_slot": "waving" }
+      ]
+    },
+    {
+      "id": "boredom_soak_dragon_16",
+      "title": "Dragon-watching expedition",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "{toy} unrolls a tiny scroll: a dragon has been spotted near {room}!", "action_slot": "thinking" },
+        { "text": "Pack a {prop} as your dragon-watching kit.", "action_slot": "thinking" },
+        { "text": "{action_verb} carefully toward the rumored cave (under the table).", "action_slot": "running" },
+        { "text": "Crouch and peek inside.", "action_slot": "looking" },
+        { "text": "There it is! A small {adjective} dragon, sound asleep.", "action_slot": "confused", "id": "dragon_choice", "choices": [
+          { "label": "Sketch it quietly", "next": "sketch_end" },
+          { "label": "Whisper a hello", "next": "hello_end" }
+        ] },
+        { "id": "sketch_end", "text": "You draw it perfectly in your mind. {toy} keeps the only copy. Top-secret discovery!", "action_slot": "thinking" },
+        { "id": "hello_end", "text": "The dragon opens one eye, smiles, and goes back to sleep. You made a polite friend.", "action_slot": "waving" }
+      ]
+    },
+    {
+      "id": "boredom_soak_carwash_17",
+      "title": "{toy} at the magic car wash",
+      "buckets": ["morning", "afternoon"],
+      "steps": [
+        { "text": "{toy} drives an imaginary car into the wash bay set up in {room}.", "action_slot": "running" },
+        { "text": "Pick the wash level.", "action_slot": "thinking", "id": "wash_pick", "choices": [
+          { "label": "Sparkle deluxe", "next": "deluxe" },
+          { "label": "Rainbow foam special", "next": "rainbow" },
+          { "label": "Quick rinse", "next": "rinse" }
+        ] },
+        { "id": "deluxe", "text": "Make swooshing motions and tickle {toy}'s {body_part} like soft brushes.", "action_slot": "thinking", "next": "dry_off" },
+        { "id": "rainbow", "text": "Wave a {prop} like a foam wand and sing the colors as they appear.", "action_slot": "cheering", "next": "dry_off" },
+        { "id": "rinse", "text": "Make a quick whoosh and a single big splash sound.", "action_slot": "jumping", "next": "dry_off" },
+        { "id": "dry_off", "text": "Now the giant fan! Wave your hands fast to dry {toy}.", "action_slot": "waving" },
+        { "text": "{toy} drives off shiny and {adjective}. Best wash ever!", "action_slot": "cheering" }
+      ]
+    },
+    {
+      "id": "boredom_soak_volcano_18",
+      "title": "Tiny volcano in {room}",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "{toy} sniffs the air. Something is rumbling under {room}!", "action_slot": "confused" },
+        { "text": "Build a volcano by piling {count} cushions in a cone.", "action_slot": "thinking" },
+        { "text": "Place a {prop} on top as the crater.", "action_slot": "pointing" },
+        { "text": "Make the volcano rumble with a low growly voice.", "action_slot": "thinking" },
+        { "text": "It's about to blow! Pick the eruption.", "action_slot": "thinking", "id": "erupt_pick", "choices": [
+          { "label": "Lava made of glitter", "next": "glitter_end" },
+          { "label": "Lava made of giggles", "next": "giggle_end" }
+        ] },
+        { "id": "glitter_end", "text": "POOF! Imaginary glitter showers down. {room} sparkles for a week. {toy} is dazzled.", "action_slot": "cheering" },
+        { "id": "giggle_end", "text": "BWAHAHA! Laughter pours out and you both crack up until you need a sip of water.", "action_slot": "cheering" }
+      ]
+    },
+    {
+      "id": "boredom_soak_orchestra_19",
+      "title": "Household orchestra",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "{toy} taps a tiny baton. Tonight, {room} hosts an orchestra!", "action_slot": "pointing" },
+        { "text": "Pick your section.", "action_slot": "thinking", "id": "section", "choices": [
+          { "label": "Percussion (tap a {prop})", "next": "perc" },
+          { "label": "Strings (pluck the air)", "next": "strings" },
+          { "label": "Brass (hum into a fist)", "next": "brass" }
+        ] },
+        { "id": "perc", "text": "Find a steady rhythm. {count} taps, then pause. Repeat!", "action_slot": "thinking", "next": "warmup" },
+        { "id": "strings", "text": "Mime slow long bow strokes across an invisible cello.", "action_slot": "thinking", "next": "warmup" },
+        { "id": "brass", "text": "Take a deep breath and hum a low {adjective} note.", "action_slot": "thinking", "next": "warmup" },
+        { "id": "warmup", "text": "{toy} signals the downbeat. The whole room joins in!", "action_slot": "cheering" },
+        { "text": "Build to a giant crescendo. Louder! LOUDER!", "action_slot": "cheering" },
+        { "text": "End on a long held note. Then perfect silence.", "action_slot": "idle" },
+        { "text": "Bow to {toy} and to the imaginary audience. Bravo!", "action_slot": "waving" }
+      ]
+    },
+    {
+      "id": "boredom_soak_hotair_20",
+      "title": "Hot air balloon over {room}",
+      "buckets": ["morning"],
+      "steps": [
+        { "text": "{toy} hops into the laundry-basket balloon. Today you fly!", "action_slot": "cheering" },
+        { "text": "Cast off! Climb high above {room}.", "action_slot": "jumping" },
+        { "text": "Spot {count} {adjective} clouds you have never noticed before.", "action_slot": "looking" },
+        { "text": "A bird flies up to chat.", "action_slot": "confused" },
+        { "text": "Where should you sail next?", "action_slot": "thinking", "id": "sail_pick", "choices": [
+          { "label": "Toward the candy mountains", "next": "candy_end" },
+          { "label": "Out over the sleepy sea", "next": "sea_end" }
+        ] },
+        { "id": "candy_end", "text": "You drift over peaks of marshmallow. {toy} pretends to nibble a cloud and grins.", "action_slot": "cheering" },
+        { "id": "sea_end", "text": "Wide blue stretches below. The breeze is hush-quiet. {toy} dozes on your shoulder.", "action_slot": "sleeping" }
+      ]
     }
   ]
 }
