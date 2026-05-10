@@ -1,0 +1,342 @@
+{
+  "intent": "request_play",
+  "templates": [
+    {
+      "id": "request_play_soak_pirate_01",
+      "title": "Pirate ship of {room}",
+      "buckets": ["afternoon", "always"],
+      "steps": [
+        { "text": "Hoist the sails! {toy} is captain of a pirate ship sailing across {room}.", "action_slot": "cheering" },
+        { "text": "Climb to the crow's nest (a chair or cushion) and shout what you see.", "action_slot": "looking" },
+        { "text": "A storm hits! Rock {toy} side to side and brace against the waves.", "sfx": "thunder", "action_slot": "jumping" },
+        { "text": "The lookout spots an island. Steer toward it with {toy} at the wheel.", "action_slot": "pointing" },
+        {
+          "id": "fork",
+          "text": "On the beach, two paths split — which way does {toy} lead?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Into the jungle", "next": "jungle_end" },
+            { "label": "Up the cliff", "next": "cliff_end" }
+          ]
+        },
+        {
+          "id": "jungle_end",
+          "text": "You hack through vines and find buried treasure! {toy} crowns you First Mate.",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "cliff_end",
+          "text": "You climb high and spot another ship — {toy} signals with a flag and you trade gold.",
+          "action_slot": "waving"
+        }
+      ]
+    },
+    {
+      "id": "request_play_soak_spaceship_02",
+      "title": "Rocket launch with {toy}",
+      "buckets": ["afternoon", "always"],
+      "steps": [
+        { "text": "Strap {toy} into the rocket! {room} is mission control.", "action_slot": "pointing" },
+        { "text": "Count down from {count} loud and clear.", "expected_action": "child_counts_down", "action_slot": "thinking" },
+        { "text": "Blast off! Crouch low then leap up high holding {toy}.", "sfx": "rocket_whoosh", "action_slot": "jumping" },
+        { "text": "Float weightless — wave your arms slowly like an astronaut.", "action_slot": "waving" },
+        { "text": "An alien ship appears on the radar. Squint and focus.", "action_slot": "looking" },
+        {
+          "id": "alien_fork",
+          "text": "What does {toy} do about the aliens?",
+          "choices": [
+            { "label": "Open a friendship channel", "next": "friend_end" },
+            { "label": "Zoom away fast", "next": "zoom_end" }
+          ]
+        },
+        {
+          "id": "friend_end",
+          "text": "The aliens cheer and teach {toy} a {adjective} space dance — show me your moves!",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "zoom_end",
+          "text": "You blast home in record time and {toy} earns the Speed Pilot badge.",
+          "action_slot": "running"
+        }
+      ]
+    },
+    {
+      "id": "request_play_soak_castle_03",
+      "title": "Defend the castle with {toy}",
+      "buckets": ["afternoon", "always"],
+      "steps": [
+        { "text": "{toy} is the brave knight defending the castle of {room}.", "action_slot": "pointing" },
+        { "text": "Build a fort wall with cushions or chairs — three pieces will do.", "action_slot": "idle" },
+        { "text": "Patrol the perimeter with {toy} held high like a banner.", "action_slot": "running" },
+        { "text": "A dragon roars in the distance! Listen carefully.", "sfx": "dragon_roar", "action_slot": "looking" },
+        {
+          "id": "knight_choice",
+          "text": "How does {toy} face the dragon?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "Charge with a sword", "next": "charge_path" },
+            { "label": "Sneak around back", "next": "sneak_path" },
+            { "label": "Offer a peace gift", "next": "peace_path" }
+          ]
+        },
+        {
+          "id": "charge_path",
+          "text": "You leap forward swinging your {body_part} like a sword! The dragon flees.",
+          "action_slot": "jumping"
+        },
+        {
+          "id": "sneak_path",
+          "text": "You tiptoe behind the dragon and tickle its tail. It giggles and rolls over!",
+          "action_slot": "looking"
+        },
+        {
+          "id": "peace_path",
+          "text": "You offer a {prop} and the dragon snuggles up. {toy} has a new friend.",
+          "action_slot": "waving"
+        }
+      ]
+    },
+    {
+      "id": "request_play_soak_jungle_04",
+      "title": "Jungle expedition with {toy}",
+      "buckets": ["afternoon", "always"],
+      "steps": [
+        { "text": "{toy} packs the explorer kit — you're heading deep into the jungle of {room}.", "action_slot": "pointing" },
+        { "text": "Hack through tall grass by waving your arms like machetes.", "action_slot": "waving" },
+        { "text": "Listen for jungle sounds — chirps, hoots, distant drums.", "sfx": "jungle_birds", "action_slot": "looking" },
+        { "text": "Spot a {adjective} animal hiding behind a {prop} — describe it to {toy}.", "action_slot": "pointing" },
+        { "text": "A river blocks the path. The water roars below.", "sfx": "river_rush", "action_slot": "thinking" },
+        {
+          "id": "river_fork",
+          "text": "How does {toy} cross the river?",
+          "choices": [
+            { "label": "Swing on a vine", "next": "vine_end" },
+            { "label": "Build a raft", "next": "raft_end" }
+          ]
+        },
+        {
+          "id": "vine_end",
+          "text": "You leap and swing yodeling — {toy} cheers from the other side. You made it!",
+          "action_slot": "jumping"
+        },
+        {
+          "id": "raft_end",
+          "text": "You stack three pillows into a raft and paddle across with {toy} steering.",
+          "action_slot": "idle"
+        }
+      ]
+    },
+    {
+      "id": "request_play_soak_underwater_05",
+      "title": "Deep sea dive with {toy}",
+      "buckets": ["afternoon", "always"],
+      "steps": [
+        { "text": "{toy} suits up — it's a deep sea dive into the secret ocean of {room}.", "action_slot": "thinking" },
+        {
+          "id": "dive_choice",
+          "text": "Which sea creature does {toy} want to find first?",
+          "choices": [
+            { "label": "A glowing jellyfish", "next": "jelly_path" },
+            { "label": "A hidden shipwreck", "next": "wreck_path" },
+            { "label": "A friendly whale", "next": "whale_path" }
+          ]
+        },
+        {
+          "id": "jelly_path",
+          "text": "You drift through dark water and the jellyfish glows {adjective} pink!",
+          "action_slot": "looking",
+          "next": "treasure_climax"
+        },
+        {
+          "id": "wreck_path",
+          "text": "You squeeze through a porthole and find barnacled chests inside.",
+          "action_slot": "looking",
+          "next": "treasure_climax"
+        },
+        {
+          "id": "whale_path",
+          "text": "The whale sings a low rumble and lets {toy} ride on its back.",
+          "action_slot": "waving",
+          "next": "treasure_climax"
+        },
+        {
+          "id": "treasure_climax",
+          "text": "All paths lead to a sunken treasure chest! Pry it open with {toy}.",
+          "action_slot": "pointing"
+        },
+        { "text": "Inside are pearls and a magic {prop}. {toy} declares you Captain of the Deep!", "action_slot": "cheering" }
+      ]
+    },
+    {
+      "id": "request_play_soak_dino_06",
+      "title": "Dino tracker with {toy}",
+      "buckets": ["afternoon", "always"],
+      "steps": [
+        { "text": "{toy} smells dinosaurs nearby — grab the binoculars and scout {room}.", "action_slot": "looking" },
+        {
+          "id": "track_choice",
+          "text": "Which trail does {toy} follow?",
+          "choices": [
+            { "label": "Big footprints by the couch", "next": "big_path" },
+            { "label": "Tiny tracks under the table", "next": "small_path" }
+          ]
+        },
+        {
+          "id": "big_path",
+          "text": "You stomp like a T-rex following the prints, shaking the floor!",
+          "action_slot": "running",
+          "next": "egg_meet"
+        },
+        {
+          "id": "small_path",
+          "text": "You tiptoe like a velociraptor, watching for traps.",
+          "action_slot": "looking",
+          "next": "egg_meet"
+        },
+        {
+          "id": "egg_meet",
+          "text": "Both trails lead to a nest! Three speckled eggs sit inside.",
+          "action_slot": "pointing"
+        },
+        { "text": "An egg cracks — a baby dino peeks out and snuggles up to {toy}.", "sfx": "crack_pop", "action_slot": "cheering" }
+      ]
+    },
+    {
+      "id": "request_play_soak_secret_agent_07",
+      "title": "Secret agent {toy}",
+      "buckets": ["afternoon", "always"],
+      "steps": [
+        { "text": "Mission accepted! {toy} gets a secret coded message about {room}.", "action_slot": "thinking" },
+        { "text": "Sneak across the floor without making a sound — silent as a cat.", "action_slot": "looking" },
+        { "text": "Hide behind a {prop} and peek out for clues.", "action_slot": "looking" },
+        { "text": "Decode the secret message by counting to {count} backward.", "expected_action": "child_decodes", "action_slot": "thinking" },
+        { "text": "An alarm trips! Red lights flash everywhere.", "sfx": "alarm_beep", "action_slot": "running" },
+        {
+          "id": "escape_fork",
+          "text": "How does {toy} escape headquarters?",
+          "choices": [
+            { "label": "Out the air vent", "next": "vent_end" },
+            { "label": "Disguise as a guard", "next": "disguise_end" }
+          ]
+        },
+        {
+          "id": "vent_end",
+          "text": "You crawl on your tummy through the vent and pop out outside. Mission accomplished!",
+          "action_slot": "running"
+        },
+        {
+          "id": "disguise_end",
+          "text": "You wrap a blanket cape on {toy} and march right past the guards. Smooth!",
+          "action_slot": "waving"
+        }
+      ]
+    },
+    {
+      "id": "request_play_soak_volcano_08",
+      "title": "Volcano rescue with {toy}",
+      "buckets": ["afternoon", "always"],
+      "steps": [
+        { "text": "The kitchen is a volcano and {toy} is on a rescue mission to {room}!", "action_slot": "pointing" },
+        { "text": "Lava is everywhere — leap from cushion to cushion only.", "action_slot": "jumping" },
+        { "text": "Spot a stranded toy that needs saving — point it out.", "action_slot": "pointing" },
+        { "text": "Toss a rope (a scarf or sock) toward the rescue.", "action_slot": "waving" },
+        { "text": "The volcano rumbles louder! Smoke fills the air.", "sfx": "volcano_rumble", "action_slot": "thinking" },
+        {
+          "id": "vol_fork",
+          "text": "How does {toy} get everyone out?",
+          "choices": [
+            { "label": "Run for the door", "next": "run_end" },
+            { "label": "Climb to the rooftop", "next": "roof_end" }
+          ]
+        },
+        {
+          "id": "run_end",
+          "text": "You sprint with {toy} tucked under your arm. Safe outside! Cheers all around.",
+          "action_slot": "running"
+        },
+        {
+          "id": "roof_end",
+          "text": "A helicopter lowers a ladder. {toy} climbs up and waves from the sky.",
+          "action_slot": "waving"
+        }
+      ]
+    },
+    {
+      "id": "request_play_soak_circus_09",
+      "title": "{toy}'s circus showtime",
+      "buckets": ["afternoon", "evening", "always"],
+      "steps": [
+        { "text": "Step right up! {toy} is the ringmaster of the {room} circus.", "action_slot": "cheering" },
+        {
+          "id": "act_choice",
+          "text": "Which circus act does {toy} perform first?",
+          "choices": [
+            { "label": "Tightrope walk", "next": "rope_act" },
+            { "label": "Lion taming", "next": "lion_act" },
+            { "label": "Juggling balls", "next": "juggle_act" }
+          ]
+        },
+        {
+          "id": "rope_act",
+          "text": "Walk a straight line heel-to-toe with {toy} balanced on your head!",
+          "action_slot": "thinking",
+          "next": "finale"
+        },
+        {
+          "id": "lion_act",
+          "text": "Roar mighty roars and hold up a ring — the lion (a pillow) leaps through!",
+          "action_slot": "jumping",
+          "next": "finale"
+        },
+        {
+          "id": "juggle_act",
+          "text": "Toss three soft toys gently up and down. {toy} keeps score.",
+          "action_slot": "pointing",
+          "next": "finale"
+        },
+        {
+          "id": "finale",
+          "text": "Time for the grand finale — everyone bows together as the crowd cheers!",
+          "sfx": "applause",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_play_soak_robot_10",
+      "title": "Build-a-robot with {toy}",
+      "buckets": ["afternoon", "always"],
+      "steps": [
+        { "text": "{toy} found robot blueprints hidden in {room}!", "action_slot": "thinking" },
+        { "text": "Gather {count} household objects to be robot parts.", "expected_action": "child_gathers_parts", "action_slot": "looking" },
+        { "text": "Snap the parts together with imaginary bolts and screws.", "sfx": "robot_beeps", "action_slot": "idle" },
+        { "text": "Power on! Make a long beeeeeep sound and shake your {body_part}.", "action_slot": "jumping" },
+        {
+          "id": "robot_fork",
+          "text": "What is the robot's special ability?",
+          "choices": [
+            { "label": "Super strength", "next": "strong_end" },
+            { "label": "Laser vision", "next": "laser_end" },
+            { "label": "Dance moves", "next": "dance_end" }
+          ]
+        },
+        {
+          "id": "strong_end",
+          "text": "The robot lifts the entire couch (pretend!) and {toy} rides on top!",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "laser_end",
+          "text": "PEW PEW! Laser eyes melt invisible obstacles. {toy} salutes the new hero.",
+          "action_slot": "pointing"
+        },
+        {
+          "id": "dance_end",
+          "text": "The robot does the {adjective} disco shuffle and {toy} joins in!",
+          "action_slot": "cheering"
+        }
+      ]
+    }
+  ]
+}
