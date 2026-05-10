@@ -352,6 +352,27 @@ def _load_intent_templates(intent: str) -> list[_Template]:
     return templates
 
 
+def find_template_by_id(template_id: str) -> _Template | None:
+    """Phase G G3: look up a loaded template by its id.
+
+    Searches every supported intent's template pool and returns the
+    first match. Returns ``None`` if no template with that id exists
+    in any pool — caller decides whether that's a 500 (corrupt
+    activity row) or a 404. Cached implicitly via
+    :func:`_load_intent_templates`'s per-intent cache.
+
+    The lazy advance handler in :mod:`toybox.api.activities` calls
+    this with the ``template_id`` recovered from the activity's
+    persisted summary envelope so it can resolve ``next`` /
+    ``choices[i].next`` targets at advance time.
+    """
+    for intent in SUPPORTED_INTENTS:
+        for template in _load_intent_templates(intent):
+            if template.id == template_id:
+                return template
+    return None
+
+
 def _filter_eligible(templates: list[_Template], hour: int) -> list[_Template]:
     return [t for t in templates if is_eligible(set(t.buckets), hour)]
 
@@ -657,6 +678,26 @@ def _substitute(
             continue
         used.append(value)
     return out, used
+
+
+def render_with_slot_fills(text: str, slot_fills: dict[str, str]) -> str:
+    """Phase G G3: render ``{slot}`` placeholders in ``text``.
+
+    Public, signature-only wrapper over :func:`_substitute` so the lazy
+    advance handler in :mod:`toybox.api.activities` can render later
+    step bodies + choice labels with the SAME slot fills as step 1
+    (persisted in ``activities.slot_fills_json``). Returns just the
+    substituted text — the signature-contribution side-channel is
+    irrelevant outside the generator's selection path.
+
+    Behavior matches :func:`_substitute` exactly: replaces every
+    ``{name}`` for which ``slot_fills`` has a key. Missing fills are
+    left as literal placeholders rather than raising — keeps a fixture
+    activity (created without going through the generator) advance-
+    able even if its persisted slot map is empty.
+    """
+    out, _used = _substitute(text, slot_fills)
+    return out
 
 
 def _derive_uuid(
@@ -1110,6 +1151,8 @@ __all__ = [
     "VALID_MODES",
     "build_generator_context",
     "clear_template_cache",
+    "find_template_by_id",
     "generate",
+    "render_with_slot_fills",
     "resolve_dispatch",
 ]

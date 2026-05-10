@@ -47,7 +47,9 @@ from ..activities.generator import (
     ADAPTER_LOCAL,
     MODE_LOOP,
     build_generator_context,
+    find_template_by_id,
     generate,
+    render_with_slot_fills,
     resolve_dispatch,
 )
 from ..ai.judge import judge_and_persist
@@ -175,6 +177,24 @@ def get_judge_call() -> JudgeCall:
     )
 
 
+class ChoiceOption(BaseModel):
+    """Phase G G3: one runtime choice button on an activity step.
+
+    Distinct from the template-time :class:`toybox.activities.models.Choice`
+    (which carries ``next``, the successor step id used by the server's
+    edge resolver). The kiosk consumes only this runtime shape: a
+    rendered label string + the array index used as ``choice_index``
+    when posting back to ``/advance``. The ``next`` field is
+    intentionally NOT exposed to the kid — the server resolves edges,
+    the kid just picks an option.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    label: str = Field(min_length=1)
+    choice_index: int = Field(ge=0)
+
+
 class ActivityStepResponse(BaseModel):
     """Wire shape for one activity step.
 
@@ -183,6 +203,15 @@ class ActivityStepResponse(BaseModel):
     or ``None`` for legacy rows / templates that don't pin a slot.
     The kiosk renders the matching toy sprite (F7) when the slot is
     set AND the activity has at least one toy with a sprite for it.
+
+    Phase G G3 additions (additive, both nullable for backward-compat):
+
+    * ``choices`` — runtime choice buttons rendered with this step's
+      slot fills. ``None`` on linear steps (no buttons), populated to
+      ``[{label, choice_index}, ...]`` on branching steps.
+    * ``chosen_label`` — the label the kid picked at THIS step (NOT
+      the next step). Populated when the kid advanced past a choice
+      point; ``None`` for linear-advance and terminal rows.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -193,6 +222,17 @@ class ActivityStepResponse(BaseModel):
     expected_action: str | None = None
     current: bool = False
     action_slot: str | None = None
+    # Phase G G3: rendered choice buttons. Parsed by the serializer
+    # from the persisted ``activity_steps.choices_json`` (a JSON
+    # array of strings) by enumerating array indices into
+    # ``choice_index``. ``None`` on linear steps.
+    choices: list[ChoiceOption] | None = None
+    # Phase G G3: ``chosen_label`` records the label of the choice
+    # the kid picked at this step. Populated by the advance handler
+    # on the previous step's row when a branching choice resolved;
+    # ``None`` for linear advance, terminal, and steps not yet
+    # advanced past.
+    chosen_label: str | None = None
 
 
 class ActivityResponse(BaseModel):
@@ -277,6 +317,25 @@ class DidntWorkRequest(BaseModel):
     """Body for ``POST /api/activities/{id}/didnt-work``."""
 
     reason: str | None = None
+
+
+class AdvanceRequest(BaseModel):
+    """Phase G G3: optional body for ``POST /api/activities/{id}/advance``.
+
+    Linear advance steps (no ``choices`` on the current step) post no
+    body or an empty body — both shapes resolve to ``choice_index=None``.
+    Branching advance steps post ``{"choice_index": <int>}`` to identify
+    which choice button the kid tapped. The handler validates against
+    the persisted ``activity_steps.choices_json`` length on the current
+    step and raises 400 with ``code=invalid_choice_index`` if the index
+    is out of range, ``code=choice_required`` if the field is missing
+    when required, and ``code=choice_not_allowed`` if the field is
+    present when the current step has no choices.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    choice_index: int | None = Field(default=None, ge=0)
 
 
 def _ensure_session(conn: sqlite3.Connection, session_id: str | None) -> str:
@@ -473,9 +532,37 @@ def _fetch_activity_row(conn: sqlite3.Connection, activity_id: str) -> sqlite3.R
     return row
 
 
+def _decode_choices_json(raw: Any) -> list[ChoiceOption] | None:
+    """Phase G G3: parse a persisted ``choices_json`` cell into the
+    runtime ``[{label, choice_index}]`` shape.
+
+    Returns ``None`` for both NULL and empty-array inputs — the
+    kiosk's ``step.choices`` check is nullish-only (``step.choices?.length``
+    not legal here in TS, but logically equivalent), and an empty
+    list is semantically "no choices" so we collapse the two cases
+    to one wire shape. Malformed JSON is logged + dropped (returns
+    ``None``) rather than raising — a corrupt cell on one step row
+    must not break the whole activity GET.
+    """
+    if raw is None:
+        return None
+    try:
+        decoded = json.loads(str(raw))
+    except json.JSONDecodeError:
+        _logger.warning("activity_steps.choices_json malformed; treating as no choices")
+        return None
+    if not isinstance(decoded, list) or not decoded:
+        return None
+    return [
+        ChoiceOption(label=str(label), choice_index=idx)
+        for idx, label in enumerate(decoded)
+    ]
+
+
 def _fetch_steps(conn: sqlite3.Connection, activity_id: str) -> list[ActivityStepResponse]:
     rows = conn.execute(
-        "SELECT seq, body, sfx, expected_action, current, action_slot "
+        "SELECT seq, body, sfx, expected_action, current, action_slot, "
+        " choices_json, chosen_label "
         "FROM activity_steps WHERE activity_id = ? ORDER BY seq ASC",
         (activity_id,),
     ).fetchall()
@@ -487,6 +574,8 @@ def _fetch_steps(conn: sqlite3.Connection, activity_id: str) -> list[ActivitySte
             expected_action=r["expected_action"],
             current=bool(r["current"]),
             action_slot=r["action_slot"],
+            choices=_decode_choices_json(r["choices_json"]),
+            chosen_label=r["chosen_label"],
         )
         for r in rows
     ]
@@ -1431,6 +1520,108 @@ def post_regenerate(
     )
 
 
+def _bad_advance(code: str, **extra: Any) -> HTTPException:
+    """Phase G G3: build a 400 with the canonical ``{code, ...}`` body
+    used by the advance handler's three branching-input error cases.
+    """
+    detail: dict[str, Any] = {"code": code}
+    detail.update(extra)
+    return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+
+
+def _resolve_template_step_index(
+    template_steps: tuple[Any, ...],
+    *,
+    step_template_id: str | None,
+    fallback_array_index: int,
+) -> int:
+    """Phase G G3: find the array index of an activity row's step in its
+    template. Prefers ``step_template_id`` (set on Phase G branching
+    templates and any template step that has an authored ``id``); falls
+    back to ``fallback_array_index`` (typically ``seq - 1``) for legacy
+    linear templates whose steps have no ids. Returns ``-1`` if no
+    match is possible — caller handles that as a corrupt-row case.
+    """
+    if step_template_id is not None:
+        for idx, t_step in enumerate(template_steps):
+            if t_step.id == step_template_id:
+                return idx
+    if 0 <= fallback_array_index < len(template_steps):
+        return fallback_array_index
+    return -1
+
+
+def _insert_next_step(
+    conn: sqlite3.Connection,
+    *,
+    activity_id: str,
+    template_step: Any,
+    slot_fills: dict[str, str],
+    new_seq: int,
+    previous_step_id: str,
+    chosen_label: str | None = None,
+) -> None:
+    """Phase G G3: lazily INSERT the next ``activity_steps`` row.
+
+    Single source of truth for step insertion under lazy advance —
+    rule 1 (choices), rule 2 (explicit ``next``), and rule 3
+    (fall-through) all funnel through here. The caller is responsible
+    for resolving which template step is the target; this helper does
+    the rendering + persistence.
+
+    Renders ``body`` and (when ``template_step.choices`` is present)
+    each choice label using ``slot_fills`` so the inserted row is
+    byte-identical to what step 1 would have rendered with the same
+    fills (consistent with the G2 propose-time pattern). Marks the
+    previous step ``current=0`` AND writes ``chosen_label`` on it
+    when the kid passed through a choice point — the label written
+    is the EXACT rendered string from the previous step's persisted
+    ``choices_json`` so it matches what the kid saw.
+
+    Caller MUST be inside the version-bumped transaction so a stale
+    retry cannot double-insert.
+    """
+    body_text = render_with_slot_fills(template_step.text, slot_fills)
+    choices_blob: str | None = None
+    if template_step.choices is not None:
+        rendered_labels = [
+            render_with_slot_fills(label, slot_fills)
+            for label, _next in template_step.choices
+        ]
+        choices_blob = json.dumps(rendered_labels)
+    # Mark the previous step "not current" AND record the kid's choice
+    # if any. We update by id (not seq) so a future helper that calls
+    # this with a non-monotonic seq still flips the right row.
+    prev_set_clauses = ["current = 0"]
+    prev_params: list[Any] = []
+    if chosen_label is not None:
+        prev_set_clauses.append("chosen_label = ?")
+        prev_params.append(chosen_label)
+    prev_params.extend([activity_id, previous_step_id])
+    conn.execute(
+        f"UPDATE activity_steps SET {', '.join(prev_set_clauses)} "
+        "WHERE activity_id = ? AND id = ?",
+        prev_params,
+    )
+    conn.execute(
+        "INSERT INTO activity_steps "
+        "(id, activity_id, seq, body, sfx, expected_action, current, action_slot, "
+        " choices_json, step_template_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)",
+        (
+            str(uuid.uuid4()),
+            activity_id,
+            new_seq,
+            body_text,
+            template_step.sfx,
+            template_step.expected_action,
+            template_step.action_slot,
+            choices_blob,
+            template_step.id,
+        ),
+    )
+
+
 @router.post("/{activity_id}/advance", response_model=ActivityResponse)
 def post_advance(
     activity_id: str,
@@ -1438,8 +1629,33 @@ def post_advance(
     pubsub: Annotated[PubSub, Depends(get_pubsub)],
     expected_version: Annotated[int, Depends(if_match_version_dependency)],
     _: Annotated[Any, Depends(RequireScope({TokenScope.parent, TokenScope.child}))],
+    body: AdvanceRequest | None = None,
 ) -> ActivityResponse:
-    """Advance one step. approved → running on first call; running → running/completed otherwise."""
+    """Advance one step. approved → running on first call; running → running/completed otherwise.
+
+    Phase G G3: optional body ``{"choice_index": int}`` when the
+    current step has ``choices``. Edge resolution (per the four
+    rules in §"Vocabulary and conventions" of the Phase G plan):
+
+    1. Current step has ``choices`` → ``choice_index`` REQUIRED →
+       resolve ``choices[choice_index].next`` → lazy-INSERT next
+       step rendered with the activity's slot fills + record
+       ``chosen_label`` on the previous step.
+    2. Current step has ``next`` → ``choice_index`` MUST be absent
+       (else 400 ``choice_not_allowed``) → resolve target id →
+       lazy-INSERT next step.
+    3. Neither + not last in template array → fall through to
+       ``steps[i + 1]`` → lazy-INSERT next step.
+    4. Neither + last in template array → terminal; transition to
+       ``completed``; no INSERT.
+
+    Pre-G2 in-flight activities (5 rows already pre-seeded) skip the
+    lazy-insert path and use the existing "row already exists" branch
+    so the migration boundary doesn't break them.
+
+    Idempotency: ``If-Match-Version`` mismatch → 409 with no INSERT
+    (the version check fires before the INSERT path).
+    """
     row = _fetch_activity_row(conn, activity_id)
     current_state = str(row["state"])
     current_version = int(row["version"])
@@ -1460,7 +1676,8 @@ def post_advance(
         raise VersionConflictError(current_version, current_state)
 
     steps = conn.execute(
-        "SELECT id, seq, current FROM activity_steps WHERE activity_id = ? ORDER BY seq ASC",
+        "SELECT id, seq, current, choices_json, step_template_id "
+        "FROM activity_steps WHERE activity_id = ? ORDER BY seq ASC",
         (activity_id,),
     ).fetchall()
     if not steps:
@@ -1469,53 +1686,269 @@ def post_advance(
             detail={"code": "activity_has_no_steps", "id": activity_id},
         )
 
-    if current_state == STATE_APPROVED:
-        next_index = 0
-    else:
-        current_index = next((i for i, s in enumerate(steps) if int(s["current"]) == 1), -1)
-        next_index = current_index + 1
+    advance_body = body if body is not None else AdvanceRequest()
 
-    if next_index >= len(steps):
-        target = STATE_COMPLETED
+    # Special-case ``approved → running``: the first /advance after
+    # approve doesn't insert a new row — steps[0] is already present
+    # (G2 lazy-inserted it at propose time) and the kiosk is already
+    # rendering it. Just flip ``state`` to running + ``current=1``
+    # (already set by G2 — defensive re-set is cheap).
+    if current_state == STATE_APPROVED:
+        if advance_body.choice_index is not None:
+            # Approve → running is a position-zero transition; there
+            # is nothing to "choose" yet because the kid hasn't seen
+            # any branching step. Reject loudly so a confused client
+            # surfaces the bug instead of silently dropping the index.
+            raise _bad_advance("choice_not_allowed", reason="initial_advance_no_choice")
         ok, row = _attempt_transition(
             conn,
             activity_id=activity_id,
             expected_version=expected_version,
-            new_state=target,
-            additional_sets=(("ended_at", _now_iso()),),
+            new_state=STATE_RUNNING,
+            additional_sets=(("started_at", _now_iso()),),
         )
         if not ok:
             raise VersionConflictError(int(row["version"]), str(row["state"]))
         with conn:
+            # Defensive: ensure exactly seq=1 is current. G2 already
+            # set this at insert time but a buggy intermediate write
+            # might have left things off — this handler is the only
+            # callsite that bumps the activity to running.
             conn.execute(
                 "UPDATE activity_steps SET current = 0 WHERE activity_id = ?",
+                (activity_id,),
+            )
+            conn.execute(
+                "UPDATE activity_steps SET current = 1 WHERE activity_id = ? AND seq = 1",
                 (activity_id,),
             )
         response = _row_to_response(conn, row)
         _emit_state(pubsub, response)
         return response
 
-    additional: tuple[tuple[str, Any], ...] = ()
-    if current_state == STATE_APPROVED:
-        additional = (("started_at", _now_iso()),)
+    # Running path: find the current row.
+    current_index = next((i for i, s in enumerate(steps) if int(s["current"]) == 1), -1)
+    if current_index < 0:
+        # Shouldn't happen — running activities always have a current
+        # row. Treat as terminal so a buggy intermediate state can't
+        # wedge the kiosk forever.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "no_current_step", "id": activity_id},
+        )
+    current_row = steps[current_index]
+
+    # Pre-G2 path: the next row already exists in activity_steps.
+    # This holds for in-flight activities created BEFORE G2 (all 5 rows
+    # pre-seeded) AND for the special test fixture flow that backfills
+    # legacy rows on top of a G2 propose. Skip the lazy-insert work
+    # entirely — just flip ``current`` and bump version.
+    if current_index + 1 < len(steps):
+        next_row = steps[current_index + 1]
+        # Reject ``choice_index`` for legacy linear flow — pre-G2
+        # activities never had choices, so a client posting one is
+        # confused. Cheap defense; the alternative is silent drop.
+        # (G3 plan: rule 2's "choice_not_allowed" applies here too.)
+        if advance_body.choice_index is not None:
+            raise _bad_advance("choice_not_allowed", reason="legacy_linear_no_choices")
+        ok, row = _attempt_transition(
+            conn,
+            activity_id=activity_id,
+            expected_version=expected_version,
+            new_state=target,
+        )
+        if not ok:
+            raise VersionConflictError(int(row["version"]), str(row["state"]))
+        target_seq = int(next_row["seq"])
+        with conn:
+            conn.execute(
+                "UPDATE activity_steps SET current = 0 WHERE activity_id = ?",
+                (activity_id,),
+            )
+            conn.execute(
+                "UPDATE activity_steps SET current = 1 WHERE activity_id = ? AND seq = ?",
+                (activity_id, target_seq),
+            )
+        response = _row_to_response(conn, row)
+        _emit_state(pubsub, response)
+        return response
+
+    # Lazy-insert path (current_index == len(steps) - 1): the next
+    # step (if any) does NOT yet exist in activity_steps. Recover the
+    # template, evaluate the edge rule on the current step, and either
+    # INSERT the next row or transition to completed.
+    summary_raw = row["summary"]
+    template_id: str | None = None
+    if summary_raw:
+        try:
+            payload = json.loads(summary_raw)
+            if isinstance(payload, dict):
+                tid = payload.get("template_id")
+                if isinstance(tid, str) and tid:
+                    template_id = tid
+        except json.JSONDecodeError:
+            template_id = None
+    if template_id is None:
+        # No template_id → cannot resolve edges. Terminal fallback so
+        # an old activity without the envelope contract still ends
+        # cleanly instead of 500ing.
+        return _terminal_advance(conn, pubsub, activity_id, expected_version)
+
+    template = find_template_by_id(template_id)
+    if template is None:
+        # Template was removed/renamed between propose and advance.
+        # Treat as terminal; the kiosk completes the activity rather
+        # than wedging.
+        _logger.warning(
+            "advance: template %r not found for activity %s — terminating",
+            template_id,
+            activity_id,
+        )
+        return _terminal_advance(conn, pubsub, activity_id, expected_version)
+
+    # Recover the current step's index in the template array. Branching
+    # templates always have ``step_template_id`` populated (their step[0]
+    # has an authored ``id`` per the schema's reachability invariant);
+    # legacy linear templates fall back to seq-1.
+    current_step_template_id = current_row["step_template_id"]
+    current_template_index = _resolve_template_step_index(
+        template.steps,
+        step_template_id=current_step_template_id,
+        fallback_array_index=int(current_row["seq"]) - 1,
+    )
+    if current_template_index < 0:
+        return _terminal_advance(conn, pubsub, activity_id, expected_version)
+    current_template_step = template.steps[current_template_index]
+
+    # Load slot fills (G2 column).
+    slot_fills_raw = row["slot_fills_json"]
+    slot_fills: dict[str, str] = {}
+    if slot_fills_raw:
+        try:
+            decoded = json.loads(slot_fills_raw)
+        except json.JSONDecodeError:
+            decoded = None
+        if isinstance(decoded, dict):
+            slot_fills = {str(k): str(v) for k, v in decoded.items()}
+
+    # Edge resolution.
+    target_template_step: Any = None
+    chosen_label: str | None = None
+
+    if current_template_step.choices is not None:
+        # Rule 1: choices → choice_index REQUIRED.
+        ci = advance_body.choice_index
+        choices_tuple = current_template_step.choices
+        if ci is None:
+            raise _bad_advance("choice_required", choice_count=len(choices_tuple))
+        if ci < 0 or ci >= len(choices_tuple):
+            raise _bad_advance(
+                "invalid_choice_index",
+                choice_index=ci,
+                choice_count=len(choices_tuple),
+            )
+        # Read the rendered label the kid actually saw from the
+        # previous step's persisted ``choices_json`` (NOT from the
+        # template — that has unrendered ``{slot}`` placeholders).
+        # Fall through to the rendered-now value if the persisted
+        # column is somehow corrupt — better than failing the advance.
+        persisted_choices = _decode_choices_json(current_row["choices_json"])
+        if persisted_choices is not None and 0 <= ci < len(persisted_choices):
+            chosen_label = persisted_choices[ci].label
+        else:
+            chosen_label = render_with_slot_fills(choices_tuple[ci][0], slot_fills)
+        target_step_id = choices_tuple[ci][1]
+        for t_step in template.steps:
+            if t_step.id == target_step_id:
+                target_template_step = t_step
+                break
+    elif current_template_step.next is not None:
+        # Rule 2: explicit next → choice_index must NOT be set.
+        if advance_body.choice_index is not None:
+            raise _bad_advance(
+                "choice_not_allowed", reason="current_step_uses_explicit_next"
+            )
+        target_step_id = current_template_step.next
+        for t_step in template.steps:
+            if t_step.id == target_step_id:
+                target_template_step = t_step
+                break
+    elif current_template_index + 1 < len(template.steps):
+        # Rule 3: fall through to next array position.
+        if advance_body.choice_index is not None:
+            raise _bad_advance("choice_not_allowed", reason="current_step_is_linear")
+        target_template_step = template.steps[current_template_index + 1]
+    else:
+        # Rule 4: terminal.
+        if advance_body.choice_index is not None:
+            raise _bad_advance("choice_not_allowed", reason="current_step_is_terminal")
+        return _terminal_advance(conn, pubsub, activity_id, expected_version)
+
+    if target_template_step is None:
+        # An ``id`` reference that didn't resolve — graph validator
+        # should have caught this at template-load time, but defend
+        # against runtime drift.
+        _logger.error(
+            "advance: edge target id not found in template %r for activity %s",
+            template_id,
+            activity_id,
+        )
+        return _terminal_advance(conn, pubsub, activity_id, expected_version)
+
+    # Atomically: bump version + state, INSERT next step, mark current
+    # ``not current`` (and write ``chosen_label`` if branching). All
+    # under one transaction so a stale retry post-bump can't double-
+    # insert (the version check inside ``_attempt_transition`` is the
+    # gate).
     ok, row = _attempt_transition(
         conn,
         activity_id=activity_id,
         expected_version=expected_version,
         new_state=target,
-        additional_sets=additional,
     )
     if not ok:
         raise VersionConflictError(int(row["version"]), str(row["state"]))
-    target_seq = int(steps[next_index]["seq"])
+    new_seq = int(current_row["seq"]) + 1
+    with conn:
+        _insert_next_step(
+            conn,
+            activity_id=activity_id,
+            template_step=target_template_step,
+            slot_fills=slot_fills,
+            new_seq=new_seq,
+            previous_step_id=str(current_row["id"]),
+            chosen_label=chosen_label,
+        )
+    response = _row_to_response(conn, row)
+    _emit_state(pubsub, response)
+    return response
+
+
+def _terminal_advance(
+    conn: sqlite3.Connection,
+    pubsub: PubSub,
+    activity_id: str,
+    expected_version: int,
+) -> ActivityResponse:
+    """Phase G G3: complete the activity (rule 4 — terminal node).
+
+    Pulled out of :func:`post_advance` so all the "no successor"
+    branches (template missing, edge unresolved, last-array entry)
+    share the exact same transition + WS broadcast path.
+    """
+    ok, row = _attempt_transition(
+        conn,
+        activity_id=activity_id,
+        expected_version=expected_version,
+        new_state=STATE_COMPLETED,
+        additional_sets=(("ended_at", _now_iso()),),
+    )
+    if not ok:
+        raise VersionConflictError(int(row["version"]), str(row["state"]))
     with conn:
         conn.execute(
             "UPDATE activity_steps SET current = 0 WHERE activity_id = ?",
             (activity_id,),
-        )
-        conn.execute(
-            "UPDATE activity_steps SET current = 1 WHERE activity_id = ? AND seq = ?",
-            (activity_id, target_seq),
         )
     response = _row_to_response(conn, row)
     _emit_state(pubsub, response)
