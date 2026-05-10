@@ -1025,6 +1025,312 @@
           "action_slot": "pointing"
         }
       ]
+    },
+    {
+      "id": "request_play_soak_bodypart_obstacle_31",
+      "title": "{body_part} obstacle course",
+      "buckets": ["morning", "afternoon", "always"],
+      "steps": [
+        { "text": "{toy} sets up an obstacle course in {room} — but you can ONLY use your {body_part}!", "action_slot": "thinking" },
+        { "text": "First trial: {action_verb} across the room using only your {body_part} for balance.", "action_slot": "running" },
+        { "text": "Pick up a {prop} using ONLY your {body_part}. No hands allowed!", "expected_action": "child_uses_body_part", "action_slot": "looking" },
+        { "text": "Carry the {prop} {count} steps without dropping it.", "action_slot": "idle" },
+        {
+          "id": "final_fork",
+          "text": "Final challenge time — what does {toy} pick?",
+          "choices": [
+            { "label": "Hop on one foot", "next": "hop_end" },
+            { "label": "Wiggle like jelly", "next": "wiggle_end" }
+          ]
+        },
+        {
+          "id": "hop_end",
+          "text": "Hop {count} times in a row holding the {prop} on your {body_part}. Champion!",
+          "action_slot": "jumping"
+        },
+        {
+          "id": "wiggle_end",
+          "text": "Wiggle every part of you while holding {toy}. {toy} laughs uncontrollably!",
+          "action_slot": "jumping"
+        }
+      ]
+    },
+    {
+      "id": "request_play_soak_propchain_32",
+      "title": "{prop} {action_verb} relay",
+      "buckets": ["morning", "afternoon", "always"],
+      "steps": [
+        { "text": "Find a {prop}, a second {prop}, and a third — line them up across {room}.", "action_slot": "looking" },
+        { "text": "Now {action_verb} from the first {prop} to the second.", "action_slot": "running" },
+        { "text": "{action_verb} from the second {prop} to the third — keep your {body_part} steady!", "action_slot": "jumping" },
+        {
+          "id": "speed_fork",
+          "text": "{toy} times the next round. Go fast or go fancy?",
+          "choices": [
+            { "label": "Speed run!", "next": "speed_end" },
+            { "label": "Style points!", "next": "style_end" }
+          ]
+        },
+        {
+          "id": "speed_end",
+          "text": "Race back through the props in {count} seconds! {toy} cheers — new record!",
+          "action_slot": "running"
+        },
+        {
+          "id": "style_end",
+          "text": "Spin and twirl past each {prop} like a {adjective} dancer. {toy} claps in awe.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_play_soak_action_chain_33",
+      "title": "Three {action_verb} adventure",
+      "buckets": ["morning", "afternoon", "always"],
+      "steps": [
+        { "text": "{toy} challenges you to {action_verb} {count} times in a row across {room}!", "action_slot": "thinking" },
+        { "text": "First {action_verb}: do it {adjective} — {toy} judges the style.", "action_slot": "jumping" },
+        { "text": "Second {action_verb}: do it sideways while waving a {prop}.", "action_slot": "waving" },
+        { "text": "Third {action_verb}: do it backward holding {toy} on your {body_part}.", "action_slot": "running" },
+        {
+          "id": "encore_fork",
+          "text": "Encore time! Pick the grand finale:",
+          "choices": [
+            { "label": "Mega {action_verb} jump", "next": "mega_end" },
+            { "label": "Slow-motion finish", "next": "slow_end" }
+          ]
+        },
+        {
+          "id": "mega_end",
+          "text": "Crouch low and LAUNCH! Biggest {action_verb} of the day — {toy} gives a 10!",
+          "action_slot": "jumping"
+        },
+        {
+          "id": "slow_end",
+          "text": "Move sloooowly like a sloth. Every motion stretches forever. {toy} giggles.",
+          "action_slot": "thinking"
+        }
+      ]
+    },
+    {
+      "id": "request_play_soak_room_transform_34",
+      "title": "{room} transformation",
+      "buckets": ["morning", "afternoon", "always"],
+      "steps": [
+        { "text": "{toy} casts a spell — {room} is now an entirely new place!", "action_slot": "waving" },
+        {
+          "id": "transform_choice",
+          "text": "What does {room} transform into?",
+          "choices": [
+            { "label": "A {adjective} swamp", "next": "swamp_path" },
+            { "label": "A {adjective} cave", "next": "cave_path" },
+            { "label": "A {adjective} cloud", "next": "cloud_path" }
+          ]
+        },
+        {
+          "id": "swamp_path",
+          "text": "Squelch through mud — lift your {body_part} high with each step!",
+          "action_slot": "running",
+          "next": "creature_meet"
+        },
+        {
+          "id": "cave_path",
+          "text": "Crawl through the dark cave — your {body_part} brushes the rocky walls.",
+          "action_slot": "looking",
+          "next": "creature_meet"
+        },
+        {
+          "id": "cloud_path",
+          "text": "Float weightless — kick your {body_part} like swimming through air!",
+          "action_slot": "jumping",
+          "next": "creature_meet"
+        },
+        {
+          "id": "creature_meet",
+          "text": "A {adjective} creature appears with a {prop} in its claws!",
+          "action_slot": "looking"
+        },
+        { "text": "{toy} trades a smile for the {prop}. New friend made — quest done!", "action_slot": "cheering" }
+      ]
+    },
+    {
+      "id": "request_play_soak_count_quest_35",
+      "title": "{count}-step quest with {toy}",
+      "buckets": ["morning", "afternoon", "always"],
+      "steps": [
+        { "text": "{toy} hands you a quest scroll — exactly {count} tasks await in {room}.", "action_slot": "thinking" },
+        { "text": "Task one: find {count} {adjective} objects and pile them up.", "expected_action": "child_finds_objects", "action_slot": "looking" },
+        { "text": "Task two: {action_verb} around the pile {count} times.", "action_slot": "running" },
+        { "text": "Task three: balance a {prop} on your {body_part} for {count} seconds.", "action_slot": "thinking" },
+        {
+          "id": "final_task",
+          "text": "Final task — {toy} lets you pick:",
+          "choices": [
+            { "label": "Roar like a beast", "next": "roar_end" },
+            { "label": "Sing a victory song", "next": "song_end" }
+          ]
+        },
+        {
+          "id": "roar_end",
+          "text": "ROOOOAARRR {count} times! {toy} flinches then bursts into laughter.",
+          "sfx": "roar",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "song_end",
+          "text": "Sing LA-LA-LA at the top of your lungs! {toy} conducts with a {prop}.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_play_soak_adjective_morph_36",
+      "title": "{toy}'s {adjective} morph",
+      "buckets": ["afternoon", "always"],
+      "steps": [
+        { "text": "{toy} is feeling {adjective} today. Match the energy in {room}!", "action_slot": "thinking" },
+        { "text": "Walk {adjective}-style across the room — show {toy} how.", "action_slot": "running" },
+        { "text": "Pick up a {prop} the {adjective} way and carry it on your {body_part}.", "action_slot": "looking" },
+        {
+          "id": "morph_fork",
+          "text": "Now {toy} changes mood. Pick a new feeling:",
+          "choices": [
+            { "label": "Sneaky and quiet", "next": "sneaky_end" },
+            { "label": "Loud and proud", "next": "loud_end" },
+            { "label": "Floaty and dreamy", "next": "dreamy_end" }
+          ]
+        },
+        {
+          "id": "sneaky_end",
+          "text": "Tiptoe past {toy} without a sound. Don't even let your {body_part} squeak!",
+          "action_slot": "looking"
+        },
+        {
+          "id": "loud_end",
+          "text": "Shout your name {count} times and stomp around. {toy} cheers wildly!",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "dreamy_end",
+          "text": "Drift around with arms outstretched, humming softly. {toy} sways with you.",
+          "action_slot": "waving"
+        }
+      ]
+    },
+    {
+      "id": "request_play_soak_multi_slot_setup_37",
+      "title": "{adjective} {prop} in {room}",
+      "buckets": ["afternoon", "always"],
+      "steps": [
+        { "text": "Quick — find a {adjective} {prop} hidden somewhere in {room}.", "expected_action": "child_finds_prop", "action_slot": "looking" },
+        { "text": "Hold the {adjective} {prop} on your {body_part} and walk to {toy}.", "action_slot": "thinking" },
+        { "text": "{toy} inspects it carefully — is it the right one? Spin it slowly.", "action_slot": "looking" },
+        {
+          "id": "verdict_fork",
+          "text": "{toy}'s verdict — what now?",
+          "choices": [
+            { "label": "Use it as a magic wand", "next": "wand_end" },
+            { "label": "Trade for a better one", "next": "trade_end" }
+          ]
+        },
+        {
+          "id": "wand_end",
+          "text": "Wave the {prop} and shout {action_verb}! Sparks fly from your {body_part}!",
+          "action_slot": "waving"
+        },
+        {
+          "id": "trade_end",
+          "text": "Find a different {prop} and swap. {toy} approves — better choice!",
+          "action_slot": "pointing"
+        }
+      ]
+    },
+    {
+      "id": "request_play_soak_body_dance_38",
+      "title": "{toy}'s {body_part} dance",
+      "buckets": ["morning", "afternoon", "always"],
+      "steps": [
+        { "text": "{toy} starts a brand new dance craze: the {body_part} shimmy!", "action_slot": "cheering" },
+        { "text": "Move only your {body_part} for {count} seconds. The rest of you stays still!", "action_slot": "jumping" },
+        { "text": "Now add a {prop} — twirl it as your {body_part} keeps shaking!", "action_slot": "waving" },
+        {
+          "id": "tempo_fork",
+          "text": "Tempo change! How does {toy} call it?",
+          "choices": [
+            { "label": "Triple speed!", "next": "fast_end" },
+            { "label": "Slow motion!", "next": "slow_end" }
+          ]
+        },
+        {
+          "id": "fast_end",
+          "text": "Shake your {body_part} as fast as you can! {toy} can barely keep up!",
+          "action_slot": "running"
+        },
+        {
+          "id": "slow_end",
+          "text": "Move your {body_part} sloooooooowly like underwater. {toy} hums along.",
+          "action_slot": "thinking"
+        }
+      ]
+    },
+    {
+      "id": "request_play_soak_layered_action_39",
+      "title": "Layered {action_verb} game",
+      "buckets": ["morning", "afternoon", "always"],
+      "steps": [
+        { "text": "{toy} invents a game: every step you {action_verb} adds a new layer!", "action_slot": "thinking" },
+        { "text": "Layer one: just {action_verb} across {room}.", "action_slot": "running" },
+        { "text": "Layer two: {action_verb} while waving a {prop}.", "action_slot": "waving" },
+        { "text": "Layer three: {action_verb} {adjective}-style with {toy} on your {body_part}!", "action_slot": "jumping" },
+        {
+          "id": "boss_fork",
+          "text": "Boss layer time — pick the wildest twist:",
+          "choices": [
+            { "label": "Add a goofy face", "next": "face_end" },
+            { "label": "Add a victory shout", "next": "shout_end" }
+          ]
+        },
+        {
+          "id": "face_end",
+          "text": "{action_verb} with the silliest face you can make! {toy} can't stop laughing!",
+          "action_slot": "jumping"
+        },
+        {
+          "id": "shout_end",
+          "text": "Shout HOORAY at every step! Your voice echoes off the walls.",
+          "sfx": "echo_shout",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_play_soak_room_relay_40",
+      "title": "{room} relay race",
+      "buckets": ["morning", "afternoon", "always"],
+      "steps": [
+        { "text": "{toy} marks {count} stations around {room}. It's a relay!", "action_slot": "pointing" },
+        { "text": "At station one: {action_verb} in place {count} times.", "action_slot": "jumping" },
+        { "text": "Sprint to station two: balance a {prop} on your {body_part}.", "action_slot": "running" },
+        { "text": "Sprint to station three: do a {adjective} pose for {toy} to admire.", "action_slot": "thinking" },
+        {
+          "id": "finish_fork",
+          "text": "Finish line approaches! How do you cross it?",
+          "choices": [
+            { "label": "Diving leap!", "next": "leap_end" },
+            { "label": "Spin across!", "next": "spin_end" }
+          ]
+        },
+        {
+          "id": "leap_end",
+          "text": "Crouch low and LAUNCH across the line! {toy} celebrates the photo finish!",
+          "action_slot": "jumping"
+        },
+        {
+          "id": "spin_end",
+          "text": "Twirl all the way across. Wave at {toy} mid-spin — what a stylish finish!",
+          "action_slot": "waving"
+        }
+      ]
     }
   ]
 }
