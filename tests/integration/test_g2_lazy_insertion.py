@@ -470,3 +470,75 @@ def test_pre_g2_inflight_activity_still_advances(
         "pre-G2 in-flight activity must advance through to completed using "
         "the existing linear handler — Phase G must not break running activities"
     )
+
+
+# ---------------------------------------------------------------------------
+# G2.5: propose response carries the full template plan (not just
+# steps[0]). Restores the parent-dashboard review UX that G2's lazy
+# insertion narrowed when the response was built from activity_steps
+# rows. The DB contract (activity_steps has 1 row at propose) is
+# unchanged; only the response shape is widened for proposed/approved.
+# ---------------------------------------------------------------------------
+
+
+def test_propose_response_carries_full_template_plan(
+    client: TestClient,
+    parent_headers: dict[str, str],
+    db_path: Path,
+) -> None:
+    """G2.5: propose response shows ALL 5 template steps (rendered with
+    slot fills) so the parent can preview the full activity before
+    approving. activity_steps DB rows remain lazy-inserted (1 row at
+    propose). On state transition to running/completed, the response
+    narrows to the kid's actually-played path (activity_steps).
+    """
+    body = _propose(client, parent_headers)
+    activity_id = body["id"]
+    version = body["version"]
+
+    # Response: full plan (5 steps for linear templates)
+    assert body["state"] == "proposed"
+    assert len(body["steps"]) == 5
+    assert body["steps"][0]["seq"] == 1
+    assert body["steps"][0]["current"] is True
+    for s in body["steps"][1:]:
+        assert s["current"] is False
+        # All bodies must be fully-rendered (no leftover slot placeholders).
+        assert "{" not in s["body"], f"unrendered slot in step body: {s['body']!r}"
+
+    # DB: still only 1 row (lazy insert is untouched)
+    conn = connect(db_path, check_same_thread=False)
+    try:
+        rows = conn.execute(
+            "SELECT seq FROM activity_steps WHERE activity_id = ? ORDER BY seq",
+            (activity_id,),
+        ).fetchall()
+    finally:
+        conn.close()
+    assert len(rows) == 1, "G2 lazy-insert contract: only steps[0] in DB"
+
+    # Approve preserves the full plan (still pre-running).
+    approve = client.post(
+        f"/api/activities/{activity_id}/approve",
+        json={},
+        headers={**parent_headers, "If-Match-Version": str(version)},
+    )
+    assert approve.status_code == 200
+    approved = approve.json()
+    assert approved["state"] == "approved"
+    assert len(approved["steps"]) == 5
+    version = approved["version"]
+
+    # Start play: the first advance (approved -> running) flips to the
+    # activity_steps view since we now reflect the kid's played path.
+    advance = client.post(
+        f"/api/activities/{activity_id}/advance",
+        headers={**parent_headers, "If-Match-Version": str(version)},
+    )
+    assert advance.status_code == 200
+    running = advance.json()
+    assert running["state"] == "running"
+    assert len(running["steps"]) == 1, (
+        "running activities should reflect activity_steps (kid's actual path), "
+        "not the full template plan"
+    )

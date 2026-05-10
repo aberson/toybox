@@ -121,15 +121,12 @@ def test_v1_default_path_is_byte_identical(
     assert proposed["id"] == baseline_activity.id
     assert proposed["title"] == baseline_activity.title
 
-    # Phase G G2: under lazy insertion the propose response only
-    # carries ``steps[0]`` (subsequent steps are inserted by G3's
-    # advance handler), so we assert the FIRST step body matches the
-    # offline generator's first step. The full template-step list
-    # round-trip is captured in ``activity_json`` below.
+    # Phase G G2.5: propose response carries the full template plan
+    # (5 steps for linear templates), rendered with the same slot fills
+    # the offline generator used. All 5 step bodies should round-trip.
     baseline_step_texts = [s.text for s in baseline_activity.steps]
     propose_step_texts = [s["body"] for s in proposed["steps"]]
-    assert len(propose_step_texts) == 1
-    assert propose_step_texts[0] == baseline_step_texts[0]
+    assert propose_step_texts == baseline_step_texts
 
     # signature + hour_bucket + slot_values in metadata also pin the same.
     # signature is the load-bearing hash — if it diverges, downstream
@@ -157,10 +154,11 @@ def test_v1_default_path_is_byte_identical(
     assert persisted_step_texts == baseline_step_texts
 
     # Activity-shape sanity (cheap follow-on assertions).
-    # Phase G G2: lazy insertion → response has only steps[0]; the
-    # full 5-step template list lives on the persisted Activity model
-    # carried in ``labeled_events.activity_json`` (asserted above).
-    assert len(proposed["steps"]) == 1
+    # Phase G G2.5: propose response carries the full template plan
+    # (5 steps for linear templates) — restored after G2 lazy-insert
+    # narrowed it to 1, so the parent dashboard can preview all steps
+    # before approving. activity_steps DB rows remain lazy-inserted.
+    assert len(proposed["steps"]) == 5
     assert proposed["state"] == "proposed"
 
 

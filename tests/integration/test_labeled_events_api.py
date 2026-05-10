@@ -339,8 +339,9 @@ def test_propose_succeeds_when_recorder_raises(
     body = response.json()
     assert body["id"]
     assert body["state"] == "proposed"
-    # Phase G G2: lazy insertion → propose response carries only steps[0].
-    assert len(body["steps"]) == 1
+    # Phase G G2.5: propose response carries the full template plan
+    # (5 steps for linear templates).
+    assert len(body["steps"]) == 5
 
     # Activity itself was persisted; only the labeled_events row is missing.
     conn = connect(db_path)

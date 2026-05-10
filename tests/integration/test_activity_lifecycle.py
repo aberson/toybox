@@ -74,21 +74,27 @@ def test_propose_returns_proposed_activity(
     client: TestClient,
     parent_headers: dict[str, str],
 ) -> None:
-    """Phase G G2: propose response carries ONE step row (lazy insertion).
+    """Phase G G2.5: propose response carries the full template step plan.
 
-    Pre-G2 propose returned all 5 template steps in the response.
-    Post-G2 only ``steps[0]`` is INSERTed at activity creation; the
-    remaining template steps are inserted lazily by G3's advance
-    handler. The propose response shape mirrors the DB rows, so it
-    has exactly one step.
+    Pre-G2 propose returned all 5 template steps because the DB had all
+    5 rows pre-seeded. G2 switched to lazy insertion (only ``steps[0]``
+    in the DB at creation) which narrowed the propose response to 1
+    step — breaking the parent dashboard's review UX. G2.5 restores the
+    full-plan response for proposed/approved activities by rendering
+    from the template + persisted slot fills, while activity_steps DB
+    rows remain lazy-inserted (G3's advance handler INSERTs the rest as
+    the kid plays).
     """
     body = _propose(client, parent_headers)
     assert body["state"] == "proposed"
     assert body["version"] == 1
-    assert len(body["steps"]) == 1
-    # The single inserted row is steps[0]: seq=1 with current=1.
+    # Full template plan: 5 steps for linear templates.
+    assert len(body["steps"]) == 5
+    # steps[0] is current; the rest are previewed but not yet active.
     assert body["steps"][0]["seq"] == 1
     assert body["steps"][0]["current"] is True
+    for s in body["steps"][1:]:
+        assert s["current"] is False
 
 
 def test_propose_emits_state_envelope(

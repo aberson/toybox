@@ -581,6 +581,72 @@ def _fetch_steps(conn: sqlite3.Connection, activity_id: str) -> list[ActivitySte
     ]
 
 
+def _render_template_plan_steps(
+    template_id: str | None,
+    slot_fills_raw: str | None,
+) -> list[ActivityStepResponse] | None:
+    """Phase G G2.5: render the full template step plan for preview.
+
+    Returns the activity's full template steps mapped to response shape
+    (rendered with the activity's persisted slot fills), with seq=1
+    marked ``current=True``. Used by ``_row_to_response`` for activities
+    in ``proposed`` / ``approved`` state so the parent dashboard's
+    suggestion card can preview ALL steps before approval — restoring the
+    pre-G2 review UX that was lost when ``_persist_activity`` switched
+    from pre-seeding all 5 rows to lazy-inserting only ``steps[0]``.
+
+    Returns ``None`` (graceful fallback to ``_fetch_steps``) when:
+    - the activity has no ``template_id`` in its metadata envelope
+    - the template can't be resolved (renamed / removed since propose)
+    - ``slot_fills_json`` is malformed
+
+    Activity-step rows in the DB remain authoritative for
+    ``running``/``completed`` activities (they record the kid's actually-
+    played path including ``chosen_label`` on choice points); this
+    function is only consulted for the preview states.
+    """
+    if template_id is None:
+        return None
+    template = find_template_by_id(template_id)
+    if template is None:
+        return None
+
+    fills: dict[str, str] = {}
+    if slot_fills_raw:
+        try:
+            decoded = json.loads(slot_fills_raw)
+            if isinstance(decoded, dict):
+                fills = {str(k): str(v) for k, v in decoded.items()}
+        except json.JSONDecodeError:
+            return None
+
+    rendered: list[ActivityStepResponse] = []
+    for idx, step in enumerate(template.steps):
+        body = render_with_slot_fills(step.text, fills)
+        choices: list[ChoiceOption] | None = None
+        if step.choices is not None:
+            choices = [
+                ChoiceOption(
+                    label=render_with_slot_fills(label, fills),
+                    choice_index=ci,
+                )
+                for ci, (label, _next) in enumerate(step.choices)
+            ]
+        rendered.append(
+            ActivityStepResponse(
+                seq=idx + 1,
+                body=body,
+                sfx=step.sfx,
+                expected_action=step.expected_action,
+                current=(idx == 0),
+                action_slot=step.action_slot,
+                choices=choices,
+                chosen_label=None,
+            )
+        )
+    return rendered
+
+
 def _row_to_response(
     conn: sqlite3.Connection,
     row: sqlite3.Row,
@@ -653,9 +719,36 @@ def _row_to_response(
     # ``_emit_state`` sees the already-cleaned metadata, and there's no
     # second read path that bypasses ``_row_to_response``.
     metadata = {k: v for k, v in metadata.items() if k != "slot_fills"}
+
+    # Phase G G2.5: for proposed / approved activities, render the full
+    # template step plan so the parent dashboard's suggestion card can
+    # preview all steps before approval. Pre-G2 the propose response
+    # always carried 5 rows (pre-seeded); G2's lazy-insert dropped that
+    # to 1, breaking the parent's review UX. Once the activity is
+    # running/completed, fall back to activity_steps (the kid's actually-
+    # played path is the source of truth).
+    state = str(row["state"])
+    template_id_for_plan: str | None = None
+    if summary_raw and state in (STATE_PROPOSED, STATE_APPROVED):
+        try:
+            payload = json.loads(summary_raw)
+            if isinstance(payload, dict):
+                tid = payload.get("template_id")
+                if isinstance(tid, str) and tid:
+                    template_id_for_plan = tid
+        except json.JSONDecodeError:
+            pass
+
+    steps: list[ActivityStepResponse] | None = None
+    if template_id_for_plan is not None:
+        slot_fills_raw = row["slot_fills_json"] if "slot_fills_json" in row.keys() else None
+        steps = _render_template_plan_steps(template_id_for_plan, slot_fills_raw)
+    if steps is None:
+        steps = _fetch_steps(conn, activity_id)
+
     return ActivityResponse(
         id=activity_id,
-        state=str(row["state"]),
+        state=state,
         version=int(row["version"]),
         title=title,
         summary=summary_raw if not title else None,
@@ -666,7 +759,7 @@ def _row_to_response(
         created_at=str(row["created_at"]),
         started_at=row["started_at"],
         ended_at=row["ended_at"],
-        steps=_fetch_steps(conn, activity_id),
+        steps=steps,
         metadata=metadata,
         trigger_phrase=trigger_phrase,
         persona_reasoning=persona_reasoning,
