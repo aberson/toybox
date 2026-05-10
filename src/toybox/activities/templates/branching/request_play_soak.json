@@ -685,6 +685,346 @@
           "action_slot": "running"
         }
       ]
+    },
+    {
+      "id": "request_play_soak_ninja_21",
+      "title": "{toy} the silent ninja",
+      "buckets": ["afternoon", "always"],
+      "steps": [
+        { "text": "Mission briefing: {toy} the ninja must cross {room} unseen!", "action_slot": "thinking" },
+        { "text": "Tie an imaginary headband and crouch down low.", "action_slot": "idle" },
+        { "text": "Tiptoe past invisible laser beams — duck under and step over.", "action_slot": "looking" },
+        { "text": "Roll behind a {prop} when the guard turns around.", "action_slot": "running" },
+        {
+          "id": "ninja_fork",
+          "text": "How does {toy} reach the scroll?",
+          "choices": [
+            { "label": "Climb up the wall", "next": "climb_end" },
+            { "label": "Use a smoke bomb", "next": "smoke_end" }
+          ]
+        },
+        {
+          "id": "climb_end",
+          "text": "You scale up using imaginary handholds. Snatch the scroll! Mission accomplished.",
+          "action_slot": "jumping"
+        },
+        {
+          "id": "smoke_end",
+          "text": "POOF! Throw down the smoke and dash through. {toy} bows in approval.",
+          "sfx": "poof",
+          "action_slot": "running"
+        }
+      ]
+    },
+    {
+      "id": "request_play_soak_safari_22",
+      "title": "Safari adventure with {toy}",
+      "buckets": ["afternoon", "always"],
+      "steps": [
+        { "text": "Grab the binoculars — {toy} is leading a safari through {room}!", "action_slot": "looking" },
+        {
+          "id": "habitat_choice",
+          "text": "Which habitat does {toy} explore?",
+          "choices": [
+            { "label": "Sandy desert", "next": "desert_path" },
+            { "label": "Grassy savanna", "next": "savanna_path" },
+            { "label": "Misty mountain", "next": "mountain_path" }
+          ]
+        },
+        {
+          "id": "desert_path",
+          "text": "Trudge through hot sand. Spot a camel resting under a {adjective} tree.",
+          "action_slot": "running",
+          "next": "watering_hole"
+        },
+        {
+          "id": "savanna_path",
+          "text": "Sneak through tall grass — a giraffe nibbles leaves nearby.",
+          "action_slot": "looking",
+          "next": "watering_hole"
+        },
+        {
+          "id": "mountain_path",
+          "text": "Climb misty rocks — a snow leopard watches from above.",
+          "action_slot": "thinking",
+          "next": "watering_hole"
+        },
+        {
+          "id": "watering_hole",
+          "text": "All trails lead to the watering hole. Sit quietly with {toy} and watch the animals drink.",
+          "action_slot": "looking"
+        },
+        { "text": "An elephant trumpets goodbye! Wave back with both arms.", "sfx": "elephant", "action_slot": "waving" }
+      ]
+    },
+    {
+      "id": "request_play_soak_arctic_23",
+      "title": "Arctic mission with {toy}",
+      "buckets": ["afternoon", "always"],
+      "steps": [
+        { "text": "Brrrr! {toy} bundles up — the temperature in {room} just dropped to arctic!", "action_slot": "thinking" },
+        { "text": "Strap on imaginary snowshoes and trudge through deep snow.", "action_slot": "running" },
+        { "text": "Scan the icy horizon for a {adjective} polar bear.", "action_slot": "looking" },
+        { "text": "Crack! Thin ice underfoot — leap to a sturdy floe!", "sfx": "ice_crack", "action_slot": "jumping" },
+        {
+          "id": "arctic_fork",
+          "text": "How does {toy} reach the research base?",
+          "choices": [
+            { "label": "Sled dogs across the snow", "next": "sled_end" },
+            { "label": "Sail an icebreaker", "next": "ship_end" }
+          ]
+        },
+        {
+          "id": "sled_end",
+          "text": "Mush mush! Pretend to crack the reins and the dogs zoom across the ice. Yip yip!",
+          "action_slot": "running"
+        },
+        {
+          "id": "ship_end",
+          "text": "Crunch through ice with the ship's mighty hull. {toy} steers from the bridge.",
+          "action_slot": "pointing"
+        }
+      ]
+    },
+    {
+      "id": "request_play_soak_market_24",
+      "title": "Market day with {toy}",
+      "buckets": ["morning", "afternoon", "always"],
+      "steps": [
+        { "text": "It's market day! {toy} sets up a stall in busy {room}.", "action_slot": "cheering" },
+        {
+          "id": "stall_choice",
+          "text": "What does {toy} sell at the market?",
+          "choices": [
+            { "label": "Magic potions", "next": "potion_path" },
+            { "label": "Tasty fruit", "next": "fruit_path" },
+            { "label": "Handmade hats", "next": "hat_path" }
+          ]
+        },
+        {
+          "id": "potion_path",
+          "text": "Bottle up sparkly imaginary liquids. Shout: GET YOUR {adjective} POTIONS!",
+          "action_slot": "waving",
+          "next": "haggle"
+        },
+        {
+          "id": "fruit_path",
+          "text": "Stack pretend apples and oranges in pyramids. Polish each one shiny.",
+          "action_slot": "idle",
+          "next": "haggle"
+        },
+        {
+          "id": "hat_path",
+          "text": "Display silly hats on your {body_part} to attract customers.",
+          "action_slot": "pointing",
+          "next": "haggle"
+        },
+        {
+          "id": "haggle",
+          "text": "A customer wants to haggle! Offer {count} coins back and forth.",
+          "action_slot": "thinking"
+        },
+        { "text": "Sold! High-five {toy} — the stall is a hit!", "action_slot": "cheering" }
+      ]
+    },
+    {
+      "id": "request_play_soak_fairy_25",
+      "title": "{toy} meets the fairies",
+      "buckets": ["evening", "always"],
+      "steps": [
+        { "text": "Listen carefully — {toy} hears tiny bells in the corner of {room}.", "action_slot": "looking" },
+        {
+          "id": "fairy_choice",
+          "text": "Which fairy does {toy} meet first?",
+          "choices": [
+            { "label": "The flower fairy", "next": "flower_path" },
+            { "label": "The water fairy", "next": "water_path" }
+          ]
+        },
+        {
+          "id": "flower_path",
+          "text": "Pink petals swirl around. The flower fairy hops onto your {body_part}!",
+          "action_slot": "looking",
+          "next": "fairy_dance"
+        },
+        {
+          "id": "water_path",
+          "text": "Tiny droplets sparkle. The water fairy splashes {toy} and giggles.",
+          "action_slot": "thinking",
+          "next": "fairy_dance"
+        },
+        {
+          "id": "fairy_dance",
+          "text": "All the fairies invite you to a dance. Spin slowly with {toy} held high.",
+          "action_slot": "cheering"
+        },
+        { "text": "The fairies leave a {adjective} flower as thanks. Tuck it safe with {toy}.", "action_slot": "waving" }
+      ]
+    },
+    {
+      "id": "request_play_soak_racecar_26",
+      "title": "{toy} at the speedway",
+      "buckets": ["afternoon", "always"],
+      "steps": [
+        { "text": "Engines roar! {toy} is the star driver at the {room} speedway.", "sfx": "engine", "action_slot": "cheering" },
+        { "text": "Buckle up. Squeeze the steering wheel tight!", "action_slot": "thinking" },
+        { "text": "On your marks... GO! Run in place super fast — vroooom!", "action_slot": "running" },
+        { "text": "A sharp turn ahead! Lean to one side dramatically.", "action_slot": "jumping" },
+        {
+          "id": "race_fork",
+          "text": "Two cars are right beside you at the final lap!",
+          "choices": [
+            { "label": "Press the turbo boost", "next": "turbo_end" },
+            { "label": "Take the inside lane", "next": "inside_end" }
+          ]
+        },
+        {
+          "id": "turbo_end",
+          "text": "WHOOSH! You blast past everyone and cross the finish line first. Trophy time!",
+          "sfx": "whoosh",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "inside_end",
+          "text": "You squeak through a tight gap and edge ahead at the line. Victory by an inch!",
+          "action_slot": "running"
+        }
+      ]
+    },
+    {
+      "id": "request_play_soak_treasure_island_27",
+      "title": "Treasure island with {toy}",
+      "buckets": ["afternoon", "always"],
+      "steps": [
+        { "text": "Land ho! {toy} unfolds a tattered map of {room} with X marks the spot.", "action_slot": "pointing" },
+        { "text": "Wade through pretend tide pools — careful of the crabs!", "action_slot": "looking" },
+        { "text": "Push through palm fronds — wave your arms to part the leaves.", "action_slot": "waving" },
+        { "text": "Spot the X on the ground. Dig with imaginary shovels!", "action_slot": "running" },
+        { "text": "Clunk! You hit the treasure chest. Pry it open with a {prop}.", "sfx": "clunk", "action_slot": "thinking" },
+        {
+          "id": "treasure_fork",
+          "text": "What's inside the chest?",
+          "choices": [
+            { "label": "Gold coins", "next": "gold_end" },
+            { "label": "A magic key", "next": "key_end" }
+          ]
+        },
+        {
+          "id": "gold_end",
+          "text": "Coins everywhere! Toss them in the air with {toy} laughing beside you.",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "key_end",
+          "text": "A glowing {adjective} key! It opens a secret door — what's behind it next time?",
+          "action_slot": "thinking"
+        }
+      ]
+    },
+    {
+      "id": "request_play_soak_market_taste_28",
+      "title": "{toy}'s tasting tour",
+      "buckets": ["morning", "afternoon", "always"],
+      "steps": [
+        { "text": "{toy} declares it's a tasting tour through {room} — {count} stops total!", "action_slot": "pointing" },
+        {
+          "id": "first_taste",
+          "text": "Which station does {toy} sample first?",
+          "choices": [
+            { "label": "Spicy snack stall", "next": "spicy_path" },
+            { "label": "Sweet candy stall", "next": "sweet_path" },
+            { "label": "Sour pickle stall", "next": "sour_path" }
+          ]
+        },
+        {
+          "id": "spicy_path",
+          "text": "WHOA spicy! Fan your {body_part} and stomp around!",
+          "action_slot": "jumping",
+          "next": "judging"
+        },
+        {
+          "id": "sweet_path",
+          "text": "Mmmmm sweet! Smile huge and rub your tummy.",
+          "action_slot": "cheering",
+          "next": "judging"
+        },
+        {
+          "id": "sour_path",
+          "text": "PUCKER! Squish your face and shiver all over!",
+          "action_slot": "thinking",
+          "next": "judging"
+        },
+        {
+          "id": "judging",
+          "text": "Now {toy} judges — give the dish a thumbs up or thumbs down!",
+          "expected_action": "child_thumbs",
+          "action_slot": "pointing"
+        },
+        { "text": "The chef hands you a winner's ribbon. {toy} pins it on you proudly!", "action_slot": "cheering" }
+      ]
+    },
+    {
+      "id": "request_play_soak_balloon_29",
+      "title": "{toy}'s balloon journey",
+      "buckets": ["morning", "afternoon", "always"],
+      "steps": [
+        { "text": "Fire up the burner! {toy}'s hot air balloon rises above {room}.", "sfx": "burner_whoosh", "action_slot": "looking" },
+        {
+          "id": "drift_choice",
+          "text": "Which way does the wind blow {toy}?",
+          "choices": [
+            { "label": "Toward the cloud kingdom", "next": "cloud_path" },
+            { "label": "Toward the rainbow river", "next": "rainbow_path" }
+          ]
+        },
+        {
+          "id": "cloud_path",
+          "text": "Float through fluffy clouds. Reach out and grab a handful — soft and bouncy!",
+          "action_slot": "waving",
+          "next": "landing"
+        },
+        {
+          "id": "rainbow_path",
+          "text": "Sail over a shimmering rainbow river. Wave at the colorful fish below.",
+          "action_slot": "waving",
+          "next": "landing"
+        },
+        {
+          "id": "landing",
+          "text": "Time to descend! Pull the rope gently and the balloon settles down.",
+          "action_slot": "thinking"
+        },
+        { "text": "You and {toy} step out and bow to the crowd that's gathered. What a journey!", "action_slot": "cheering" }
+      ]
+    },
+    {
+      "id": "request_play_soak_kingfor_a_day_30",
+      "title": "{toy} king for a day",
+      "buckets": ["morning", "afternoon", "always"],
+      "steps": [
+        { "text": "Crown {toy}! Today {toy} rules the kingdom of {room}.", "action_slot": "cheering" },
+        { "text": "Sit {toy} on a throne (a chair with a blanket).", "action_slot": "idle" },
+        { "text": "Bow before the king and present a {prop} as a royal gift.", "action_slot": "thinking" },
+        { "text": "A royal messenger arrives! Read the urgent letter aloud.", "action_slot": "pointing" },
+        {
+          "id": "decree_fork",
+          "text": "What does King {toy} decree?",
+          "choices": [
+            { "label": "Throw a giant feast", "next": "feast_end" },
+            { "label": "Send out brave knights", "next": "knights_end" }
+          ]
+        },
+        {
+          "id": "feast_end",
+          "text": "Roll out the feast! Pretend-eat seven courses with your royal {body_part}!",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "knights_end",
+          "text": "March {count} knights out the door — {toy} watches from the balcony, proud.",
+          "action_slot": "pointing"
+        }
+      ]
     }
   ]
 }
