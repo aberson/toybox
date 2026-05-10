@@ -935,6 +935,326 @@
           "action_slot": "sleeping"
         }
       ]
+    },
+    {
+      "id": "request_story_soak_slot_action_31",
+      "title": "When {toy} learned to {action_verb}",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "Once upon a time, {toy} could do almost anything except {action_verb}.", "action_slot": "confused" },
+        { "text": "An old crane on a stone bridge said: 'There are two ways to learn. Patient and brave. Both work.'", "action_slot": "thinking" },
+        {
+          "id": "fork",
+          "text": "Which way does {toy} try?",
+          "choices": [
+            { "label": "Patient — practice slowly", "next": "patient" },
+            { "label": "Brave — try right away", "next": "brave" }
+          ]
+        },
+        {
+          "id": "patient",
+          "text": "Day after day, {toy} practiced for ten minutes. By the end of the month, it became natural.",
+          "action_slot": "thinking",
+          "next": "river"
+        },
+        {
+          "id": "brave",
+          "text": "{toy} tripped, fell, got back up, tripped, fell, got back up. By sundown, {toy} was doing it without thinking.",
+          "action_slot": "jumping",
+          "next": "river"
+        },
+        {
+          "id": "river",
+          "text": "Both ways led {toy} back to the bridge. The crane bowed deeply. 'Now,' it said, 'teach a friend.' The end.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_slot_propchain_32",
+      "title": "The {prop} and the {prop}",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "{toy} owned two things it loved: a {prop} and another {prop}. They were jealous of each other.", "action_slot": "confused" },
+        { "text": "Each one wanted to be {toy}'s favorite. {toy} did not know what to do.", "action_slot": "thinking" },
+        { "text": "An old turtle laughed gently. 'Two things can be loved at once,' she said. 'Watch.'", "action_slot": "looking" },
+        { "text": "She placed both {prop}s side by side and told them a story about belonging.", "action_slot": "thinking" },
+        {
+          "id": "fork",
+          "text": "How does the story end for the {prop}s?",
+          "choices": [
+            { "label": "Best friends now", "next": "friends" },
+            { "label": "Quiet roommates", "next": "quiet" }
+          ]
+        },
+        {
+          "id": "friends",
+          "text": "The two {prop}s leaned together and never argued again. {toy} carried both proudly. The end.",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "quiet",
+          "text": "They learned to share the shelf without bickering. {toy} loved both equally — and they finally believed it. The end.",
+          "action_slot": "thinking"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_slot_room_33",
+      "title": "The {adjective} {room}",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "One morning, {toy} woke up to find {room} entirely {adjective}. Even the dust was {adjective}.", "action_slot": "confused" },
+        { "text": "Nothing was missing. Nothing was broken. It was just... very {adjective}.", "action_slot": "looking" },
+        {
+          "id": "fork",
+          "text": "How does {toy} respond?",
+          "choices": [
+            { "label": "Investigate the change", "next": "investigate" },
+            { "label": "Enjoy it for a day", "next": "enjoy" }
+          ]
+        },
+        {
+          "id": "investigate",
+          "text": "{toy} discovered a sleepy fairy in the closet. She had spilled her bottle of feelings. By teatime, things were normal again.",
+          "action_slot": "thinking"
+        },
+        {
+          "id": "enjoy",
+          "text": "{toy} spent the day in the {adjective} {room}, soaking it in. It faded by sundown, but the memory stayed bright. The end.",
+          "action_slot": "sleeping"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_slot_actionverb_34",
+      "title": "The day everyone had to {action_verb}",
+      "buckets": ["morning", "afternoon"],
+      "steps": [
+        { "text": "Far away in a village called Plinth, there was one day each year when everyone had to {action_verb} together.", "action_slot": "thinking" },
+        { "text": "{toy} arrived in Plinth on exactly that day, a stranger and a little nervous.", "action_slot": "confused" },
+        { "text": "The mayor handed {toy} a small ribbon. 'You'll need this,' she said. 'It helps.'", "action_slot": "looking" },
+        {
+          "id": "fork",
+          "text": "How does {toy} join in?",
+          "choices": [
+            { "label": "With a partner", "next": "partner" },
+            { "label": "On its own", "next": "alone" }
+          ]
+        },
+        {
+          "id": "partner",
+          "text": "A kind farmer offered an arm. Together they {action_verb}'d in perfect rhythm and laughed the whole time. The end.",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "alone",
+          "text": "{toy} {action_verb}'d in the middle of the square with quiet confidence. The whole village cheered. The end.",
+          "action_slot": "cheering"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_slot_bodypart2_35",
+      "title": "The map on the {body_part}",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "When {toy} woke up, there was a map drawn lightly on its {body_part}, in faint silver lines.", "action_slot": "looking" },
+        { "text": "It showed a path through {room}, ending at a place {toy} had never noticed before.", "action_slot": "thinking" },
+        {
+          "id": "fork",
+          "text": "Does {toy} follow the map?",
+          "choices": [
+            { "label": "Right away", "next": "now" },
+            { "label": "After breakfast", "next": "later" }
+          ]
+        },
+        {
+          "id": "now",
+          "text": "The map led to a small loose floorboard. Beneath it: a tin of letters from someone who used to live here. The end.",
+          "action_slot": "looking"
+        },
+        {
+          "id": "later",
+          "text": "By the time {toy} finished toast, the lines had faded. But {toy} remembered every turn — and found the spot. The end.",
+          "action_slot": "thinking"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_long_circus_36",
+      "title": "The midnight circus",
+      "buckets": ["evening"],
+      "steps": [
+        { "text": "Past the edge of town, just past the old fence, a circus tent appeared only on nights without a moon.", "action_slot": "looking" },
+        { "text": "{toy} found the entrance by accident, chasing a runaway balloon.", "action_slot": "running" },
+        { "text": "A small ticket-taker, half rabbit, half something else, asked: 'Do you have a story?'", "action_slot": "thinking" },
+        { "text": "{toy} told a small one — about a lost shoe and a found friend. The ticket-taker nodded, satisfied.", "action_slot": "waving" },
+        { "text": "Inside, the air smelled like cinnamon and something a little older. A row of seats waited.", "action_slot": "looking" },
+        { "text": "The first act was three foxes balancing teacups. The teacups were full. Nothing spilled.", "action_slot": "thinking" },
+        { "text": "The second act was a very tall bear who recited a poem about wind.", "action_slot": "thinking" },
+        {
+          "id": "fork",
+          "text": "What is the final act?",
+          "choices": [
+            { "label": "A trapeze of stars", "next": "stars" },
+            { "label": "A tightrope of yarn", "next": "yarn" }
+          ]
+        },
+        {
+          "id": "stars",
+          "text": "Stars hung in the tent like ornaments. Two acrobats swung from one to the next, bowing as the lights twinkled. {toy} clapped softly. The end.",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "yarn",
+          "text": "A kitten walked the entire length of a yarn tightrope, never wobbling. The crowd held its breath. {toy} did too. The end.",
+          "action_slot": "looking"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_long_voyage_37",
+      "title": "The longest voyage",
+      "buckets": ["afternoon", "evening"],
+      "steps": [
+        { "text": "Captain Wren and her crew set out across the Quiet Sea looking for the singing islands.", "action_slot": "thinking" },
+        { "text": "{toy} was the smallest sailor on board, in charge of the lookout perch.", "action_slot": "looking" },
+        { "text": "On the third day they passed a fog so thick the ship sailed by ear alone.", "action_slot": "confused" },
+        { "text": "On the seventh day, a whale offered them directions in a slow, kind voice.", "action_slot": "thinking" },
+        { "text": "On the tenth day, {toy} spotted a green smudge on the horizon. 'Land!'", "action_slot": "pointing" },
+        {
+          "id": "fork",
+          "text": "Which island do they visit first?",
+          "choices": [
+            { "label": "The island of low songs", "next": "low" },
+            { "label": "The island of bright bells", "next": "bells" },
+            { "label": "The island of soft hums", "next": "hums" }
+          ]
+        },
+        {
+          "id": "low",
+          "text": "The island sang in deep, warm tones. The crew danced slowly along the beach.",
+          "action_slot": "waving",
+          "next": "harbor"
+        },
+        {
+          "id": "bells",
+          "text": "Tiny bells hung from every tree. A breeze made the whole island chime. {toy} laughed in delight.",
+          "action_slot": "cheering",
+          "next": "harbor"
+        },
+        {
+          "id": "hums",
+          "text": "Even the stones hummed faintly. {toy} sat down and listened until the sun dipped low.",
+          "action_slot": "thinking",
+          "next": "harbor"
+        },
+        {
+          "id": "harbor",
+          "text": "All three islands were waiting for them eventually. The crew sailed home with a song in every pocket. The end.",
+          "action_slot": "sleeping"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_long_clockwork_38",
+      "title": "The clockwork bird",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "In the back room of an old shop, {toy} found a tiny clockwork bird, perfectly still.", "action_slot": "looking" },
+        { "text": "Its wings were silver, its eyes were two tiny seeds. A note read: 'Wind once, then wait.'", "action_slot": "thinking" },
+        { "text": "{toy} turned the small key on its back. Tick. Tick. Tick.", "sfx": "tick", "action_slot": "thinking" },
+        { "text": "The bird's eyes blinked. It tilted its head, looking at {toy} as if remembering.", "action_slot": "looking" },
+        { "text": "It hopped to the windowsill. It looked at the sky. Then it looked back.", "action_slot": "thinking" },
+        { "text": "It wanted to go. But it also wanted to stay. The note had not said which.", "action_slot": "confused" },
+        {
+          "id": "fork",
+          "text": "What does {toy} do?",
+          "choices": [
+            { "label": "Open the window", "next": "open" },
+            { "label": "Place it on the shelf", "next": "shelf" }
+          ]
+        },
+        {
+          "id": "open",
+          "text": "The bird flew once around {toy}'s head, dipped low in thanks, and zipped out into the bright air. {toy} smiled. The end.",
+          "action_slot": "waving"
+        },
+        {
+          "id": "shelf",
+          "text": "The bird settled in, fluffed its silver wings, and sang one slow note before falling still. A keeper, then. The end.",
+          "action_slot": "sleeping"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_long_forest_39",
+      "title": "The forest of names",
+      "buckets": ["afternoon"],
+      "steps": [
+        { "text": "Deep in a forest no map showed, every tree knew the name of someone who once stood beneath it.", "action_slot": "looking" },
+        { "text": "{toy} entered with a small list of friends to find.", "action_slot": "thinking" },
+        { "text": "The first tree was a willow, who whispered the name of {toy}'s grandmother.", "action_slot": "thinking" },
+        { "text": "The second was an oak, who whispered the name of an old teacher.", "action_slot": "thinking" },
+        { "text": "The third was a small birch with a name {toy} hadn't expected to hear.", "action_slot": "confused" },
+        { "text": "It was {toy}'s own name — though much younger, when first the trees had heard it.", "action_slot": "looking" },
+        {
+          "id": "fork",
+          "text": "How does {toy} respond?",
+          "choices": [
+            { "label": "Sit beneath the birch", "next": "sit" },
+            { "label": "Add a new name", "next": "add" }
+          ]
+        },
+        {
+          "id": "sit",
+          "text": "{toy} rested against the trunk. The birch hummed softly all afternoon, as if it had missed {toy} too. The end.",
+          "action_slot": "sleeping"
+        },
+        {
+          "id": "add",
+          "text": "{toy} whispered a friend's name into the birch's bark. Years from now, that friend would arrive and feel suddenly welcome. The end.",
+          "action_slot": "waving"
+        }
+      ]
+    },
+    {
+      "id": "request_story_soak_long_balloon_40",
+      "title": "The hot air balloon to nowhere",
+      "buckets": ["morning", "afternoon"],
+      "steps": [
+        { "text": "{toy} climbed into a basket beneath an enormous striped balloon. The pilot was a grumpy badger named Felix.", "action_slot": "thinking" },
+        { "text": "'Where to?' Felix asked, lighting the burner. {toy} did not know.", "action_slot": "confused" },
+        { "text": "'Then nowhere,' Felix grunted. 'Nowhere is my favorite place.'", "action_slot": "thinking" },
+        { "text": "Up they went. Up and up, until the houses became small and the rivers became ribbons.", "action_slot": "looking" },
+        { "text": "Felix passed {toy} a thermos of cocoa. They drifted in silence for a while.", "action_slot": "thinking" },
+        {
+          "id": "fork",
+          "text": "What does {toy} ask Felix?",
+          "choices": [
+            { "label": "Why he loves nowhere", "next": "why" },
+            { "label": "What he sees from up here", "next": "see" }
+          ]
+        },
+        {
+          "id": "why",
+          "text": "Felix smiled — the first smile of the trip. 'Because nowhere never asks you to be anyone in particular.'",
+          "action_slot": "thinking",
+          "next": "land"
+        },
+        {
+          "id": "see",
+          "text": "Felix pointed slowly: a heron, a fox kit, a kid waving from a yard. 'Everything,' he said. 'I see everything.'",
+          "action_slot": "pointing",
+          "next": "land"
+        },
+        {
+          "id": "land",
+          "text": "Hours later they touched down in a meadow. {toy} hopped out feeling lighter than the basket itself. The end.",
+          "action_slot": "cheering"
+        }
+      ]
     }
   ]
 }
