@@ -414,11 +414,6 @@ export interface TranscriptListResponse {
   items: TranscriptRow[];
 }
 
-// Body of the 200 returned by DELETE /api/transcripts/{id}.
-export interface TranscriptDeleteOneResponse {
-  ok: boolean;
-}
-
 // Body for DELETE /api/transcripts (wipe-all).
 export interface TranscriptWipeRequest {
   pin: string;
@@ -427,14 +422,6 @@ export interface TranscriptWipeRequest {
 // Body of the 200 returned by DELETE /api/transcripts.
 export interface TranscriptWipeResponse {
   deleted: number;
-}
-
-// Body of the 404 returned by DELETE /api/transcripts/{id} when no row
-// matches. The frontend reads this to render "already deleted" inline
-// when the operator double-clicks delete.
-export interface TranscriptNotFoundDetail {
-  code: "transcript_not_found";
-  id: string;
 }
 
 // Step 24: operator dashboard wire shapes. Mirror the dataclasses in
@@ -1361,19 +1348,6 @@ export class ApiClient {
     );
   }
 
-  // Step 22: delete one transcript by id. 404 surfaces as ApiError(404)
-  // with detail.code === "transcript_not_found"; the management UI
-  // treats that as "already deleted" rather than a hard error.
-  async deleteTranscript(
-    id: string,
-    opts: RequestOptions = {},
-  ): Promise<TranscriptDeleteOneResponse> {
-    return this.request<TranscriptDeleteOneResponse>(
-      `/api/transcripts/${encodeURIComponent(id)}`,
-      { method: "DELETE", signal: opts.signal },
-    );
-  }
-
   // Step 22: wipe all transcripts. PIN re-confirm body is required on
   // top of the parent token; the rate limiter is shared with
   // ``POST /api/auth/parent`` so a wrong PIN here counts toward the
@@ -1583,31 +1557,6 @@ export function extractRoomInUseDetail(
       code: "room_in_use",
       room_id: c["room_id"],
       feature_count: c["feature_count"],
-    };
-  }
-  return null;
-}
-
-// Step 22: pull the ``transcript_not_found`` detail off a 404 ApiError.
-// The management UI uses this to distinguish "already deleted" (which
-// is benign — refetch + show inline notice) from other 404s.
-export function extractTranscriptNotFoundDetail(
-  err: unknown,
-): TranscriptNotFoundDetail | null {
-  if (!(err instanceof ApiError) || err.status !== 404) return null;
-  const body = err.body;
-  if (typeof body !== "object" || body === null) return null;
-  const rec = body as Record<string, unknown>;
-  const candidate = "detail" in rec ? rec["detail"] : rec;
-  if (typeof candidate !== "object" || candidate === null) return null;
-  const c = candidate as Record<string, unknown>;
-  if (
-    c["code"] === "transcript_not_found" &&
-    typeof c["id"] === "string"
-  ) {
-    return {
-      code: "transcript_not_found",
-      id: c["id"],
     };
   }
   return null;

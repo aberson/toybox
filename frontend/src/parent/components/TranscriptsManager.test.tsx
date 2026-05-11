@@ -1,6 +1,13 @@
-// Component tests for the Step 22 transcript management UI. Spins up a
-// stubbed ApiClient (only the methods the manager calls are wired) and
-// asserts list / search / delete / wipe-all behaviour.
+// Component tests for the Phase I step I4 transcript management UI.
+// Spins up a stubbed ApiClient (only the methods the manager calls are
+// wired) and asserts list / search / fade / wipe-all behaviour.
+//
+// Phase I step I4 replaced the per-row delete affordance with a local
+// 1s fade-out tick driven by ``retentionSeconds``. The delete-path
+// tests have been removed; fade-machinery tests cover (a) row fades
+// out after retention, (b) in-flight rows don't fade, (c) shortening
+// retention fades older rows, (d) malformed ``ended_at`` is skipped
+// with a once-per-id console.warn, (e) wipe-all still works.
 
 import {
   act,
@@ -11,7 +18,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import type { Mock } from "vitest";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../api";
 import type {
@@ -41,7 +48,6 @@ function fakeRow(overrides: Partial<TranscriptRow> = {}): TranscriptRow {
 interface StubApi {
   listTranscripts: Mock;
   searchTranscripts: Mock;
-  deleteTranscript: Mock;
   wipeTranscripts: Mock;
 }
 
@@ -59,9 +65,6 @@ function buildStubApi(initial: TranscriptRow[]): StubApi {
         ),
       }),
     ) as Mock,
-    deleteTranscript: vi.fn(
-      async (_id: string): Promise<{ ok: boolean }> => ({ ok: true }),
-    ) as Mock,
     wipeTranscripts: vi.fn(
       async (_body: TranscriptWipeRequest): Promise<TranscriptWipeResponse> =>
         ({ deleted: 0 }),
@@ -73,13 +76,6 @@ afterEach(() => {
   vi.useRealTimers();
   cleanup();
   vi.restoreAllMocks();
-});
-
-beforeEach(() => {
-  // Per-row delete uses ``window.confirm`` (mirrors ChildProfileEditor).
-  // Default to "yes" for the delete tests; the cancel case overrides
-  // this in-test.
-  vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 
 describe("TranscriptsManager", () => {
@@ -125,47 +121,6 @@ describe("TranscriptsManager", () => {
     });
     expect(stub.searchTranscripts).toHaveBeenCalledTimes(1);
     expect(stub.searchTranscripts.mock.calls[0]?.[0]).toBe("hello");
-  });
-
-  it("clicks delete and calls api.deleteTranscript with the row id", async () => {
-    const stub = buildStubApi([fakeRow({ id: "t-1", text: "first" })]);
-    render(<TranscriptsManager api={stub as unknown as ApiClient} retentionSeconds={60} />);
-    await waitFor(() => {
-      expect(screen.getByText("first")).toBeTruthy();
-    });
-    fireEvent.click(screen.getByTestId("delete-transcript-button"));
-    await waitFor(() => {
-      expect(stub.deleteTranscript).toHaveBeenCalledWith(
-        "t-1",
-        expect.anything(),
-      );
-    });
-    // Optimistic remove — row gone before refetch.
-    await waitFor(() => {
-      expect(screen.queryByText("first")).toBeNull();
-    });
-  });
-
-  it("surfaces an 'already deleted' notice when delete returns 404", async () => {
-    const stub = buildStubApi([fakeRow({ id: "t-1", text: "first" })]);
-    stub.deleteTranscript.mockRejectedValueOnce(
-      new ApiError(404, {
-        detail: { code: "transcript_not_found", id: "t-1" },
-      }),
-    );
-    render(<TranscriptsManager api={stub as unknown as ApiClient} retentionSeconds={60} />);
-    await waitFor(() => {
-      expect(screen.getByText("first")).toBeTruthy();
-    });
-    fireEvent.click(screen.getByTestId("delete-transcript-button"));
-    await waitFor(() => {
-      expect(screen.getByTestId("transcripts-row-notice")).toBeTruthy();
-    });
-    expect(
-      screen.getByTestId("transcripts-row-notice").textContent,
-    ).toContain("already deleted");
-    // Row stays removed (optimistic).
-    expect(screen.queryByText("first")).toBeNull();
   });
 
   it("opens the wipe-all modal with a PIN field", async () => {
@@ -277,68 +232,6 @@ describe("TranscriptsManager", () => {
     });
   });
 
-  it("aborts the in-flight delete signal when the manager unmounts mid-flight", async () => {
-    const stub = buildStubApi([fakeRow({ id: "t-1" })]);
-    let capturedSignal: AbortSignal | undefined;
-    stub.deleteTranscript.mockImplementationOnce(
-      async (
-        _id: string,
-        opts: { signal?: AbortSignal } = {},
-      ): Promise<{ ok: boolean }> => {
-        capturedSignal = opts.signal;
-        return new Promise<{ ok: boolean }>((_resolve, reject) => {
-          opts.signal?.addEventListener("abort", () => {
-            const err = new Error("aborted");
-            err.name = "AbortError";
-            reject(err);
-          });
-        });
-      },
-    );
-    const consoleErrorSpy = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => {});
-    const { unmount } = render(
-      <TranscriptsManager
-        api={stub as unknown as ApiClient}
-        retentionSeconds={60}
-      />,
-    );
-    await waitFor(() => {
-      expect(screen.getByTestId("transcripts-list")).toBeTruthy();
-    });
-    fireEvent.click(screen.getByTestId("delete-transcript-button"));
-    await waitFor(() => {
-      expect(stub.deleteTranscript).toHaveBeenCalled();
-    });
-    expect(capturedSignal).toBeDefined();
-    expect(capturedSignal?.aborted).toBe(false);
-    await act(async () => {
-      unmount();
-    });
-    expect(capturedSignal?.aborted).toBe(true);
-    const setStateWarnings = consoleErrorSpy.mock.calls.filter((args) =>
-      args.some(
-        (arg) => typeof arg === "string" && arg.includes("unmounted"),
-      ),
-    );
-    expect(setStateWarnings).toHaveLength(0);
-  });
-
-  it("skips delete when the confirm dialog is dismissed", async () => {
-    // Override the default "yes" for this case — operator hits Cancel.
-    vi.spyOn(window, "confirm").mockReturnValue(false);
-    const stub = buildStubApi([fakeRow({ id: "t-1", text: "first" })]);
-    render(<TranscriptsManager api={stub as unknown as ApiClient} retentionSeconds={60} />);
-    await waitFor(() => {
-      expect(screen.getByText("first")).toBeTruthy();
-    });
-    fireEvent.click(screen.getByTestId("delete-transcript-button"));
-    // Confirm prompt fired but rejected — no API call, row still there.
-    expect(stub.deleteTranscript).not.toHaveBeenCalled();
-    expect(screen.getByText("first")).toBeTruthy();
-  });
-
   it("clears the PIN field when the wipe modal Cancel is clicked", async () => {
     const stub = buildStubApi([fakeRow({ id: "t-1" })]);
     render(<TranscriptsManager api={stub as unknown as ApiClient} retentionSeconds={60} />);
@@ -441,5 +334,181 @@ describe("TranscriptsManager", () => {
     await waitFor(() => {
       expect(screen.getAllByTestId("transcript-row")).toHaveLength(51);
     });
+  });
+
+  // --- Phase I step I4 fade machinery ---
+
+  it("fade: row fades out and is removed after retention elapses", async () => {
+    // Pin wall-clock so the row's ``ended_at`` lines up with the fake
+    // timer's notion of "now". The row's ``ended_at`` is 61 seconds
+    // before ``baseNow``; with retentionSeconds=60, the 1s tick should
+    // flag it as expired immediately.
+    const baseNow = new Date("2026-05-11T12:00:00Z").getTime();
+    vi.useFakeTimers();
+    vi.setSystemTime(baseNow);
+    const expiredEndedAt = new Date(baseNow - 61_000).toISOString();
+    const stub = buildStubApi([
+      fakeRow({
+        id: "t-old",
+        text: "stale row",
+        started_at: new Date(baseNow - 65_000).toISOString(),
+        ended_at: expiredEndedAt,
+      }),
+    ]);
+    render(
+      <TranscriptsManager
+        api={stub as unknown as ApiClient}
+        retentionSeconds={60}
+      />,
+    );
+    // Flush the initial mount fetch (microtask + 0ms timers).
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getAllByTestId("transcript-row")).toHaveLength(1);
+
+    // Advance 1s — the tick should fire, flag the row as fading, and
+    // queue the 600ms removal. The row should still be in the DOM with
+    // ``opacity: 0`` and ``data-fading="true"``.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    const fadingRow = screen.getByTestId("transcript-row");
+    expect(fadingRow.getAttribute("data-fading")).toBe("true");
+    expect((fadingRow as HTMLElement).style.opacity).toBe("0");
+
+    // Advance the 600ms transition window — the row should be removed
+    // from the DOM entirely.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+    });
+    expect(screen.queryByTestId("transcript-row")).toBeNull();
+  });
+
+  it("fade: in-flight row (ended_at=null) does not fade", async () => {
+    const baseNow = new Date("2026-05-11T12:00:00Z").getTime();
+    vi.useFakeTimers();
+    vi.setSystemTime(baseNow);
+    const stub = buildStubApi([
+      fakeRow({
+        id: "t-live",
+        text: "still talking",
+        started_at: new Date(baseNow - 300_000).toISOString(),
+        ended_at: null,
+      }),
+    ]);
+    render(
+      <TranscriptsManager
+        api={stub as unknown as ApiClient}
+        retentionSeconds={60}
+      />,
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getAllByTestId("transcript-row")).toHaveLength(1);
+
+    // Advance well past any reasonable expiry — the in-flight row
+    // should remain because the tick skips ``ended_at === null``.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    const row = screen.getByTestId("transcript-row");
+    expect(row.getAttribute("data-fading")).toBe("false");
+    expect((row as HTMLElement).style.opacity).not.toBe("0");
+  });
+
+  it("fade: shortening retentionSeconds fades older rows on next tick", async () => {
+    const baseNow = new Date("2026-05-11T12:00:00Z").getTime();
+    vi.useFakeTimers();
+    vi.setSystemTime(baseNow);
+    // 5-minute-old row — safe under 15m retention, expired under 1m.
+    const fiveMinAgo = new Date(baseNow - 5 * 60_000).toISOString();
+    const stub = buildStubApi([
+      fakeRow({
+        id: "t-medium",
+        text: "five minutes old",
+        started_at: fiveMinAgo,
+        ended_at: fiveMinAgo,
+      }),
+    ]);
+    const { rerender } = render(
+      <TranscriptsManager
+        api={stub as unknown as ApiClient}
+        retentionSeconds={900}
+      />,
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    // Tick a couple of times under 15m retention — row should stay
+    // non-fading.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    expect(screen.getByTestId("transcript-row").getAttribute("data-fading")).toBe(
+      "false",
+    );
+
+    // Drop retention to 60s; the next tick should flag the 5-min row.
+    rerender(
+      <TranscriptsManager
+        api={stub as unknown as ApiClient}
+        retentionSeconds={60}
+      />,
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    const row = screen.getByTestId("transcript-row");
+    expect(row.getAttribute("data-fading")).toBe("true");
+    expect((row as HTMLElement).style.opacity).toBe("0");
+  });
+
+  it("fade: malformed ended_at is skipped with a once-per-id console.warn", async () => {
+    const baseNow = new Date("2026-05-11T12:00:00Z").getTime();
+    vi.useFakeTimers();
+    vi.setSystemTime(baseNow);
+    const warnSpy = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
+    const stub = buildStubApi([
+      fakeRow({
+        id: "t-bogus",
+        text: "bogus row",
+        started_at: new Date(baseNow - 10_000).toISOString(),
+        ended_at: "not a date",
+      }),
+    ]);
+    render(
+      <TranscriptsManager
+        api={stub as unknown as ApiClient}
+        retentionSeconds={60}
+      />,
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    // Advance enough to fire two ticks. The row should remain in the
+    // DOM, console.warn called exactly once for ``t-bogus`` (the second
+    // tick is gated by ``warnedIdsRef``).
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    expect(screen.getByTestId("transcript-row")).toBeTruthy();
+    // The "once-per-id" contract is what matters — assert on the call
+    // count directly rather than coupling to the exact message wording
+    // or argument layout. After two ticks the warn must have fired
+    // exactly once even though the row stays in the DOM.
+    expect(warnSpy.mock.calls).toHaveLength(1);
+
+    // Two more ticks — still no additional warn.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    expect(warnSpy.mock.calls).toHaveLength(1);
+    expect(screen.getByTestId("transcript-row")).toBeTruthy();
   });
 });

@@ -1,11 +1,10 @@
-import type { JSX } from "react";
+import type { CSSProperties, JSX } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   ApiError,
   extractPinInvalidDetail,
   extractPinLockedDetail,
-  extractTranscriptNotFoundDetail,
   isAbortError,
 } from "../api";
 import type { ApiClient, TranscriptRow } from "../api";
@@ -19,9 +18,12 @@ import type { Envelope } from "../ws";
 //   ``ended_at`` cursor the backend exposes (no opaque next-page token).
 // * Debounced search field (250ms). Switches to ``searchTranscripts``
 //   when non-empty; falls back to the paginated list when cleared.
-// * Per-row delete with optimistic removal; on 404 the row is also
-//   removed (already-deleted) but a subdued inline notice surfaces so
-//   the operator knows the click landed.
+// * Local-timer fade-out (Phase I step I4): a 1s ``setInterval``
+//   iterates the visible items, computes ``expires_at = ended_at +
+//   retentionSeconds`` per row, marks expired rows as fading via inline
+//   styles (opacity + max-height collapse over 600ms), and removes them
+//   from local state when the transition finishes. Per-row delete is
+//   gone — wipe-all is the only operator-initiated removal path.
 // * "Wipe all" modal that re-prompts for the parent PIN. The PIN is
 //   never persisted — it lives in modal state and clears on close.
 //
@@ -41,6 +43,12 @@ const PIN_MAX = 12;
 const DEFAULT_PAGE_SIZE = 50;
 const TEXT_PREVIEW_CHARS = 100;
 const SEARCH_DEBOUNCE_MS = 250;
+// Phase I step I4: shared inline ``transition`` string for the fade-out
+// animation. Hoisted to keep the inline style sites within the project
+// column norm and to keep both sites in lockstep (any tuning of the
+// 600ms easing applies everywhere).
+const FADE_TRANSITION =
+  "opacity 600ms ease, max-height 600ms ease, margin 600ms ease, padding 600ms ease";
 
 function digitsOnly(s: string): string {
   return s.replace(/\D+/g, "").slice(0, PIN_MAX);
@@ -88,7 +96,7 @@ export interface TranscriptsManagerProps {
 export function TranscriptsManager(
   props: TranscriptsManagerProps,
 ): JSX.Element {
-  const { api, subscribeToTranscripts } = props;
+  const { api, subscribeToTranscripts, retentionSeconds } = props;
   const [items, setItems] = useState<TranscriptRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [listError, setListError] = useState<string | null>(null);
@@ -96,9 +104,29 @@ export function TranscriptsManager(
   const [activeQuery, setActiveQuery] = useState<string>("");
   const [hasMore, setHasMore] = useState<boolean>(false);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [rowNotice, setRowNotice] = useState<string | null>(null);
-  const [rowError, setRowError] = useState<string | null>(null);
+  // Phase I step I4 fade machinery. ``fadingIds`` flips a row's inline
+  // style to the opacity/max-height collapse on the next render; a
+  // queued ``setTimeout`` removes the row from ``items`` 600ms later
+  // when the CSS transition finishes. ``warnedIdsRef`` deduplicates
+  // ``console.warn`` output for rows with malformed ``ended_at`` so a
+  // corrupt row doesn't spam the console once per tick.
+  const [fadingIds, setFadingIds] = useState<Set<string>>(
+    () => new Set<string>(),
+  );
+  // Mirror of ``fadingIds`` for read access inside the tick. The tick's
+  // ``useEffect`` deliberately does NOT depend on ``fadingIds`` (so the
+  // setInterval cadence doesn't reset every fade); reading state from
+  // the closure would freeze on the first render's empty set. The ref
+  // is written from the ``setFadingIds`` updater so it stays in lockstep
+  // with state without re-running the effect.
+  const fadingIdsRef = useRef<Set<string>>(new Set<string>());
+  const warnedIdsRef = useRef<Set<string>>(new Set<string>());
+  // Handles for the 600ms removal ``setTimeout``s queued by the tick.
+  // Tracked so the effect cleanup can ``clearTimeout`` them on unmount
+  // (and on React 18 StrictMode dev double-mount). Each callback also
+  // removes its own handle before mutating state so the set doesn't
+  // leak across the manager's lifetime.
+  const removalTimeoutsRef = useRef<Set<number>>(new Set<number>());
 
   const [wipeOpen, setWipeOpen] = useState<boolean>(false);
   const [wipePin, setWipePin] = useState<string>("");
@@ -277,50 +305,90 @@ export function TranscriptsManager(
     }
   }, [api, items, loadingMore]);
 
-  const deleteRow = useCallback(
-    async (row: TranscriptRow): Promise<void> => {
-      if (deletingId !== null) return;
-      // Mirror the ChildProfileEditor pattern: a native confirm guards
-      // the destructive action so a stray click doesn't lose data.
-      // Wipe-all has its own modal + PIN re-confirm; per-row delete
-      // is lower-stakes so a single confirm is enough.
-      if (!window.confirm("Delete this transcript?")) return;
-      const aborter = aborterRef.current ?? new AbortController();
-      setDeletingId(row.id);
-      setRowNotice(null);
-      setRowError(null);
-      // Optimistic remove — the row vanishes immediately. We restore it
-      // on a non-404 error so the operator can retry.
-      const before = items;
-      setItems((prev) => prev.filter((r) => r.id !== row.id));
-      try {
-        await api.deleteTranscript(row.id, { signal: aborter.signal });
-      } catch (err) {
-        if (isAbortError(err)) {
-          return;
+  // Phase I step I4: 1s tick that flips expired rows into the fading
+  // set and queues their 600ms removal. ``row.ended_at === null``
+  // (in-flight transcript) is skipped — the next WS push lands the
+  // final row with a non-null ``ended_at`` which the next tick picks
+  // up. Malformed (non-parseable) ``ended_at`` is skipped with a
+  // single ``console.warn`` per row id, tracked via ``warnedIdsRef``
+  // so a corrupt row doesn't spam the console.
+  // Effect deps are ``[retentionSeconds]`` only — the interval must
+  // be stable for the lifetime of the manager mount so cadence holds
+  // across many fades. ``fadingIds`` is read via ``fadingIdsRef`` to
+  // avoid pulling it into the deps array (which would reset the
+  // interval on every fade and slide cadence).
+  useEffect(() => {
+    const tick = (): void => {
+      const now = Date.now();
+      setItems((current) => {
+        for (const row of current) {
+          if (row.ended_at === null) continue;
+          if (fadingIdsRef.current.has(row.id)) continue;
+          const expiresAtMs =
+            new Date(row.ended_at).getTime() + retentionSeconds * 1000;
+          if (Number.isNaN(expiresAtMs)) {
+            if (!warnedIdsRef.current.has(row.id)) {
+              warnedIdsRef.current.add(row.id);
+              // eslint-disable-next-line no-console
+              console.warn(
+                "transcript has malformed ended_at, skipping fade",
+                row.id,
+                row.ended_at,
+              );
+            }
+            continue;
+          }
+          if (expiresAtMs <= now) {
+            // Capture the id in a const so the queued setTimeout
+            // closes over a stable value (the row reference might be
+            // GC'd by then).
+            const expiringId = row.id;
+            setFadingIds((prev) => {
+              if (prev.has(expiringId)) return prev;
+              const next = new Set(prev);
+              next.add(expiringId);
+              fadingIdsRef.current = next;
+              return next;
+            });
+            const handle = window.setTimeout(() => {
+              removalTimeoutsRef.current.delete(handle);
+              setItems((curr) => curr.filter((r) => r.id !== expiringId));
+              setFadingIds((prev) => {
+                if (!prev.has(expiringId)) return prev;
+                const next = new Set(prev);
+                next.delete(expiringId);
+                fadingIdsRef.current = next;
+                return next;
+              });
+            }, 600);
+            removalTimeoutsRef.current.add(handle);
+          }
         }
-        const notFound = extractTranscriptNotFoundDetail(err);
-        if (notFound !== null) {
-          // Row was already gone — keep the optimistic removal but
-          // surface a subdued notice so the click doesn't look silent.
-          setRowNotice(`already deleted (${row.id}).`);
-          return;
-        }
-        // Restore the row.
-        setItems(before);
-        if (err instanceof ApiError) {
-          setRowError(`delete failed: ${err.status}`);
-        } else if (err instanceof Error) {
-          setRowError(`delete failed: ${err.message}`);
-        } else {
-          setRowError("delete failed");
-        }
-      } finally {
-        setDeletingId(null);
+        // No mutation to ``items`` here — only the fade state and the
+        // queued removal touch ``items``. Return the same reference
+        // so React skips a re-render from this setter.
+        return current;
+      });
+    };
+    const handle = window.setInterval(tick, 1000);
+    // Capture the ref's Set once at effect-run so the cleanup closes
+    // over the exact same instance the tick callbacks mutated. We
+    // never reassign ``removalTimeoutsRef.current`` (only ``.add`` /
+    // ``.delete`` / ``.clear`` on it), so this is safe and silences
+    // the react-hooks/exhaustive-deps stale-ref warning.
+    const removalTimeouts = removalTimeoutsRef.current;
+    return () => {
+      window.clearInterval(handle);
+      // Cancel any in-flight 600ms removal timeouts. React 18 dev
+      // StrictMode double-mounts this effect, and on real unmount
+      // we don't want a stale timeout firing setItems against a
+      // dead component.
+      for (const t of removalTimeouts) {
+        window.clearTimeout(t);
       }
-    },
-    [api, deletingId, items],
-  );
+      removalTimeouts.clear();
+    };
+  }, [retentionSeconds]);
 
   const openWipe = useCallback((): void => {
     setWipeOpen(true);
@@ -473,24 +541,6 @@ export function TranscriptsManager(
           {listError}
         </p>
       )}
-      {rowNotice !== null && (
-        <p
-          data-testid="transcripts-row-notice"
-          role="status"
-          style={{ color: "#555", fontSize: 12 }}
-        >
-          {rowNotice}
-        </p>
-      )}
-      {rowError !== null && (
-        <p
-          data-testid="transcripts-row-error"
-          role="alert"
-          style={{ color: "#b71c1c", fontSize: 13 }}
-        >
-          {rowError}
-        </p>
-      )}
       {wipeSuccessCount !== null && (
         <p
           data-testid="transcripts-wipe-success"
@@ -523,55 +573,69 @@ export function TranscriptsManager(
           data-testid="transcripts-list"
           style={{ listStyle: "none", padding: 0, margin: 0 }}
         >
-          {items.map((row) => (
-            <li
-              key={row.id}
-              data-testid="transcript-row"
-              data-transcript-id={row.id}
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                justifyContent: "space-between",
-                padding: "8px 0",
-                borderBottom: "1px solid #eee",
-                gap: 8,
-              }}
-            >
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{ fontSize: 12, color: "#777" }}
-                  data-testid="transcript-row-meta"
-                >
-                  <span data-testid="transcript-row-time">
-                    {row.started_at ?? "(no time)"}
-                  </span>
-                  <span
-                    data-testid="transcript-row-confidence"
-                    style={{ marginLeft: 8 }}
-                  >
-                    conf {confidenceBadge(row.confidence)}
-                  </span>
-                </div>
-                <div
-                  data-testid="transcript-row-text"
-                  title={row.text ?? ""}
-                  style={{ fontSize: 14, marginTop: 2 }}
-                >
-                  {truncateText(row.text)}
-                </div>
-              </div>
-              <button
-                type="button"
-                data-testid="delete-transcript-button"
-                disabled={deletingId === row.id}
-                onClick={() => {
-                  void deleteRow(row);
+          {items.map((row) => {
+            const isFading = fadingIds.has(row.id);
+            // Non-fading rows still carry the ``transition`` so when
+            // the flag flips on the next render, the opacity/height
+            // collapse animates rather than snapping. ``max-height:
+            // 0`` (not ``display: none``) lets the height transition
+            // play smoothly to zero.
+            const fadeStyle: CSSProperties = isFading
+              ? {
+                  opacity: 0,
+                  maxHeight: 0,
+                  marginTop: 0,
+                  marginBottom: 0,
+                  paddingTop: 0,
+                  paddingBottom: 0,
+                  overflow: "hidden",
+                  transition: FADE_TRANSITION,
+                }
+              : {
+                  transition: FADE_TRANSITION,
+                };
+            return (
+              <li
+                key={row.id}
+                data-testid="transcript-row"
+                data-transcript-id={row.id}
+                data-fading={isFading ? "true" : "false"}
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "space-between",
+                  padding: "8px 0",
+                  borderBottom: "1px solid #eee",
+                  gap: 8,
+                  ...fadeStyle,
                 }}
               >
-                {deletingId === row.id ? "deleting..." : "delete"}
-              </button>
-            </li>
-          ))}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{ fontSize: 12, color: "#777" }}
+                    data-testid="transcript-row-meta"
+                  >
+                    <span data-testid="transcript-row-time">
+                      {row.started_at ?? "(no time)"}
+                    </span>
+                    <span
+                      data-testid="transcript-row-confidence"
+                      style={{ marginLeft: 8 }}
+                    >
+                      conf {confidenceBadge(row.confidence)}
+                    </span>
+                  </div>
+                  <div
+                    data-testid="transcript-row-text"
+                    title={row.text ?? ""}
+                    style={{ fontSize: 14, marginTop: 2 }}
+                  >
+                    {truncateText(row.text)}
+                  </div>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
 

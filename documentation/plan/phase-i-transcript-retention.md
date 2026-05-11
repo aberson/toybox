@@ -175,7 +175,7 @@ Critical path: I1 → I3 → I4 → I5 (4 steps). I2 runs alongside I3+I4 with z
 - **Issue:** [#90](https://github.com/aberson/toybox/issues/90)
 - **Flags:** --reviewers code
 - **Files:** MODIFY `frontend/src/parent/components/TranscriptsManager.tsx` (function-body changes: rip delete + add fade machinery + consume retentionSeconds; **do not** modify the TranscriptsManagerProps interface — I3 already added the prop), `frontend/src/parent/components/TranscriptsManager.test.tsx` (drop delete tests + add fade tests), `frontend/src/parent/api.ts` (remove `deleteTranscript` from `ApiClient` interface + implementation).
-- **Status:** TODO
+- **Status:** DONE (2026-05-11)
 
 ### Step I5: iPad parent-app UAT — retention + fade end-to-end
 
