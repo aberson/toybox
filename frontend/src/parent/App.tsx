@@ -15,14 +15,11 @@ import type {
 } from "./api";
 import { ActivityPanel } from "./components/ActivityPanel";
 import { CapabilityBanner } from "./components/CapabilityBanner";
-import { ChildProfileEditor } from "./components/ChildProfileEditor";
 import { Header } from "./components/Header";
-import { OperatorTab } from "./components/OperatorTab";
 import { PinLogin } from "./components/PinLogin";
 import { PinSetup } from "./components/PinSetup";
-import { RoomIngestBulk } from "./components/RoomIngestBulk";
+import { SubTabs, Tabs, useTabState } from "./components/Tabs";
 import { SuggestionCard } from "./components/SuggestionCard";
-import { ToyIngest } from "./components/ToyIngest";
 import { TranscriptsManager } from "./components/TranscriptsManager";
 import { TriggerButton } from "./components/TriggerButton";
 import { useParentStore } from "./store";
@@ -60,6 +57,21 @@ function deriveWsUrl(): string {
 // the initial probe so neither screen flashes incorrectly.
 type AuthMode = "bootstrap" | "setup" | "login" | "ready" | "error";
 
+// Phase H step H2: top-level tab + per-section sub-tab unions. Each tab
+// dimension persists independently in localStorage so a re-mount lands
+// the operator on their last selection. Storage keys + defaults match
+// the plan's Vocabulary section. Kept as string-literal unions (not
+// enums) so the values themselves double as ``data-testid`` suffixes.
+type TopTab = "play" | "kids-toyboxes" | "settings";
+type PlaySubTab = "play-ideas" | "transcription";
+type KidsSubTab = "toys" | "children" | "rooms";
+type SettingsSubTab = "settings" | "stats";
+
+const TOP_TAB_VALUES: readonly TopTab[] = ["play", "kids-toyboxes", "settings"];
+const PLAY_SUBTAB_VALUES: readonly PlaySubTab[] = ["play-ideas", "transcription"];
+const KIDS_SUBTAB_VALUES: readonly KidsSubTab[] = ["toys", "children", "rooms"];
+const SETTINGS_SUBTAB_VALUES: readonly SettingsSubTab[] = ["settings", "stats"];
+
 export function App(): JSX.Element {
   const state = useParentStore();
   // Live audio block from the metrics topic. Seeded by a one-shot
@@ -71,32 +83,39 @@ export function App(): JSX.Element {
     null,
   );
   const [muteBusy, setMuteBusy] = useState(false);
-  const [showChildEditor, setShowChildEditor] = useState(false);
-  const [showToyIngest, setShowToyIngest] = useState(false);
-  const [showRoomIngest, setShowRoomIngest] = useState(false);
-  const [showOperator, setShowOperator] = useState(false);
-  const [showTranscripts, setShowTranscripts] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>("bootstrap");
   const [authStatus, setAuthStatus] = useState<ParentAuthStatus | null>(null);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const apiRef = useRef<ApiClient | null>(null);
   const wsRef = useRef<ParentWsClient | null>(null);
-  // Step 24: registry of metrics-envelope listeners. The ws onEnvelope
-  // callback fans every metrics envelope out to every listener; the
-  // OperatorTab subscribes via a callback returned from
-  // ``subscribeToMetrics``. Built as a Set so unsubscribe is O(1).
-  const metricsListenersRef = useRef<Set<(env: Envelope) => void>>(new Set());
-  const subscribeToMetrics = useCallback(
-    (handler: (env: Envelope) => void): (() => void) => {
-      metricsListenersRef.current.add(handler);
-      return () => {
-        metricsListenersRef.current.delete(handler);
-      };
-    },
-    [],
+
+  // Phase H step H2: top + sub-tab selections live in localStorage so a
+  // re-mount lands the operator where they left off. The four
+  // dimensions are independent — flipping the top tab doesn't reset the
+  // remembered sub-tab inside the OTHER top tabs. H3/H5 will read these
+  // same hooks when they fill in their placeholders.
+  const topTab = useTabState<TopTab>(
+    "toybox.parent.tabs.top",
+    "play",
+    TOP_TAB_VALUES,
+  );
+  const playTab = useTabState<PlaySubTab>(
+    "toybox.parent.tabs.play",
+    "play-ideas",
+    PLAY_SUBTAB_VALUES,
+  );
+  const kidsTab = useTabState<KidsSubTab>(
+    "toybox.parent.tabs.kids-toyboxes",
+    "toys",
+    KIDS_SUBTAB_VALUES,
+  );
+  const settingsTab = useTabState<SettingsSubTab>(
+    "toybox.parent.tabs.settings",
+    "settings",
+    SETTINGS_SUBTAB_VALUES,
   );
 
-  // Same pattern for live ``transcript`` envelopes — TranscriptsManager
+  // Live ``transcript`` envelope fanout — TranscriptsManager
   // subscribes so a new utterance appears in the list without the user
   // refreshing the panel. Without this, ``applyEnvelope`` would drop
   // transcript envelopes on the floor (the store has no transcript
@@ -174,16 +193,15 @@ export function App(): JSX.Element {
             // envelope. Defensive cast: the wire shape is checked by
             // the publisher but a malformed payload should not crash
             // the ws callback.
+            //
+            // Phase H step H2: OperatorTab is no longer mounted in H2,
+            // so the metrics-listener fanout is removed here. H5 will
+            // re-introduce a per-consumer subscription when StatsPanel
+            // lands. The header's audioStatus still updates directly
+            // off every envelope so the mic indicator stays live.
             const payload = env.payload as { audio?: MetricsAudioStatus };
             if (payload.audio !== undefined) {
               setAudioStatus(payload.audio);
-            }
-            for (const listener of metricsListenersRef.current) {
-              try {
-                listener(env);
-              } catch {
-                // listener bugs must not crash the ws callback.
-              }
             }
           }
           if (env.topic === "transcript") {
@@ -630,91 +648,130 @@ export function App(): JSX.Element {
       />
       <CapabilityBanner reason={state.capabilityReason} />
       <div style={{ padding: 16 }}>
-        <div style={{ marginBottom: 16, display: "flex", gap: 8 }}>
-          <TriggerButton onTrigger={handleTrigger} />
-          <button
-            type="button"
-            data-testid="toggle-child-editor"
-            aria-pressed={showChildEditor}
-            onClick={() => setShowChildEditor((prev) => !prev)}
-          >
-            {showChildEditor ? "hide child profiles" : "child profiles"}
-          </button>
-          <button
-            type="button"
-            data-testid="toggle-toy-ingest"
-            aria-pressed={showToyIngest}
-            onClick={() => setShowToyIngest((prev) => !prev)}
-          >
-            {showToyIngest ? "hide toys" : "toys"}
-          </button>
-          <button
-            type="button"
-            data-testid="toggle-room-ingest"
-            aria-pressed={showRoomIngest}
-            onClick={() => setShowRoomIngest((prev) => !prev)}
-          >
-            {showRoomIngest ? "hide rooms" : "rooms"}
-          </button>
-          <button
-            type="button"
-            data-testid="toggle-operator"
-            aria-pressed={showOperator}
-            onClick={() => setShowOperator((prev) => !prev)}
-          >
-            {showOperator ? "hide operator" : "operator"}
-          </button>
-          <button
-            type="button"
-            data-testid="toggle-transcripts"
-            aria-pressed={showTranscripts}
-            onClick={() => setShowTranscripts((prev) => !prev)}
-          >
-            {showTranscripts ? "hide transcripts" : "transcripts"}
-          </button>
+        {/* Phase H step H2: two-level tab shell. The top Tabs row picks
+            the section; each section renders its own SubTabs row inside
+            its tabpanel. State for which tab is selected lives in
+            ``useTabState`` (localStorage-backed) so the operator's last
+            choice survives a reload. Kids & Toyboxes + Settings are
+            placeholders in this step — H3 wires in the children/toys/
+            rooms editors, H5 wires in the settings/stats panels. */}
+        <Tabs<TopTab>
+          items={[
+            { key: "play", label: "Play" },
+            { key: "kids-toyboxes", label: "Kids & Toyboxes" },
+            { key: "settings", label: "Settings" },
+          ]}
+          value={topTab.value}
+          onChange={topTab.setValue}
+        />
+        <div role="tabpanel" style={{ marginTop: 16 }}>
+          {topTab.value === "play" && (
+            <>
+              <SubTabs<PlaySubTab>
+                items={[
+                  { key: "play-ideas", label: "Play Ideas" },
+                  { key: "transcription", label: "Transcription" },
+                ]}
+                value={playTab.value}
+                onChange={playTab.setValue}
+              />
+              <div role="tabpanel" style={{ marginTop: 12 }}>
+                {playTab.value === "play-ideas" && (
+                  <>
+                    <div style={{ marginBottom: 16 }}>
+                      <TriggerButton onTrigger={handleTrigger} />
+                    </div>
+                    {/* Activity surface gates preserved from pre-H2 —
+                        the SuggestionCard renders for ``proposed`` rows
+                        and ActivityPanel renders for the running/paused/
+                        completed lifecycle. State is unaffected by tab
+                        switches; only render visibility is gated by the
+                        ``play`` + ``play-ideas`` selection. */}
+                    {showSuggestion && activity !== null && (
+                      <SuggestionCard
+                        activity={activity}
+                        onApprove={handleApprove}
+                        onSkip={handleSkip}
+                        onDismiss={handleDismiss}
+                        busy={{
+                          approve: busy.approve,
+                          skip: busy.skip,
+                          dismiss: busy.dismiss,
+                        }}
+                      />
+                    )}
+                    {showPanel && activity !== null && (
+                      <ActivityPanel
+                        activity={activity}
+                        onRegenerate={handleRegenerate}
+                        onEnd={handleEnd}
+                        onDidntWork={handleDidntWork}
+                        onThumbsUp={handleThumbsUp}
+                        onStepBack={handleStepBack}
+                        busy={{
+                          regenerate: busy.regenerate,
+                          end: busy.end,
+                          didntWork: busy.didntWork,
+                          thumbsUp: busy.thumbsUp,
+                          stepBack: busy.stepBack,
+                        }}
+                      />
+                    )}
+                  </>
+                )}
+                {playTab.value === "transcription" && (
+                  <TranscriptsManager
+                    api={api}
+                    subscribeToTranscripts={subscribeToTranscripts}
+                  />
+                )}
+              </div>
+            </>
+          )}
+          {topTab.value === "kids-toyboxes" && (
+            <>
+              <SubTabs<KidsSubTab>
+                items={[
+                  { key: "toys", label: "Toys" },
+                  { key: "children", label: "Children" },
+                  { key: "rooms", label: "Rooms" },
+                ]}
+                value={kidsTab.value}
+                onChange={kidsTab.setValue}
+              />
+              <div role="tabpanel" style={{ marginTop: 12 }}>
+                {/* H3 fills these in (ToyIngest / ChildProfileEditor /
+                    RoomIngestBulk). For H2 they're a single placeholder
+                    so the shell + nav are testable in isolation. */}
+                <div data-testid="kids-toyboxes-placeholder">
+                  (H3 fills in Kids &amp; Toyboxes content)
+                </div>
+              </div>
+            </>
+          )}
+          {topTab.value === "settings" && (
+            <>
+              <SubTabs<SettingsSubTab>
+                items={[
+                  { key: "settings", label: "Settings" },
+                  { key: "stats", label: "Stats" },
+                ]}
+                value={settingsTab.value}
+                onChange={settingsTab.setValue}
+              />
+              <div role="tabpanel" style={{ marginTop: 12 }}>
+                {/* H5 fills these in (SettingsPanel / StatsPanel after
+                    the OperatorTab split + BannedThemesSettings). */}
+                <div data-testid="settings-placeholder">
+                  (H5 fills in Settings content)
+                </div>
+              </div>
+            </>
+          )}
         </div>
-        {showChildEditor && <ChildProfileEditor api={api} /> }
-        {showToyIngest && <ToyIngest api={api} />}
-        {showRoomIngest && <RoomIngestBulk api={api} />}
-        {showOperator && (
-          <OperatorTab api={api} subscribeToMetrics={subscribeToMetrics} />
-        )}
-        {showTranscripts && (
-          <TranscriptsManager
-            api={api}
-            subscribeToTranscripts={subscribeToTranscripts}
-          />
-        )}
-        {showSuggestion && activity !== null && (
-          <SuggestionCard
-            activity={activity}
-            onApprove={handleApprove}
-            onSkip={handleSkip}
-            onDismiss={handleDismiss}
-            busy={{
-              approve: busy.approve,
-              skip: busy.skip,
-              dismiss: busy.dismiss,
-            }}
-          />
-        )}
-        {showPanel && activity !== null && (
-          <ActivityPanel
-            activity={activity}
-            onRegenerate={handleRegenerate}
-            onEnd={handleEnd}
-            onDidntWork={handleDidntWork}
-            onThumbsUp={handleThumbsUp}
-            onStepBack={handleStepBack}
-            busy={{
-              regenerate: busy.regenerate,
-              end: busy.end,
-              didntWork: busy.didntWork,
-              thumbsUp: busy.thumbsUp,
-              stepBack: busy.stepBack,
-            }}
-          />
-        )}
+        {/* Toasts are cross-cutting transient feedback — they MUST stay
+            outside any tab gate so a mute-error toast (Settings-driven)
+            is visible from Play, etc. */}
         {state.toasts.length > 0 && (
           <div data-testid="toasts" style={{ marginTop: 16 }}>
             {state.toasts.map((t) => (

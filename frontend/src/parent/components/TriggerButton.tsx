@@ -37,7 +37,7 @@ export function TriggerButton(props: TriggerButtonProps): JSX.Element {
         cursor: busy ? "wait" : "pointer",
       }}
     >
-      {busy ? "triggering..." : "Trigger play (manual)"}
+      {busy ? "Loading..." : "Play Ideas"}
     </button>
   );
 }

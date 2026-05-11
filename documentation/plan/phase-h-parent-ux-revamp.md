@@ -162,6 +162,7 @@ Critical path: H1 → H2 → H3 → H5 → H6 (5 steps); H4 runs alongside H1+H2
 - **Issue:** [#79](https://github.com/aberson/toybox/issues/79)
 - **Flags:** --reviewers code
 - **Files:** MODIFY `frontend/src/parent/App.tsx`, `frontend/src/parent/components/TriggerButton.tsx` (label only), `frontend/src/parent/App.test.tsx` (update test IDs to new tab + sub-tab selectors).
+- **Status:** DONE (2026-05-10) — App.tsx tab shell + Play tab content + 5 placeholders for H3/H5; +6 tests (285 → 291) including activity-state preservation + toast cross-tab visibility; 4 code reviewers PASS after iter 2
 
 ### Step H3: Kids & Toyboxes tab content
 
