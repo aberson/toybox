@@ -148,7 +148,7 @@ Critical path: I1 → I3 → I4 → I5 (4 steps). I2 runs alongside I3+I4 with z
 - **Issue:** [#87](https://github.com/aberson/toybox/issues/87)
 - **Flags:** --reviewers code
 - **Files:** CREATE `src/toybox/db/migrations/0010_transcript_retention.sql`, `src/toybox/core/transcript_retention.py`, `src/toybox/api/transcript_retention_settings.py`, `tests/unit/test_transcript_retention.py`, `tests/integration/test_transcript_retention_api.py`, `tests/integration/test_migration_0010_transcript_retention.py`. MODIFY `src/toybox/app.py` (register the new router). UPDATE `documentation/plan/data-model.md` to note the new `transcript_retention_seconds` settings key + `idx_transcripts_ended_at` index.
-- **Status:** TODO
+- **Status:** DONE (2026-05-11)
 
 ### Step I2: Backend sweep task + filter-on-read + remove single-delete (parallel with I3)
 

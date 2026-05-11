@@ -247,6 +247,7 @@ Settings keys:
 | `time_of_day_aware` | bool | inject hour-of-day into activity generator context, default true |
 | `image_gen_mode` | string | `cartoon` (default, capability-driven dispatch) or `composite` (force Tier C); set via `PUT /api/settings/image-gen-mode` |
 | `banned_themes_global` | string | comma-separated household-wide ban list, e.g. `"monsters, spiders"`; absent row = "no global ban list" (read as `None` in Python); set via `PUT /api/settings/banned-themes`. Promoted from a per-child column by Phase H Step H4 migration 0009. |
+| `transcript_retention_seconds` | int (one of `60, 180, 300, 600, 900`) | default `60`; seeded by Phase I Step I1 migration 0010 (`INSERT OR IGNORE`); set via `PUT /api/settings/transcript-retention`. Drives the I2 backend sweep + filter-on-read; values outside the canonical set fall back to default with a WARNING log. Companion index `idx_transcripts_ended_at` on `transcripts(ended_at)` is created by the same migration. |
 
 ## File layout
 
