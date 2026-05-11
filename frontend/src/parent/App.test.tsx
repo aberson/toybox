@@ -185,6 +185,32 @@ function stubFullAuthFetch(opts: { pin_set: boolean }): Mock {
         { status: 200, headers: { "Content-Type": "application/json" } },
       );
     }
+    // H3: the Kids & Toyboxes sub-tabs mount ToyIngest /
+    // ChildProfileEditor / RoomIngestBulk, each of which fires a list
+    // probe on mount and reads a specific keyed array off the response
+    // (resp.toys / resp.children / resp.rooms). The generic
+    // ``{items: [], next: null}`` fallback below would leave those
+    // arrays undefined and crash the components. Return shape-correct
+    // empty lists for each list endpoint so the post-login render is
+    // clean for H3's tab-switch assertions.
+    if (url.endsWith("/api/toys")) {
+      return new Response(JSON.stringify({ toys: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (url.endsWith("/api/children")) {
+      return new Response(JSON.stringify({ children: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (url.endsWith("/api/rooms")) {
+      return new Response(JSON.stringify({ rooms: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     // Anything else (e.g. TranscriptsManager's pagination probe) gets a
     // benign empty response so the post-login render doesn't surface
     // unrelated network noise as test failures.
@@ -245,7 +271,7 @@ describe("App tab shell (post-PIN, H2)", () => {
     expect(screen.queryByTestId("kids-toyboxes-placeholder")).toBeNull();
   });
 
-  it("switching to Kids & Toyboxes shows its sub-tabs + placeholder", async () => {
+  it("switching to Kids & Toyboxes shows its sub-tabs (H3 wires ToyIngest as default)", async () => {
     stubFullAuthFetch({ pin_set: true });
     render(<App />);
     await driveLoginToTabShell();
@@ -255,7 +281,8 @@ describe("App tab shell (post-PIN, H2)", () => {
     expect(screen.getByTestId("subtab-toys")).toBeTruthy();
     expect(screen.getByTestId("subtab-children")).toBeTruthy();
     expect(screen.getByTestId("subtab-rooms")).toBeTruthy();
-    expect(screen.getByTestId("kids-toyboxes-placeholder")).toBeTruthy();
+    // H3: the placeholder is gone; ToyIngest is the default sub-tab.
+    expect(screen.queryByTestId("kids-toyboxes-placeholder")).toBeNull();
     // Play-tab content is no longer in the DOM.
     expect(screen.queryByTestId("subtab-play-ideas")).toBeNull();
   });
@@ -372,5 +399,80 @@ describe("App tab shell (post-PIN, H2)", () => {
       fireEvent.click(screen.getByTestId("tab-kids-toyboxes"));
     });
     expect(screen.queryByTestId("toasts")).toBeTruthy();
+  });
+});
+
+// Phase H step H3: Kids & Toyboxes tab is now wired to its three real
+// editors (ToyIngest / ChildProfileEditor / RoomIngestBulk). These
+// tests pin that the right component renders under the right sub-tab
+// and that switching sub-tabs unmounts the previous editor — the
+// editors are heavy enough that leaving them mounted in parallel would
+// fire duplicate list probes and waste a render budget.
+describe("App Kids & Toyboxes tab (H3)", () => {
+  beforeEach(() => {
+    useParentStore.setState({
+      token: null,
+      activity: null,
+      wsState: "idle",
+      health: null,
+      toasts: [],
+      capabilityReason: null,
+    } as Partial<ReturnType<typeof useParentStore.getState>>);
+    window.localStorage.clear();
+  });
+
+  it("Toys is the default sub-tab and renders ToyIngest", async () => {
+    stubFullAuthFetch({ pin_set: true });
+    render(<App />);
+    await driveLoginToTabShell();
+    act(() => {
+      fireEvent.click(screen.getByTestId("tab-kids-toyboxes"));
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId("toy-ingest")).toBeTruthy();
+    });
+    // The other two editors are NOT mounted.
+    expect(screen.queryByTestId("child-profile-editor")).toBeNull();
+    expect(screen.queryByTestId("room-ingest-bulk")).toBeNull();
+  });
+
+  it("clicking subtab-children unmounts ToyIngest and mounts ChildProfileEditor", async () => {
+    stubFullAuthFetch({ pin_set: true });
+    render(<App />);
+    await driveLoginToTabShell();
+    act(() => {
+      fireEvent.click(screen.getByTestId("tab-kids-toyboxes"));
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId("toy-ingest")).toBeTruthy();
+    });
+    act(() => {
+      fireEvent.click(screen.getByTestId("subtab-children"));
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId("child-profile-editor")).toBeTruthy();
+    });
+    expect(screen.queryByTestId("toy-ingest")).toBeNull();
+    expect(screen.queryByTestId("room-ingest-bulk")).toBeNull();
+  });
+
+  it("clicking subtab-rooms mounts RoomIngestBulk", async () => {
+    stubFullAuthFetch({ pin_set: true });
+    render(<App />);
+    await driveLoginToTabShell();
+    act(() => {
+      fireEvent.click(screen.getByTestId("tab-kids-toyboxes"));
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId("toy-ingest")).toBeTruthy();
+    });
+    act(() => {
+      fireEvent.click(screen.getByTestId("subtab-rooms"));
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId("room-ingest-bulk")).toBeTruthy();
+    });
+    expect(screen.queryByTestId("toy-ingest")).toBeNull();
+    expect(screen.queryByTestId("child-profile-editor")).toBeNull();
   });
 });

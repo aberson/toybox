@@ -15,11 +15,14 @@ import type {
 } from "./api";
 import { ActivityPanel } from "./components/ActivityPanel";
 import { CapabilityBanner } from "./components/CapabilityBanner";
+import { ChildProfileEditor } from "./components/ChildProfileEditor";
 import { Header } from "./components/Header";
 import { PinLogin } from "./components/PinLogin";
 import { PinSetup } from "./components/PinSetup";
+import { RoomIngestBulk } from "./components/RoomIngestBulk";
 import { SubTabs, Tabs, useTabState } from "./components/Tabs";
 import { SuggestionCard } from "./components/SuggestionCard";
+import { ToyIngest } from "./components/ToyIngest";
 import { TranscriptsManager } from "./components/TranscriptsManager";
 import { TriggerButton } from "./components/TriggerButton";
 import { useParentStore } from "./store";
@@ -740,12 +743,17 @@ export function App(): JSX.Element {
                 onChange={kidsTab.setValue}
               />
               <div role="tabpanel" style={{ marginTop: 12 }}>
-                {/* H3 fills these in (ToyIngest / ChildProfileEditor /
-                    RoomIngestBulk). For H2 they're a single placeholder
-                    so the shell + nav are testable in isolation. */}
-                <div data-testid="kids-toyboxes-placeholder">
-                  (H3 fills in Kids &amp; Toyboxes content)
-                </div>
+                {/* H3: relocated ToyIngest / ChildProfileEditor /
+                    RoomIngestBulk under their respective sub-tabs. The
+                    components are mounted unchanged from their pre-H2
+                    homes — only their parent gate moved. ChildProfileEditor
+                    still carries its banned-themes UI in this step; H5
+                    rips that out and moves it into Settings. */}
+                {kidsTab.value === "toys" && <ToyIngest api={api} />}
+                {kidsTab.value === "children" && (
+                  <ChildProfileEditor api={api} />
+                )}
+                {kidsTab.value === "rooms" && <RoomIngestBulk api={api} />}
               </div>
             </>
           )}

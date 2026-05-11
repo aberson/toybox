@@ -43,8 +43,10 @@ test("parent toy ingest → action grid renders → WS-driven done state", async
   // (Implementation detail intentionally omitted — the orchestrator's
   // backend launcher seeds PIN + token before this spec runs.)
 
-  // 1. Open the toys tab.
-  await page.getByTestId("toggle-toy-ingest").click();
+  // 1. Open the toys tab. Phase H step H3 relocated ToyIngest under
+  //    Kids & Toyboxes → Toys; the legacy toggle button is gone.
+  await page.getByTestId("tab-kids-toyboxes").click();
+  await page.getByTestId("subtab-toys").click();
   await expect(page.getByTestId("toy-ingest")).toBeVisible();
 
   // 2. Pick a fixture image. The orchestrator copies a PNG into the

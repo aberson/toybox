@@ -171,6 +171,7 @@ Critical path: H1 → H2 → H3 → H5 → H6 (5 steps); H4 runs alongside H1+H2
 - **Issue:** [#80](https://github.com/aberson/toybox/issues/80)
 - **Flags:** --reviewers code
 - **Files:** MODIFY `frontend/src/parent/App.tsx` (replace Kids & Toyboxes placeholder from H2 with the three sub-tabs).
+- **Status:** DONE (2026-05-10) — Toys/Children/Rooms sub-tabs mount existing components; +3 tests (291 → 294); 4 code reviewers PASS first iteration; stale `toggle-toy-ingest` selector in `parent-toy-action-grid.spec.ts` updated to the new tab path
 
 ### Step H4: Backend — migration 0009 + global banned-themes API
 
