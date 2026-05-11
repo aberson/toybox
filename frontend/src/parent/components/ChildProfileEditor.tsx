@@ -15,15 +15,14 @@ import type {
   ReadingLevel,
   ValidationFieldError,
 } from "../api";
-import {
-  BANNED_THEME_PRESETS,
-  findPreset,
-  mergeBannedThemes,
-} from "./bannedThemePresets";
 
 // Shape of the editor form. Matches ``ChildProfileCreate`` but with
 // strings (never null) so the controlled inputs round-trip cleanly.
 // Empty strings convert to ``null`` when shipping to the API.
+//
+// Phase H step H5: ``banned_themes`` was removed from this form along
+// with the per-child column (migration 0009). The new home is the
+// global ``BannedThemesSettings`` block under Settings.
 interface FormState {
   display_name: string;
   birthdate: string;
@@ -31,7 +30,6 @@ interface FormState {
   reading_level: ReadingLevel | "";
   interests: string;
   comfort: string;
-  banned_themes: string;
   notes: string;
 }
 
@@ -42,7 +40,6 @@ const EMPTY_FORM: FormState = {
   reading_level: "",
   interests: "",
   comfort: "",
-  banned_themes: "",
   notes: "",
 };
 
@@ -54,7 +51,6 @@ function profileToForm(profile: ChildProfile): FormState {
     reading_level: profile.reading_level ?? "",
     interests: profile.interests ?? "",
     comfort: profile.comfort ?? "",
-    banned_themes: profile.banned_themes ?? "",
     notes: profile.notes ?? "",
   };
 }
@@ -70,7 +66,6 @@ function formToCreatePayload(form: FormState): ChildProfileCreate {
     reading_level: form.reading_level === "" ? null : form.reading_level,
     interests: nullify(form.interests),
     comfort: nullify(form.comfort),
-    banned_themes: nullify(form.banned_themes),
     notes: nullify(form.notes),
   };
 }
@@ -93,7 +88,6 @@ function diffToUpdatePayload(
     reading_level: form.reading_level === "" ? null : form.reading_level,
     interests: nullify(form.interests),
     comfort: nullify(form.comfort),
-    banned_themes: nullify(form.banned_themes),
     notes: nullify(form.notes),
   };
   const original_map: Record<keyof typeof next, string | null> = {
@@ -102,7 +96,6 @@ function diffToUpdatePayload(
     reading_level: original.reading_level,
     interests: original.interests,
     comfort: original.comfort,
-    banned_themes: original.banned_themes,
     notes: original.notes,
   };
   for (const key of Object.keys(next) as (keyof typeof next)[]) {
@@ -152,10 +145,6 @@ export function ChildProfileEditor(
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [rowError, setRowError] = useState<string | null>(null);
-  // Banned-theme preset picker selection. Local to the open form;
-  // resets whenever the form opens, closes, or saves so re-opening
-  // the editor doesn't show a stale bundle preview.
-  const [selectedPresetId, setSelectedPresetId] = useState<string>("");
 
   // AbortController spanning one mount of the editor. Recreated on each
   // mount inside the useEffect below — under React 18 StrictMode the
@@ -200,7 +189,6 @@ export function ChildProfileEditor(
     setForm(EMPTY_FORM);
     setFormError(null);
     setFieldErrors({});
-    setSelectedPresetId("");
   }, []);
 
   const openEdit = useCallback((profile: ChildProfile): void => {
@@ -208,7 +196,6 @@ export function ChildProfileEditor(
     setForm(profileToForm(profile));
     setFormError(null);
     setFieldErrors({});
-    setSelectedPresetId("");
   }, []);
 
   const cancel = useCallback((): void => {
@@ -216,7 +203,6 @@ export function ChildProfileEditor(
     setForm(EMPTY_FORM);
     setFormError(null);
     setFieldErrors({});
-    setSelectedPresetId("");
   }, []);
 
   const submit = useCallback(async (): Promise<void> => {
@@ -300,18 +286,6 @@ export function ChildProfileEditor(
     },
     [],
   );
-
-  const appendSelectedPreset = useCallback((): void => {
-    const preset = findPreset(selectedPresetId);
-    if (preset === null) return;
-    setForm((prev) => ({
-      ...prev,
-      banned_themes: mergeBannedThemes(prev.banned_themes, preset.themes),
-    }));
-    setSelectedPresetId("");
-  }, [selectedPresetId]);
-
-  const selectedPreset = findPreset(selectedPresetId);
 
   return (
     <section
@@ -445,15 +419,6 @@ export function ChildProfileEditor(
                     style={{ fontSize: 12, color: "#555", marginTop: 2 }}
                   >
                     <span style={{ color: "#888" }}>comfort:</span> {c.comfort}
-                  </div>
-                )}
-                {c.banned_themes !== null && (
-                  <div
-                    data-testid="child-row-banned"
-                    style={{ fontSize: 12, color: "#b85c00", marginTop: 2 }}
-                  >
-                    <span style={{ color: "#888" }}>banned:</span>{" "}
-                    {c.banned_themes}
                   </div>
                 )}
                 {c.notes !== null && (
@@ -642,83 +607,6 @@ export function ChildProfileEditor(
               rows={2}
               value={form.comfort}
               onChange={(e) => updateField("comfort", e.target.value)}
-              style={{ width: "100%", padding: 6 }}
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="child-banned-themes"
-              style={{ display: "block", fontSize: 13 }}
-            >
-              Banned themes (comma-separated)
-            </label>
-            <div
-              data-testid="banned-theme-preset-picker"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                margin: "4px 0",
-                flexWrap: "wrap",
-              }}
-            >
-              <label
-                htmlFor="banned-theme-preset"
-                style={{ fontSize: 12, color: "#555" }}
-              >
-                Add preset bundle:
-              </label>
-              <select
-                id="banned-theme-preset"
-                data-testid="banned-theme-preset-select"
-                value={selectedPresetId}
-                onChange={(e) => setSelectedPresetId(e.target.value)}
-                style={{ padding: 4, fontSize: 12 }}
-              >
-                <option value="">(choose a bundle…)</option>
-                {BANNED_THEME_PRESETS.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                data-testid="banned-theme-preset-append"
-                onClick={appendSelectedPreset}
-                disabled={selectedPreset === null}
-                style={{ fontSize: 12 }}
-              >
-                append to list
-              </button>
-            </div>
-            {selectedPreset !== null && (
-              <div
-                data-testid="banned-theme-preset-preview"
-                style={{
-                  background: "#f7f7f7",
-                  border: "1px solid #ddd",
-                  borderRadius: 4,
-                  padding: 8,
-                  margin: "0 0 6px",
-                  fontSize: 12,
-                  color: "#555",
-                }}
-              >
-                <div style={{ marginBottom: 4 }}>{selectedPreset.description}</div>
-                <div>
-                  <span style={{ color: "#888" }}>themes:</span>{" "}
-                  {selectedPreset.themes.join(", ")}
-                </div>
-              </div>
-            )}
-            <textarea
-              id="child-banned-themes"
-              data-testid="field-banned-themes"
-              maxLength={500}
-              rows={2}
-              value={form.banned_themes}
-              onChange={(e) => updateField("banned_themes", e.target.value)}
               style={{ width: "100%", padding: 6 }}
             />
           </div>

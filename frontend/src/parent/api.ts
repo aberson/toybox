@@ -125,7 +125,6 @@ export interface ChildProfile {
   reading_level: ReadingLevel | null;
   interests: string | null;
   comfort: string | null;
-  banned_themes: string | null;
   notes: string | null;
 }
 
@@ -138,7 +137,6 @@ export interface ChildProfileCreate {
   reading_level?: ReadingLevel | null;
   interests?: string | null;
   comfort?: string | null;
-  banned_themes?: string | null;
   notes?: string | null;
 }
 
@@ -489,6 +487,16 @@ export type ImageGenMode = "cartoon" | "composite";
 
 export interface ImageGenModeResponse {
   mode: ImageGenMode;
+}
+
+// Phase H step H5: wire shape for the household-global banned-themes
+// setting. Mirrors :class:`toybox.api.banned_themes_settings.BannedThemesResponse`.
+// ``themes`` is a comma-separated CSV (matching the old per-child
+// shape) or ``null`` when no global ban-list is set. Storage lives in
+// the ``settings`` table under key ``banned_themes_global``; the
+// escalation pipeline reads it per-request.
+export interface BannedThemesResponse {
+  themes: string | null;
 }
 
 export interface MetricsAIStatus {
@@ -1184,8 +1192,9 @@ export class ApiClient {
 
   // Step 24: operator metrics dashboard. Fetches the same snapshot
   // shape that the ``metrics`` ws topic publishes every 30s — used by
-  // OperatorTab as the first-render value before the ws snapshot
-  // arrives, and as the fallback when the ws connection is down.
+  // StatsPanel (Phase H step H5; formerly OperatorTab) as the first-
+  // render value before the ws snapshot arrives, and as the fallback
+  // when the ws connection is down.
   async getMetrics(opts: RequestOptions = {}): Promise<MetricsSnapshot> {
     return this.request<MetricsSnapshot>("/api/metrics", {
       method: "GET",
@@ -1246,6 +1255,32 @@ export class ApiClient {
     return this.request<ImageGenModeResponse>("/api/settings/image-gen-mode", {
       method: "PUT",
       body: JSON.stringify({ mode }),
+      signal: opts.signal,
+    });
+  }
+
+  // Phase H step H5: household-global banned-themes setting. The GET is
+  // unauthenticated (mirrors getImageGenMode — household read); the PUT
+  // requires parent scope and is wired in BannedThemesSettings.tsx
+  // under the Settings sub-tab. The wire shape is ``{themes: string |
+  // null}`` — comma-separated CSV (matching the historical per-child
+  // format) or ``null`` to clear the household list.
+  async getBannedThemesGlobal(
+    opts: RequestOptions = {},
+  ): Promise<BannedThemesResponse> {
+    return this.request<BannedThemesResponse>("/api/settings/banned-themes", {
+      method: "GET",
+      signal: opts.signal,
+    });
+  }
+
+  async setBannedThemesGlobal(
+    themes: string | null,
+    opts: RequestOptions = {},
+  ): Promise<BannedThemesResponse> {
+    return this.request<BannedThemesResponse>("/api/settings/banned-themes", {
+      method: "PUT",
+      body: JSON.stringify({ themes }),
       signal: opts.signal,
     });
   }

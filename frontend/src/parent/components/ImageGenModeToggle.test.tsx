@@ -10,7 +10,7 @@ import type { Mock } from "vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ApiClient, ImageGenMode } from "../api";
-import { ImageGenModeToggle } from "./OperatorTab";
+import { ImageGenModeToggle } from "./SettingsPanel";
 
 interface StubApi {
   getImageGenMode: Mock;

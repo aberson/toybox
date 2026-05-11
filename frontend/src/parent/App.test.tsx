@@ -173,17 +173,73 @@ function stubFullAuthFetch(opts: { pin_set: boolean }): Mock {
       });
     }
     if (url.endsWith("/api/metrics")) {
+      // H5: SettingsPanel + StatsPanel both consume the metrics
+      // snapshot, so the shape must be MetricsSnapshot-complete (not
+      // just the ``audio`` block H2 used to read for the header
+      // indicator). Defaults match what an empty install would emit.
       return new Response(
         JSON.stringify({
+          generated_at: "2026-05-10T12:00:00Z",
+          ws_subscribers: 0,
+          activities: {
+            proposed_current: 0,
+            approved_current: 0,
+            running_current: 0,
+            completed_current: 0,
+            ended_current: 0,
+            dismissed_current: 0,
+            didnt_work_current: 0,
+            last_24h: {},
+          },
+          transcripts: { total: 0, last_24h: 0 },
           audio: {
             mic_device: null,
+            queue_depth: 0,
+            buffer_overruns_total: 0,
             mic_enabled: true,
-            sample_rate: 16000,
-            chunk_ms: 20,
+          },
+          ai: {
+            breaker_state: "closed",
+            breaker_retry_after_iso: null,
+            claude_capable: false,
+            claude_capability_reason: "token_missing",
+            listening_mode: 3,
+            min_interval_throttle_seconds: 15.0,
+          },
+          activity_quality: {
+            last_24h_mean_scores: {},
+            judge_parent_agreement: {
+              overlap_count: 0,
+              agreement_rate: null,
+              metric_name: "sign_agreement_rate",
+            },
+            safety_autofails_last_24h: 0,
+          },
+          eval_gate: {
+            last_run_at: null,
+            mean_dimension_scores: null,
+            regressions_detected: 0,
+            placeholder_baseline: true,
           },
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       );
+    }
+    if (url.endsWith("/api/settings/banned-themes")) {
+      // H5: BannedThemesSettings GETs the persisted value on mount.
+      // Default to ``null`` so the textarea renders empty + Save
+      // disabled; tests that need a non-empty value can override.
+      return new Response(JSON.stringify({ themes: null }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (url.endsWith("/api/settings/image-gen-mode")) {
+      // H5: ImageGenModeToggle GETs the persisted mode on mount.
+      return new Response(JSON.stringify({ mode: "cartoon" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
     }
     // H3: the Kids & Toyboxes sub-tabs mount ToyIngest /
     // ChildProfileEditor / RoomIngestBulk, each of which fires a list
@@ -287,7 +343,7 @@ describe("App tab shell (post-PIN, H2)", () => {
     expect(screen.queryByTestId("subtab-play-ideas")).toBeNull();
   });
 
-  it("switching to Settings shows its sub-tabs + placeholder", async () => {
+  it("switching to Settings shows its sub-tabs and mounts SettingsPanel by default", async () => {
     stubFullAuthFetch({ pin_set: true });
     render(<App />);
     await driveLoginToTabShell();
@@ -296,7 +352,33 @@ describe("App tab shell (post-PIN, H2)", () => {
     });
     expect(screen.getByTestId("subtab-settings")).toBeTruthy();
     expect(screen.getByTestId("subtab-stats")).toBeTruthy();
-    expect(screen.getByTestId("settings-placeholder")).toBeTruthy();
+    // H5: the placeholder is gone — SettingsPanel mounts under the
+    // default ``settings`` sub-tab.
+    expect(screen.queryByTestId("settings-placeholder")).toBeNull();
+    await waitFor(() => {
+      expect(screen.queryByTestId("settings-panel")).toBeTruthy();
+    });
+    // StatsPanel is NOT mounted while ``settings`` is the active sub-tab.
+    expect(screen.queryByTestId("stats-panel")).toBeNull();
+  });
+
+  it("clicking subtab-stats unmounts SettingsPanel and mounts StatsPanel", async () => {
+    stubFullAuthFetch({ pin_set: true });
+    render(<App />);
+    await driveLoginToTabShell();
+    act(() => {
+      fireEvent.click(screen.getByTestId("tab-settings"));
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId("settings-panel")).toBeTruthy();
+    });
+    act(() => {
+      fireEvent.click(screen.getByTestId("subtab-stats"));
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId("stats-panel")).toBeTruthy();
+    });
+    expect(screen.queryByTestId("settings-panel")).toBeNull();
   });
 
   it("Play sub-tab persists in localStorage on Transcription select", async () => {

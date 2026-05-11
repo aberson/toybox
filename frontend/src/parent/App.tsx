@@ -20,6 +20,8 @@ import { Header } from "./components/Header";
 import { PinLogin } from "./components/PinLogin";
 import { PinSetup } from "./components/PinSetup";
 import { RoomIngestBulk } from "./components/RoomIngestBulk";
+import { SettingsPanel } from "./components/SettingsPanel";
+import { StatsPanel } from "./components/StatsPanel";
 import { SubTabs, Tabs, useTabState } from "./components/Tabs";
 import { SuggestionCard } from "./components/SuggestionCard";
 import { ToyIngest } from "./components/ToyIngest";
@@ -134,6 +136,24 @@ export function App(): JSX.Element {
     [],
   );
 
+  // Phase H step H5: live ``metrics`` envelope fanout — StatsPanel
+  // subscribes so the operator-dashboard tables refresh from the same
+  // 30s ws cadence the old OperatorTab used. H2 removed the fanout when
+  // OperatorTab was unmounted in the placeholder; H5 restores it for
+  // the new StatsPanel under Settings → Stats. The header's audio
+  // indicator continues to read audio off every envelope directly
+  // (below in onEnvelope) regardless of this fanout.
+  const metricsListenersRef = useRef<Set<(env: Envelope) => void>>(new Set());
+  const subscribeToMetrics = useCallback(
+    (handler: (env: Envelope) => void): (() => void) => {
+      metricsListenersRef.current.add(handler);
+      return () => {
+        metricsListenersRef.current.delete(handler);
+      };
+    },
+    [],
+  );
+
   // Lazily build the api client once. getToken pulls from the store on
   // every call so token rotation surfaces immediately.
   if (apiRef.current === null) {
@@ -196,15 +216,20 @@ export function App(): JSX.Element {
             // envelope. Defensive cast: the wire shape is checked by
             // the publisher but a malformed payload should not crash
             // the ws callback.
-            //
-            // Phase H step H2: OperatorTab is no longer mounted in H2,
-            // so the metrics-listener fanout is removed here. H5 will
-            // re-introduce a per-consumer subscription when StatsPanel
-            // lands. The header's audioStatus still updates directly
-            // off every envelope so the mic indicator stays live.
             const payload = env.payload as { audio?: MetricsAudioStatus };
             if (payload.audio !== undefined) {
               setAudioStatus(payload.audio);
+            }
+            // Phase H step H5: fan out to any StatsPanel subscriber.
+            // The header's audioStatus still updates directly off
+            // every envelope (above) so the mic indicator stays live
+            // even when Stats isn't mounted.
+            for (const listener of metricsListenersRef.current) {
+              try {
+                listener(env);
+              } catch {
+                // listener bugs must not crash the ws callback.
+              }
             }
           }
           if (env.topic === "transcript") {
@@ -746,9 +771,9 @@ export function App(): JSX.Element {
                 {/* H3: relocated ToyIngest / ChildProfileEditor /
                     RoomIngestBulk under their respective sub-tabs. The
                     components are mounted unchanged from their pre-H2
-                    homes — only their parent gate moved. ChildProfileEditor
-                    still carries its banned-themes UI in this step; H5
-                    rips that out and moves it into Settings. */}
+                    homes — only their parent gate moved. H5 stripped the
+                    banned-themes UI from ChildProfileEditor and promoted
+                    it to the global Settings → Settings sub-tab. */}
                 {kidsTab.value === "toys" && <ToyIngest api={api} />}
                 {kidsTab.value === "children" && (
                   <ChildProfileEditor api={api} />
@@ -768,11 +793,21 @@ export function App(): JSX.Element {
                 onChange={settingsTab.setValue}
               />
               <div role="tabpanel" style={{ marginTop: 12 }}>
-                {/* H5 fills these in (SettingsPanel / StatsPanel after
-                    the OperatorTab split + BannedThemesSettings). */}
-                <div data-testid="settings-placeholder">
-                  (H5 fills in Settings content)
-                </div>
+                {/* H5: SettingsPanel hosts the toggle cards + the new
+                    global banned-themes editor; StatsPanel renders the
+                    metrics snapshot dashboard the pre-H5 OperatorTab
+                    used to surface. Only the visible sub-tab is
+                    mounted so the metrics-snapshot fetch + ws
+                    subscription only fire when Stats is selected. */}
+                {settingsTab.value === "settings" && (
+                  <SettingsPanel api={api} />
+                )}
+                {settingsTab.value === "stats" && (
+                  <StatsPanel
+                    api={api}
+                    subscribeToMetrics={subscribeToMetrics}
+                  />
+                )}
               </div>
             </>
           )}

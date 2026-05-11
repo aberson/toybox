@@ -45,12 +45,6 @@ def test_full_crud_round_trip(
             "reading_level": "early-reader",
             "interests": "dinosaurs, drawing",
             "comfort": "stuffed bunny",
-            # ``banned_themes`` is a zombie field on the wire after H4 —
-            # the request body still accepts the key (so pre-H5 clients
-            # keep compiling), but it's silently discarded server-side.
-            # The response always reads back as ``None``. The canonical
-            # value lives at ``settings.banned_themes_global`` now.
-            "banned_themes": "spiders, loud noises",
             "notes": "tested via crud round trip",
         },
     )
@@ -58,8 +52,9 @@ def test_full_crud_round_trip(
     assert created["birthdate"] == "2020-03-15"
     assert created["reading_level"] == "early-reader"
     assert isinstance(created["id"], str) and len(created["id"]) >= 16
-    # H4 zombie field: present in the response, always ``None``.
-    assert created["banned_themes"] is None
+    # Phase H step H5: ``banned_themes`` is gone from the wire — the
+    # household-global value lives at ``settings.banned_themes_global``.
+    assert "banned_themes" not in created
     child_id = created["id"]
 
     got = client.get(f"/api/children/{child_id}", headers=parent_headers)
@@ -77,9 +72,8 @@ def test_full_crud_round_trip(
     assert body["interests"] == "puzzles"
     # untouched fields preserved
     assert body["birthdate"] == "2020-03-15"
-    # Zombie field: still ``None`` regardless of whether the request
-    # body included it.
-    assert body["banned_themes"] is None
+    # Phase H step H5: ``banned_themes`` is fully gone from the wire.
+    assert "banned_themes" not in body
 
     deleted = client.delete(f"/api/children/{child_id}", headers=parent_headers)
     assert deleted.status_code == 200
@@ -244,43 +238,6 @@ def test_patch_can_clear_optional_field_with_null(
     )
     assert response.status_code == 200
     assert response.json()["pronouns"] is None
-
-
-def test_banned_themes_is_zombie_field_after_h4(
-    client: TestClient,
-    parent_headers: dict[str, str],
-) -> None:
-    """H4: ``banned_themes`` survives on the wire but is discarded.
-
-    Pre-H5 clients can still POST/PATCH the field without erroring (so
-    the existing frontend keeps compiling), but the value never reaches
-    the database — the underlying column was dropped by migration 0009
-    and the canonical home is ``settings.banned_themes_global``. GET
-    always returns ``null`` regardless of what was sent.
-    """
-    created = _post(
-        client,
-        parent_headers,
-        {
-            "display_name": "Zoe",
-            "banned_themes": "monsters, spiders",
-        },
-    )
-    assert created["banned_themes"] is None
-
-    # PATCH with the zombie field must not 500 / 422 — just no-op.
-    patched = client.patch(
-        f"/api/children/{created['id']}",
-        json={"banned_themes": "ghosts"},
-        headers=parent_headers,
-    )
-    assert patched.status_code == 200, patched.text
-    assert patched.json()["banned_themes"] is None
-
-    # GET round-trip confirms.
-    got = client.get(f"/api/children/{created['id']}", headers=parent_headers)
-    assert got.status_code == 200
-    assert got.json()["banned_themes"] is None
 
 
 def test_patch_rejects_empty_display_name(

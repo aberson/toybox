@@ -33,7 +33,6 @@ function fakeProfile(overrides: Partial<ChildProfile> = {}): ChildProfile {
     reading_level: null,
     interests: null,
     comfort: null,
-    banned_themes: null,
     notes: null,
     ...overrides,
   };
@@ -263,76 +262,6 @@ describe("ChildProfileEditor", () => {
     expect(id).toBe("c1");
     // The diff sends interests: null (not undefined and not "").
     expect(body).toEqual({ interests: null });
-  });
-
-  it("preset picker preview is hidden until a bundle is selected", async () => {
-    const stub = buildStubApi([]);
-    render(<ChildProfileEditor api={stub as unknown as ApiClient} />);
-    await waitFor(() => {
-      expect(stub.listChildren).toHaveBeenCalled();
-    });
-    fireEvent.click(screen.getByTestId("new-child-button"));
-    expect(screen.queryByTestId("banned-theme-preset-preview")).toBeNull();
-    const appendBtn = screen.getByTestId(
-      "banned-theme-preset-append",
-    ) as HTMLButtonElement;
-    expect(appendBtn.disabled).toBe(true);
-  });
-
-  it("appending a preset bundle merges its themes into the textarea", async () => {
-    const stub = buildStubApi([]);
-    render(<ChildProfileEditor api={stub as unknown as ApiClient} />);
-    await waitFor(() => {
-      expect(stub.listChildren).toHaveBeenCalled();
-    });
-    fireEvent.click(screen.getByTestId("new-child-button"));
-    const select = screen.getByTestId(
-      "banned-theme-preset-select",
-    ) as HTMLSelectElement;
-    fireEvent.change(select, { target: { value: "horror-and-gore" } });
-    // Preview is shown so the parent can see what they're about to add.
-    expect(screen.getByTestId("banned-theme-preset-preview")).toBeTruthy();
-    fireEvent.click(screen.getByTestId("banned-theme-preset-append"));
-    const textarea = screen.getByTestId(
-      "field-banned-themes",
-    ) as HTMLTextAreaElement;
-    // A handful of bundle entries land in the field.
-    expect(textarea.value).toContain("horror");
-    expect(textarea.value).toContain("gore");
-    expect(textarea.value).toContain("zombies");
-    // After append, the picker resets so a second bundle can be picked
-    // without re-opening the form.
-    expect(select.value).toBe("");
-    expect(screen.queryByTestId("banned-theme-preset-preview")).toBeNull();
-  });
-
-  it("preset merge dedupes case-insensitively against pre-existing terms", async () => {
-    const stub = buildStubApi([]);
-    render(<ChildProfileEditor api={stub as unknown as ApiClient} />);
-    await waitFor(() => {
-      expect(stub.listChildren).toHaveBeenCalled();
-    });
-    fireEvent.click(screen.getByTestId("new-child-button"));
-    const textarea = screen.getByTestId(
-      "field-banned-themes",
-    ) as HTMLTextAreaElement;
-    // Parent-typed entries — one matches a bundle term in different case.
-    fireEvent.change(textarea, { target: { value: "Horror, clowns" } });
-    fireEvent.change(
-      screen.getByTestId("banned-theme-preset-select") as HTMLSelectElement,
-      { target: { value: "horror-and-gore" } },
-    );
-    fireEvent.click(screen.getByTestId("banned-theme-preset-append"));
-    const value = textarea.value;
-    // Existing entries preserved (in the parent's casing) and listed first.
-    expect(value.startsWith("Horror, clowns")).toBe(true);
-    // The duplicate "horror" from the bundle is dropped — only one
-    // case-insensitive occurrence appears.
-    const horrorMatches = value.match(/horror/gi) ?? [];
-    expect(horrorMatches).toHaveLength(1);
-    // Other bundle terms appear after the existing ones.
-    expect(value).toContain("gore");
-    expect(value).toContain("zombies");
   });
 
   it("aborts the in-flight mutation signal when the editor unmounts mid-flight", async () => {

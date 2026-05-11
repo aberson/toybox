@@ -21,8 +21,9 @@ export const PARENT_TOPICS: readonly string[] = [
   "triggers.invalidate",
   "transcript",
   // Step 24: operator dashboard subscribes to the metrics topic for
-  // 30s snapshot pushes; OperatorTab still falls back to REST polling
-  // when the ws connection is unavailable.
+  // 30s snapshot pushes; StatsPanel (Phase H step H5; formerly
+  // OperatorTab) still falls back to REST polling when the ws
+  // connection is unavailable.
   "metrics",
   // Phase F Step F8: parent toy detail UI subscribes to
   // ``toy_actions`` so the 2x5 sprite grid receives per-slot status

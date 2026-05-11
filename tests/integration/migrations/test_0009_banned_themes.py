@@ -8,7 +8,8 @@ Pins:
   single ``settings.banned_themes_global`` row.
 * All-NULL / all-empty inputs leave the global key absent (not an
   empty-string row — ``None`` is the canonical "no constraint" state).
-* The ``children`` API zombie field reads back as ``null`` post-migration.
+* The ``children`` API no longer carries the ``banned_themes`` field
+  (stripped in Phase H step H5 in lockstep with the frontend type drop).
 * Migration is forward and idempotent.
 
 Test pattern mirrors :mod:`tests.integration.migrations.test_0008_activity_slot_fills`:
@@ -358,13 +359,17 @@ def test_0009_preserves_all_other_children_columns_and_rows(tmp_path: Path) -> N
         conn.close()
 
 
-def test_0009_zombie_field_returns_null_on_get_children(tmp_path: Path) -> None:
-    """After 0009 + the H4 API patch, ``GET /api/children`` carries the
-    zombie ``banned_themes: null`` field.
+def test_0009_banned_themes_field_removed_from_get_children(
+    tmp_path: Path,
+) -> None:
+    """Post-migration, ``GET /api/children`` no longer carries the
+    ``banned_themes`` field.
 
-    Pins the seam: pre-H5 frontend keeps deserialising the field, the
-    column is gone, and the value is consistently ``null`` regardless
-    of what the pre-migration row carried.
+    Phase H step H5 followed step H4: the zombie field that H4 kept on
+    the children API response (always ``null``) was stripped from the
+    Pydantic models in lockstep with the frontend type drop. The
+    canonical home for the value is ``settings.banned_themes_global``;
+    pre-H5 clients are unsupported.
     """
     db_path = _apply_pre_h4(tmp_path)
     conn = connect(db_path)
@@ -379,7 +384,7 @@ def test_0009_zombie_field_returns_null_on_get_children(tmp_path: Path) -> None:
     finally:
         conn.close()
 
-    # Now hit the API. The zombie field must be present + null.
+    # Now hit the API. The field must be absent from the response.
     from collections.abc import Iterator as _Iterator
 
     from fastapi import FastAPI
@@ -415,9 +420,8 @@ def test_0009_zombie_field_returns_null_on_get_children(tmp_path: Path) -> None:
         body = response.json()
         assert len(body["children"]) == 1
         child = body["children"][0]
-        # Zombie field present, always null.
-        assert "banned_themes" in child
-        assert child["banned_themes"] is None
+        # H5: the field is fully gone from the wire.
+        assert "banned_themes" not in child
 
 
 # ---------------------------------------------------------------------------
