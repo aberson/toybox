@@ -622,7 +622,13 @@ def _resolve_template_slots(
     (they're already-decided inputs); registry-backed slots consume
     RNG via ``registry.fill``.
     """
-    haystack = template.title + " " + " ".join(s.text for s in template.steps)
+    haystack_parts: list[str] = [template.title]
+    for s in template.steps:
+        haystack_parts.append(s.text)
+        if s.choices is not None:
+            for label, _next_id in s.choices:
+                haystack_parts.append(label)
+    haystack = " ".join(haystack_parts)
     seen: set[str] = set()
     order: list[str] = []
     for match in _SLOT_PATTERN.finditer(haystack):
