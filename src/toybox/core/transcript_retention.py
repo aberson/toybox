@@ -24,8 +24,11 @@ numeric comparison when formats are pinned.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import sqlite3
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 
 _logger = logging.getLogger(__name__)
 
@@ -112,10 +115,89 @@ def set_retention_seconds(conn: sqlite3.Connection, seconds: int) -> int:
     return seconds
 
 
+def _format_ended_at_cutoff(ts: datetime) -> str:
+    """Render ``ts`` as a UTC ISO string byte-identical to the pipeline.
+
+    Mirrors :func:`toybox.audio.pipeline._isoformat` exactly:
+    ``ts.astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")``.
+    The shape pinned by :data:`ENDED_AT_ISO_FORMAT_NOTE` — UTC, second
+    precision, trailing literal ``Z`` — is load-bearing because the
+    sweep + read-filter both compare ``ended_at`` lexicographically
+    against this string. A different precision or TZ suffix on either
+    side would produce the wrong subset.
+
+    Kept private (leading underscore) — callers inside the package
+    import it directly off the module; nothing outside this package
+    should be formatting cutoff strings.
+    """
+    return ts.astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def sweep_expired_transcripts(conn: sqlite3.Connection, now: datetime) -> int:
+    """Delete every transcript whose ``ended_at`` is past the retention window.
+
+    Reads the current retention preset, computes the cutoff once, and
+    runs a single ``DELETE FROM transcripts WHERE ended_at IS NOT NULL
+    AND ended_at < ?`` statement. Rows with ``ended_at IS NULL`` (an
+    in-flight utterance) are untouched regardless of ``started_at`` — a
+    still-being-spoken transcript never disappears mid-render. Returns
+    the deleted row count via ``cursor.rowcount`` so the loop driver
+    can log non-zero ticks.
+    """
+    retention = current_retention_seconds(conn)
+    cutoff = _format_ended_at_cutoff(now - timedelta(seconds=retention))
+    cursor = conn.execute(
+        "DELETE FROM transcripts WHERE ended_at IS NOT NULL AND ended_at < ?",
+        (cutoff,),
+    )
+    conn.commit()
+    return cursor.rowcount
+
+
+async def run_transcript_sweep_loop(
+    conn_factory: Callable[[], sqlite3.Connection],
+    *,
+    interval_seconds: float = 10.0,
+    clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+) -> None:
+    """Drive :func:`sweep_expired_transcripts` on a cadence.
+
+    Wakes every ``interval_seconds``, opens a fresh sqlite connection
+    via ``conn_factory``, runs one sweep, and closes the connection.
+    Non-zero sweeps log at INFO ("swept N expired transcripts").
+
+    Per-tick exceptions are logged at ERROR and the loop continues —
+    a single bad tick (e.g. a transient ``sqlite3.OperationalError``)
+    must not crash the lifespan task. The ``conn_factory()`` call itself
+    is inside the try/except too: a factory failure (locked DB, missing
+    file, I/O error) is treated as just another bad tick — the loop
+    logs and waits for the next interval. ``asyncio.CancelledError`` is
+    re-raised so the lifespan can shut the task down cleanly on app
+    teardown.
+    """
+    while True:
+        await asyncio.sleep(interval_seconds)
+        conn: sqlite3.Connection | None = None
+        try:
+            conn = conn_factory()
+            count = sweep_expired_transcripts(conn, clock())
+            if count:
+                _logger.info("swept %d expired transcripts", count)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            _logger.exception("transcript sweep tick failed")
+        finally:
+            if conn is not None:
+                conn.close()
+
+
 __all__ = [
     "ENDED_AT_ISO_FORMAT_NOTE",
     "RETENTION_SECONDS_DEFAULT",
     "RETENTION_SECONDS_VALID",
     "current_retention_seconds",
+    "run_transcript_sweep_loop",
     "set_retention_seconds",
+    "sweep_expired_transcripts",
 ]

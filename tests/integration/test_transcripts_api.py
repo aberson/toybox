@@ -5,16 +5,25 @@ These tests share the per-test app + db fixtures from
 listening-mode tests use). The transcripts API is not auth-gated in v1
 — the parent UI runs on the LAN — matching the convention of
 ``/api/listening`` and ``/api/health``.
+
+Phase I Step I2 added a retention-aware filter-on-read to both list and
+search. Fixture timestamps must be fresh relative to wall-clock ``now``
+so they sit inside the retention window (default 60s) — otherwise the
+filter excludes them and the legacy assertions about row ordering would
+flip. The :func:`_recent_iso` helper generates pipeline-format strings
+``offset_seconds`` ago.
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterable
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
+from toybox.core.transcript_retention import _format_ended_at_cutoff
 from toybox.db.connection import connect
 
 # ---------------------------------------------------------------------
@@ -32,6 +41,18 @@ def _seed_session(db_path: Path, session_id: str = "s1") -> None:
             )
     finally:
         conn.close()
+
+
+def _recent_iso(offset_seconds: float, *, base: datetime | None = None) -> str:
+    """Format ``base - offset_seconds`` in the pipeline-matched ISO shape.
+
+    Uses :func:`_format_ended_at_cutoff` so test fixtures emit the same
+    byte sequence the production pipeline writes to ``ended_at`` — and
+    so lexicographic comparison against the read filter's cutoff matches
+    numeric comparison. Defaults ``base`` to ``datetime.now(UTC)``.
+    """
+    when = (base or datetime.now(UTC)) - timedelta(seconds=offset_seconds)
+    return _format_ended_at_cutoff(when)
 
 
 def _insert_transcripts(
@@ -63,12 +84,16 @@ def _insert_transcripts(
 
 def test_list_returns_recent_transcripts(client: TestClient, db_path: Path) -> None:
     _seed_session(db_path)
+    base = datetime.now(UTC)
+    # Three rows spaced 1s apart, all comfortably inside the default 60s
+    # retention window. ``oldest`` is the largest offset so it sorts last
+    # in the DESC-by-ended_at view.
     _insert_transcripts(
         db_path,
         [
-            ("t-1", "first", "2026-01-01T00:00:01Z", "2026-01-01T00:00:02Z", 0.7, "en"),
-            ("t-2", "second", "2026-01-01T00:00:03Z", "2026-01-01T00:00:04Z", 0.8, "en"),
-            ("t-3", "third", "2026-01-01T00:00:05Z", "2026-01-01T00:00:06Z", 0.9, "en"),
+            ("t-1", "first",  _recent_iso(8, base=base), _recent_iso(7, base=base), 0.7, "en"),
+            ("t-2", "second", _recent_iso(6, base=base), _recent_iso(5, base=base), 0.8, "en"),
+            ("t-3", "third",  _recent_iso(4, base=base), _recent_iso(3, base=base), 0.9, "en"),
         ],
     )
 
@@ -83,16 +108,20 @@ def test_list_returns_recent_transcripts(client: TestClient, db_path: Path) -> N
 
 def test_list_respects_limit(client: TestClient, db_path: Path) -> None:
     _seed_session(db_path)
+    base = datetime.now(UTC)
+    # 30 rows, each 1s newer than the previous; all sit inside the 60s
+    # retention window. ``i=0`` is the oldest (offset=30s); ``i=29`` is
+    # the newest (offset=1s). ``limit=10`` should return rows 29..20.
     rows = [
         (
             f"t-{i:03d}",
             f"row {i}",
-            f"2026-01-01T00:{i:02d}:00Z",
-            f"2026-01-01T00:{i:02d}:01Z",
+            _recent_iso(31 - i, base=base),
+            _recent_iso(30 - i, base=base),
             0.6,
             "en",
         )
-        for i in range(60)
+        for i in range(30)
     ]
     _insert_transcripts(db_path, rows)
 
@@ -100,25 +129,29 @@ def test_list_respects_limit(client: TestClient, db_path: Path) -> None:
     assert response.status_code == 200
     items = response.json()["items"]
     assert len(items) == 10
-    # Most recent (highest minute) first.
-    assert items[0]["text"] == "row 59"
-    assert items[-1]["text"] == "row 50"
+    # Most recent (highest i, smallest offset) first.
+    assert items[0]["text"] == "row 29"
+    assert items[-1]["text"] == "row 20"
 
 
 def test_list_before_cursor_paginates(client: TestClient, db_path: Path) -> None:
     _seed_session(db_path)
+    base = datetime.now(UTC)
+    old_end = _recent_iso(10, base=base)
+    mid_end = _recent_iso(6, base=base)
+    new_end = _recent_iso(2, base=base)
     _insert_transcripts(
         db_path,
         [
-            ("t-1", "old",    "2026-01-01T00:00:01Z", "2026-01-01T00:00:02Z", 0.7, "en"),
-            ("t-2", "middle", "2026-01-01T00:00:03Z", "2026-01-01T00:00:04Z", 0.7, "en"),
-            ("t-3", "new",    "2026-01-01T00:00:05Z", "2026-01-01T00:00:06Z", 0.7, "en"),
+            ("t-1", "old",    _recent_iso(11, base=base), old_end, 0.7, "en"),
+            ("t-2", "middle", _recent_iso(7,  base=base), mid_end, 0.7, "en"),
+            ("t-3", "new",    _recent_iso(3,  base=base), new_end, 0.7, "en"),
         ],
     )
 
     response = client.get(
         "/api/transcripts",
-        params={"before": "2026-01-01T00:00:05Z"},
+        params={"before": new_end},
     )
     assert response.status_code == 200
     items = response.json()["items"]
@@ -127,16 +160,19 @@ def test_list_before_cursor_paginates(client: TestClient, db_path: Path) -> None
 
 def test_list_default_limit_is_50(client: TestClient, db_path: Path) -> None:
     _seed_session(db_path)
+    base = datetime.now(UTC)
+    # 55 rows packed into a 55s window so the default limit-50 path
+    # produces a full page without spilling outside retention.
     rows = [
         (
             f"t-{i:03d}",
             f"row {i}",
-            f"2026-01-01T01:{i:02d}:00Z",
-            f"2026-01-01T01:{i:02d}:01Z",
+            _recent_iso(56 - i, base=base),
+            _recent_iso(55 - i, base=base),
             0.6,
             "en",
         )
-        for i in range(60)
+        for i in range(55)
     ]
     _insert_transcripts(db_path, rows)
     response = client.get("/api/transcripts")
@@ -151,6 +187,93 @@ def test_list_empty_table_returns_empty_list(client: TestClient) -> None:
 
 
 # ---------------------------------------------------------------------
+# Phase I Step I2 — filter-on-read
+# ---------------------------------------------------------------------
+
+
+def test_list_excludes_rows_older_than_retention(
+    client: TestClient,
+    db_path: Path,
+) -> None:
+    """Default retention=60s — rows >60s old must NOT appear in the list.
+
+    Inserts one fresh row + one row 600s past expiry (using
+    pipeline-format ISO timestamps). Asserts only the fresh row comes
+    back, proving the ``AND ended_at >= ?`` clause is wired correctly
+    against the same cutoff format the sweep uses.
+    """
+    _seed_session(db_path)
+    base = datetime.now(UTC)
+    _insert_transcripts(
+        db_path,
+        [
+            (
+                "t-fresh",
+                "still here",
+                _recent_iso(11, base=base),
+                _recent_iso(10, base=base),
+                0.7,
+                "en",
+            ),
+            (
+                "t-expired",
+                "gone",
+                _recent_iso(601, base=base),
+                _recent_iso(600, base=base),
+                0.7,
+                "en",
+            ),
+        ],
+    )
+
+    response = client.get("/api/transcripts")
+    assert response.status_code == 200
+    items = response.json()["items"]
+    ids = [r["id"] for r in items]
+    assert ids == ["t-fresh"]
+
+
+def test_search_excludes_rows_older_than_retention(
+    client: TestClient,
+    db_path: Path,
+) -> None:
+    """Search must honour the same retention-aware filter as list.
+
+    Both rows match the substring query ``"hello"``, but only the fresh
+    one sits inside the 60s window; the 10-minute-old row is excluded
+    by ``AND ended_at >= ?`` in the search SQL.
+    """
+    _seed_session(db_path)
+    base = datetime.now(UTC)
+    _insert_transcripts(
+        db_path,
+        [
+            (
+                "t-fresh",
+                "hello fresh",
+                _recent_iso(7, base=base),
+                _recent_iso(6, base=base),
+                0.7,
+                "en",
+            ),
+            (
+                "t-expired",
+                "hello expired",
+                _recent_iso(601, base=base),
+                _recent_iso(600, base=base),
+                0.7,
+                "en",
+            ),
+        ],
+    )
+
+    response = client.get("/api/transcripts/search", params={"q": "hello"})
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert [r["id"] for r in items] == ["t-fresh"]
+
+
+# ---------------------------------------------------------------------
 # Search endpoint
 # ---------------------------------------------------------------------
 
@@ -160,12 +283,34 @@ def test_search_substring_case_insensitive(
     db_path: Path,
 ) -> None:
     _seed_session(db_path)
+    base = datetime.now(UTC)
     _insert_transcripts(
         db_path,
         [
-            ("t-1", "Hello World",   "2026-01-01T00:00:01Z", "2026-01-01T00:00:02Z", 0.7, "en"),
-            ("t-2", "goodbye there", "2026-01-01T00:00:03Z", "2026-01-01T00:00:04Z", 0.7, "en"),
-            ("t-3", "say HELLO",     "2026-01-01T00:00:05Z", "2026-01-01T00:00:06Z", 0.7, "en"),
+            (
+                "t-1",
+                "Hello World",
+                _recent_iso(9, base=base),
+                _recent_iso(8, base=base),
+                0.7,
+                "en",
+            ),
+            (
+                "t-2",
+                "goodbye there",
+                _recent_iso(7, base=base),
+                _recent_iso(6, base=base),
+                0.7,
+                "en",
+            ),
+            (
+                "t-3",
+                "say HELLO",
+                _recent_iso(5, base=base),
+                _recent_iso(4, base=base),
+                0.7,
+                "en",
+            ),
         ],
     )
 
@@ -193,16 +338,18 @@ def test_search_whitespace_only_query_rejected(client: TestClient) -> None:
 
 def test_search_limit_enforced(client: TestClient, db_path: Path) -> None:
     _seed_session(db_path)
+    base = datetime.now(UTC)
+    # 30 rows in a 30s window — all fit inside default retention.
     rows = [
         (
             f"t-{i:03d}",
             f"unicorn {i}",
-            f"2026-01-01T02:{i:02d}:00Z",
-            f"2026-01-01T02:{i:02d}:01Z",
+            _recent_iso(31 - i, base=base),
+            _recent_iso(30 - i, base=base),
             0.6,
             "en",
         )
-        for i in range(40)
+        for i in range(30)
     ]
     _insert_transcripts(db_path, rows)
 
@@ -214,7 +361,7 @@ def test_search_limit_enforced(client: TestClient, db_path: Path) -> None:
     items = response.json()["items"]
     assert len(items) == 5
     # Results are most-recent first.
-    assert items[0]["text"] == "unicorn 39"
+    assert items[0]["text"] == "unicorn 29"
 
 
 def test_search_no_match_returns_empty_list(
@@ -222,10 +369,11 @@ def test_search_no_match_returns_empty_list(
     db_path: Path,
 ) -> None:
     _seed_session(db_path)
+    base = datetime.now(UTC)
     _insert_transcripts(
         db_path,
         [
-            ("t-1", "Hello",   "2026-01-01T00:00:01Z", "2026-01-01T00:00:02Z", 0.7, "en"),
+            ("t-1", "Hello",   _recent_iso(5, base=base), _recent_iso(4, base=base), 0.7, "en"),
         ],
     )
     response = client.get("/api/transcripts/search", params={"q": "nonexistent"})
@@ -251,10 +399,18 @@ def test_search_limit_out_of_range_422(client: TestClient) -> None:
 def test_search_returns_language_field(client: TestClient, db_path: Path) -> None:
     """Default ``unknown`` language round-trips through the API."""
     _seed_session(db_path)
+    base = datetime.now(UTC)
     _insert_transcripts(
         db_path,
         [
-            ("t-1", "muffled", "2026-01-01T00:00:01Z", "2026-01-01T00:00:02Z", 0.4, "unknown"),
+            (
+                "t-1",
+                "muffled",
+                _recent_iso(5, base=base),
+                _recent_iso(4, base=base),
+                0.4,
+                "unknown",
+            ),
         ],
     )
     response = client.get("/api/transcripts/search", params={"q": "muffled"})
@@ -302,16 +458,21 @@ def test_list_before_cursor_accepts_offset_form(
     string and clients legitimately use either spelling.
     """
     _seed_session(db_path)
+    base = datetime.now(UTC)
+    new_end = _recent_iso(4, base=base)
     _insert_transcripts(
         db_path,
         [
-            ("t-1", "old", "2026-01-01T00:00:01Z", "2026-01-01T00:00:02Z", 0.7, "en"),
-            ("t-2", "new", "2026-01-01T00:00:03Z", "2026-01-01T00:00:04Z", 0.7, "en"),
+            ("t-1", "old", _recent_iso(9, base=base), _recent_iso(8, base=base), 0.7, "en"),
+            ("t-2", "new", _recent_iso(5, base=base), new_end,                   0.7, "en"),
         ],
     )
+    # Spell the cursor in ``+00:00`` form rather than ``Z`` to exercise
+    # both supported shapes.
+    before_offset = new_end.replace("Z", "+00:00")
     response = client.get(
         "/api/transcripts",
-        params={"before": "2026-01-01T00:00:03+00:00"},
+        params={"before": before_offset},
     )
     assert response.status_code == 200
     items = response.json()["items"]
@@ -337,30 +498,33 @@ def test_list_pagination_ties_returned_across_pages(
     no row vanishes during pagination.
     """
     _seed_session(db_path)
+    base = datetime.now(UTC)
+    tied_end = _recent_iso(8, base=base)
+    newer_end = _recent_iso(3, base=base)
     _insert_transcripts(
         db_path,
         [
             (
                 tied_ids[0],
                 "tie A",
-                "2026-01-01T00:00:01Z",
-                "2026-01-01T00:00:05Z",
+                _recent_iso(9, base=base),
+                tied_end,
                 0.7,
                 "en",
             ),
             (
                 tied_ids[1],
                 "tie B",
-                "2026-01-01T00:00:01Z",
-                "2026-01-01T00:00:05Z",
+                _recent_iso(9, base=base),
+                tied_end,
                 0.7,
                 "en",
             ),
             (
                 "t-newer",
                 "newer",
-                "2026-01-01T00:00:06Z",
-                "2026-01-01T00:00:07Z",
+                _recent_iso(4, base=base),
+                newer_end,
                 0.7,
                 "en",
             ),
@@ -377,7 +541,7 @@ def test_list_pagination_ties_returned_across_pages(
     # Page 2: ask for everything strictly before the newer row.
     page2 = client.get(
         "/api/transcripts",
-        params={"before": "2026-01-01T00:00:07Z"},
+        params={"before": newer_end},
     )
     assert page2.status_code == 200
     items2 = page2.json()["items"]
@@ -397,10 +561,11 @@ def test_search_sql_injection_in_q_is_safe(
     is doing its job.
     """
     _seed_session(db_path)
+    base = datetime.now(UTC)
     _insert_transcripts(
         db_path,
         [
-            ("t-1", "hello", "2026-01-01T00:00:01Z", "2026-01-01T00:00:02Z", 0.7, "en"),
+            ("t-1", "hello", _recent_iso(5, base=base), _recent_iso(4, base=base), 0.7, "en"),
         ],
     )
     response = client.get(

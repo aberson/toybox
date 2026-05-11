@@ -14,8 +14,6 @@ Step 13 (Phase B) shipped the read-only surface:
 Step 22 (Phase D) adds the destructive surface, gated behind a
 parent-scope token:
 
-* ``DELETE /api/transcripts/{id}`` — single delete. 404 with
-  ``transcript_not_found`` when the row is missing.
 * ``DELETE /api/transcripts`` — wipe all rows. PIN re-confirm body
   required on top of the parent token; the wire shape and lock
   precedence mirror ``POST /api/auth/parent`` so a hot-recently-failed
@@ -24,6 +22,13 @@ parent-scope token:
   ``transcripts`` has no FKs pointing at it (only its own FK to
   ``sessions``) so the operation does NOT cascade to other tables.
   The action CANNOT be undone.
+
+Phase I Step I2 added filter-on-read to both list + search: rows whose
+``ended_at`` is older than the household retention preset are excluded
+at the SQL layer using the same pipeline-format cutoff the sweep task
+uses. The single-row ``DELETE /api/transcripts/{id}`` endpoint was
+removed in I2 — the fade animation + sweep loop replace per-row deletes
+in the parent UX.
 """
 
 from __future__ import annotations
@@ -31,7 +36,7 @@ from __future__ import annotations
 import logging
 import sqlite3
 from collections.abc import Iterator
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -40,6 +45,10 @@ from pydantic import BaseModel, Field
 from ..core.auth import TokenScope
 from ..core.pin import PIN_MAX_LENGTH, PIN_MIN_LENGTH
 from ..core.pin_rate_limit import PinRateLimiter
+from ..core.transcript_retention import (
+    _format_ended_at_cutoff,
+    current_retention_seconds,
+)
 from ..db import connect, resolve_db_path
 from .auth import enforce_pin_check, get_pin_rate_limiter
 from .auth_dep import RequireScope, get_auth_db
@@ -86,12 +95,6 @@ class TranscriptListResponse(BaseModel):
     """Wire shape for the list/search endpoints."""
 
     items: list[TranscriptRow] = Field(default_factory=list)
-
-
-class DeleteOneResponse(BaseModel):
-    """Wire shape for ``DELETE /api/transcripts/{id}``."""
-
-    ok: bool = True
 
 
 class WipeAllRequest(BaseModel):
@@ -158,15 +161,27 @@ def list_transcripts(
     identical ``ended_at`` may straddle a page boundary -- a future
     iteration can extend the cursor to ``(ended_at, id)`` to fully
     eliminate that.
+
+    Phase I Step I2 added filter-on-read: rows older than the current
+    retention preset are excluded via ``AND ended_at >= ?`` using the
+    same pipeline-format cutoff the sweep task uses. The 10s sweep
+    cadence means the read can briefly see rows that are 0-10s past
+    expiry; the filter trims those so the API and the UI stay in sync.
+    Rows with ``ended_at IS NULL`` (in-flight) are not returned by
+    this endpoint either way — they're surfaced via the WS push.
     """
+    retention_cutoff = _format_ended_at_cutoff(
+        datetime.now(UTC) - timedelta(seconds=current_retention_seconds(conn))
+    )
     if before is None:
         rows = conn.execute(
             "SELECT id, session_id, mic_id, started_at, ended_at, text, "
             "       confidence, language, triggered_intent "
             "FROM transcripts "
+            "WHERE ended_at IS NOT NULL AND ended_at >= ? "
             "ORDER BY ended_at DESC, id DESC "
             "LIMIT ?",
-            (limit,),
+            (retention_cutoff, limit),
         ).fetchall()
     else:
         try:
@@ -180,10 +195,10 @@ def list_transcripts(
             "SELECT id, session_id, mic_id, started_at, ended_at, text, "
             "       confidence, language, triggered_intent "
             "FROM transcripts "
-            "WHERE ended_at IS NOT NULL AND ended_at < ? "
+            "WHERE ended_at IS NOT NULL AND ended_at < ? AND ended_at >= ? "
             "ORDER BY ended_at DESC, id DESC "
             "LIMIT ?",
-            (before, limit),
+            (before, retention_cutoff, limit),
         ).fetchall()
     return TranscriptListResponse(items=[_row_to_model(r) for r in rows])
 
@@ -199,6 +214,12 @@ def search_transcripts(
     Empty ``q`` is rejected by Pydantic at the query layer (HTTP 422).
     Whitespace-only ``q`` is rejected here with HTTP 400 because the
     ``min_length`` constraint counts whitespace as content.
+
+    Phase I Step I2 added filter-on-read: rows older than the current
+    retention preset are excluded via ``AND ended_at >= ?``. Search is
+    explicitly NOT a way around the retention window — the "search
+    across expired rows" use case is declined per the plan; results
+    shrink consistently with the list view.
     """
     needle = q.strip()
     if not needle:
@@ -207,49 +228,27 @@ def search_transcripts(
             detail={"code": "search_query_required"},
         )
     pattern = f"%{needle}%"
+    retention_cutoff = _format_ended_at_cutoff(
+        datetime.now(UTC) - timedelta(seconds=current_retention_seconds(conn))
+    )
     rows = conn.execute(
         "SELECT id, session_id, mic_id, started_at, ended_at, text, "
         "       confidence, language, triggered_intent "
         "FROM transcripts "
         "WHERE text IS NOT NULL AND LOWER(text) LIKE LOWER(?) "
+        "  AND ended_at IS NOT NULL AND ended_at >= ? "
         "ORDER BY ended_at DESC, id DESC "
         "LIMIT ?",
-        (pattern, limit),
+        (pattern, retention_cutoff, limit),
     ).fetchall()
     return TranscriptListResponse(items=[_row_to_model(r) for r in rows])
 
 
-@router.delete("/{transcript_id}", response_model=DeleteOneResponse)
-def delete_transcript(
-    transcript_id: str,
-    conn: Annotated[sqlite3.Connection, Depends(get_transcripts_db)],
-    _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
-) -> DeleteOneResponse:
-    """Delete one transcript row by id, or 404 if missing.
-
-    Parent token only — the same scope guard as the rest of the
-    parent-managed surfaces (children/toys/rooms). Single-row delete
-    doesn't require a PIN re-confirm because the blast radius is one
-    row; wipe-all is the high-stakes case that does.
-
-    The ``404 transcript_not_found`` shape mirrors the sibling
-    ``children``/``toys``/``rooms`` 404s so the frontend's typed-error
-    helper can dispatch on ``code``.
-    """
-    # Single-statement atomic delete. ``rowcount == 0`` distinguishes
-    # "row never existed" from a successful delete without a separate
-    # SELECT round-trip (and without a tiny TOCTOU window between SELECT
-    # and DELETE that an admin script racing on the same DB could land
-    # in). ``with conn`` keeps the txn boundary so a crash mid-statement
-    # leaves the row count consistent.
-    with conn:
-        cursor = conn.execute("DELETE FROM transcripts WHERE id = ?", (transcript_id,))
-    if cursor.rowcount == 0:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"code": "transcript_not_found", "id": transcript_id},
-        )
-    return DeleteOneResponse(ok=True)
+# Phase I Step I2 removed the single-row ``DELETE /api/transcripts/{id}``
+# endpoint. The parent UX no longer surfaces per-row delete buttons —
+# rows fade out automatically once they pass the retention window, with
+# the sweep loop (10s cadence) doing the actual DB deletion. The
+# wipe-all surface below stays unchanged.
 
 
 # ``DELETE`` with a request body is unusual but FastAPI / starlette
@@ -309,7 +308,6 @@ def wipe_transcripts(
 __all__ = [
     "DEFAULT_LIMIT",
     "MAX_LIMIT",
-    "DeleteOneResponse",
     "TranscriptListResponse",
     "TranscriptRow",
     "WipeAllRequest",

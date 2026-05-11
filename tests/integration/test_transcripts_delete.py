@@ -1,8 +1,8 @@
 """HTTP coverage for the Step 22 transcript-management DELETE surface.
 
-Two endpoints under test:
+One endpoint under test (the Phase I Step I2 retention rework removed
+the per-row DELETE endpoint; the wipe-all surface stays):
 
-* ``DELETE /api/transcripts/{id}`` — single delete, parent-token only.
 * ``DELETE /api/transcripts`` — wipe all, parent-token + PIN re-confirm.
 
 The wipe-all endpoint shares the process-wide PIN rate limiter with
@@ -86,51 +86,12 @@ def _row_count(db_path: Path, table: str) -> int:
 
 
 # ---------------------------------------------------------------------
-# DELETE /api/transcripts/{id}
-# ---------------------------------------------------------------------
-
-
-def test_delete_one_returns_ok_and_removes_row(
-    client: TestClient,
-    db_path: Path,
-    parent_headers: dict[str, str],
-) -> None:
-    _seed_session(db_path)
-    _insert_transcripts(
-        db_path,
-        [
-            ("t-1", "first", "2026-01-01T00:00:01Z", "2026-01-01T00:00:02Z", 0.7, "en"),
-            ("t-2", "second", "2026-01-01T00:00:03Z", "2026-01-01T00:00:04Z", 0.8, "en"),
-        ],
-    )
-    response = client.delete("/api/transcripts/t-1", headers=parent_headers)
-    assert response.status_code == 200, response.text
-    assert response.json() == {"ok": True}
-    # Survivor still listed; deleted row gone.
-    assert _row_count(db_path, "transcripts") == 1
-    listing = client.get("/api/transcripts").json()
-    assert {r["id"] for r in listing["items"]} == {"t-2"}
-
-
-def test_delete_one_unknown_id_returns_404(
-    client: TestClient,
-    parent_headers: dict[str, str],
-) -> None:
-    response = client.delete("/api/transcripts/not-a-real-id", headers=parent_headers)
-    assert response.status_code == 404
-    body = response.json()
-    assert body["detail"]["code"] == "transcript_not_found"
-    assert body["detail"]["id"] == "not-a-real-id"
-
-
-# Per-endpoint 401/403 cases for ``DELETE /api/transcripts/{id}`` are
-# covered by the ``_PROTECTED_ENDPOINTS`` parametrize tables at the
-# bottom of this module, so we don't repeat them here.
-
-
-# ---------------------------------------------------------------------
 # DELETE /api/transcripts (wipe all)
 # ---------------------------------------------------------------------
+#
+# Phase I Step I2 removed ``DELETE /api/transcripts/{id}`` — the parent
+# UX uses fade-out + sweep instead of per-row deletion. The wipe-all
+# surface below is the only DELETE remaining.
 
 
 def test_wipe_all_happy_path_returns_count_and_clears_rows(
@@ -442,7 +403,6 @@ def test_wipe_failed_attempt_logs_count_not_pin(
 
 
 _PROTECTED_ENDPOINTS: list[tuple[str, str, dict[str, Any] | None]] = [
-    ("DELETE", "/api/transcripts/abc", None),
     ("DELETE", "/api/transcripts", {"pin": GOOD_PIN}),
 ]
 

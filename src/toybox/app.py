@@ -6,6 +6,7 @@ running uvicorn or going through CLI parsing.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
 import sqlite3
@@ -28,6 +29,7 @@ from .api.rooms import router as rooms_router
 from .api.toys import router as toys_router
 from .api.transcript_retention_settings import router as transcript_retention_settings_router
 from .api.transcripts import router as transcripts_router
+from .core.transcript_retention import run_transcript_sweep_loop
 from .db import connect, resolve_db_path
 from .image_gen.capability import is_image_gen_capable
 from .image_gen.worker import (
@@ -169,9 +171,43 @@ async def image_gen_worker_lifespan(app: FastAPI) -> AsyncIterator[ImageGenWorke
         await stop_image_gen_worker()
 
 
+# ---------------------------------------------------------------------
+# Phase I Step I2 — transcript retention sweep lifespan
+# ---------------------------------------------------------------------
+
+
+@contextlib.asynccontextmanager
+async def transcript_sweep_lifespan(app: FastAPI) -> AsyncIterator[asyncio.Task[None]]:
+    """Spawn the periodic transcript-retention sweep task; cancel on shutdown.
+
+    Mirrors :func:`image_gen_worker_lifespan` in shape: a background
+    ``asyncio.Task`` is created on enter and cancelled + awaited on
+    exit. The loop driver wakes every 10s by default, reads the
+    current retention preset via :func:`current_retention_seconds`,
+    computes a pipeline-format cutoff, and runs one bulk
+    ``DELETE FROM transcripts`` statement. Errors per tick are logged
+    and the loop continues — only ``CancelledError`` (raised by
+    ``task.cancel()`` on shutdown) escapes.
+    """
+    del app  # not used; kept for the lifespan signature contract.
+    task = asyncio.create_task(
+        run_transcript_sweep_loop(default_worker_conn_factory()),
+        name="transcript-sweep-loop",
+    )
+    try:
+        yield task
+    finally:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+
 __all__ = [
     "create_app",
     "default_worker_conn_factory",
     "default_worker_emit",
     "image_gen_worker_lifespan",
+    "transcript_sweep_lifespan",
 ]

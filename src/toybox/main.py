@@ -56,7 +56,7 @@ from .activities.models import Activity
 from .ai.breaker import CircuitBreaker
 from .ai.client import AIClient, StubClient
 from .api.metrics import get_metrics_breaker
-from .app import create_app, image_gen_worker_lifespan
+from .app import create_app, image_gen_worker_lifespan, transcript_sweep_lifespan
 from .audio.capture import MicCapture
 from .audio.pipeline import TranscriptPipeline
 from .audio.stt import WhisperTranscriber
@@ -592,6 +592,9 @@ def _build_smoke_lifespan(
         # first, then stopping pipeline → mic → transcriber).
         async with contextlib.AsyncExitStack() as stack:
             await stack.enter_async_context(image_gen_worker_lifespan(app))
+            # Phase I Step I2: drive transcript retention sweep in --smoke too
+            # so the E2E harness exercises the same wiring as production.
+            await stack.enter_async_context(transcript_sweep_lifespan(app))
 
             try:
                 yield
@@ -826,7 +829,7 @@ async def _metrics_lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     pubsub = get_pubsub()
     try:
-        async with image_gen_worker_lifespan(app):
+        async with image_gen_worker_lifespan(app), transcript_sweep_lifespan(app):
             task = start_metrics_publisher(pubsub, deps)
             try:
                 yield

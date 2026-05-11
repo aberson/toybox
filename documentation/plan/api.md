@@ -44,7 +44,6 @@
 | POST | `/api/activities/{id}/feedback` | "didn't work" / "loved it" | `{kind, step_seq?, reason?}` | `{ok}` |
 | GET | `/api/transcripts` | list (recent first; ISO `before` cursor) | `?limit=50&before=<iso>` | `TranscriptListResponse{items: [TranscriptRow], next_before?}` |
 | GET | `/api/transcripts/search` | case-insensitive substring search (parameterized LIKE) | `?q=<str>&limit=50` | `TranscriptListResponse` |
-| DELETE | `/api/transcripts/{id}` | delete one (Phase D Step 22) | — | `{ok}` |
 | DELETE | `/api/transcripts` | wipe all (PIN-gated, Phase D Step 22) | — | `{deleted: int}` |
 | WS | `/ws` | bidirectional topics | subscribe by topic | streamed events |
 

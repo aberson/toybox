@@ -157,7 +157,7 @@ Critical path: I1 → I3 → I4 → I5 (4 steps). I2 runs alongside I3+I4 with z
 - **Issue:** [#88](https://github.com/aberson/toybox/issues/88)
 - **Flags:** --reviewers code
 - **Files:** MODIFY `src/toybox/core/transcript_retention.py` (add sweep helper + loop driver), `src/toybox/app.py` (add `transcript_sweep_lifespan` helper), `src/toybox/main.py` (compose the new lifespan), `src/toybox/api/transcripts.py` (add filter-on-read, remove single-delete endpoint + its Pydantic model if unused elsewhere), `tests/integration/test_transcripts_api.py` (drop single-delete tests, add filter-on-read tests). CREATE `tests/integration/test_transcript_retention_sweep.py`, `tests/integration/test_transcript_retention_e2e.py`. MODIFY the existing production-lifespan smoke test (locate via `rg "def test_.*lifespan\|def test_main" tests/`) to compose `transcript_sweep_lifespan` and assert clean startup/shutdown.
-- **Status:** TODO
+- **Status:** DONE (2026-05-11)
 
 ### Step I3: Frontend Settings UI + App.tsx plumbing + declare retention prop (parallel with I2)
 
