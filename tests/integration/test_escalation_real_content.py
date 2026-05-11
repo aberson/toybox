@@ -72,16 +72,28 @@ def _seed_child(
     banned_themes: str | None = None,
     reading_level: str | None = None,
 ) -> None:
+    """Seed a child + (optionally) the household-global banned-themes setting.
+
+    Phase H Step H4: ``banned_themes`` is no longer per-child. When the
+    caller passes ``banned_themes``, we write the value to
+    ``settings.banned_themes_global`` (UPSERT — repeated calls overwrite,
+    matching the previous "last-seed-wins" semantic the per-child column
+    happened to have when only one child was seeded).
+    """
     conn = connect(db_path)
     try:
         with conn:
             conn.execute(
                 "INSERT INTO children "
                 "(id, display_name, birthdate, pronouns, reading_level, "
-                " interests, comfort, banned_themes, notes) "
-                "VALUES (?, 'Child', NULL, NULL, ?, NULL, NULL, ?, NULL)",
-                (child_id, reading_level, banned_themes),
+                " interests, comfort, notes) "
+                "VALUES (?, 'Child', NULL, NULL, ?, NULL, NULL, NULL)",
+                (child_id, reading_level),
             )
+        if banned_themes is not None:
+            from toybox.core.banned_themes import set_banned_themes_global
+
+            set_banned_themes_global(conn, banned_themes)
     finally:
         conn.close()
 
@@ -358,14 +370,15 @@ async def test_claude_directive_re_resolves_per_dispatch(
     first_system = stub.calls[0][2]["system"]
     assert "scary" in first_system
 
-    # Edit the child's banned_themes mid-test.
+    # Edit the household-global banned_themes mid-test.
+    # Phase H Step H4: banned_themes is no longer per-child; the
+    # canonical home is ``settings.banned_themes_global``, accessed via
+    # :func:`toybox.core.banned_themes.set_banned_themes_global`.
     conn = connect(db_path)
     try:
-        with conn:
-            conn.execute(
-                "UPDATE children SET banned_themes = ? WHERE id = ?",
-                ("loud", "c1"),
-            )
+        from toybox.core.banned_themes import set_banned_themes_global
+
+        set_banned_themes_global(conn, "loud")
     finally:
         conn.close()
 

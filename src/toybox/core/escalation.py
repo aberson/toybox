@@ -864,13 +864,17 @@ class EscalationDispatcher:
 
         Multi-child policy: trigger-driven activities have no explicit
         child_ids (no API caller specified them), so we resolve ALL
-        children in the table. Aggregated constraints follow the
-        most-restrictive-wins rule from
-        :func:`toybox.activities.content_resolver.aggregate_child_constraints`
-        (banned_themes UNION; reading_level MIN). The ``children``
-        table doesn't have an ``archived`` column today, so "all
-        children" is literal — a future migration that adds archive
-        semantics will need to filter here too.
+        children in the table. Phase H Step H4 (migration 0009)
+        promoted ``banned_themes`` from a per-child column to a single
+        household-global setting (``settings.banned_themes_global``);
+        :func:`toybox.activities.content_resolver.resolve_child_profiles`
+        is the single seam that splices that value onto the per-child
+        ``reading_level`` aggregate. ``aggregate_child_constraints``
+        therefore only computes ``reading_level`` (MIN — most
+        restrictive wins) now. The ``children`` table doesn't have an
+        ``archived`` column today, so "all children" is literal — a
+        future migration that adds archive semantics will need to
+        filter here too.
         """
         if self._connection_factory is None:
             return ResolvedContent()

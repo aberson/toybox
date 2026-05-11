@@ -125,6 +125,16 @@ def _seed_child(
     banned_themes: str | None = None,
     reading_level: str | None = None,
 ) -> None:
+    """Seed a child + (optionally) update the household-global banned-themes.
+
+    Phase H Step H4: ``banned_themes`` lives in
+    ``settings.banned_themes_global`` now. To keep the test ergonomics
+    of "pass banned_themes per child", we UNION the value into the
+    global setting on each call — so seeding two children with
+    different banned_themes ends up with the unioned global value, which
+    is the runtime semantic. Tests that need a clean global slate should
+    call ``set_banned_themes_global(conn, None)`` themselves.
+    """
     conn = connect(db_path)
     try:
         with conn:
@@ -133,10 +143,33 @@ def _seed_child(
             conn.execute(
                 "INSERT INTO children "
                 "(id, display_name, birthdate, pronouns, reading_level, "
-                " interests, comfort, banned_themes, notes) "
-                "VALUES (?, ?, NULL, NULL, ?, NULL, NULL, ?, NULL)",
-                (child_id, display_name, reading_level, banned_themes),
+                " interests, comfort, notes) "
+                "VALUES (?, ?, NULL, NULL, ?, NULL, NULL, NULL)",
+                (child_id, display_name, reading_level),
             )
+        if banned_themes is not None:
+            from toybox.core.banned_themes import (
+                current_banned_themes_global,
+                set_banned_themes_global,
+            )
+
+            existing = current_banned_themes_global(conn) or ""
+            # UNION via simple "append + dedupe-preserving-order" — the
+            # runtime split-and-trim still applies at read time, so
+            # storage just needs to carry every token at least once.
+            tokens: list[str] = []
+            seen: set[str] = set()
+            for raw in f"{existing},{banned_themes}".split(","):
+                t = raw.strip()
+                if not t:
+                    continue
+                k = t.lower()
+                if k in seen:
+                    continue
+                seen.add(k)
+                tokens.append(t)
+            merged = ", ".join(tokens) if tokens else None
+            set_banned_themes_global(conn, merged)
     finally:
         conn.close()
 

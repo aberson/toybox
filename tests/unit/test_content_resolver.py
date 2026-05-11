@@ -114,17 +114,36 @@ def _insert_child(
     *,
     child_id: str,
     display_name: str = "Test Child",
-    banned_themes: str | None = None,
     reading_level: str | None = None,
 ) -> None:
+    """Insert a child row.
+
+    Phase H Step H4: ``banned_themes`` is no longer a per-child column —
+    the value is household-global. Tests that want a banned-themes
+    seed should call :func:`_seed_banned_themes` separately; tests
+    that check aggregation should write directly to the ``settings``
+    table via that helper.
+    """
     with conn:
         conn.execute(
             "INSERT INTO children "
             "(id, display_name, birthdate, pronouns, reading_level, "
-            " interests, comfort, banned_themes, notes) "
-            "VALUES (?, ?, NULL, NULL, ?, NULL, NULL, ?, NULL)",
-            (child_id, display_name, reading_level, banned_themes),
+            " interests, comfort, notes) "
+            "VALUES (?, ?, NULL, NULL, ?, NULL, NULL, NULL)",
+            (child_id, display_name, reading_level),
         )
+
+
+def _seed_banned_themes(conn: sqlite3.Connection, value: str) -> None:
+    """Write the household-global banned-themes string to ``settings``.
+
+    Replaces the per-child seeding the pre-H4 tests did. Passing an
+    empty string deletes the row, matching the contract of
+    :func:`toybox.core.banned_themes.set_banned_themes_global`.
+    """
+    from toybox.core.banned_themes import set_banned_themes_global
+
+    set_banned_themes_global(conn, value)
 
 
 # ---------------------------------------------------------------------------
@@ -385,38 +404,51 @@ def test_resolve_rooms_default_when_env_unset(
 # ---------------------------------------------------------------------------
 
 
-def test_resolve_child_profiles_empty_ids(conn: sqlite3.Connection) -> None:
+def test_resolve_child_profiles_empty_ids_no_global_setting(
+    conn: sqlite3.Connection,
+) -> None:
+    """Empty ``child_ids`` + no global setting → fully default."""
     out = resolve_child_profiles(conn, [])
     assert out == ResolvedChildren()
 
 
+def test_resolve_child_profiles_empty_ids_reads_global_setting(
+    conn: sqlite3.Connection,
+) -> None:
+    """Empty ``child_ids`` still surfaces the global banned-themes value.
+
+    Trigger-driven activities (no explicit child_ids) still have a
+    household ban list; the value applies regardless of how many
+    children are in scope.
+    """
+    _seed_banned_themes(conn, "scary, loud noises")
+    out = resolve_child_profiles(conn, [])
+    # _split_csv: trimmed, lowercased, dedup, first-seen order.
+    assert out.banned_themes == ("scary", "loud noises")
+    assert out.reading_level is None
+
+
 def test_resolve_child_profiles_single_child(conn: sqlite3.Connection) -> None:
-    _insert_child(
-        conn, child_id="c1", banned_themes="scary, loud noises", reading_level="early-reader"
-    )
+    _seed_banned_themes(conn, "scary, loud noises")
+    _insert_child(conn, child_id="c1", reading_level="early-reader")
     out = resolve_child_profiles(conn, ["c1"])
-    assert out.banned_themes == ("loud noises", "scary")
+    assert out.banned_themes == ("scary", "loud noises")
     assert out.reading_level == "early-reader"
 
 
-def test_resolve_child_profiles_unknown_id_returns_default(
+def test_resolve_child_profiles_unknown_id_no_settings_returns_default(
     conn: sqlite3.Connection,
 ) -> None:
     out = resolve_child_profiles(conn, ["does-not-exist"])
     assert out == ResolvedChildren()
 
 
-def test_aggregate_child_constraints_union_banned_themes() -> None:
-    profiles = [
-        ChildProfileRow(id="a", banned_themes=("scary", "Loud"), reading_level="early-reader"),
-        ChildProfileRow(id="b", banned_themes=("loud", "spiders"), reading_level="fluent"),
-    ]
-    out = aggregate_child_constraints(profiles)
-    # Lowercased, deduped, sorted.
-    assert out.banned_themes == ("loud", "scary", "spiders")
-
-
 def test_aggregate_child_constraints_minimum_reading_level() -> None:
+    """``aggregate_child_constraints`` aggregates ``reading_level`` only.
+
+    Phase H Step H4: ``banned_themes`` lives in the household-global
+    setting now, so the aggregator no longer touches it.
+    """
     profiles = [
         ChildProfileRow(id="a", reading_level="fluent"),
         ChildProfileRow(id="b", reading_level="pre-reader"),
@@ -424,6 +456,9 @@ def test_aggregate_child_constraints_minimum_reading_level() -> None:
     ]
     out = aggregate_child_constraints(profiles)
     assert out.reading_level == "pre-reader"
+    # banned_themes isn't aggregated here any more — the field defaults
+    # to () on the resulting ResolvedChildren.
+    assert out.banned_themes == ()
 
 
 def test_aggregate_child_constraints_null_reading_level_doesnt_override() -> None:
@@ -445,11 +480,15 @@ def test_aggregate_child_constraints_all_null_levels() -> None:
     assert out.reading_level is None
 
 
-def test_resolve_child_profiles_multi_child(conn: sqlite3.Connection) -> None:
-    _insert_child(conn, child_id="a", banned_themes="scary", reading_level="pre-reader")
-    _insert_child(conn, child_id="b", banned_themes="loud", reading_level="fluent")
+def test_resolve_child_profiles_multi_child_reading_level_minimum(
+    conn: sqlite3.Connection,
+) -> None:
+    """Reading level is aggregated per-child; banned_themes is global."""
+    _seed_banned_themes(conn, "scary, loud")
+    _insert_child(conn, child_id="a", reading_level="pre-reader")
+    _insert_child(conn, child_id="b", reading_level="fluent")
     out = resolve_child_profiles(conn, ["a", "b"])
-    assert out.banned_themes == ("loud", "scary")
+    assert out.banned_themes == ("scary", "loud")
     assert out.reading_level == "pre-reader"
 
 

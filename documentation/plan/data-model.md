@@ -130,8 +130,9 @@ Library-source personas cannot be deleted (only edited or hidden).
 | `reading_level` | TEXT | `none`, `sounds_out`, `fluent` |
 | `interests` | TEXT (JSON) | free tags |
 | `comfort` | TEXT | `loud_ok`, `prefers_quiet`, `mixed` |
-| `banned_themes` | TEXT (JSON) | parent-set, e.g. `["monsters","violence"]` |
 | `notes` | TEXT | |
+
+`banned_themes` was removed from this table by **migration 0009** (Phase H Step H4) — the value is now a single household-global setting (`settings.banned_themes_global`, see below). The runtime always UNIONed banned themes across every child before sending them to Claude, so this is a data-model formalisation, not a behavior change. Per-child overrides are explicitly out of scope; if they come back later they layer on top of the global value.
 
 ### `rooms`
 | Column | Type | Notes |
@@ -244,6 +245,8 @@ Settings keys:
 | `log_level` | string | `DEBUG`/`INFO`/`WARNING`, default `INFO` |
 | `mic_enabled` | bool | parent UI mute toggle (separate from mode) |
 | `time_of_day_aware` | bool | inject hour-of-day into activity generator context, default true |
+| `image_gen_mode` | string | `cartoon` (default, capability-driven dispatch) or `composite` (force Tier C); set via `PUT /api/settings/image-gen-mode` |
+| `banned_themes_global` | string | comma-separated household-wide ban list, e.g. `"monsters, spiders"`; absent row = "no global ban list" (read as `None` in Python); set via `PUT /api/settings/banned-themes`. Promoted from a per-child column by Phase H Step H4 migration 0009. |
 
 ## File layout
 

@@ -69,6 +69,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Final, Literal, cast
 
+from ..core.banned_themes import current_banned_themes_global
+
 _logger = logging.getLogger(__name__)
 
 # Reading level enum mirrors :class:`toybox.api.children.ReadingLevel`
@@ -128,7 +130,20 @@ class ResolvedRoom:
 
 @dataclass(frozen=True, slots=True)
 class ResolvedChildren:
-    """Aggregated child-constraints across an activity's child_ids."""
+    """Aggregated child-constraints for a single dispatch.
+
+    ``banned_themes`` is sourced from the household-global setting
+    (``settings.banned_themes_global``) via
+    :func:`toybox.core.banned_themes.current_banned_themes_global` —
+    NOT from per-child aggregation any more. Phase H Step H4 migration
+    0009 promoted the value out of the ``children`` table.
+    :func:`resolve_child_profiles` is the single producer that does the
+    one read per request and populates this field; downstream consumers
+    (escalation, generator, propose API) treat the field as already
+    UNION-of-the-household.
+
+    ``reading_level`` is still aggregated per-child (MINIMUM wins).
+    """
 
     banned_themes: tuple[str, ...] = ()
     reading_level: ReadingLevel | None = None
@@ -136,10 +151,16 @@ class ResolvedChildren:
 
 @dataclass(frozen=True, slots=True)
 class ChildProfileRow:
-    """One child profile fetched for aggregation."""
+    """One child profile fetched for aggregation.
+
+    Note: ``banned_themes`` was removed in Phase H Step H4 (migration
+    0009 promoted the value to a household-global setting). The field
+    no longer lives on individual rows; :func:`resolve_child_profiles`
+    populates :class:`ResolvedChildren.banned_themes` from
+    :func:`toybox.core.banned_themes.current_banned_themes_global`.
+    """
 
     id: str
-    banned_themes: tuple[str, ...] = ()
     reading_level: ReadingLevel | None = None
 
 
@@ -387,54 +408,83 @@ def resolve_child_profiles(
 ) -> ResolvedChildren:
     """Fetch the child rows for ``child_ids`` and aggregate constraints.
 
-    Empty ``child_ids`` returns a no-constraint :class:`ResolvedChildren`
-    (no banned themes, no reading-level constraint). Unknown ids are
-    silently dropped — the caller may not have a child profile yet.
+    ``banned_themes`` comes from the household-global setting (one read
+    per request, NOT per child) — see
+    :func:`toybox.core.banned_themes.current_banned_themes_global`.
+    The Phase H Step H4 migration (0009) promoted the value out of the
+    ``children`` table; readers used to UNION the per-child column,
+    which is now expressed as a single canonical setting.
+
+    ``reading_level`` is still aggregated per-child (MINIMUM wins) since
+    it remains a per-child attribute.
+
+    Empty ``child_ids`` still returns a :class:`ResolvedChildren` whose
+    ``banned_themes`` reflects the global setting (no children does not
+    mean "no global ban list" — the operator's value still applies for
+    trigger-driven activities).
     """
+    banned_themes = _banned_themes_from_settings(conn)
     if not child_ids:
-        return ResolvedChildren()
+        return ResolvedChildren(banned_themes=banned_themes)
     unique = list(dict.fromkeys(child_ids))  # preserve order, dedupe
     placeholders = ",".join("?" * len(unique))
     rows = conn.execute(
-        f"SELECT id, banned_themes, reading_level FROM children WHERE id IN ({placeholders})",
+        f"SELECT id, reading_level FROM children WHERE id IN ({placeholders})",
         unique,
     ).fetchall()
     profiles: list[ChildProfileRow] = []
     for row in rows:
         reading_level_raw = row["reading_level"]
         reading_level: ReadingLevel | None = _coerce_reading_level(reading_level_raw)
-        banned = _split_csv(row["banned_themes"])
         profiles.append(
             ChildProfileRow(
                 id=str(row["id"]),
-                banned_themes=banned,
                 reading_level=reading_level,
             )
         )
-    return aggregate_child_constraints(profiles)
+    aggregated = aggregate_child_constraints(profiles)
+    # Splice the global banned_themes onto the aggregated reading-level
+    # result. aggregate_child_constraints no longer touches banned_themes
+    # (it operates on the per-child reading_level only) so this is the
+    # single seam between the two sources.
+    return ResolvedChildren(
+        banned_themes=banned_themes,
+        reading_level=aggregated.reading_level,
+    )
+
+
+def _banned_themes_from_settings(conn: sqlite3.Connection) -> tuple[str, ...]:
+    """Read ``settings.banned_themes_global`` and split into normalised tokens.
+
+    Returns an empty tuple when the setting is absent or empty. Tokens
+    are trimmed, lowercased, deduped, and order-preserved (first-seen
+    wins). Mirrors the per-child decoder behavior the per-child CSV
+    column had pre-migration-0009.
+    """
+    raw = current_banned_themes_global(conn)
+    return _split_csv(raw)
 
 
 def aggregate_child_constraints(
     profiles: Sequence[ChildProfileRow],
 ) -> ResolvedChildren:
-    """Aggregate banned_themes (UNION) and reading_level (MINIMUM).
+    """Aggregate reading_level (MINIMUM) across child profiles.
 
-    "Most restrictive wins":
+    Phase H Step H4 (migration 0009) moved banned_themes out of the
+    per-child rows into a household-global setting, so this helper no
+    longer touches them — :func:`resolve_child_profiles` is the seam
+    that splices the global value onto the aggregated reading-level
+    result.
 
-    * Banned themes: union across children, lowercased, deduplicated, sorted.
-    * Reading level: minimum of present values
-      (``pre-reader`` < ``early-reader`` < ``fluent``); unknown/null
-      values do NOT participate (a child with no level set doesn't
-      drag the rest down to "no constraint").
+    Reading level: minimum of present values
+    (``pre-reader`` < ``early-reader`` < ``fluent``); unknown/null
+    values do NOT participate (a child with no level set doesn't drag
+    the rest down to "no constraint").
 
     Empty ``profiles`` returns a default :class:`ResolvedChildren`.
     """
     if not profiles:
         return ResolvedChildren()
-    banned: set[str] = set()
-    for p in profiles:
-        for theme in p.banned_themes:
-            banned.add(theme.strip().lower())
     chosen: ReadingLevel | None = None
     best_rank: int | None = None
     for p in profiles:
@@ -446,7 +496,6 @@ def aggregate_child_constraints(
             best_rank = rank
             chosen = cur
     return ResolvedChildren(
-        banned_themes=tuple(sorted(banned)),
         reading_level=chosen,
     )
 

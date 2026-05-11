@@ -87,6 +87,13 @@ class ChildProfileBase(BaseModel):
     reading_level: ReadingLevel | None = None
     interests: str | None = Field(default=None, max_length=1000)
     comfort: str | None = Field(default=None, max_length=1000)
+    # TODO: drop in H5. Phase H Step H4 dropped the underlying column
+    # (migration 0009) and promoted the value to a household-global
+    # setting; we keep the field on the wire in both directions to
+    # bridge the pre-H5 frontend cleanly. Response always returns
+    # ``None``; request bodies still accept the key but it is discarded
+    # server-side (no SQL touches the column). H5 strips this field in
+    # lockstep with the frontend type drop.
     banned_themes: str | None = Field(default=None, max_length=500)
     notes: str | None = Field(default=None, max_length=2000)
 
@@ -175,7 +182,11 @@ def _row_to_profile(row: sqlite3.Row) -> ChildProfile:
         reading_level=reading_level,
         interests=row["interests"],
         comfort=row["comfort"],
-        banned_themes=row["banned_themes"],
+        # TODO: drop in H5. ``banned_themes`` column was removed by
+        # migration 0009; we still surface the field on the wire as
+        # ``None`` so the pre-H5 frontend keeps compiling. See the
+        # comment on ``ChildProfileBase.banned_themes``.
+        banned_themes=None,
         notes=row["notes"],
     )
 
@@ -183,7 +194,7 @@ def _row_to_profile(row: sqlite3.Row) -> ChildProfile:
 def _fetch_child_row(conn: sqlite3.Connection, child_id: str) -> sqlite3.Row:
     row: sqlite3.Row | None = conn.execute(
         "SELECT id, display_name, birthdate, pronouns, reading_level, "
-        "interests, comfort, banned_themes, notes "
+        "interests, comfort, notes "
         "FROM children WHERE id = ?",
         (child_id,),
     ).fetchone()
@@ -218,7 +229,7 @@ def list_children(
     """Return every child profile, sorted case-insensitively by display name."""
     rows = conn.execute(
         "SELECT id, display_name, birthdate, pronouns, reading_level, "
-        "interests, comfort, banned_themes, notes "
+        "interests, comfort, notes "
         "FROM children ORDER BY display_name COLLATE NOCASE ASC"
     ).fetchall()
     return ChildProfileListResponse(
@@ -249,12 +260,18 @@ def create_child(
 ) -> ChildProfile:
     """Create a new child profile. id is server-generated (uuid4 hex)."""
     new_id = uuid.uuid4().hex
+    # ``body.banned_themes`` is intentionally NOT bound here. The field
+    # survives on the request model as a zombie (see ChildProfileBase)
+    # so pre-H5 clients keep working, but the column was dropped by
+    # migration 0009 and the value is discarded server-side. The global
+    # banned-themes setting at ``settings.banned_themes_global`` is the
+    # canonical home now — see :mod:`toybox.core.banned_themes`.
     with conn:
         conn.execute(
             "INSERT INTO children "
             "(id, display_name, birthdate, pronouns, reading_level, "
-            " interests, comfort, banned_themes, notes) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " interests, comfort, notes) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 new_id,
                 body.display_name,
@@ -263,7 +280,6 @@ def create_child(
                 body.reading_level,
                 body.interests,
                 body.comfort,
-                body.banned_themes,
                 body.notes,
             ),
         )
@@ -286,6 +302,12 @@ def update_child(
     """
     _fetch_child_row(conn, child_id)  # raises 404 when missing
     data = body.model_dump(exclude_unset=True)
+    # TODO: drop in H5 with the field itself. ``banned_themes`` is a
+    # zombie field on the request model (see ChildProfileBase) — the
+    # underlying column was removed by migration 0009. Strip the key
+    # before it reaches the UPDATE so a pre-H5 client passing the
+    # value doesn't error with ``no such column``.
+    data.pop("banned_themes", None)
     if data:
         columns = list(data.keys())
         set_clause = ", ".join(f"{col} = ?" for col in columns)
