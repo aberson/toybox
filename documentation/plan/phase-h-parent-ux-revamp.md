@@ -205,6 +205,7 @@ Critical path: H1 → H2 → H3 → H5 → H6 (5 steps); H4 runs alongside H1+H2
 - **Issue:** [#83](https://github.com/aberson/toybox/issues/83)
 - **Flags:** none (operator-driven; no autonomous build agent)
 - **Files:** CREATE `documentation/runs/<YYYY-MM-DD>-phase-h-uat.md` capturing iPadOS version, browser version, walkthrough results, any defects found. UPDATE this plan doc's H6 row Status to ✅ DONE on success (with date + run-doc link), or to ⚠ DEFECTS with link to a follow-on issue.
+- **Status:** DONE (2026-05-10) — all 11 walkthrough items PASS on iPad. One operational issue (stale backend process → 404; resolved by restart) + one unrelated Phase G defect filed as follow-up [#84](https://github.com/aberson/toybox/issues/84) (slot-fill skips placeholders that only appear in choice labels). UAT run doc: [documentation/runs/2026-05-10-phase-h-uat.md](../runs/2026-05-10-phase-h-uat.md)
 
 ## Risks
 
