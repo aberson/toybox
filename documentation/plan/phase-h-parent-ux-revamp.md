@@ -153,6 +153,7 @@ Critical path: H1 → H2 → H3 → H5 → H6 (5 steps); H4 runs alongside H1+H2
 - **Issue:** [#78](https://github.com/aberson/toybox/issues/78)
 - **Flags:** --reviewers code
 - **Files:** CREATE `frontend/src/parent/components/Tabs.tsx`, `frontend/src/parent/components/Tabs.test.tsx`. No App.tsx changes in this step. (`documentation/plan.md` already updated 2026-05-10 with Phase H status row + doc-map entry — no plan-index changes needed in this step.)
+- **Status:** DONE (2026-05-10) — 2 files created, +10 tests (275 → 285), all 4 code reviewers PASS
 
 ### Step H2: App shell restructure + Play tab content
 
