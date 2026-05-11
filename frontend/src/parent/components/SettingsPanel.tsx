@@ -26,6 +26,7 @@ import type {
   MetricsSnapshot,
 } from "../api";
 import { BannedThemesSettings } from "./BannedThemesSettings";
+import { TranscriptRetentionControl } from "./TranscriptRetentionControl";
 
 const GRID_STYLE: CSSProperties = {
   display: "grid",
@@ -411,7 +412,16 @@ export interface SettingsPanelProps {
     | "setImageGenMode"
     | "getBannedThemesGlobal"
     | "setBannedThemesGlobal"
+    | "setTranscriptRetention"
   >;
+  // Phase I step I3: transcript retention picker source-of-truth. The
+  // value lives in App.tsx (fetched once on mount via the
+  // settings/transcript-retention GET) and is threaded through here so
+  // the same state object also flows into TranscriptsManager (I4
+  // consumes it for the fade animation). ``onRetentionChanged`` bubbles
+  // a successful PUT response back up so App.tsx can update its state.
+  currentRetentionSeconds: number;
+  onRetentionChanged: (seconds: number) => void;
 }
 
 // Settings sub-tab. Renders the three toggle cards + the global
@@ -420,7 +430,7 @@ export interface SettingsPanelProps {
 // optimistic ``onModeChanged`` / ``onMicEnabledChanged`` callbacks own
 // the state. No ws fanout — the toggles are write-on-click.
 export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
-  const { api } = props;
+  const { api, currentRetentionSeconds, onRetentionChanged } = props;
   const [listeningMode, setListeningMode] = useState<number>(3);
   const [micEnabled, setMicEnabled] = useState<boolean>(true);
   const [seedError, setSeedError] = useState<string | null>(null);
@@ -486,6 +496,11 @@ export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
           onMicEnabledChanged={handleMicEnabledChanged}
         />
         <ImageGenModeToggle api={api} />
+        <TranscriptRetentionControl
+          api={api}
+          currentSeconds={currentRetentionSeconds}
+          onSecondsChanged={onRetentionChanged}
+        />
       </div>
       <div style={{ marginTop: 12 }}>
         <BannedThemesSettings api={api} />

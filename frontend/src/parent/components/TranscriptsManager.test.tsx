@@ -88,7 +88,7 @@ describe("TranscriptsManager", () => {
       fakeRow({ id: "t-1", text: "first" }),
       fakeRow({ id: "t-2", text: "second" }),
     ]);
-    render(<TranscriptsManager api={stub as unknown as ApiClient} />);
+    render(<TranscriptsManager api={stub as unknown as ApiClient} retentionSeconds={60} />);
     await waitFor(() => {
       expect(stub.listTranscripts).toHaveBeenCalled();
     });
@@ -105,7 +105,7 @@ describe("TranscriptsManager", () => {
       fakeRow({ id: "t-1", text: "hello world" }),
       fakeRow({ id: "t-2", text: "goodbye" }),
     ]);
-    render(<TranscriptsManager api={stub as unknown as ApiClient} />);
+    render(<TranscriptsManager api={stub as unknown as ApiClient} retentionSeconds={60} />);
     // Initial mount fires listTranscripts.
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
@@ -129,7 +129,7 @@ describe("TranscriptsManager", () => {
 
   it("clicks delete and calls api.deleteTranscript with the row id", async () => {
     const stub = buildStubApi([fakeRow({ id: "t-1", text: "first" })]);
-    render(<TranscriptsManager api={stub as unknown as ApiClient} />);
+    render(<TranscriptsManager api={stub as unknown as ApiClient} retentionSeconds={60} />);
     await waitFor(() => {
       expect(screen.getByText("first")).toBeTruthy();
     });
@@ -153,7 +153,7 @@ describe("TranscriptsManager", () => {
         detail: { code: "transcript_not_found", id: "t-1" },
       }),
     );
-    render(<TranscriptsManager api={stub as unknown as ApiClient} />);
+    render(<TranscriptsManager api={stub as unknown as ApiClient} retentionSeconds={60} />);
     await waitFor(() => {
       expect(screen.getByText("first")).toBeTruthy();
     });
@@ -170,7 +170,7 @@ describe("TranscriptsManager", () => {
 
   it("opens the wipe-all modal with a PIN field", async () => {
     const stub = buildStubApi([fakeRow({ id: "t-1" })]);
-    render(<TranscriptsManager api={stub as unknown as ApiClient} />);
+    render(<TranscriptsManager api={stub as unknown as ApiClient} retentionSeconds={60} />);
     await waitFor(() => {
       expect(screen.getByTestId("transcripts-list")).toBeTruthy();
     });
@@ -186,7 +186,7 @@ describe("TranscriptsManager", () => {
         detail: { code: "pin_invalid", attempts_remaining: 3 },
       }),
     );
-    render(<TranscriptsManager api={stub as unknown as ApiClient} />);
+    render(<TranscriptsManager api={stub as unknown as ApiClient} retentionSeconds={60} />);
     await waitFor(() => {
       expect(screen.getByTestId("transcripts-list")).toBeTruthy();
     });
@@ -211,7 +211,7 @@ describe("TranscriptsManager", () => {
         detail: { code: "pin_locked", seconds_until_unlock: 65 },
       }),
     );
-    render(<TranscriptsManager api={stub as unknown as ApiClient} />);
+    render(<TranscriptsManager api={stub as unknown as ApiClient} retentionSeconds={60} />);
     await waitFor(() => {
       expect(screen.getByTestId("transcripts-list")).toBeTruthy();
     });
@@ -250,7 +250,7 @@ describe("TranscriptsManager", () => {
         items: [fakeRow({ id: "t-1" }), fakeRow({ id: "t-2" })],
       }),
     );
-    render(<TranscriptsManager api={stub as unknown as ApiClient} />);
+    render(<TranscriptsManager api={stub as unknown as ApiClient} retentionSeconds={60} />);
     await waitFor(() => {
       expect(screen.getAllByTestId("transcript-row")).toHaveLength(2);
     });
@@ -299,7 +299,10 @@ describe("TranscriptsManager", () => {
       .spyOn(console, "error")
       .mockImplementation(() => {});
     const { unmount } = render(
-      <TranscriptsManager api={stub as unknown as ApiClient} />,
+      <TranscriptsManager
+        api={stub as unknown as ApiClient}
+        retentionSeconds={60}
+      />,
     );
     await waitFor(() => {
       expect(screen.getByTestId("transcripts-list")).toBeTruthy();
@@ -326,7 +329,7 @@ describe("TranscriptsManager", () => {
     // Override the default "yes" for this case — operator hits Cancel.
     vi.spyOn(window, "confirm").mockReturnValue(false);
     const stub = buildStubApi([fakeRow({ id: "t-1", text: "first" })]);
-    render(<TranscriptsManager api={stub as unknown as ApiClient} />);
+    render(<TranscriptsManager api={stub as unknown as ApiClient} retentionSeconds={60} />);
     await waitFor(() => {
       expect(screen.getByText("first")).toBeTruthy();
     });
@@ -338,7 +341,7 @@ describe("TranscriptsManager", () => {
 
   it("clears the PIN field when the wipe modal Cancel is clicked", async () => {
     const stub = buildStubApi([fakeRow({ id: "t-1" })]);
-    render(<TranscriptsManager api={stub as unknown as ApiClient} />);
+    render(<TranscriptsManager api={stub as unknown as ApiClient} retentionSeconds={60} />);
     await waitFor(() => {
       expect(screen.getByTestId("transcripts-list")).toBeTruthy();
     });
@@ -366,7 +369,7 @@ describe("TranscriptsManager", () => {
       fakeRow({ id: "t-1", text: "hello world" }),
       fakeRow({ id: "t-2", text: "goodbye" }),
     ]);
-    render(<TranscriptsManager api={stub as unknown as ApiClient} />);
+    render(<TranscriptsManager api={stub as unknown as ApiClient} retentionSeconds={60} />);
     // Initial mount fires listTranscripts.
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
@@ -420,7 +423,7 @@ describe("TranscriptsManager", () => {
             : [],
       }),
     );
-    render(<TranscriptsManager api={stub as unknown as ApiClient} />);
+    render(<TranscriptsManager api={stub as unknown as ApiClient} retentionSeconds={60} />);
     await waitFor(() => {
       expect(screen.getAllByTestId("transcript-row")).toHaveLength(50);
     });

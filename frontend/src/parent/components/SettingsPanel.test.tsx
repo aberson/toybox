@@ -75,6 +75,7 @@ interface StubApi {
   setImageGenMode: Mock;
   getBannedThemesGlobal: Mock;
   setBannedThemesGlobal: Mock;
+  setTranscriptRetention: Mock;
 }
 
 function buildStubApi(snapshot: MetricsSnapshot): StubApi {
@@ -95,7 +96,28 @@ function buildStubApi(snapshot: MetricsSnapshot): StubApi {
           themes === null || themes.trim() === "" ? null : themes,
       }),
     ) as Mock,
+    setTranscriptRetention: vi.fn(async (seconds: number) => ({
+      seconds,
+    })) as Mock,
   };
+}
+
+// Phase I step I3: SettingsPanel gained two new required props
+// (``currentRetentionSeconds`` + ``onRetentionChanged``). Tests that
+// only care about the older toggles pass through a shared default; the
+// new control's contract has its own dedicated test file
+// (TranscriptRetentionControl.test.tsx).
+function renderSettingsPanel(
+  api: StubApi,
+  overrides: { currentRetentionSeconds?: number; onRetentionChanged?: (n: number) => void } = {},
+): void {
+  render(
+    <SettingsPanel
+      api={api as unknown as ApiClient}
+      currentRetentionSeconds={overrides.currentRetentionSeconds ?? 60}
+      onRetentionChanged={overrides.onRetentionChanged ?? (() => {})}
+    />,
+  );
 }
 
 afterEach(() => {
@@ -122,7 +144,7 @@ describe("SettingsPanel", () => {
       },
     });
     const api = buildStubApi(snapshot);
-    render(<SettingsPanel api={api as unknown as ApiClient} />);
+    renderSettingsPanel(api);
     await waitFor(() => {
       expect(api.getMetrics).toHaveBeenCalled();
     });
@@ -155,7 +177,11 @@ describe("SettingsPanel", () => {
       }) as Mock,
     };
     const { unmount } = render(
-      <SettingsPanel api={api as unknown as ApiClient} />,
+      <SettingsPanel
+        api={api as unknown as ApiClient}
+        currentRetentionSeconds={60}
+        onRetentionChanged={() => {}}
+      />,
     );
     unmount();
     expect(aborted.length).toBeGreaterThanOrEqual(1);
@@ -170,7 +196,7 @@ describe("SettingsPanel", () => {
         throw new Error("seed boom");
       }) as Mock,
     };
-    render(<SettingsPanel api={api as unknown as ApiClient} />);
+    renderSettingsPanel(api);
     await waitFor(() => {
       expect(
         screen.getByTestId("settings-panel-seed-error").textContent,
@@ -186,7 +212,7 @@ describe("SettingsPanel", () => {
   it("PUTs the requested listening mode and reflects it in the active button", async () => {
     const snapshot = fakeSnapshot();
     const api = buildStubApi(snapshot);
-    render(<SettingsPanel api={api as unknown as ApiClient} />);
+    renderSettingsPanel(api);
     await waitFor(() => {
       expect(
         screen.getByTestId("listening-mode-btn-3").getAttribute("data-active"),
@@ -212,7 +238,7 @@ describe("SettingsPanel", () => {
     const snapshot = fakeSnapshot();
     const api = buildStubApi(snapshot);
     api.setListeningMode.mockRejectedValueOnce(new Error("backend down"));
-    render(<SettingsPanel api={api as unknown as ApiClient} />);
+    renderSettingsPanel(api);
     await waitFor(() => {
       expect(screen.getByTestId("listening-mode-btn-5")).toBeTruthy();
     });
@@ -231,7 +257,7 @@ describe("SettingsPanel", () => {
   it("mic-mute PUT success flips the display; PUT failure surfaces an inline error without flipping", async () => {
     const snapshot = fakeSnapshot();
     const api = buildStubApi(snapshot);
-    render(<SettingsPanel api={api as unknown as ApiClient} />);
+    renderSettingsPanel(api);
     // Seed: mic_enabled=true → toggle reads "true".
     await waitFor(() => {
       expect(
@@ -270,4 +296,65 @@ describe("SettingsPanel", () => {
         .getAttribute("data-mic-enabled"),
     ).toBe("false");
   });
+
+  // Phase I step I3: assert the new transcript-retention picker mounts
+  // in the expected position — between the ImageGenModeToggle card and
+  // the BannedThemesSettings card. The plan spec ("between
+  // ImageGenModeToggle and BannedThemesSettings") is locked in via DOM
+  // order so a careless refactor that drops the new section elsewhere
+  // fails this test.
+  it("mounts TranscriptRetentionControl between image-gen-mode and banned-themes", async () => {
+    const snapshot = fakeSnapshot();
+    const api = buildStubApi(snapshot);
+    renderSettingsPanel(api);
+    // The control renders synchronously (it has no fetch-on-mount of
+    // its own); the seed fetch for the toggle defaults is the only
+    // async work in the panel. waitFor lets us pass either way without
+    // depending on the seed.
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("transcript-retention-control"),
+      ).toBeTruthy();
+    });
+    const panel = screen.getByTestId("settings-panel");
+    const imageGenIdx = Array.from(
+      panel.querySelectorAll("[data-testid]"),
+    ).findIndex(
+      (el) => el.getAttribute("data-testid") === "operator-image-gen-mode",
+    );
+    const retentionIdx = Array.from(
+      panel.querySelectorAll("[data-testid]"),
+    ).findIndex(
+      (el) => el.getAttribute("data-testid") === "transcript-retention-control",
+    );
+    const bannedThemesIdx = Array.from(
+      panel.querySelectorAll("[data-testid]"),
+    ).findIndex(
+      (el) => el.getAttribute("data-testid") === "banned-themes-settings",
+    );
+    expect(imageGenIdx).toBeGreaterThanOrEqual(0);
+    expect(retentionIdx).toBeGreaterThanOrEqual(0);
+    expect(bannedThemesIdx).toBeGreaterThanOrEqual(0);
+    expect(retentionIdx).toBeGreaterThan(imageGenIdx);
+    expect(retentionIdx).toBeLessThan(bannedThemesIdx);
+  });
+
+  it("threads currentRetentionSeconds to the picker's pressed button", () => {
+    const snapshot = fakeSnapshot();
+    const api = buildStubApi(snapshot);
+    renderSettingsPanel(api, { currentRetentionSeconds: 600 });
+    // 600s = 10m — that button is pressed; 60s (the default-default)
+    // is not.
+    expect(
+      screen
+        .getByTestId("transcript-retention-600")
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(
+      screen
+        .getByTestId("transcript-retention-60")
+        .getAttribute("aria-pressed"),
+    ).toBe("false");
+  });
+
 });

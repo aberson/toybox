@@ -241,6 +241,15 @@ function stubFullAuthFetch(opts: { pin_set: boolean }): Mock {
         headers: { "Content-Type": "application/json" },
       });
     }
+    if (url.endsWith("/api/settings/transcript-retention")) {
+      // Phase I step I3: App.tsx GETs the persisted retention preset
+      // on mount + threads it down to SettingsPanel + TranscriptsManager.
+      // Default 60 matches the backend's RETENTION_SECONDS_DEFAULT.
+      return new Response(JSON.stringify({ seconds: 60 }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     // H3: the Kids & Toyboxes sub-tabs mount ToyIngest /
     // ChildProfileEditor / RoomIngestBulk, each of which fires a list
     // probe on mount and reads a specific keyed array off the response

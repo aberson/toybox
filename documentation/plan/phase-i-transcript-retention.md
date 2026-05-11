@@ -166,7 +166,7 @@ Critical path: I1 → I3 → I4 → I5 (4 steps). I2 runs alongside I3+I4 with z
 - **Issue:** [#89](https://github.com/aberson/toybox/issues/89)
 - **Flags:** --reviewers code
 - **Files:** MODIFY `frontend/src/parent/api.ts` (add the two retention helpers; **do not** touch `deleteTranscript` in this step), `frontend/src/parent/components/SettingsPanel.tsx` (mount the new control + thread props), `frontend/src/parent/components/SettingsPanel.test.tsx` (assert new control mounts), `frontend/src/parent/components/TranscriptsManager.tsx` (interface-only: add `retentionSeconds: number;` to TranscriptsManagerProps), `frontend/src/parent/App.tsx` (fetch + state + thread to both consumers; warn-and-default on fetch failure), `frontend/src/parent/App.test.tsx` (mount + flow + failure-path assertions). CREATE `frontend/src/parent/components/TranscriptRetentionControl.tsx`, `frontend/src/parent/components/TranscriptRetentionControl.test.tsx`.
-- **Status:** TODO
+- **Status:** DONE (2026-05-11)
 
 ### Step I4: Frontend TranscriptsManager refresh — rip per-row delete + add fade machinery
 

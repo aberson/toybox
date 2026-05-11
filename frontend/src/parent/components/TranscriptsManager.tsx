@@ -76,6 +76,13 @@ export interface TranscriptsManagerProps {
   subscribeToTranscripts?: (
     handler: (envelope: Envelope) => void,
   ) => () => void;
+  // Phase I step I3: retention preset (seconds) threaded from App.tsx
+  // via SettingsPanel's source-of-truth. I3 only declares the prop —
+  // the consumption logic (1s tick + fade animation + setItems
+  // removal) lands in I4 in the function body. Declared here in I3 so
+  // App.tsx's prop pass typechecks; I4 then adds the body changes
+  // without re-touching the interface block.
+  retentionSeconds: number;
 }
 
 export function TranscriptsManager(

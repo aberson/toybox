@@ -88,6 +88,16 @@ export function App(): JSX.Element {
     null,
   );
   const [muteBusy, setMuteBusy] = useState(false);
+  // Phase I step I3: household-scoped transcript retention preset
+  // (seconds). Seeded from ``GET /api/settings/transcript-retention``
+  // during bootstrap (mirrors the listening-mode + mic seeding from
+  // /api/metrics); on fetch failure the optimistic default ``60``
+  // (which matches the backend default) is retained and a warn is
+  // logged. SettingsPanel writes update this state via the
+  // ``onRetentionChanged`` callback; the value flows down to
+  // TranscriptsManager so the I4 fade machinery uses the same source-
+  // of-truth as the picker. No WS broadcast — single-parent kiosk.
+  const [retentionSeconds, setRetentionSeconds] = useState<number>(60);
   const [authMode, setAuthMode] = useState<AuthMode>("bootstrap");
   const [authStatus, setAuthStatus] = useState<ParentAuthStatus | null>(null);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
@@ -205,6 +215,25 @@ export function App(): JSX.Element {
       } catch (err) {
         if (isAbortError(err)) return;
         // metrics is best-effort during bootstrap
+      }
+      // Phase I step I3: seed the transcript retention preset alongside
+      // the audio/listening seeding. Failure is non-fatal — the
+      // optimistic default of 60s (matching the backend default + the
+      // ``useState`` initializer) stays in place and the next
+      // SettingsPanel write succeeds against the server's authoritative
+      // value. No toast — matches the rest of the bootstrap's posture.
+      try {
+        const retentionResp = await api.getTranscriptRetention({
+          signal: aborter.signal,
+        });
+        setRetentionSeconds(retentionResp.seconds);
+      } catch (err) {
+        if (isAbortError(err)) return;
+        // eslint-disable-next-line no-console
+        console.warn(
+          "transcript retention initial fetch failed, using default",
+          err,
+        );
       }
       const ws = new ParentWsClient({
         url: deriveWsUrl(),
@@ -751,6 +780,7 @@ export function App(): JSX.Element {
                   <TranscriptsManager
                     api={api}
                     subscribeToTranscripts={subscribeToTranscripts}
+                    retentionSeconds={retentionSeconds}
                   />
                 )}
               </div>
@@ -800,7 +830,11 @@ export function App(): JSX.Element {
                     mounted so the metrics-snapshot fetch + ws
                     subscription only fire when Stats is selected. */}
                 {settingsTab.value === "settings" && (
-                  <SettingsPanel api={api} />
+                  <SettingsPanel
+                    api={api}
+                    currentRetentionSeconds={retentionSeconds}
+                    onRetentionChanged={setRetentionSeconds}
+                  />
                 )}
                 {settingsTab.value === "stats" && (
                   <StatsPanel

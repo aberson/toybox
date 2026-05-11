@@ -489,6 +489,16 @@ export interface ImageGenModeResponse {
   mode: ImageGenMode;
 }
 
+// Phase I step I3: household-scoped transcript retention preset. The
+// value is the integer number of seconds a transcript row lives after
+// its ``ended_at`` before being swept by the backend + faded from the
+// parent UI. Mirrors the wire shape of ``GET/PUT
+// /api/settings/image-gen-mode`` — the GET is public (household read),
+// the PUT requires parent scope.
+export interface TranscriptRetentionResponse {
+  seconds: number;
+}
+
 // Phase H step H5: wire shape for the household-global banned-themes
 // setting. Mirrors :class:`toybox.api.banned_themes_settings.BannedThemesResponse`.
 // ``themes`` is a comma-separated CSV (matching the old per-child
@@ -1257,6 +1267,36 @@ export class ApiClient {
       body: JSON.stringify({ mode }),
       signal: opts.signal,
     });
+  }
+
+  // Phase I step I3: transcript retention read-write pair. The GET is
+  // unauthenticated (matches ``getImageGenMode`` — household read); the
+  // PUT requires parent scope. Body shape on both sides is
+  // ``{seconds: int}``. Valid seconds: 60 / 180 / 300 / 600 / 900.
+  async getTranscriptRetention(
+    opts: RequestOptions = {},
+  ): Promise<TranscriptRetentionResponse> {
+    return this.request<TranscriptRetentionResponse>(
+      "/api/settings/transcript-retention",
+      {
+        method: "GET",
+        signal: opts.signal,
+      },
+    );
+  }
+
+  async setTranscriptRetention(
+    seconds: number,
+    opts: RequestOptions = {},
+  ): Promise<TranscriptRetentionResponse> {
+    return this.request<TranscriptRetentionResponse>(
+      "/api/settings/transcript-retention",
+      {
+        method: "PUT",
+        body: JSON.stringify({ seconds }),
+        signal: opts.signal,
+      },
+    );
   }
 
   // Phase H step H5: household-global banned-themes setting. The GET is
