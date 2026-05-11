@@ -8,11 +8,23 @@ Runs entirely on home hardware. Internet is optional — Claude is reached over 
 
 ## Build status
 
-**Phase B steps 11–14b complete.** Issues #15–#19 closed. Audio capture daemon + silero-VAD gate, faster-whisper STT (GPU autodetect, CPU fallback, asyncio-serialized), transcript pipeline with persistence + `Topic.transcript` ws emission + confidence-floor-gated trigger evaluation, mode-aware Claude escalation (5 modes, min-interval throttle, half-open-aware breaker integration, malformed-output → offline + `system` ws warning), and an end-to-end synthetic-audio Playwright smoke (`tests/e2e/test_smoke_pipeline.py`, marked `@pytest.mark.slow` with port-collision pre-flight, runs in ~10 s) — all wired with stub-driven fast tests (no real mic, no real ONNX/Whisper model, no live Claude calls in CI). 610 backend pytest (1 slow E2E excluded from default run) + 99 frontend vitest + 2 Playwright specs passing. 0 type errors, 0 lint violations. M1 (Claude OAuth) + M2 (mic hardware) DONE.
+**Phase H complete 2026-05-10.** Issues #77–#83 closed (umbrella + 6 steps); follow-up [#84](https://github.com/aberson/toybox/issues/84) filed for an unrelated Phase G slot-fill defect surfaced during UAT. Parent app moves from panel-toggle nav to a two-level tabbed shell (Play / Kids & Toyboxes / Settings, with sub-tabs); `banned_themes` promoted from a per-child column to a single `settings.banned_themes_global` key (formalizes the UNION-across-children semantic already present in the escalation pipeline). New `BannedThemesSettings` UI with explicit Save button + dirty indicator + age-group preset picker; `OperatorTab` split into `SettingsPanel` (toggles + banned-themes editor) + `StatsPanel` (metrics snapshot). 1304 backend pytest + 301 frontend vitest passing. 0 type errors, 0 lint violations. iPad UAT PASS — run doc at [`documentation/runs/2026-05-10-phase-h-uat.md`](documentation/runs/2026-05-10-phase-h-uat.md).
 
-**Phase C step 15 + Phase D step 20 shipped 2026-05-03** (commits `20c9b97` + `87e692b`): activity-quality telemetry & eval scaffold (issue #23), and anti-signal feedback in the generator (issue #25). See `tests/fixtures/eval/README.md` for the held-out fixture set.
+### Phase history (post-v1)
 
-Backend modules live: `audio/{capture,vad,ring_buffer,devices,stt,pipeline}`, `core/{escalation,throttle}` (Phase B); plus prior `core/`, `db/`, `personas/`, `ai/`, `triggers/`, `activities/`, `api/{listening,activities,auth,auth_dep,transcripts}`, `ws/{server,heartbeat}`. Frontend unchanged from v1.1: `/parent` (suggestion + activity panel + trigger button, persona name visible) and `/child` (full-bleed kiosk with persona avatar, step card, advance button, "all done" terminal state).
+- **v1 ship — Phase A** (2026-05-02): closed-loop demo with manual "trigger" button.
+- **Phase B** (2026-05-03): audio capture + silero-VAD + faster-whisper + mode-aware Claude escalation. Real mic + STT live in production.
+- **Phase C + D** (2026-05-03): toy/room/child ingestion, activity-quality eval scaffold, anti-signal feedback (commits `20c9b97` + `87e692b`).
+- **iPad-Kiosk** (2026-05-04 → 2026-05-10): child kiosk as PWA on real iPad over LAN.
+- **Phase F → F.5** (2026-05-06 → 2026-05-09): toy action sprites — F archived after c10.dll crash class ([#61](https://github.com/aberson/toybox/issues/61)); replaced by F.5 (SD 1.5 + LCM-LoRA + Tier C composite). All 5 F.5 steps shipped; #61 closed via F.5-5 soft-pass soak.
+- **Phase G** (2026-05-10): branching gameplay — 200 branching templates (50 per intent) via overnight 4-agent soak (50× scope, 0% validation failures); catalog grew 25 → 225 templates.
+- **Phase H** (2026-05-10): parent UX revamp — this commit.
+
+### In flight
+
+- **Phase E** (local model + tool-loop): Step 28 carve-out shipped 2026-05-05 (commit `33a4b3c`). Remainder gated on ≥50 SFT-filter rows in `labeled_events` — populated naturally as parents tag activities.
+
+Backend modules live: `audio/{capture,vad,ring_buffer,devices,stt,pipeline}`, `core/{escalation,throttle,banned_themes,image_gen_mode,…}`, `image_gen/{worker,capability,…}`, `activities/{generator,content_resolver,slots,_validator,…}`, `api/{listening,activities,auth,auth_dep,transcripts,children,toys,rooms,metrics,image_gen_settings,banned_themes_settings,…}`, `ws/{server,heartbeat,envelope,topics}`. Frontend parent app (`/parent`) is now a two-level tab shell; child kiosk (`/child`) is the full-bleed kiosk with persona avatar + step cards + persona-specific toy action sprites + branching choice buttons.
 
 ## Stack
 

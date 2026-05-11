@@ -32,7 +32,7 @@ Runs entirely on home hardware. Internet is optional — Claude is reached over 
 | **G** — branching gameplay | multi-option choice steps + variable-length activities (offline templates only) | ✅ COMPLETE 2026-05-10 — 200 branching templates (50 per intent) shipped via overnight 4-agent soak; iPad UAT PASS |
 | **M2.5** — bundled UAT release gate (formerly Phase D) | bundled human UI verification of steps 16/17/18/21/22/23/24 | RETIRED 2026-05-10 — happy paths de-facto validated by every phase B-G operator session; remaining edge-case checks (dedup 409, bulk-cap 51, wipe-all PIN, ws→REST fallback) optional, not gating; script preserved as reference |
 | **E** — local model + tool-loop (post-v1) | tool-loop refactor + locally-hosted SFT (Supervised Fine-Tuned) model swap-in for Claude OAuth | IN FLIGHT — Step 28 carve-out shipped 2026-05-05 (commit `33a4b3c`: tool registry + ClaudeActivityGenerator wrapper + env-var dispatch + `is_local_capable()` stub). Remainder gated on ≥50 SFT-filter rows in `labeled_events` (the parent-feedback signal table from Phase D step 20 — populated naturally as parents tag activities; schema in [plan/data-model.md](plan/data-model.md)) |
-| **H** — parent UX revamp (tabs + global banned themes) | parent app moves from panel-toggle nav to two-level tabbed shell (Play / Kids & Toyboxes / Settings); `banned_themes` promoted from per-child column to a single `settings.banned_themes_global` key (formalizes existing UNION-across-children runtime behavior) | PLAN WRITTEN 2026-05-10 — see [plan/phase-h-parent-ux-revamp.md](plan/phase-h-parent-ux-revamp.md); 6 steps (H1-H6); H4 backend can run in parallel with H1+H2+H3 frontend; independent of Phase E |
+| **H** — parent UX revamp (tabs + global banned themes) | parent app moves from panel-toggle nav to two-level tabbed shell (Play / Kids & Toyboxes / Settings); `banned_themes` promoted from per-child column to a single `settings.banned_themes_global` key (formalizes existing UNION-across-children runtime behavior) | ✅ COMPLETE 2026-05-10 — all 6 steps (H1-H6) shipped; iPad UAT PASS; [run doc](runs/2026-05-10-phase-h-uat.md); follow-up [#84](https://github.com/aberson/toybox/issues/84) for unrelated Phase G slot-fill defect surfaced during UAT |
 
 ## Stack
 
@@ -93,7 +93,7 @@ Each phase doc carries the per-step `**Problem:**/**Type:**/**Issue:**/**Flags:*
 | [plan/phase-e.md](plan/phase-e.md) — local model + tool-loop | NOT STARTED |
 | [plan/phase-f-5-sprite-cartoon-redo.md](plan/phase-f-5-sprite-cartoon-redo.md) — sprite pipeline cartoon redo (SD 1.5 + LCM-LoRA + Tier C composite) | ✅ DONE 2026-05-09 — all 5 steps shipped, [#61](https://github.com/aberson/toybox/issues/61) closed via F.5-5 soft-pass |
 | [plan/phase-g-branching-gameplay.md](plan/phase-g-branching-gameplay.md) — branching gameplay (multi-option steps + variable length) | ✅ COMPLETE 2026-05-10 — 200 branching templates shipped, iPad UAT PASS |
-| [plan/phase-h-parent-ux-revamp.md](plan/phase-h-parent-ux-revamp.md) — parent UX revamp (tabs + global banned themes) | PLAN WRITTEN 2026-05-10 — H1-H6 spec'd, ready for `/build-phase`; H4 ↔ H1+H2+H3 file-disjoint (parallelizable) |
+| [plan/phase-h-parent-ux-revamp.md](plan/phase-h-parent-ux-revamp.md) — parent UX revamp (tabs + global banned themes) | ✅ COMPLETE 2026-05-10 — all 6 steps shipped, iPad UAT PASS, [run doc](runs/2026-05-10-phase-h-uat.md) |
 
 ### Archive
 
@@ -124,4 +124,4 @@ Use `/build-phase --plan documentation/plan.md` per phase. Steps within a phase 
 
 **Prerequisite before the first `/build-phase` run:** run `/repo-init` to create the GitHub repo + per-step issues, then `/repo-sync` to populate the `**Issue:** #` lines in each step. `/build-phase` posts progress to those issues; missing issue numbers break the audit trail. Re-run `/repo-sync` after any plan-doc edits that change step shape or numbering.
 
-Build order: Phase A → B → C → D → iPad-Kiosk → F (archived) → F.5 → G ✅ (all shipped). Phase E (local model + tool-loop) is in flight — Step 28 carve-out shipped 2026-05-05; remainder is gated on a data-volume threshold (≥50 SFT-filter rows in `labeled_events`), not calendar time. Phase H (parent UX revamp) plan written 2026-05-10 and ready for `/build-phase`; independent of E and may run in parallel.
+Build order: Phase A → B → C → D → iPad-Kiosk → F (archived) → F.5 → G → H ✅ (all shipped). Phase E (local model + tool-loop) is in flight — Step 28 carve-out shipped 2026-05-05; remainder is gated on a data-volume threshold (≥50 SFT-filter rows in `labeled_events`), not calendar time. One Phase G follow-up [#84](https://github.com/aberson/toybox/issues/84) — slot-fill skips placeholders that only appear in choice labels (surfaced by Phase H iPad UAT).
