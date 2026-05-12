@@ -378,7 +378,7 @@ Each file lives in `documentation/operator/`.
 - Issue template for friction reports (text body)
 
 **`recovery.md`:**
-- Recovery recipes from the [phase-d.md "Manual M5"](phase-d.md#manual-m5--operator-recovery-procedures-referenced-from-documentationoperatorrecoverymd) table expanded with full commands
+- Recovery recipes from the [phase-d.md "Manual M5"](archive/phase-d.md#manual-m5--operator-recovery-procedures-referenced-from-documentationoperatorrecoverymd) table expanded with full commands
 - Each recipe lists: symptom, prerequisites (backup first?), exact commands, verification step
 
 **`troubleshooting.md`:**

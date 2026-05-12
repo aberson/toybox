@@ -1,6 +1,6 @@
 # Phase iPad-Kiosk UAT — 2026-05-09
 
-Verification half of [Phase iPad-Kiosk Step iK5](../plan/phase-ipad-kiosk.md#step-ik5-operator-ipad-setup-doc--visual-verification). Tests the kiosk-on-iPad install + run procedure documented in [`../operator/ipad-setup.md`](../operator/ipad-setup.md), using the 14-row M_iK manual table from the same plan section.
+Verification half of [Phase iPad-Kiosk Step iK5](../plan/archive/phase-ipad-kiosk.md#step-ik5-operator-ipad-setup-doc--visual-verification). Tests the kiosk-on-iPad install + run procedure documented in [`../operator/ipad-setup.md`](../operator/ipad-setup.md), using the 14-row M_iK manual table from the same plan section.
 
 ## Environment
 

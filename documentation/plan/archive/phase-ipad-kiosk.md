@@ -1,5 +1,7 @@
 # Phase iPad-Kiosk — Child kiosk on iPad (PWA, post-v1)
 
+> **ARCHIVED 2026-05-11: phase shipped.** See [plan.md status](../../plan.md#status) for the authoritative completion record. Internal cross-refs in this doc are frozen as of archival.
+
 > **Scope:** iPad-Kiosk build plan — turn `/child` into an installable PWA via Add-to-Home-Screen. Carries the per-step `**Problem:**/**Type:**/**Issue:**/**Flags:**/**Status:**/**Done when:**` shape that `/build-phase` parses, plus the M_iK manual UAT script and Backlog enhancements (Tailscale+HTTPS, Service Worker, Capacitor). Sequenced after Phase D (PIN gate ships LAN binding); independent of Phase E (local model) and Phase F (toy action sprites). Top-level overview is in [../plan.md](../plan.md).
 
 ## What this feature does

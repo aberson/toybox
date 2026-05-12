@@ -1,5 +1,7 @@
 # Phase A — Closed-loop skeleton (v1 ship)
 
+> **ARCHIVED 2026-05-11: phase shipped.** See [plan.md status](../../plan.md#status) for the authoritative completion record. Internal cross-refs in this doc are frozen as of archival.
+
 > **Scope:** the 10 automated steps + Manual M1 that took toybox from empty repo to "trigger demo → suggestion → approve → child runs activity to completion." **Status: COMPLETE (2026-05-02).** Read this for archival/regression context, or when extending one of the modules these steps stood up.
 
 Goal: parent clicks "trigger demo," sees suggestion, approves, child app runs activity to completion. No audio. No Claude.

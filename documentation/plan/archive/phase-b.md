@@ -1,5 +1,7 @@
 # Phase B — Hearing
 
+> **ARCHIVED 2026-05-11: phase shipped.** See [plan.md status](../../plan.md#status) for the authoritative completion record. Internal cross-refs in this doc are frozen as of archival.
+
 > **Scope:** the 5 steps + Manual M2 that wired audio capture → VAD → faster-whisper → trigger registry → mode-aware Claude escalation, plus a synthetic-audio E2E smoke. **Status: COMPLETE (2026-05-03).** Read this for module-level orientation when touching `audio/`, `core/escalation`, or `core/throttle`.
 
 **Issues #15–#19 closed. 610 backend pytest passing (1 slow E2E excluded from default `pytest`). Zero type errors. Zero lint violations.**

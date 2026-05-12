@@ -107,7 +107,7 @@ Access are the parts that genuinely require hardware.
   no TLS, no Service Worker (browsers block SW registration on HTTP
   outside `localhost`), and no out-of-home access. The follow-up
   enhancement is Tailscale + Let's Encrypt — see
-  [`../plan/phase-ipad-kiosk.md#ik-backlog-1-tailscale--lets-encrypt-https-for-the-kiosk`](../plan/phase-ipad-kiosk.md#ik-backlog-1-tailscale--lets-encrypt-https-for-the-kiosk).
+  [`../plan/archive/phase-ipad-kiosk.md#ik-backlog-1-tailscale--lets-encrypt-https-for-the-kiosk`](../plan/archive/phase-ipad-kiosk.md#ik-backlog-1-tailscale--lets-encrypt-https-for-the-kiosk).
 - **No offline support.** The kiosk requires backend connectivity for the entire activity; a flaky LAN will stall it.
 - **Token-caching boundary is Guided Access**, not the token lifecycle — see the Guided Access section above.
 
@@ -115,7 +115,7 @@ Access are the parts that genuinely require hardware.
 
 The verification half of Step iK5 is a real-iPad UAT pass against the
 14-row M_iK manual table in
-[`../plan/phase-ipad-kiosk.md#step-ik5-operator-ipad-setup-doc--visual-verification`](../plan/phase-ipad-kiosk.md#step-ik5-operator-ipad-setup-doc--visual-verification).
+[`../plan/archive/phase-ipad-kiosk.md#step-ik5-operator-ipad-setup-doc--visual-verification`](../plan/archive/phase-ipad-kiosk.md#step-ik5-operator-ipad-setup-doc--visual-verification).
 Run all rows in order on the real device, capture findings (including the
 iPadOS version — it determines whether iK3 Wake Lock is active or the
 manual Auto-Lock fallback applies) in a run-doc at

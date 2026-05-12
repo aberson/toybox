@@ -1,5 +1,7 @@
 # Phase G — Branching gameplay (multi-option steps + variable length)
 
+> **ARCHIVED 2026-05-11: phase shipped.** See [plan.md status](../../plan.md#status) for the authoritative completion record. Internal cross-refs in this doc are frozen as of archival.
+
 > **Scope:** Phase G build plan — extend the offline activity template model from a fixed-5 linear list of steps to a directed acyclic graph with optional choice points. Adds three optional fields to the step schema (`id`, `next`, `choices`), drops the `minItems=5, maxItems=5` constraint, switches `activity_steps` from pre-seeded to lazy insertion, and renders a multi-button choice UI on the kiosk when a step has choices. Carries the per-step `**Problem:**/**Type:**/**Issue:**/**Flags:**/**Status:**` shape that `/build-phase` parses. Sequenced after Phase F.5 (DONE 2026-05-09); precedes Phase E and ships the dynamic-step-count + lazy-insertion primitives that E5 had planned to ship. Top-level overview is in [../plan.md](../plan.md). Investigation that led to this phase is in this conversation; no separate run-doc.
 
 ## What this feature does

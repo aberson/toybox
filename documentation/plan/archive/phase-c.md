@@ -1,5 +1,7 @@
 # Phase C — Content
 
+> **ARCHIVED 2026-05-11: phase shipped.** See [plan.md status](../../plan.md#status) for the authoritative completion record. Internal cross-refs in this doc are frozen as of archival.
+
 > **Scope:** the 5 steps + Manual M3 that wired real catalog content (toys, rooms, child profiles) into both offline and Claude generation paths, plus the activity-quality telemetry / eval scaffold. **Status: COMPLETE (2026-05-03).** Read this when touching ingestion, the eval rubric, or the content resolver.
 
 | # | Step | Reviewers | Done-when |

@@ -82,20 +82,13 @@ Each phase doc carries the per-step `**Problem:**/**Type:**/**Issue:**/**Flags:*
 
 | Doc | Status |
 |-----|--------|
-| [plan/phase-a.md](plan/phase-a.md) — closed-loop skeleton | ✅ DONE |
-| [plan/phase-b.md](plan/phase-b.md) — hearing | ✅ DONE |
-| [plan/phase-c.md](plan/phase-c.md) — content | ✅ DONE |
-| [plan/phase-d.md](plan/phase-d.md) — polish | ✅ DONE |
-| [plan/phase-ipad-kiosk.md](plan/phase-ipad-kiosk.md) — child kiosk on iPad PWA | ✅ COMPLETE 2026-05-10 |
-| [plan/phase-e.md](plan/phase-e.md) — local model + tool-loop | NOT STARTED |
-| [plan/phase-f-5-sprite-cartoon-redo.md](plan/phase-f-5-sprite-cartoon-redo.md) — sprite pipeline cartoon redo (SD 1.5 + LCM-LoRA + Tier C composite) | ✅ DONE 2026-05-09 — all 5 steps shipped, [#61](https://github.com/aberson/toybox/issues/61) closed via F.5-5 soft-pass |
-| [plan/phase-g-branching-gameplay.md](plan/phase-g-branching-gameplay.md) — branching gameplay (multi-option steps + variable length) | ✅ COMPLETE 2026-05-10 — 200 branching templates shipped, iPad UAT PASS |
-| [plan/phase-h-parent-ux-revamp.md](plan/phase-h-parent-ux-revamp.md) — parent UX revamp (tabs + global banned themes) | ✅ COMPLETE 2026-05-10 — all 6 steps shipped, iPad UAT PASS, [run doc](runs/2026-05-10-phase-h-uat.md) |
-| [plan/phase-i-transcript-retention.md](plan/phase-i-transcript-retention.md) — transcript retention + display refresh | PLANNED 2026-05-10 — 5 steps (I1–I5); awaiting `/repo-sync` for issue minting |
+| [plan/phase-e.md](plan/phase-e.md) — local model + tool-loop | IN FLIGHT — Step 28 carve-out shipped 2026-05-05; remainder pending |
+
+Completed phase docs (A, B, C, D, iPad-Kiosk, F.5, G, H, I) are in [`plan/archive/`](plan/archive/) — see the archive [README](plan/archive/README.md) for the per-doc index. The Status table above is the authoritative completion record.
 
 ### Archive
 
-[`plan/archive/`](plan/archive/) holds the pre-refactor single-file plan for historical diffing only. Not canonical — do not read it as a source of truth.
+[`plan/archive/`](plan/archive/) holds the pre-refactor single-file plan and all completed phase docs. Snapshots only — do not read as a source of truth. Use the Status table above for current truth, and the [archive README](plan/archive/README.md) as the per-doc index.
 
 ## Key invariants (must respect on every edit)
 
@@ -107,10 +100,10 @@ These are the load-bearing rules. Several are runtime-checked or wired into hook
 4. **Every Claude call goes through the capability gate.** `is_capable()` returning `False` falls back to the offline path with a stable `capability_reason`. ([runtime.md](plan/runtime.md))
 5. **Photo uploads always go through the validation pipeline.** No direct `Image.open` on user bytes outside `src/toybox/storage/images.py`. ([activity-loop.md "Upload validation rules"](plan/activity-loop.md#upload-validation-rules-apply-to-all-photo-endpoints))
 6. **Transcript text never logged at INFO+.** A pre-commit hook enforces this. ([runtime.md "Logging policy"](plan/runtime.md#logging-policy))
-7. **`trigger_phrase` and `persona_reasoning` are PII-stripped (Personally Identifiable Information) from the `activity.state` ws topic.** REST GET remains full-fidelity for parent scope only. ([phase-d.md "Step 23"](plan/phase-d.md#step-23-live-activity-polish--suggestion-why-this))
+7. **`trigger_phrase` and `persona_reasoning` are PII-stripped (Personally Identifiable Information) from the `activity.state` ws topic.** REST GET remains full-fidelity for parent scope only. ([archive/phase-d.md "Step 23"](plan/archive/phase-d.md#step-23-live-activity-polish--suggestion-why-this))
 8. **Slugs are server-derived from `display_name`.** Client cannot supply them. Empty/all-symbol display_names reject with `code=invalid_display_name`. ([data-model.md "Slug derivation"](plan/data-model.md#slug-derivation))
 9. **Pydantic ↔ TypeScript codegen is a pre-commit hook.** Drift in `frontend/src/shared/types.ts` is a check failure. ([appendix.md ".pre-commit-config.yaml"](plan/appendix.md#pre-commit-configyaml))
-10. **Forward-only migrations.** v1 has no rollback path and no DB backups; abort + preserve DB on failure, recover via `documentation/operator/recovery.md`. ([data-model.md "Storage"](plan/data-model.md#storage), [phase-d.md "Manual M5"](plan/phase-d.md#manual-m5--operator-recovery-procedures-referenced-from-documentationoperatorrecoverymd))
+10. **Forward-only migrations.** v1 has no rollback path and no DB backups; abort + preserve DB on failure, recover via `documentation/operator/recovery.md`. ([data-model.md "Storage"](plan/data-model.md#storage), [archive/phase-d.md "Manual M5"](plan/archive/phase-d.md#manual-m5--operator-recovery-procedures-referenced-from-documentationoperatorrecoverymd))
 
 ## Development process
 

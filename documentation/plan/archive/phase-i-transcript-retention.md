@@ -1,5 +1,7 @@
 # Phase I — Transcript retention + display refresh
 
+> **ARCHIVED 2026-05-11: phase shipped.** See [plan.md status](../../plan.md#status) for the authoritative completion record. Internal cross-refs in this doc are frozen as of archival.
+
 > **Scope:** Phase I build plan — add a configurable retention window to the `transcripts` table (preset durations 1m / 3m / 5m / 10m / 15m, default 1 minute) backed by a periodic backend sweep + filter-on-read; in the parent UI, remove the per-row delete affordance (wipe-all stays) and add a local-timer fade-out animation as rows cross their expiry. No changes to the transcription pipeline itself — STT capture, persistence, and the live WS push all stay as Phase H left them; this phase changes only retention and display. Organized for maximum autonomous parallelism: after I1 lands, I2 (backend) runs in parallel with I3 (frontend Settings UI + plumbing); I4 (frontend list refresh) sequences after I3; I5 (UAT) fans in. Carries the per-step `**Problem:**/**Type:**/**Issue:**/**Flags:**/**Files:**/**Status:**` shape that `/build-phase` parses. Sequenced after Phase H (DONE 2026-05-10); independent of Phase E (local model). Top-level overview is in [../plan.md](../plan.md).
 
 ## What this feature does

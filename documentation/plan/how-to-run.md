@@ -60,7 +60,7 @@ cd frontend; npm run dev
 
 ## Run dev — child tablet on LAN (Phase D and later only)
 
-> See also: [phase-ipad-kiosk.md](phase-ipad-kiosk.md) for iPad-specific setup (Add-to-Home-Screen install, Guided Access, Wake Lock, audio unlock troubleshooting). Generic LAN tablet pairing is below; iPad operators should follow this section first to confirm reachability, then jump to the iPad doc.
+> See also: [archive/phase-ipad-kiosk.md](archive/phase-ipad-kiosk.md) for iPad-specific setup (Add-to-Home-Screen install, Guided Access, Wake Lock, audio unlock troubleshooting). Generic LAN tablet pairing is below; iPad operators should follow this section first to confirm reachability, then jump to the iPad doc.
 
 After Phase D step 21 sets a parent PIN, LAN binding is unlocked:
 
@@ -153,4 +153,4 @@ Use `/build-phase --plan documentation/plan.md` per phase. Steps within a phase 
 
 **Prerequisite before the first `/build-phase` run:** run `/repo-init` to create the GitHub repo + per-step issues, then `/repo-sync` to populate the `**Issue:** #` lines in each step (currently `TBD`). `/build-phase` posts progress to those issues; missing issue numbers break the audit trail. Re-run `/repo-sync` after any plan-doc edits that change step shape or numbering.
 
-Build order: Phase A → B → C → D. Manual steps interleave as marked. See [phase-a.md](phase-a.md) through [phase-e.md](phase-e.md).
+Build order: Phase A → B → C → D. Manual steps interleave as marked. See [archive/phase-a.md](archive/phase-a.md) through [phase-e.md](phase-e.md).

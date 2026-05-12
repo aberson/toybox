@@ -1,5 +1,7 @@
 # Phase F.5 — Sprite pipeline cartoon redo (post-F9-fail v1.5 retry)
 
+> **ARCHIVED 2026-05-11: phase shipped.** See [plan.md status](../../plan.md#status) for the authoritative completion record. Internal cross-refs in this doc are frozen as of archival.
+
 > **Scope:** Phase F.5 build plan — replace the SDXL+IPA+pixel-art-LoRA pipeline that crashed F9 ([smoke run 2026-05-07](../runs/2026-05-07-toy-action-sprites-smoke.md), [issue #61](https://github.com/aberson/toybox/issues/61)) with a smaller cartoon-style pipeline (SD 1.5 + LCM-LoRA + cartoon LoRA at 512²) plus a Tier C sticker-composite fallback for hosts without a capable GPU. Carries the per-step `**Problem:**/**Type:**/**Issue:**/**Flags:**/**Status:**` shape that `/build-phase` parses. Sequenced after Phase F's F1-F8 (which DONE shipped 2026-05-06); supersedes the SDXL pipeline shipped in F2. Top-level overview is in [../plan.md](../plan.md). Detailed comparison of approaches considered is in [../runs/2026-05-08-sprite-pipeline-alternatives.md](../runs/2026-05-08-sprite-pipeline-alternatives.md).
 
 ## What this feature does

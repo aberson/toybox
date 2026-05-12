@@ -1,5 +1,7 @@
 # Phase H — Parent UX revamp (tabs + global banned themes)
 
+> **ARCHIVED 2026-05-11: phase shipped.** See [plan.md status](../../plan.md#status) for the authoritative completion record. Internal cross-refs in this doc are frozen as of archival.
+
 > **Scope:** Phase H build plan — replace the parent app's panel-toggle nav with a two-level tabbed shell (top tabs Play / Kids & Toyboxes / Settings; sub-tabs inside each), and promote `banned_themes` from a per-child CSV field to a single household-scoped setting. No gameplay or activity-engine changes; this is a UI restructure plus one schema migration that makes the runtime's already-UNION-across-children behavior the documented model. Carries the per-step `**Problem:**/**Type:**/**Issue:**/**Flags:**/**Files:**/**Status:**` shape that `/build-phase` parses. Sequenced after Phase G (DONE 2026-05-10); independent of Phase E (local model) — both can proceed in parallel since H touches the parent UI + one settings key, and E touches generation. Top-level overview is in [../plan.md](../plan.md).
 
 ## What this feature does

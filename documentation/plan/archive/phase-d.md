@@ -1,5 +1,7 @@
 # Phase D — Polish
 
+> **ARCHIVED 2026-05-11: phase shipped.** See [plan.md status](../../plan.md#status) for the authoritative completion record. Internal cross-refs in this doc are frozen as of archival.
+
 > **Scope:** the 5 steps + Manuals M4 + M5 that closed v1 — anti-signal feedback, parent PIN gate, transcript management, live activity polish, metrics dashboard. **Status: COMPLETE (2026-05-03).** The bundled UAT release gate ([phase-d-uat-m2.5.md](phase-d-uat-m2.5.md)) covers visual verification for steps 16/17/18/21/22/23/24. Read this when extending one of these surfaces or arguing about PIN/auth invariants.
 
 | # | Step | Reviewers | Done-when |
