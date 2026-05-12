@@ -25,6 +25,8 @@ from .api.health import router as health_router
 from .api.image_gen_settings import router as image_gen_settings_router
 from .api.listening import router as listening_router
 from .api.metrics import router as metrics_router
+from .api.play_cadence_seconds_settings import router as play_cadence_seconds_settings_router
+from .api.play_target_depth_settings import router as play_target_depth_settings_router
 from .api.rooms import router as rooms_router
 from .api.toys import router as toys_router
 from .api.transcript_retention_settings import router as transcript_retention_settings_router
@@ -55,6 +57,8 @@ def create_app() -> FastAPI:
     app.include_router(image_gen_settings_router)
     app.include_router(banned_themes_settings_router)
     app.include_router(transcript_retention_settings_router)
+    app.include_router(play_target_depth_settings_router)
+    app.include_router(play_cadence_seconds_settings_router)
     app.include_router(auth_router)
     app.include_router(activities_router)
     app.include_router(children_router)

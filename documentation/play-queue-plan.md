@@ -408,6 +408,7 @@ to clarify the action's scope is the row, not the activity flow.
 - **Type:** code
 - **Issue:** #93
 - **Flags:** `--tdd`
+- **Status:** DONE (2026-05-11)
 - **Produces:** 2 migrations, 2 core modules, 2 API modules, router
   registration in `main.py`, pytest coverage for read/write/validation/
   invalid-row fallback on each module.
