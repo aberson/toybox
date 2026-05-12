@@ -98,7 +98,7 @@ export function SuggestionCard(props: SuggestionCardProps): JSX.Element {
             void onSkip();
           }}
         >
-          {busy.skip ? "skipping..." : "skip"}
+          {busy.skip ? "swapping..." : "try a different one"}
         </button>
         <button
           type="button"

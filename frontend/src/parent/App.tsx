@@ -13,17 +13,16 @@ import type {
   ParentAuthStatus,
   ParentTokenResponse,
 } from "./api";
-import { ActivityPanel } from "./components/ActivityPanel";
 import { CapabilityBanner } from "./components/CapabilityBanner";
 import { ChildProfileEditor } from "./components/ChildProfileEditor";
 import { Header } from "./components/Header";
 import { PinLogin } from "./components/PinLogin";
 import { PinSetup } from "./components/PinSetup";
+import { PlayQueueList } from "./components/PlayQueueList";
 import { RoomIngestBulk } from "./components/RoomIngestBulk";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { StatsPanel } from "./components/StatsPanel";
 import { SubTabs, Tabs, useTabState } from "./components/Tabs";
-import { SuggestionCard } from "./components/SuggestionCard";
 import { ToyIngest } from "./components/ToyIngest";
 import { TranscriptsManager } from "./components/TranscriptsManager";
 import { TriggerButton } from "./components/TriggerButton";
@@ -31,20 +30,9 @@ import { useParentStore } from "./store";
 import type { Envelope } from "./ws";
 import { ParentWsClient } from "./ws";
 
-// Phase A active-suggestion vs. running-activity split: the
-// SuggestionCard renders for `proposed` rows; the ActivityPanel
-// renders once the row is `approved`/`running`/`paused`/`completed`.
-// `dismissed`, `didnt_work`, and `ended` clear the panel — `end`
-// signals the parent is done with this activity, so the surface
-// closes and the parent can trigger a new one.
-//
-// Step 23 iter-2 (L1): `paused` is included so a paused activity
-// keeps the panel visible. Pause/resume are backend-only for v1 (the
-// idempotency contract is wired but the explicit Pause/Resume buttons
-// are deferred). Without `paused` in this set, a paused row would
-// silently disappear from the parent UI.
-const SUGGESTION_STATES = new Set(["proposed"]);
-const PANEL_STATES = new Set(["approved", "running", "paused", "completed"]);
+// Phase J step J8: the legacy showSuggestion / showPanel gates are
+// gone — ``PlayQueueList`` owns the active-vs-proposed rendering
+// internally based on the store's ``proposedList`` + ``active`` slots.
 
 function deriveWsUrl(): string {
   // The vite proxy forwards /ws to the backend during dev. In prod
@@ -98,6 +86,22 @@ export function App(): JSX.Element {
   // TranscriptsManager so the I4 fade machinery uses the same source-
   // of-truth as the picker. No WS broadcast — single-parent kiosk.
   const [retentionSeconds, setRetentionSeconds] = useState<number>(60);
+  // Phase J step J8: play-queue cadence + target depth seeded from
+  // ``GET /api/settings/play-cadence-seconds`` and
+  // ``GET /api/settings/play-target-depth`` during bootstrap. Both
+  // mirror the retentionSeconds plumbing — optimistic default lives
+  // in ``useState``, the fetch fills it post-login, and the value
+  // threads down to ``PlayQueueList`` (cadence) and J10's
+  // SettingsPanel controls (both). 30s cadence + depth 3 are the
+  // backend defaults; matching them locally keeps a failed bootstrap
+  // fetch from flashing odd values into the UI.
+  const [playCadenceSeconds, setPlayCadenceSeconds] = useState<number>(30);
+  // J10 threads playTargetDepth into the new SettingsPanel segmented
+  // control. The state lives here in J8 so the bootstrap parallel-
+  // fetch lands the resolved value before SettingsPanel mounts in J10
+  // — wiring the consumer in J10 doesn't require touching the
+  // bootstrap path again.
+  const [, setPlayTargetDepth] = useState<number>(3);
   const [authMode, setAuthMode] = useState<AuthMode>("bootstrap");
   const [authStatus, setAuthStatus] = useState<ParentAuthStatus | null>(null);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
@@ -216,23 +220,83 @@ export function App(): JSX.Element {
         if (isAbortError(err)) return;
         // metrics is best-effort during bootstrap
       }
-      // Phase I step I3: seed the transcript retention preset alongside
-      // the audio/listening seeding. Failure is non-fatal — the
-      // optimistic default of 60s (matching the backend default + the
-      // ``useState`` initializer) stays in place and the next
-      // SettingsPanel write succeeds against the server's authoritative
-      // value. No toast — matches the rest of the bootstrap's posture.
-      try {
-        const retentionResp = await api.getTranscriptRetention({
-          signal: aborter.signal,
-        });
-        setRetentionSeconds(retentionResp.seconds);
-      } catch (err) {
-        if (isAbortError(err)) return;
+      // Phase I step I3 + Phase J step J8: seed the transcript retention
+      // preset alongside the play-queue settings + proposed-list snapshot
+      // in parallel. All four are independent reads; running them
+      // sequentially would cost three extra round-trips on the login
+      // path. Each failure is handled independently so a single bad
+      // endpoint doesn't poison the others — optimistic defaults
+      // (matching the backend defaults) stay in place when a probe
+      // rejects. No toast — matches the rest of the bootstrap's posture.
+      const [
+        retentionResult,
+        cadenceResult,
+        targetDepthResult,
+        proposedResult,
+      ] = await Promise.allSettled([
+        api.getTranscriptRetention({ signal: aborter.signal }),
+        api.getPlayCadenceSeconds({ signal: aborter.signal }),
+        api.getPlayTargetDepth({ signal: aborter.signal }),
+        api.listProposedActivities(
+          { include_active: true },
+          { signal: aborter.signal },
+        ),
+      ]);
+      // ``Promise.allSettled`` swallows aborts as rejected results, so
+      // a mid-bootstrap unmount (e.g. parent navigates away while these
+      // four reads are in flight) would otherwise fall through to the
+      // ws-client construction below. Bail explicitly when the aborter
+      // fired — mirrors the ``if (isAbortError(err)) return`` guards
+      // around the earlier sequential ``await``s above. Without this,
+      // an aborted bootstrap leaks a live ws connection.
+      if (aborter.signal.aborted) return;
+      if (retentionResult.status === "fulfilled") {
+        setRetentionSeconds(retentionResult.value.seconds);
+      } else if (!isAbortError(retentionResult.reason)) {
         // eslint-disable-next-line no-console
         console.warn(
           "transcript retention initial fetch failed, using default",
-          err,
+          retentionResult.reason,
+        );
+      }
+      if (cadenceResult.status === "fulfilled") {
+        setPlayCadenceSeconds(cadenceResult.value.value);
+      } else if (!isAbortError(cadenceResult.reason)) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          "play cadence initial fetch failed, using default",
+          cadenceResult.reason,
+        );
+      }
+      if (targetDepthResult.status === "fulfilled") {
+        setPlayTargetDepth(targetDepthResult.value.value);
+      } else if (!isAbortError(targetDepthResult.reason)) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          "play target depth initial fetch failed, using default",
+          targetDepthResult.reason,
+        );
+      }
+      if (proposedResult.status === "fulfilled") {
+        // Hydrate ``proposedList`` + ``active`` from the REST snapshot.
+        // Each row is routed through ``applyMutationResult`` (which
+        // wraps ``applyEnvelopeToNewSlots``) so the version-guard
+        // logic stays identical between REST seed and ws envelope
+        // paths — a ws envelope arriving mid-fetch can't be regressed
+        // by a stale snapshot.
+        const store = useParentStore.getState();
+        const { items, active: snapshotActive } = proposedResult.value;
+        for (const item of items) {
+          store.applyMutationResult(item);
+        }
+        if (snapshotActive !== null) {
+          store.applyMutationResult(snapshotActive);
+        }
+      } else if (!isAbortError(proposedResult.reason)) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          "proposed activities initial fetch failed, using empty queue",
+          proposedResult.reason,
         );
       }
       const ws = new ParentWsClient({
@@ -413,35 +477,6 @@ export function App(): JSX.Element {
     [api],
   );
 
-  // Per-action in-flight guards. Two rapid clicks on (e.g.) approve
-  // would otherwise fire mutations with the same If-Match-Version and
-  // the second would 409. We disable the buttons while a request is
-  // in flight per action.
-  const [busy, setBusy] = useState({
-    approve: false,
-    skip: false,
-    dismiss: false,
-    regenerate: false,
-    end: false,
-    didntWork: false,
-    thumbsUp: false,
-    stepBack: false,
-  });
-
-  type BusyKey = keyof typeof busy;
-  const runGuarded = useCallback(
-    async (key: BusyKey, fn: () => Promise<void>): Promise<void> => {
-      if (busy[key]) return;
-      setBusy((prev) => ({ ...prev, [key]: true }));
-      try {
-        await fn();
-      } finally {
-        setBusy((prev) => ({ ...prev, [key]: false }));
-      }
-    },
-    [busy],
-  );
-
   const handleTrigger = useCallback(async (): Promise<void> => {
     try {
       const now = new Date();
@@ -461,207 +496,154 @@ export function App(): JSX.Element {
     }
   }, [api]);
 
-  // Phase J step J7: derive the "card on screen" target from the new
-  // play-queue slots. The visible UI keeps its pre-J7 contract — show
-  // the ActivityPanel when an active card is set, otherwise show the
-  // first proposed card from the queue. Handlers below act on this
-  // single derived target so the per-action busy/version-guard logic
-  // is unchanged. J8 swaps the proposed-card render for a scrollable
-  // queue list; the action handlers will pick a per-row target there.
-  const proposedHead = state.proposedList[0] ?? null;
-  const activity: Activity | null = state.active ?? proposedHead;
-
+  // Phase J step J8: per-row action handlers. Each takes the target
+  // ``Activity`` directly so ``PlayQueueList`` can route per-row
+  // (multiple proposed cards on screen + a pinned active) without
+  // needing to share a derived "current target". Per-action in-flight
+  // de-duplication moved INTO ``PlayQueueList``'s busy map (keyed by
+  // action + id) so two different rows can have concurrent in-flight
+  // mutations without one row's spinner blocking the other.
   const handleApprove = useCallback(
-    () =>
-      runGuarded("approve", async () => {
-        if (activity === null) return;
-        const result = await withConflictHandler({
-          mutation: () => api.approve(activity.id, activity.version),
-          refetch: () => refetchActivity(activity.id),
-          onConflict: (conflict, fresh) => {
-            useParentStore.getState().applyVersionConflict(conflict, fresh);
-          },
-        });
-        if (result !== null) {
-          useParentStore.getState().applyMutationResult(result);
-        }
-      }),
-    [activity, api, refetchActivity, runGuarded],
-  );
-
-  const handleSkip = useCallback(
-    () =>
-      runGuarded("skip", async () => {
-        if (activity === null) return;
-        const result = await withConflictHandler({
-          mutation: () => api.regenerate(activity.id, activity.version),
-          refetch: () => refetchActivity(activity.id),
-          onConflict: (conflict, fresh) => {
-            useParentStore.getState().applyVersionConflict(conflict, fresh);
-          },
-        });
-        if (result !== null) {
-          useParentStore.getState().applyMutationResult(result);
-        }
-      }),
-    [activity, api, refetchActivity, runGuarded],
+    async (target: Activity): Promise<void> => {
+      const result = await withConflictHandler({
+        mutation: () => api.approve(target.id, target.version),
+        refetch: () => refetchActivity(target.id),
+        onConflict: (conflict, fresh) => {
+          useParentStore.getState().applyVersionConflict(conflict, fresh);
+        },
+      });
+      if (result !== null) {
+        useParentStore.getState().applyMutationResult(result);
+      }
+    },
+    [api, refetchActivity],
   );
 
   const handleDismiss = useCallback(
-    () =>
-      runGuarded("dismiss", async () => {
-        if (activity === null) return;
-        const result = await withConflictHandler({
-          mutation: () => api.dismiss(activity.id, activity.version),
-          refetch: () => refetchActivity(activity.id),
-          onConflict: (conflict, fresh) => {
-            useParentStore.getState().applyVersionConflict(conflict, fresh);
-          },
-        });
-        if (result !== null) {
-          // Phase J step J7 fix: route through ``applyMutationResult`` so
-          // the ``dismissed``-state response removes the row from
-          // ``proposedList`` (where proposed cards live post-J7).
-          // Pre-J7 ``setActive(null)`` cleared the legacy single slot —
-          // post-J7 ``state.active`` is already null for a proposed
-          // dismissal, so ``setActive(null)`` was a no-op and the card
-          // stayed rendered until the ws envelope arrived (50-500ms
-          // later). ``applyMutationResult`` runs the same
-          // ``applyEnvelopeToNewSlots`` reducer the ws path uses, so the
-          // dismissed-state row clears the proposedList entry AND clears
-          // ``active`` if the id matches — covering both surfaces with a
-          // single instant update.
-          useParentStore.getState().applyMutationResult(result);
-        }
-      }),
-    [activity, api, refetchActivity, runGuarded],
+    async (target: Activity): Promise<void> => {
+      const result = await withConflictHandler({
+        mutation: () => api.dismiss(target.id, target.version),
+        refetch: () => refetchActivity(target.id),
+        onConflict: (conflict, fresh) => {
+          useParentStore.getState().applyVersionConflict(conflict, fresh);
+        },
+      });
+      if (result !== null) {
+        // J7 fix preserved: route through ``applyMutationResult`` so
+        // the dismissed-state response removes the row from the queue
+        // (or clears active) synchronously rather than waiting for
+        // the ws envelope.
+        useParentStore.getState().applyMutationResult(result);
+      }
+    },
+    [api, refetchActivity],
   );
 
   const handleRegenerate = useCallback(
-    () =>
-      runGuarded("regenerate", async () => {
-        if (activity === null) return;
-        const result = await withConflictHandler({
-          mutation: () => api.regenerate(activity.id, activity.version),
-          refetch: () => refetchActivity(activity.id),
-          onConflict: (conflict, fresh) => {
-            useParentStore.getState().applyVersionConflict(conflict, fresh);
-          },
-        });
-        if (result !== null) {
-          useParentStore.getState().applyMutationResult(result);
-        }
-      }),
-    [activity, api, refetchActivity, runGuarded],
+    async (target: Activity): Promise<void> => {
+      const result = await withConflictHandler({
+        mutation: () => api.regenerate(target.id, target.version),
+        refetch: () => refetchActivity(target.id),
+        onConflict: (conflict, fresh) => {
+          useParentStore.getState().applyVersionConflict(conflict, fresh);
+        },
+      });
+      if (result !== null) {
+        useParentStore.getState().applyMutationResult(result);
+      }
+    },
+    [api, refetchActivity],
   );
 
   const handleEnd = useCallback(
-    () =>
-      runGuarded("end", async () => {
-        if (activity === null) return;
-        // ``ended`` is only reachable from approved/running per the
-        // backend's _VALID_TRANSITIONS. From a terminal state (most
-        // commonly ``completed`` after the kiosk advanced through the
-        // last step) the server returns 409 invalid_transition and the
-        // panel sits there looking broken. Treat End as "dismiss this
-        // panel" locally for terminal states — the activity record is
-        // already finalized server-side, no API call needed.
-        if (activity.state === "completed" || activity.state === "ended") {
-          useParentStore.getState().setActive(null);
+    async (target: Activity): Promise<void> => {
+      // ``ended`` is only reachable from approved/running per the
+      // backend's _VALID_TRANSITIONS. From a terminal state the server
+      // returns 409 invalid_transition and the panel sits there looking
+      // broken. Treat End as "dismiss this panel" locally for terminal
+      // states — the activity record is already finalized server-side,
+      // no API call needed.
+      if (target.state === "completed" || target.state === "ended") {
+        useParentStore.getState().setActive(null);
+        useParentStore.getState().pushToast("info", "activity ended");
+        return;
+      }
+      try {
+        const result = await withConflictHandler({
+          mutation: () => api.end(target.id, target.version),
+          refetch: () => refetchActivity(target.id),
+          onConflict: (conflict, fresh) => {
+            useParentStore.getState().applyVersionConflict(conflict, fresh);
+          },
+        });
+        if (result !== null) {
+          useParentStore.getState().applyMutationResult(result);
+          // The panel hides on `ended` so confirm via a toast — without
+          // it the button looks like it did nothing.
           useParentStore.getState().pushToast("info", "activity ended");
-          return;
         }
-        try {
-          const result = await withConflictHandler({
-            mutation: () => api.end(activity.id, activity.version),
-            refetch: () => refetchActivity(activity.id),
-            onConflict: (conflict, fresh) => {
-              useParentStore.getState().applyVersionConflict(conflict, fresh);
-            },
-          });
-          if (result !== null) {
-            useParentStore.getState().applyMutationResult(result);
-            // The panel hides on `ended` (not in PANEL_STATES), so confirm
-            // the action took effect — without a toast it looks like the
-            // button did nothing.
-            useParentStore.getState().pushToast("info", "activity ended");
-          }
-        } catch (err) {
-          // Non-version-conflict errors (e.g. invalid_transition, network)
-          // would otherwise surface as a silent unhandled rejection.
-          const message = err instanceof Error ? err.message : "end failed";
-          useParentStore.getState().pushToast("error", `end: ${message}`);
-        }
-      }),
-    [activity, api, refetchActivity, runGuarded],
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "end failed";
+        useParentStore.getState().pushToast("error", `end: ${message}`);
+      }
+    },
+    [api, refetchActivity],
   );
 
   const handleThumbsUp = useCallback(
-    () =>
-      runGuarded("thumbsUp", async () => {
-        if (activity === null) return;
-        try {
-          await api.thumbsUp(activity.id);
-          useParentStore
-            .getState()
-            .pushToast("info", "thanks — feedback recorded");
-        } catch (err) {
-          const message =
-            err instanceof Error ? err.message : "thumbs-up failed";
-          useParentStore
-            .getState()
-            .pushToast("error", `thumbs-up: ${message}`);
-        }
-      }),
-    [activity, api, runGuarded],
+    async (target: Activity): Promise<void> => {
+      try {
+        await api.thumbsUp(target.id);
+        useParentStore
+          .getState()
+          .pushToast("info", "thanks — feedback recorded");
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "thumbs-up failed";
+        useParentStore
+          .getState()
+          .pushToast("error", `thumbs-up: ${message}`);
+      }
+    },
+    [api],
   );
 
   const handleStepBack = useCallback(
-    () =>
-      runGuarded("stepBack", async () => {
-        if (activity === null) return;
-        const result = await withConflictHandler({
-          mutation: () => api.stepBack(activity.id, activity.version),
-          refetch: () => refetchActivity(activity.id),
-          onConflict: (conflict, fresh) => {
-            useParentStore.getState().applyVersionConflict(conflict, fresh);
-          },
-        });
-        if (result !== null) {
-          useParentStore.getState().applyMutationResult(result);
-        }
-      }),
-    [activity, api, refetchActivity, runGuarded],
+    async (target: Activity): Promise<void> => {
+      const result = await withConflictHandler({
+        mutation: () => api.stepBack(target.id, target.version),
+        refetch: () => refetchActivity(target.id),
+        onConflict: (conflict, fresh) => {
+          useParentStore.getState().applyVersionConflict(conflict, fresh);
+        },
+      });
+      if (result !== null) {
+        useParentStore.getState().applyMutationResult(result);
+      }
+    },
+    [api, refetchActivity],
   );
 
   const handleDidntWork = useCallback(
-    () =>
-      runGuarded("didntWork", async () => {
-        if (activity === null) return;
-        const result = await withConflictHandler({
-          mutation: () =>
-            api.didntWork(activity.id, activity.version, "parent_marked"),
-          refetch: () => refetchActivity(activity.id),
-          onConflict: (conflict, fresh) => {
-            useParentStore.getState().applyVersionConflict(conflict, fresh);
-          },
-        });
-        if (result !== null) {
-          useParentStore.getState().applyMutationResult(result);
-          // The panel hides on `didnt_work` (not in PANEL_STATES), so without
-          // a toast the action looks like it did nothing. Confirm the
-          // feedback was recorded.
-          useParentStore
-            .getState()
-            .pushToast("info", "feedback recorded — thanks");
-        }
-      }),
-    [activity, api, refetchActivity, runGuarded],
+    async (target: Activity): Promise<void> => {
+      const result = await withConflictHandler({
+        mutation: () =>
+          api.didntWork(target.id, target.version, "parent_marked"),
+        refetch: () => refetchActivity(target.id),
+        onConflict: (conflict, fresh) => {
+          useParentStore.getState().applyVersionConflict(conflict, fresh);
+        },
+      });
+      if (result !== null) {
+        useParentStore.getState().applyMutationResult(result);
+        // The panel hides on `didnt_work` so confirm via a toast.
+        useParentStore
+          .getState()
+          .pushToast("info", "feedback recorded — thanks");
+      }
+    },
+    [api, refetchActivity],
   );
-
-  const showSuggestion =
-    activity !== null && SUGGESTION_STATES.has(activity.state);
-  const showPanel = activity !== null && PANEL_STATES.has(activity.state);
 
   // Step 21: gate on PIN status before rendering the main app.
   if (authMode === "bootstrap") {
@@ -755,45 +737,37 @@ export function App(): JSX.Element {
               <div role="tabpanel" style={{ marginTop: 12 }}>
                 {playTab.value === "play-ideas" && (
                   <>
-                    <div style={{ marginBottom: 16 }}>
+                    {/* Phase J step J8: PlayQueueList owns the
+                        pinned-active vs. proposed-queue layout
+                        internally. State for both slots lives in the
+                        store and threads in via props; the component
+                        also owns the TTL fade machinery + per-row
+                        busy keys. Pre-J8 the showSuggestion /
+                        showPanel gates rendered either SuggestionCard
+                        OR ActivityPanel — now they coexist when both
+                        slots are populated (an active card pinned
+                        with proposed cards queued underneath). */}
+                    <PlayQueueList
+                      active={state.active}
+                      proposedList={state.proposedList}
+                      cadenceSeconds={playCadenceSeconds}
+                      onApprove={handleApprove}
+                      onDismiss={handleDismiss}
+                      onRegenerate={handleRegenerate}
+                      onEnd={handleEnd}
+                      onStepBack={handleStepBack}
+                      onDidntWork={handleDidntWork}
+                      onThumbsUp={handleThumbsUp}
+                    />
+                    {/* Phase J step J8: TriggerButton restyled and
+                        repositioned below the queue. Pre-J8 it was the
+                        prominent top-of-tab CTA; with the autonomous
+                        cadence loop seeding proposals, the manual
+                        trigger becomes a fallback affordance. J10
+                        will tighten the link-style polish. */}
+                    <div style={{ marginTop: 12, textAlign: "right" }}>
                       <TriggerButton onTrigger={handleTrigger} />
                     </div>
-                    {/* Activity surface gates preserved from pre-H2 —
-                        the SuggestionCard renders for ``proposed`` rows
-                        and ActivityPanel renders for the running/paused/
-                        completed lifecycle. State is unaffected by tab
-                        switches; only render visibility is gated by the
-                        ``play`` + ``play-ideas`` selection. */}
-                    {showSuggestion && activity !== null && (
-                      <SuggestionCard
-                        activity={activity}
-                        onApprove={handleApprove}
-                        onSkip={handleSkip}
-                        onDismiss={handleDismiss}
-                        busy={{
-                          approve: busy.approve,
-                          skip: busy.skip,
-                          dismiss: busy.dismiss,
-                        }}
-                      />
-                    )}
-                    {showPanel && activity !== null && (
-                      <ActivityPanel
-                        activity={activity}
-                        onRegenerate={handleRegenerate}
-                        onEnd={handleEnd}
-                        onDidntWork={handleDidntWork}
-                        onThumbsUp={handleThumbsUp}
-                        onStepBack={handleStepBack}
-                        busy={{
-                          regenerate: busy.regenerate,
-                          end: busy.end,
-                          didntWork: busy.didntWork,
-                          thumbsUp: busy.thumbsUp,
-                          stepBack: busy.stepBack,
-                        }}
-                      />
-                    )}
                   </>
                 )}
                 {playTab.value === "transcription" && (

@@ -646,6 +646,7 @@ to clarify the action's scope is the row, not the activity flow.
 - **Depends on:** J6.
 
 ### Step J8: PlayQueueList component + App.tsx wiring
+- **Status:** DONE (2026-05-12)
 - **Problem:** New `frontend/src/parent/components/PlayQueueList.tsx`.
   Copy the structure of `TranscriptsManager.tsx`: a scrolling list with
   1s tick, `fadingIds` set, `removalTimeoutsRef` cleanup. **No separate
