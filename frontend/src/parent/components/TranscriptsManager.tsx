@@ -16,8 +16,6 @@ import type { Envelope } from "../ws";
 // * Cursor-paginated list (most recent first) with "Load more" at the
 //   bottom when the previous page returned a full window — mirrors the
 //   ``ended_at`` cursor the backend exposes (no opaque next-page token).
-// * Debounced search field (250ms). Switches to ``searchTranscripts``
-//   when non-empty; falls back to the paginated list when cleared.
 // * Local-timer fade-out (Phase I step I4): a 1s ``setInterval``
 //   iterates the visible items, computes ``expires_at = ended_at +
 //   retentionSeconds`` per row, marks expired rows as fading via inline
@@ -35,14 +33,11 @@ import type { Envelope } from "../ws";
 //   pattern as ``PinLogin`` / ``PinSetup``.
 // * PIN input is digits-only on the way in (``digitsOnly``) so a stray
 //   letter disappears mid-type rather than waiting for a 422.
-// * Debounce uses ``setTimeout`` inside a ``useEffect``; no library
-//   dependency.
 
 const PIN_MIN = 4;
 const PIN_MAX = 12;
 const DEFAULT_PAGE_SIZE = 50;
 const TEXT_PREVIEW_CHARS = 100;
-const SEARCH_DEBOUNCE_MS = 250;
 // Phase I step I4: shared inline ``transition`` string for the fade-out
 // animation. Hoisted to keep the inline style sites within the project
 // column norm and to keep both sites in lockstep (any tuning of the
@@ -100,8 +95,6 @@ export function TranscriptsManager(
   const [items, setItems] = useState<TranscriptRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [listError, setListError] = useState<string | null>(null);
-  const [searchInput, setSearchInput] = useState<string>("");
-  const [activeQuery, setActiveQuery] = useState<string>("");
   const [hasMore, setHasMore] = useState<boolean>(false);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
   // Phase I step I4 fade machinery. ``fadingIds`` flips a row's inline
@@ -140,10 +133,11 @@ export function TranscriptsManager(
   // synchronously when they fire so a late-mounted callback still
   // joins the live signal.
   const aborterRef = useRef<AbortController | null>(null);
-  // Per-search aborter so two rapid debounced fetches don't race —
-  // the older one is aborted as soon as the next one starts, otherwise
-  // a late-arriving older response could overwrite a newer one.
-  const searchAborterRef = useRef<AbortController | null>(null);
+  // Per-fetch aborter so a wipe-triggered refetch can't race the
+  // initial mount load — the older one is aborted as soon as the next
+  // one starts, otherwise a late-arriving older response could
+  // overwrite a newer one.
+  const fetchAborterRef = useRef<AbortController | null>(null);
   useEffect(() => {
     const aborter = new AbortController();
     aborterRef.current = aborter;
@@ -152,88 +146,46 @@ export function TranscriptsManager(
       if (aborterRef.current === aborter) {
         aborterRef.current = null;
       }
-      // Also abort any in-flight search; the per-search controller
-      // is independent of the lifetime one.
-      searchAborterRef.current?.abort();
-      searchAborterRef.current = null;
+      fetchAborterRef.current?.abort();
+      fetchAborterRef.current = null;
     };
   }, []);
 
-  const refetchList = useCallback(
-    async (query: string): Promise<void> => {
-      // Cancel any prior in-flight list/search; only the most recent
-      // call should ever paint into state.
-      searchAborterRef.current?.abort();
-      const aborter = new AbortController();
-      searchAborterRef.current = aborter;
-      setLoading(true);
-      setListError(null);
-      try {
-        const response =
-          query === ""
-            ? await api.listTranscripts(
-                { limit: DEFAULT_PAGE_SIZE },
-                { signal: aborter.signal },
-              )
-            : await api.searchTranscripts(
-                query,
-                { limit: DEFAULT_PAGE_SIZE },
-                { signal: aborter.signal },
-              );
-        setItems(response.items);
-        // Search results don't paginate in v1 (the spec returns up to
-        // ``limit`` matches without a cursor); only show "Load more"
-        // for the unfiltered list and only when the page is full.
-        setHasMore(query === "" && response.items.length >= DEFAULT_PAGE_SIZE);
-      } catch (err) {
-        if (isAbortError(err)) return;
-        const message = err instanceof Error ? err.message : "load failed";
-        setListError(message);
-      } finally {
-        // Only clear loading if this call is still the latest. A newer
-        // call already flipped loading=true and we shouldn't undo it.
-        if (searchAborterRef.current === aborter) {
-          setLoading(false);
-        }
+  const refetchList = useCallback(async (): Promise<void> => {
+    fetchAborterRef.current?.abort();
+    const aborter = new AbortController();
+    fetchAborterRef.current = aborter;
+    setLoading(true);
+    setListError(null);
+    try {
+      const response = await api.listTranscripts(
+        { limit: DEFAULT_PAGE_SIZE },
+        { signal: aborter.signal },
+      );
+      setItems(response.items);
+      setHasMore(response.items.length >= DEFAULT_PAGE_SIZE);
+    } catch (err) {
+      if (isAbortError(err)) return;
+      const message = err instanceof Error ? err.message : "load failed";
+      setListError(message);
+    } finally {
+      if (fetchAborterRef.current === aborter) {
+        setLoading(false);
       }
-    },
-    [api],
-  );
+    }
+  }, [api]);
 
-  // Initial mount load — empty query -> paginated list.
   useEffect(() => {
-    void refetchList("");
-    // refetchList is stable (api is stable); we deliberately run only
-    // on mount so the debounce effect drives subsequent reloads.
+    void refetchList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Debounce: any change to ``searchInput`` schedules a 250ms refetch.
-  // Cancelled by either the next change or unmount.
-  useEffect(() => {
-    const trimmed = searchInput.trim();
-    // Skip the very-first run (initial mount already loads above) by
-    // checking whether the active query already matches.
-    if (trimmed === activeQuery) return;
-    const handle = window.setTimeout(() => {
-      setActiveQuery(trimmed);
-      void refetchList(trimmed);
-    }, SEARCH_DEBOUNCE_MS);
-    return () => window.clearTimeout(handle);
-  }, [searchInput, activeQuery, refetchList]);
-
   // Live ``transcript`` envelope subscription. New rows prepend into
-  // the list as the kiosk produces them. Two guards:
-  // * Skip live-prepend when the operator is searching (activeQuery
-  //   non-empty) — the search results stay frozen until the search
-  //   clears, otherwise an unrelated new transcript would pollute
-  //   the result set without warning.
-  // * Dedupe by id — defensive against the rare case where a ws
-  //   envelope races a refetch.
+  // the list as the kiosk produces them. Dedupe by id — defensive
+  // against the rare case where a ws envelope races a refetch.
   useEffect(() => {
     if (subscribeToTranscripts === undefined) return;
     const unsubscribe = subscribeToTranscripts((envelope) => {
-      if (activeQuery !== "") return;
       const payload = envelope.payload as {
         id?: unknown;
         text?: unknown;
@@ -270,7 +222,7 @@ export function TranscriptsManager(
       });
     });
     return unsubscribe;
-  }, [subscribeToTranscripts, activeQuery]);
+  }, [subscribeToTranscripts]);
 
   const loadMore = useCallback(async (): Promise<void> => {
     if (items.length === 0 || loadingMore) return;
@@ -437,9 +389,8 @@ export function TranscriptsManager(
       setWipeOpen(false);
       setWipePin("");
       // Refetch — the list should now be empty (or near-empty if a
-      // late insert raced with the wipe). The active query stays as
-      // the operator left it.
-      await refetchList(activeQuery);
+      // late insert raced with the wipe).
+      await refetchList();
     } catch (err) {
       if (isAbortError(err)) return;
       const lockedDetail = extractPinLockedDetail(err);
@@ -484,7 +435,7 @@ export function TranscriptsManager(
     } finally {
       setWipeSubmitting(false);
     }
-  }, [activeQuery, api, refetchList, wipeLockSeconds, wipePin]);
+  }, [api, refetchList, wipeLockSeconds, wipePin]);
 
   return (
     <section
@@ -497,24 +448,7 @@ export function TranscriptsManager(
         background: "#fff",
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 8,
-        }}
-      >
-        <h2 style={{ margin: 0, fontSize: 17 }}>Transcripts</h2>
-        <input
-          type="search"
-          data-testid="transcripts-search-input"
-          placeholder="search text..."
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          style={{ padding: 6, fontSize: 13, width: 220 }}
-        />
-      </div>
+      <h2 style={{ margin: "0 0 8px 0", fontSize: 17 }}>Transcripts</h2>
       <p
         data-testid="transcripts-listening-hint"
         style={{ fontSize: 12, color: "#6b7280", margin: "0 0 8px 0" }}
@@ -562,9 +496,7 @@ export function TranscriptsManager(
           data-testid="transcripts-empty"
           style={{ color: "#777", fontSize: 13 }}
         >
-          {activeQuery === ""
-            ? "No transcripts yet."
-            : `No matches for "${activeQuery}".`}
+          No transcripts yet.
         </p>
       )}
 

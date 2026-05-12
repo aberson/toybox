@@ -1,6 +1,6 @@
 // Component tests for the Phase I step I4 transcript management UI.
 // Spins up a stubbed ApiClient (only the methods the manager calls are
-// wired) and asserts list / search / fade / wipe-all behaviour.
+// wired) and asserts list / fade / wipe-all behaviour.
 //
 // Phase I step I4 replaced the per-row delete affordance with a local
 // 1s fade-out tick driven by ``retentionSeconds``. The delete-path
@@ -47,7 +47,6 @@ function fakeRow(overrides: Partial<TranscriptRow> = {}): TranscriptRow {
 
 interface StubApi {
   listTranscripts: Mock;
-  searchTranscripts: Mock;
   wipeTranscripts: Mock;
 }
 
@@ -57,13 +56,6 @@ function buildStubApi(initial: TranscriptRow[]): StubApi {
       async (
         _params: { limit?: number; before?: string | null } = {},
       ): Promise<TranscriptListResponse> => ({ items: initial }),
-    ) as Mock,
-    searchTranscripts: vi.fn(
-      async (q: string): Promise<TranscriptListResponse> => ({
-        items: initial.filter((r) =>
-          (r.text ?? "").toLowerCase().includes(q.toLowerCase()),
-        ),
-      }),
     ) as Mock,
     wipeTranscripts: vi.fn(
       async (_body: TranscriptWipeRequest): Promise<TranscriptWipeResponse> =>
@@ -93,34 +85,6 @@ describe("TranscriptsManager", () => {
     });
     expect(screen.getByText("first")).toBeTruthy();
     expect(screen.getByText("second")).toBeTruthy();
-  });
-
-  it("debounces the search field and calls searchTranscripts", async () => {
-    vi.useFakeTimers();
-    const stub = buildStubApi([
-      fakeRow({ id: "t-1", text: "hello world" }),
-      fakeRow({ id: "t-2", text: "goodbye" }),
-    ]);
-    render(<TranscriptsManager api={stub as unknown as ApiClient} retentionSeconds={60} />);
-    // Initial mount fires listTranscripts.
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    expect(stub.listTranscripts).toHaveBeenCalledTimes(1);
-
-    const input = screen.getByTestId(
-      "transcripts-search-input",
-    ) as HTMLInputElement;
-    fireEvent.change(input, { target: { value: "hel" } });
-    fireEvent.change(input, { target: { value: "hell" } });
-    fireEvent.change(input, { target: { value: "hello" } });
-    // No call until debounce elapses.
-    expect(stub.searchTranscripts).not.toHaveBeenCalled();
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(260);
-    });
-    expect(stub.searchTranscripts).toHaveBeenCalledTimes(1);
-    expect(stub.searchTranscripts.mock.calls[0]?.[0]).toBe("hello");
   });
 
   it("opens the wipe-all modal with a PIN field", async () => {
@@ -254,42 +218,6 @@ describe("TranscriptsManager", () => {
       "transcripts-wipe-pin-input",
     ) as HTMLInputElement;
     expect(pinAgain.value).toBe("");
-  });
-
-  it("falls back to listTranscripts when the search field is cleared", async () => {
-    vi.useFakeTimers();
-    const stub = buildStubApi([
-      fakeRow({ id: "t-1", text: "hello world" }),
-      fakeRow({ id: "t-2", text: "goodbye" }),
-    ]);
-    render(<TranscriptsManager api={stub as unknown as ApiClient} retentionSeconds={60} />);
-    // Initial mount fires listTranscripts.
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    expect(stub.listTranscripts).toHaveBeenCalledTimes(1);
-
-    const input = screen.getByTestId(
-      "transcripts-search-input",
-    ) as HTMLInputElement;
-    // Type "hello" → debounce → searchTranscripts.
-    fireEvent.change(input, { target: { value: "hello" } });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(260);
-    });
-    expect(stub.searchTranscripts).toHaveBeenCalledTimes(1);
-    expect(stub.searchTranscripts.mock.calls[0]?.[0]).toBe("hello");
-    const listCallsAfterSearch = stub.listTranscripts.mock.calls.length;
-
-    // Clear the search → debounce → listTranscripts (NOT searchTranscripts("")).
-    fireEvent.change(input, { target: { value: "" } });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(260);
-    });
-    expect(stub.searchTranscripts).toHaveBeenCalledTimes(1);
-    expect(stub.listTranscripts.mock.calls.length).toBeGreaterThan(
-      listCallsAfterSearch,
-    );
   });
 
   it("'Load more' calls listTranscripts with the oldest ended_at as cursor", async () => {
