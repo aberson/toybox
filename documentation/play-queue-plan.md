@@ -701,6 +701,7 @@ to clarify the action's scope is the row, not the activity flow.
 - **Depends on:** J8.
 
 ### Step J10: SettingsPanel additions for target depth + cadence
+- **Status:** DONE (2026-05-12)
 - **Problem:** Add two segmented controls to `SettingsPanel.tsx`:
   - `play_target_depth` with labels "1", "3", "5".
   - `play_cadence_seconds` with labels **"off", "10s", "30s", "1m"**

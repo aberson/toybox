@@ -76,6 +76,8 @@ interface StubApi {
   getBannedThemesGlobal: Mock;
   setBannedThemesGlobal: Mock;
   setTranscriptRetention: Mock;
+  setPlayTargetDepth: Mock;
+  setPlayCadenceSeconds: Mock;
 }
 
 function buildStubApi(snapshot: MetricsSnapshot): StubApi {
@@ -99,6 +101,10 @@ function buildStubApi(snapshot: MetricsSnapshot): StubApi {
     setTranscriptRetention: vi.fn(async (seconds: number) => ({
       seconds,
     })) as Mock,
+    setPlayTargetDepth: vi.fn(async (value: number) => ({ value })) as Mock,
+    setPlayCadenceSeconds: vi.fn(
+      async (value: number) => ({ value }),
+    ) as Mock,
   };
 }
 
@@ -109,13 +115,28 @@ function buildStubApi(snapshot: MetricsSnapshot): StubApi {
 // (TranscriptRetentionControl.test.tsx).
 function renderSettingsPanel(
   api: StubApi,
-  overrides: { currentRetentionSeconds?: number; onRetentionChanged?: (n: number) => void } = {},
+  overrides: {
+    currentRetentionSeconds?: number;
+    onRetentionChanged?: (n: number) => void;
+    currentPlayTargetDepth?: number;
+    onPlayTargetDepthChanged?: (n: number) => void;
+    currentPlayCadenceSeconds?: number;
+    onPlayCadenceSecondsChanged?: (n: number) => void;
+  } = {},
 ): void {
   render(
     <SettingsPanel
       api={api as unknown as ApiClient}
       currentRetentionSeconds={overrides.currentRetentionSeconds ?? 60}
       onRetentionChanged={overrides.onRetentionChanged ?? (() => {})}
+      currentPlayTargetDepth={overrides.currentPlayTargetDepth ?? 3}
+      onPlayTargetDepthChanged={
+        overrides.onPlayTargetDepthChanged ?? (() => {})
+      }
+      currentPlayCadenceSeconds={overrides.currentPlayCadenceSeconds ?? 30}
+      onPlayCadenceSecondsChanged={
+        overrides.onPlayCadenceSecondsChanged ?? (() => {})
+      }
     />,
   );
 }
@@ -181,6 +202,10 @@ describe("SettingsPanel", () => {
         api={api as unknown as ApiClient}
         currentRetentionSeconds={60}
         onRetentionChanged={() => {}}
+        currentPlayTargetDepth={3}
+        onPlayTargetDepthChanged={() => {}}
+        currentPlayCadenceSeconds={30}
+        onPlayCadenceSecondsChanged={() => {}}
       />,
     );
     unmount();
@@ -357,4 +382,39 @@ describe("SettingsPanel", () => {
     ).toBe("false");
   });
 
+  // Phase J step J10: both new play-queue settings cards mount and
+  // receive their threaded values. Full per-control behavior lives in
+  // PlayQueueSettingsControls.test.tsx — this is the panel-level
+  // integration assertion.
+  it("threads currentPlayTargetDepth to the play-target-depth picker's pressed button", () => {
+    const snapshot = fakeSnapshot();
+    const api = buildStubApi(snapshot);
+    renderSettingsPanel(api, { currentPlayTargetDepth: 5 });
+    expect(
+      screen
+        .getByTestId("play-target-depth-5")
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(
+      screen
+        .getByTestId("play-target-depth-1")
+        .getAttribute("aria-pressed"),
+    ).toBe("false");
+  });
+
+  it("threads currentPlayCadenceSeconds to the cadence picker's pressed button", () => {
+    const snapshot = fakeSnapshot();
+    const api = buildStubApi(snapshot);
+    renderSettingsPanel(api, { currentPlayCadenceSeconds: 10 });
+    expect(
+      screen
+        .getByTestId("play-cadence-seconds-10")
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(
+      screen
+        .getByTestId("play-cadence-seconds-0")
+        .getAttribute("aria-pressed"),
+    ).toBe("false");
+  });
 });

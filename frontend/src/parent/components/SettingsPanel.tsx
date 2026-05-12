@@ -24,8 +24,14 @@ import type {
   ImageGenMode,
   ListeningMode,
   MetricsSnapshot,
+  PlayCadenceSeconds,
+  PlayTargetDepth,
 } from "../api";
 import { BannedThemesSettings } from "./BannedThemesSettings";
+import {
+  PlayCadenceSecondsControl,
+  PlayTargetDepthControl,
+} from "./PlayQueueSettingsControls";
 import { TranscriptRetentionControl } from "./TranscriptRetentionControl";
 
 const GRID_STYLE: CSSProperties = {
@@ -413,6 +419,8 @@ export interface SettingsPanelProps {
     | "getBannedThemesGlobal"
     | "setBannedThemesGlobal"
     | "setTranscriptRetention"
+    | "setPlayTargetDepth"
+    | "setPlayCadenceSeconds"
   >;
   // Phase I step I3: transcript retention picker source-of-truth. The
   // value lives in App.tsx (fetched once on mount via the
@@ -422,6 +430,15 @@ export interface SettingsPanelProps {
   // a successful PUT response back up so App.tsx can update its state.
   currentRetentionSeconds: number;
   onRetentionChanged: (seconds: number) => void;
+  // Phase J step J10: play-queue settings pickers. Both values live
+  // in App.tsx (seeded by J8's bootstrap parallel-fetch) and thread
+  // through here so the cadence value also feeds PlayQueueList's TTL
+  // math. Each callback bubbles a successful PUT response back up so
+  // the lifted state stays the source of truth.
+  currentPlayTargetDepth: number;
+  onPlayTargetDepthChanged: (value: PlayTargetDepth) => void;
+  currentPlayCadenceSeconds: number;
+  onPlayCadenceSecondsChanged: (value: PlayCadenceSeconds) => void;
 }
 
 // Settings sub-tab. Renders the three toggle cards + the global
@@ -430,7 +447,15 @@ export interface SettingsPanelProps {
 // optimistic ``onModeChanged`` / ``onMicEnabledChanged`` callbacks own
 // the state. No ws fanout — the toggles are write-on-click.
 export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
-  const { api, currentRetentionSeconds, onRetentionChanged } = props;
+  const {
+    api,
+    currentRetentionSeconds,
+    onRetentionChanged,
+    currentPlayTargetDepth,
+    onPlayTargetDepthChanged,
+    currentPlayCadenceSeconds,
+    onPlayCadenceSecondsChanged,
+  } = props;
   const [listeningMode, setListeningMode] = useState<number>(3);
   const [micEnabled, setMicEnabled] = useState<boolean>(true);
   const [seedError, setSeedError] = useState<string | null>(null);
@@ -500,6 +525,16 @@ export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
           api={api}
           currentSeconds={currentRetentionSeconds}
           onSecondsChanged={onRetentionChanged}
+        />
+        <PlayTargetDepthControl
+          api={api}
+          currentValue={currentPlayTargetDepth}
+          onValueChanged={onPlayTargetDepthChanged}
+        />
+        <PlayCadenceSecondsControl
+          api={api}
+          currentValue={currentPlayCadenceSeconds}
+          onValueChanged={onPlayCadenceSecondsChanged}
         />
       </div>
       <div style={{ marginTop: 12 }}>

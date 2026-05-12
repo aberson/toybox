@@ -12,6 +12,8 @@ import type {
   MetricsAudioStatus,
   ParentAuthStatus,
   ParentTokenResponse,
+  PlayCadenceSeconds,
+  PlayTargetDepth,
 } from "./api";
 import { CapabilityBanner } from "./components/CapabilityBanner";
 import { ChildProfileEditor } from "./components/ChildProfileEditor";
@@ -101,7 +103,7 @@ export function App(): JSX.Element {
   // fetch lands the resolved value before SettingsPanel mounts in J10
   // — wiring the consumer in J10 doesn't require touching the
   // bootstrap path again.
-  const [, setPlayTargetDepth] = useState<number>(3);
+  const [playTargetDepth, setPlayTargetDepth] = useState<number>(3);
   const [authMode, setAuthMode] = useState<AuthMode>("bootstrap");
   const [authStatus, setAuthStatus] = useState<ParentAuthStatus | null>(null);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
@@ -683,6 +685,27 @@ export function App(): JSX.Element {
     [api, refetchActivity],
   );
 
+  // Phase J step J10: SettingsPanel reconciliation callbacks for the
+  // two new play-queue controls. The control owns the optimistic
+  // pendingValue + inline error surface; once the PUT resolves the
+  // component bubbles the response value here and we update the lifted
+  // state so it stays the source-of-truth. ``setPlayCadenceSeconds``
+  // also flows back down into PlayQueueList for TTL math, so a
+  // successful cadence change updates two consumers from this single
+  // state setter.
+  const handlePlayTargetDepthChanged = useCallback(
+    (value: PlayTargetDepth): void => {
+      setPlayTargetDepth(value);
+    },
+    [],
+  );
+  const handlePlayCadenceSecondsChanged = useCallback(
+    (value: PlayCadenceSeconds): void => {
+      setPlayCadenceSeconds(value);
+    },
+    [],
+  );
+
   // Step 21: gate on PIN status before rendering the main app.
   if (authMode === "bootstrap") {
     return (
@@ -866,6 +889,12 @@ export function App(): JSX.Element {
                     api={api}
                     currentRetentionSeconds={retentionSeconds}
                     onRetentionChanged={setRetentionSeconds}
+                    currentPlayTargetDepth={playTargetDepth}
+                    onPlayTargetDepthChanged={handlePlayTargetDepthChanged}
+                    currentPlayCadenceSeconds={playCadenceSeconds}
+                    onPlayCadenceSecondsChanged={
+                      handlePlayCadenceSecondsChanged
+                    }
                   />
                 )}
                 {settingsTab.value === "stats" && (
