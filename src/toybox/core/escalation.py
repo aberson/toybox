@@ -49,7 +49,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import sqlite3
 import time
 import zlib
@@ -87,9 +86,6 @@ from ..ws.envelope import build_envelope
 from ..ws.topics import Topic
 
 _logger = logging.getLogger(__name__)
-
-SPONTANEOUS_INTERVAL_SEC_ENV: Final[str] = "TOYBOX_SPONTANEOUS_INTERVAL_SEC"
-DEFAULT_SPONTANEOUS_INTERVAL_SEC: Final[float] = 180.0
 
 # Default intent used when mode 5 receives a transcript with no
 # trigger match (the dispatcher still escalates) and when the
@@ -141,36 +137,6 @@ JudgeCallFactory = Callable[..., Awaitable[Any]]
 # dispatcher skips resolution and falls back to the Phase A
 # placeholders, which is the documented degraded mode.
 ConnectionFactory = Callable[[], sqlite3.Connection]
-
-
-def _env_float(name: str, default: float) -> float:
-    raw = os.environ.get(name)
-    if raw is None:
-        return default
-    try:
-        return float(raw)
-    except ValueError:
-        _logger.warning("%s=%r is not a float; using %s", name, raw, default)
-        return default
-
-
-def spontaneous_interval_from_env() -> float:
-    """Resolve the mode-4 spontaneous interval from the environment.
-
-    Falls back to :data:`DEFAULT_SPONTANEOUS_INTERVAL_SEC`. Negative or
-    zero values are clamped to the default since a non-positive
-    spontaneous cadence would fire continuously.
-    """
-    value = _env_float(SPONTANEOUS_INTERVAL_SEC_ENV, DEFAULT_SPONTANEOUS_INTERVAL_SEC)
-    if value <= 0.0:
-        _logger.warning(
-            "%s=%s must be > 0; falling back to %s",
-            SPONTANEOUS_INTERVAL_SEC_ENV,
-            value,
-            DEFAULT_SPONTANEOUS_INTERVAL_SEC,
-        )
-        return DEFAULT_SPONTANEOUS_INTERVAL_SEC
-    return value
 
 
 def _is_rate_limit_error(exc: BaseException) -> tuple[bool, float | None]:
@@ -345,15 +311,8 @@ class EscalationDispatcher:
             and the offline path.
         publisher: Optional ws publisher. Used to emit
             ``Topic.system`` warnings for malformed Claude output.
-        spontaneous_interval_sec: Override the
-            ``TOYBOX_SPONTANEOUS_INTERVAL_SEC`` env default. Currently
-            unused inside the dispatcher (the spontaneous timer is
-            owned by Step 4's listening-mode state machine), but
-            stored so a future scheduler can read it back without
-            re-resolving the env.
-        clock: Time source for the spontaneous-interval bookkeeping
-            and the ``hour`` argument fed to the offline generator.
-            Defaults to :func:`time.time`.
+        clock: Time source for the ``hour`` argument fed to the
+            offline generator. Defaults to :func:`time.time`.
     """
 
     def __init__(
@@ -365,7 +324,6 @@ class EscalationDispatcher:
         capability_check: CapabilityCheck,
         offline_generator: OfflineGenerator | None = None,
         publisher: Publisher | None = None,
-        spontaneous_interval_sec: float | None = None,
         clock: Callable[[], float] | None = None,
         labeled_event_recorder: LabeledEventRecorder | None = None,
         judge_call_factory: JudgeCallFactory | None = None,
@@ -379,11 +337,6 @@ class EscalationDispatcher:
             offline_generator if offline_generator is not None else generate
         )
         self._publisher = publisher
-        self._spontaneous_interval_sec = (
-            spontaneous_interval_sec
-            if spontaneous_interval_sec is not None
-            else spontaneous_interval_from_env()
-        )
         self._clock = clock if clock is not None else time.time
         # ``labeled_event_recorder`` is the Phase C step 15 hook that
         # writes the labeled_events row. Optional so existing tests + the
@@ -409,10 +362,6 @@ class EscalationDispatcher:
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
-
-    @property
-    def spontaneous_interval_sec(self) -> float:
-        return self._spontaneous_interval_sec
 
     async def on_transcript(
         self,
@@ -478,13 +427,17 @@ class EscalationDispatcher:
         _logger.warning("on_transcript: unknown mode %r; no-op", mode)  # pragma: no cover
         return None  # pragma: no cover
 
+    # Phase J cadence loop replaced this; method retained for test back-compat only
+    # — remove in V2 cleanup.
     async def maybe_fire_spontaneous(self, mode: ListeningMode) -> Activity | None:
-        """Spontaneous-timer hook for mode 4.
+        """Spontaneous-timer hook for mode 4 (deprecated).
 
-        Called by Step 4's listening-mode scheduler at the
-        ``TOYBOX_SPONTANEOUS_INTERVAL_SEC`` cadence. Returns ``None``
-        for any non-HIGH mode (the scheduler should already gate on
-        mode, but defensive double-check keeps the contract crisp).
+        Phase J's cadence loop replaced this entry point with a
+        settings-driven scheduler; this method survives only so the
+        existing dispatcher tests keep exercising the boredom-intent
+        path. Returns ``None`` for any non-HIGH mode (the scheduler
+        should already gate on mode, but defensive double-check keeps
+        the contract crisp).
 
         For mode 4, the dispatch is identical to a trigger-driven mode
         3/4 path with a synthesized "boredom" intent: capability +
@@ -914,7 +867,6 @@ class EscalationDispatcher:
 
 
 __all__ = [
-    "DEFAULT_SPONTANEOUS_INTERVAL_SEC",
     "ConnectionFactory",
     "EscalationDispatcher",
     "INVALID_PREVIEW_LIMIT",
@@ -922,6 +874,4 @@ __all__ = [
     "LabeledEventRecorder",
     "ResolvedContent",
     "SPONTANEOUS_INTENT",
-    "SPONTANEOUS_INTERVAL_SEC_ENV",
-    "spontaneous_interval_from_env",
 ]

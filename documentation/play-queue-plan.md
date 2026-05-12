@@ -528,6 +528,7 @@ to clarify the action's scope is the row, not the activity flow.
 - **Depends on:** J1.
 
 ### Step J4: Delete dead `TOYBOX_SPONTANEOUS_INTERVAL_SEC` env-var path
+- **Status:** DONE (2026-05-12)
 - **Problem:** With J3 landed, the production cadence is driven by
   `play_cadence_seconds`. The env-var path in `core/escalation.py` is
   dead code. Delete:
