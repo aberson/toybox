@@ -7,7 +7,9 @@ import { describe, expect, it } from "vitest";
 import type { Activity, ParentTokenResponse, ToyActionRow } from "./api";
 import {
   applyEnvelope,
+  applyProposedExpired,
   applyRejectedTopics,
+  applySwitch,
   applyToyActionEnvelope,
   applyVersionConflict,
   clearToyActions,
@@ -383,5 +385,472 @@ describe("toyActions reducers", () => {
       schema_version: 1,
     });
     expect(b).toBe(INITIAL_STATE);
+  });
+});
+
+// =====================================================================
+// Phase J6: play-queue store additions. The dashboard moves from a
+// single-slot ``activity`` shape to two parallel slots:
+//
+//   * ``proposedList: Activity[]`` — the scrolling suggestion queue
+//     (newest first, up to 5 from the REST seed, then mutated by ws).
+//   * ``active: Activity | null`` — the currently-playing card.
+//
+// This step is **purely additive** for back-compat: ``applyEnvelope``
+// MUST keep populating the legacy ``activity`` slot so App.tsx + every
+// existing consumer keeps compiling against ``state.activity`` until
+// J7 rips it out. The new slots live alongside the old, both
+// populated. The old slot is removed in J7.
+// =====================================================================
+
+describe("parent store — Phase J6 play-queue additions", () => {
+  describe("initial state", () => {
+    it("INITIAL_STATE includes empty proposedList and null active", () => {
+      // Both new slots ship as empty defaults so the dashboard's
+      // first paint (before any REST seed or ws envelope) renders an
+      // empty queue and no active card without nullable threading.
+      expect(INITIAL_STATE.proposedList).toEqual([]);
+      expect(INITIAL_STATE.active).toBeNull();
+    });
+  });
+
+  describe("applyEnvelope routes to proposedList + active", () => {
+    it("envelope state=proposed upserts a fresh row into proposedList", () => {
+      const fresh = fakeActivity({
+        id: "act-1",
+        state: "proposed",
+        version: 1,
+      });
+      const next = applyEnvelope(INITIAL_STATE, {
+        topic: "activity.state",
+        ts: "2026-05-12T10:00:00Z",
+        payload: fresh as unknown as Record<string, unknown>,
+        schema_version: 1,
+      });
+      expect(next.proposedList).toHaveLength(1);
+      expect(next.proposedList[0]?.id).toBe("act-1");
+      expect(next.proposedList[0]?.state).toBe("proposed");
+    });
+
+    it("envelope state=proposed replaces same-id row by version (newer wins)", () => {
+      const v1 = fakeActivity({ id: "act-1", state: "proposed", version: 1 });
+      const seeded = applyEnvelope(INITIAL_STATE, {
+        topic: "activity.state",
+        ts: "2026-05-12T10:00:00Z",
+        payload: v1 as unknown as Record<string, unknown>,
+        schema_version: 1,
+      });
+      const v2 = fakeActivity({
+        id: "act-1",
+        state: "proposed",
+        version: 2,
+        title: "v2 title",
+      });
+      const next = applyEnvelope(seeded, {
+        topic: "activity.state",
+        ts: "2026-05-12T10:00:01Z",
+        payload: v2 as unknown as Record<string, unknown>,
+        schema_version: 1,
+      });
+      expect(next.proposedList).toHaveLength(1);
+      expect(next.proposedList[0]?.version).toBe(2);
+      expect(next.proposedList[0]?.title).toBe("v2 title");
+    });
+
+    it("envelope state=proposed clears active when id matches", () => {
+      // Edge case: the same id flipped state from approved back to
+      // proposed (e.g. a regenerate). The old ``active`` slot must
+      // drop the row because it is now a queue item, not playing.
+      const active = fakeActivity({
+        id: "act-1",
+        state: "approved",
+        version: 3,
+      });
+      const seeded = { ...INITIAL_STATE, active };
+      const reproposed = fakeActivity({
+        id: "act-1",
+        state: "proposed",
+        version: 4,
+      });
+      const next = applyEnvelope(seeded, {
+        topic: "activity.state",
+        ts: "2026-05-12T10:00:00Z",
+        payload: reproposed as unknown as Record<string, unknown>,
+        schema_version: 1,
+      });
+      expect(next.active).toBeNull();
+      expect(next.proposedList).toHaveLength(1);
+      expect(next.proposedList[0]?.id).toBe("act-1");
+    });
+
+    it("envelope state=approved sets active and removes from proposedList", () => {
+      // The parent tapped Approve on a queue item: that row should
+      // move from proposedList into the active slot.
+      const proposed = fakeActivity({
+        id: "act-1",
+        state: "proposed",
+        version: 1,
+      });
+      const seeded = {
+        ...INITIAL_STATE,
+        proposedList: [proposed],
+      };
+      const approved = fakeActivity({
+        id: "act-1",
+        state: "approved",
+        version: 2,
+      });
+      const next = applyEnvelope(seeded, {
+        topic: "activity.state",
+        ts: "2026-05-12T10:00:00Z",
+        payload: approved as unknown as Record<string, unknown>,
+        schema_version: 1,
+      });
+      expect(next.active?.id).toBe("act-1");
+      expect(next.active?.state).toBe("approved");
+      expect(next.proposedList).toHaveLength(0);
+    });
+
+    it("envelope state=running updates active across approved → running", () => {
+      const approved = fakeActivity({
+        id: "act-1",
+        state: "approved",
+        version: 2,
+      });
+      const seeded = { ...INITIAL_STATE, active: approved };
+      const running = fakeActivity({
+        id: "act-1",
+        state: "running",
+        version: 3,
+      });
+      const next = applyEnvelope(seeded, {
+        topic: "activity.state",
+        ts: "2026-05-12T10:00:00Z",
+        payload: running as unknown as Record<string, unknown>,
+        schema_version: 1,
+      });
+      expect(next.active?.state).toBe("running");
+      expect(next.active?.version).toBe(3);
+    });
+
+    it("envelope state=paused updates active", () => {
+      const running = fakeActivity({
+        id: "act-1",
+        state: "running",
+        version: 3,
+      });
+      const seeded = { ...INITIAL_STATE, active: running };
+      const paused = fakeActivity({
+        id: "act-1",
+        state: "paused",
+        version: 4,
+      });
+      const next = applyEnvelope(seeded, {
+        topic: "activity.state",
+        ts: "2026-05-12T10:00:00Z",
+        payload: paused as unknown as Record<string, unknown>,
+        schema_version: 1,
+      });
+      expect(next.active?.state).toBe("paused");
+      expect(next.active?.version).toBe(4);
+    });
+
+    it("envelope state=completed updates active", () => {
+      const running = fakeActivity({
+        id: "act-1",
+        state: "running",
+        version: 5,
+      });
+      const seeded = { ...INITIAL_STATE, active: running };
+      const completed = fakeActivity({
+        id: "act-1",
+        state: "completed",
+        version: 6,
+      });
+      const next = applyEnvelope(seeded, {
+        topic: "activity.state",
+        ts: "2026-05-12T10:00:00Z",
+        payload: completed as unknown as Record<string, unknown>,
+        schema_version: 1,
+      });
+      expect(next.active?.state).toBe("completed");
+      expect(next.active?.version).toBe(6);
+    });
+
+    it("envelope state=dismissed removes from proposedList and clears active if matches", () => {
+      const proposed = fakeActivity({
+        id: "act-1",
+        state: "proposed",
+        version: 1,
+      });
+      const seeded = {
+        ...INITIAL_STATE,
+        proposedList: [proposed],
+        active: proposed,
+      };
+      const dismissed = fakeActivity({
+        id: "act-1",
+        state: "dismissed",
+        version: 2,
+      });
+      const next = applyEnvelope(seeded, {
+        topic: "activity.state",
+        ts: "2026-05-12T10:00:00Z",
+        payload: dismissed as unknown as Record<string, unknown>,
+        schema_version: 1,
+      });
+      expect(next.proposedList).toHaveLength(0);
+      expect(next.active).toBeNull();
+    });
+
+    it("envelope state=didnt_work removes from proposedList and clears active if matches", () => {
+      const running = fakeActivity({
+        id: "act-1",
+        state: "running",
+        version: 3,
+      });
+      const seeded = {
+        ...INITIAL_STATE,
+        proposedList: [running],
+        active: running,
+      };
+      const didntWork = fakeActivity({
+        id: "act-1",
+        state: "didnt_work",
+        version: 4,
+      });
+      const next = applyEnvelope(seeded, {
+        topic: "activity.state",
+        ts: "2026-05-12T10:00:00Z",
+        payload: didntWork as unknown as Record<string, unknown>,
+        schema_version: 1,
+      });
+      expect(next.proposedList).toHaveLength(0);
+      expect(next.active).toBeNull();
+    });
+
+    it("envelope state=ended removes from proposedList and clears active if matches", () => {
+      const running = fakeActivity({
+        id: "act-1",
+        state: "running",
+        version: 3,
+      });
+      const seeded = {
+        ...INITIAL_STATE,
+        proposedList: [running],
+        active: running,
+      };
+      const ended = fakeActivity({
+        id: "act-1",
+        state: "ended",
+        version: 4,
+      });
+      const next = applyEnvelope(seeded, {
+        topic: "activity.state",
+        ts: "2026-05-12T10:00:00Z",
+        payload: ended as unknown as Record<string, unknown>,
+        schema_version: 1,
+      });
+      expect(next.proposedList).toHaveLength(0);
+      expect(next.active).toBeNull();
+    });
+
+    it("terminal-state envelope on different-id active leaves active alone", () => {
+      // The active card is act-1; an unrelated act-2 terminates →
+      // act-1 active stays put, proposedList unchanged.
+      const active = fakeActivity({
+        id: "act-1",
+        state: "running",
+        version: 3,
+      });
+      const seeded = { ...INITIAL_STATE, active };
+      const otherEnded = fakeActivity({
+        id: "act-2",
+        state: "ended",
+        version: 1,
+      });
+      const next = applyEnvelope(seeded, {
+        topic: "activity.state",
+        ts: "2026-05-12T10:00:00Z",
+        payload: otherEnded as unknown as Record<string, unknown>,
+        schema_version: 1,
+      });
+      expect(next.active?.id).toBe("act-1");
+      expect(next.active?.state).toBe("running");
+    });
+
+    it("newer-version envelope wins for same id in proposedList", () => {
+      // Out-of-order envelope arrival: v3 already in proposedList,
+      // then v2 arrives late → v2 ignored, v3 retained.
+      const v3 = fakeActivity({ id: "act-1", state: "proposed", version: 3 });
+      const seeded = { ...INITIAL_STATE, proposedList: [v3] };
+      const v2 = fakeActivity({
+        id: "act-1",
+        state: "proposed",
+        version: 2,
+        title: "stale",
+      });
+      const next = applyEnvelope(seeded, {
+        topic: "activity.state",
+        ts: "2026-05-12T10:00:00Z",
+        payload: v2 as unknown as Record<string, unknown>,
+        schema_version: 1,
+      });
+      expect(next.proposedList).toHaveLength(1);
+      expect(next.proposedList[0]?.version).toBe(3);
+      expect(next.proposedList[0]?.title).not.toBe("stale");
+    });
+
+    it("newer-version envelope wins for same id in active", () => {
+      const v3 = fakeActivity({ id: "act-1", state: "running", version: 3 });
+      const seeded = { ...INITIAL_STATE, active: v3 };
+      const v2 = fakeActivity({
+        id: "act-1",
+        state: "approved",
+        version: 2,
+        title: "stale",
+      });
+      const next = applyEnvelope(seeded, {
+        topic: "activity.state",
+        ts: "2026-05-12T10:00:00Z",
+        payload: v2 as unknown as Record<string, unknown>,
+        schema_version: 1,
+      });
+      expect(next.active?.version).toBe(3);
+      expect(next.active?.state).toBe("running");
+      expect(next.active?.title).not.toBe("stale");
+    });
+
+    it("back-compat: old activity slot is also populated by applyEnvelope", () => {
+      // J6 ships ALONGSIDE the old single-slot. App.tsx + consumers
+      // still read ``state.activity`` until J7 rips it out, so we
+      // assert at least one path keeps populating the legacy slot.
+      const fresh = fakeActivity({
+        id: "act-1",
+        state: "approved",
+        version: 2,
+      });
+      const next = applyEnvelope(INITIAL_STATE, {
+        topic: "activity.state",
+        ts: "2026-05-12T10:00:00Z",
+        payload: fresh as unknown as Record<string, unknown>,
+        schema_version: 1,
+      });
+      // Old slot mirrored single-active behavior — approved counts as
+      // active, so it should land in the old slot too.
+      expect(next.activity?.id).toBe("act-1");
+      expect(next.activity?.state).toBe("approved");
+    });
+  });
+
+  describe("applyProposedExpired", () => {
+    it("removes the row with the matching id from proposedList", () => {
+      const a = fakeActivity({ id: "act-1", state: "proposed", version: 1 });
+      const b = fakeActivity({ id: "act-2", state: "proposed", version: 1 });
+      const seeded = { ...INITIAL_STATE, proposedList: [a, b] };
+      const next = applyProposedExpired(seeded, "act-1");
+      expect(next.proposedList).toHaveLength(1);
+      expect(next.proposedList[0]?.id).toBe("act-2");
+    });
+
+    it("is a no-op when id is not present", () => {
+      const a = fakeActivity({ id: "act-1", state: "proposed", version: 1 });
+      const seeded = { ...INITIAL_STATE, proposedList: [a] };
+      const next = applyProposedExpired(seeded, "act-99");
+      expect(next.proposedList).toHaveLength(1);
+      expect(next.proposedList[0]?.id).toBe("act-1");
+    });
+  });
+
+  describe("applySwitch", () => {
+    it("clears active then sets to approve result", () => {
+      // The "switch" gesture ends the current active and immediately
+      // approves a queue item: net result is the new approve target
+      // in active.
+      const oldActive = fakeActivity({
+        id: "act-1",
+        state: "running",
+        version: 3,
+      });
+      const ended = fakeActivity({
+        id: "act-1",
+        state: "ended",
+        version: 4,
+      });
+      const newApproved = fakeActivity({
+        id: "act-2",
+        state: "approved",
+        version: 2,
+      });
+      const seeded = { ...INITIAL_STATE, active: oldActive };
+      const next = applySwitch(seeded, ended, newApproved);
+      expect(next.active?.id).toBe("act-2");
+      expect(next.active?.state).toBe("approved");
+    });
+
+    it("removes the new active from proposedList when it was queued", () => {
+      const oldActive = fakeActivity({
+        id: "act-1",
+        state: "running",
+        version: 3,
+      });
+      const queuedB = fakeActivity({
+        id: "act-2",
+        state: "proposed",
+        version: 1,
+      });
+      const queuedC = fakeActivity({
+        id: "act-3",
+        state: "proposed",
+        version: 1,
+      });
+      const ended = fakeActivity({
+        id: "act-1",
+        state: "ended",
+        version: 4,
+      });
+      const newApproved = fakeActivity({
+        id: "act-2",
+        state: "approved",
+        version: 2,
+      });
+      const seeded = {
+        ...INITIAL_STATE,
+        active: oldActive,
+        proposedList: [queuedB, queuedC],
+      };
+      const next = applySwitch(seeded, ended, newApproved);
+      expect(next.active?.id).toBe("act-2");
+      expect(next.proposedList).toHaveLength(1);
+      expect(next.proposedList[0]?.id).toBe("act-3");
+    });
+
+    it("tolerates null endResult (just sets active from approve)", () => {
+      // Defensive branch: callers may pass null when there was no
+      // prior active to end (e.g. queue ramped up after empty active).
+      const newApproved = fakeActivity({
+        id: "act-2",
+        state: "approved",
+        version: 2,
+      });
+      const next = applySwitch(INITIAL_STATE, null, newApproved);
+      expect(next.active?.id).toBe("act-2");
+    });
+
+    it("tolerates null approveResult (just clears active)", () => {
+      const oldActive = fakeActivity({
+        id: "act-1",
+        state: "running",
+        version: 3,
+      });
+      const ended = fakeActivity({
+        id: "act-1",
+        state: "ended",
+        version: 4,
+      });
+      const seeded = { ...INITIAL_STATE, active: oldActive };
+      const next = applySwitch(seeded, ended, null);
+      expect(next.active).toBeNull();
+    });
   });
 });

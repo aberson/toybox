@@ -7,7 +7,13 @@ import {
   VersionConflictError,
   withConflictHandler,
 } from "./api";
-import type { Activity, FetchLike, VersionConflictBody } from "./api";
+import type {
+  Activity,
+  FetchLike,
+  PlayCadenceSeconds,
+  PlayTargetDepth,
+  VersionConflictBody,
+} from "./api";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -233,5 +239,175 @@ describe("withConflictHandler", () => {
     ).rejects.toThrow("boom");
     expect(onConflict).not.toHaveBeenCalled();
     expect(refetch).not.toHaveBeenCalled();
+  });
+});
+
+// =====================================================================
+// Phase J6: play-queue API additions.
+//
+// New methods that match the J5 (proposed list) + J1 (settings) wire
+// shapes shipped on the backend.
+// =====================================================================
+
+describe("ApiClient — Phase J6 play-queue additions", () => {
+  describe("listProposedActivities", () => {
+    it("calls GET /api/activities/proposed and returns {items, active: null}", async () => {
+      // Default branch (no include_active): backend returns
+      // ``{items: [...]}`` and the typed response carries
+      // ``active: null`` to keep the wire shape uniform.
+      const item = fakeActivity({
+        id: "p1",
+        state: "proposed",
+        version: 1,
+      });
+      const fetchImpl = vi
+        .fn<Parameters<FetchLike>, ReturnType<FetchLike>>()
+        .mockResolvedValue(jsonResponse(200, { items: [item], active: null }));
+      const client = new ApiClient({ fetchImpl, getToken: () => "t" });
+      const result = await client.listProposedActivities();
+      const [url, init] = fetchImpl.mock.calls[0]!;
+      expect(url).toBe("/api/activities/proposed");
+      expect(init?.method).toBe("GET");
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]?.id).toBe("p1");
+      expect(result.active).toBeNull();
+    });
+
+    it("calls GET /api/activities/proposed?include_active=true and returns active", async () => {
+      // include_active=true branch: backend adds the currently-
+      // playing card to the same round-trip so App.tsx can paint
+      // queue + active in one mount-time fetch.
+      const item = fakeActivity({ id: "p1", state: "proposed", version: 1 });
+      const active = fakeActivity({ id: "a1", state: "running", version: 3 });
+      const fetchImpl = vi
+        .fn<Parameters<FetchLike>, ReturnType<FetchLike>>()
+        .mockResolvedValue(
+          jsonResponse(200, { items: [item], active }),
+        );
+      const client = new ApiClient({ fetchImpl, getToken: () => "t" });
+      const result = await client.listProposedActivities({
+        include_active: true,
+      });
+      const [url] = fetchImpl.mock.calls[0]!;
+      expect(url).toBe("/api/activities/proposed?include_active=true");
+      expect(result.items).toHaveLength(1);
+      expect(result.active?.id).toBe("a1");
+      expect(result.active?.state).toBe("running");
+    });
+
+    it("does NOT include include_active param when omitted or false", async () => {
+      // Defensive: passing ``{include_active: false}`` should not add
+      // ``?include_active=false`` to the URL — the backend's bool
+      // parser would coerce "false" to True (FastAPI gotcha).
+      const fetchImpl = vi
+        .fn<Parameters<FetchLike>, ReturnType<FetchLike>>()
+        .mockResolvedValue(jsonResponse(200, { items: [], active: null }));
+      const client = new ApiClient({ fetchImpl, getToken: () => "t" });
+      await client.listProposedActivities({ include_active: false });
+      const [url] = fetchImpl.mock.calls[0]!;
+      expect(url).toBe("/api/activities/proposed");
+    });
+  });
+
+  describe("getPlayTargetDepth / setPlayTargetDepth", () => {
+    it("getPlayTargetDepth calls GET /api/settings/play-target-depth and returns {value}", async () => {
+      const fetchImpl = vi
+        .fn<Parameters<FetchLike>, ReturnType<FetchLike>>()
+        .mockResolvedValue(jsonResponse(200, { value: 3 }));
+      const client = new ApiClient({ fetchImpl, getToken: () => "t" });
+      const result = await client.getPlayTargetDepth();
+      const [url, init] = fetchImpl.mock.calls[0]!;
+      expect(url).toBe("/api/settings/play-target-depth");
+      expect(init?.method).toBe("GET");
+      expect(result.value).toBe(3);
+    });
+
+    it("setPlayTargetDepth PUTs {value: 5} and returns {value}", async () => {
+      const fetchImpl = vi
+        .fn<Parameters<FetchLike>, ReturnType<FetchLike>>()
+        .mockResolvedValue(jsonResponse(200, { value: 5 }));
+      const client = new ApiClient({ fetchImpl, getToken: () => "t" });
+      const value: PlayTargetDepth = 5;
+      const result = await client.setPlayTargetDepth(value);
+      const [url, init] = fetchImpl.mock.calls[0]!;
+      expect(url).toBe("/api/settings/play-target-depth");
+      expect(init?.method).toBe("PUT");
+      expect(JSON.parse(init?.body as string)).toEqual({ value: 5 });
+      expect(result.value).toBe(5);
+    });
+
+    it("setPlayTargetDepth accepts each canonical preset 1/3/5", async () => {
+      // Smoke test that the type literal-union accepts each canonical
+      // value without TS narrowing complaints. The runtime call shape
+      // is identical; we just verify all three round-trip.
+      const presets: PlayTargetDepth[] = [1, 3, 5];
+      for (const v of presets) {
+        const fetchImpl = vi
+          .fn<Parameters<FetchLike>, ReturnType<FetchLike>>()
+          .mockResolvedValue(jsonResponse(200, { value: v }));
+        const client = new ApiClient({ fetchImpl, getToken: () => "t" });
+        const result = await client.setPlayTargetDepth(v);
+        expect(result.value).toBe(v);
+      }
+    });
+  });
+
+  describe("getPlayCadenceSeconds / setPlayCadenceSeconds", () => {
+    it("getPlayCadenceSeconds calls GET /api/settings/play-cadence-seconds and returns {value}", async () => {
+      const fetchImpl = vi
+        .fn<Parameters<FetchLike>, ReturnType<FetchLike>>()
+        .mockResolvedValue(jsonResponse(200, { value: 30 }));
+      const client = new ApiClient({ fetchImpl, getToken: () => "t" });
+      const result = await client.getPlayCadenceSeconds();
+      const [url, init] = fetchImpl.mock.calls[0]!;
+      expect(url).toBe("/api/settings/play-cadence-seconds");
+      expect(init?.method).toBe("GET");
+      expect(result.value).toBe(30);
+    });
+
+    it("setPlayCadenceSeconds PUTs {value: 60} and returns {value}", async () => {
+      const fetchImpl = vi
+        .fn<Parameters<FetchLike>, ReturnType<FetchLike>>()
+        .mockResolvedValue(jsonResponse(200, { value: 60 }));
+      const client = new ApiClient({ fetchImpl, getToken: () => "t" });
+      const value: PlayCadenceSeconds = 60;
+      const result = await client.setPlayCadenceSeconds(value);
+      const [url, init] = fetchImpl.mock.calls[0]!;
+      expect(url).toBe("/api/settings/play-cadence-seconds");
+      expect(init?.method).toBe("PUT");
+      expect(JSON.parse(init?.body as string)).toEqual({ value: 60 });
+      expect(result.value).toBe(60);
+    });
+
+    it("setPlayCadenceSeconds round-trips 0 — NOT a sentinel for unset", async () => {
+      // ``0`` is a valid in-set value meaning "cadence disabled". A
+      // truthiness shortcut anywhere on this wire path would silently
+      // coerce it back to the default. We pin both directions: the
+      // body MUST contain ``{value: 0}`` (not ``{}``), and the typed
+      // result MUST return 0 (not undefined / null / fallback).
+      const fetchImpl = vi
+        .fn<Parameters<FetchLike>, ReturnType<FetchLike>>()
+        .mockResolvedValue(jsonResponse(200, { value: 0 }));
+      const client = new ApiClient({ fetchImpl, getToken: () => "t" });
+      const zero: PlayCadenceSeconds = 0;
+      const result = await client.setPlayCadenceSeconds(zero);
+      const init = fetchImpl.mock.calls[0]?.[1];
+      const body = JSON.parse(init?.body as string);
+      expect(body).toEqual({ value: 0 });
+      expect("value" in body).toBe(true);
+      expect(result.value).toBe(0);
+    });
+
+    it("setPlayCadenceSeconds accepts each canonical preset 0/10/30/60", async () => {
+      const presets: PlayCadenceSeconds[] = [0, 10, 30, 60];
+      for (const v of presets) {
+        const fetchImpl = vi
+          .fn<Parameters<FetchLike>, ReturnType<FetchLike>>()
+          .mockResolvedValue(jsonResponse(200, { value: v }));
+        const client = new ApiClient({ fetchImpl, getToken: () => "t" });
+        const result = await client.setPlayCadenceSeconds(v);
+        expect(result.value).toBe(v);
+      }
+    });
   });
 });

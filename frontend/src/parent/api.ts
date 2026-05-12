@@ -486,6 +486,34 @@ export interface TranscriptRetentionResponse {
   seconds: number;
 }
 
+// Phase J step J1: play-queue cadence + target depth presets. These
+// are the canonical literal-unions for the two household settings
+// driving the autonomous play queue. ``PlayCadenceSeconds = 0`` means
+// "cadence disabled" — it is a real in-set value, NOT a sentinel for
+// unset. The wire body is ``{value: <preset>}`` in both directions for
+// both settings, mirroring the GET/PUT pair on transcript-retention.
+export type PlayCadenceSeconds = 0 | 10 | 30 | 60;
+export type PlayTargetDepth = 1 | 3 | 5;
+
+export interface PlayCadenceSecondsResponse {
+  value: PlayCadenceSeconds;
+}
+
+export interface PlayTargetDepthResponse {
+  value: PlayTargetDepth;
+}
+
+// Phase J step J5: the proposed-activities REST seed. Items are the
+// scrolling-queue rows (newest first, up to backend cap). ``active``
+// is the currently-playing card when ``include_active=true`` was
+// passed; null otherwise. The shape stays uniform across both
+// branches so the dashboard can paint both slots from one mount-time
+// fetch.
+export interface ProposedActivitiesResponse {
+  items: Activity[];
+  active: Activity | null;
+}
+
 // Phase H step H5: wire shape for the household-global banned-themes
 // setting. Mirrors :class:`toybox.api.banned_themes_settings.BannedThemesResponse`.
 // ``themes`` is a comma-separated CSV (matching the old per-child
@@ -1281,6 +1309,90 @@ export class ApiClient {
       {
         method: "PUT",
         body: JSON.stringify({ seconds }),
+        signal: opts.signal,
+      },
+    );
+  }
+
+  // Phase J step J1: play-queue target depth read-write pair. The GET
+  // is unauthenticated (matches ``getTranscriptRetention`` — household
+  // read); the PUT requires parent scope. Body shape on both sides is
+  // ``{value: <preset>}``. Valid values: 1 / 3 / 5.
+  async getPlayTargetDepth(
+    opts: RequestOptions = {},
+  ): Promise<PlayTargetDepthResponse> {
+    return this.request<PlayTargetDepthResponse>(
+      "/api/settings/play-target-depth",
+      {
+        method: "GET",
+        signal: opts.signal,
+      },
+    );
+  }
+
+  async setPlayTargetDepth(
+    value: PlayTargetDepth,
+    opts: RequestOptions = {},
+  ): Promise<PlayTargetDepthResponse> {
+    return this.request<PlayTargetDepthResponse>(
+      "/api/settings/play-target-depth",
+      {
+        method: "PUT",
+        body: JSON.stringify({ value }),
+        signal: opts.signal,
+      },
+    );
+  }
+
+  // Phase J step J1: play-queue cadence read-write pair. Same
+  // wire-shape conventions as ``getPlayTargetDepth``. Valid values:
+  // 0 / 10 / 30 / 60. ``0`` is a real value meaning "cadence
+  // disabled"; it MUST round-trip rather than be coerced to a default
+  // anywhere on this path.
+  async getPlayCadenceSeconds(
+    opts: RequestOptions = {},
+  ): Promise<PlayCadenceSecondsResponse> {
+    return this.request<PlayCadenceSecondsResponse>(
+      "/api/settings/play-cadence-seconds",
+      {
+        method: "GET",
+        signal: opts.signal,
+      },
+    );
+  }
+
+  async setPlayCadenceSeconds(
+    value: PlayCadenceSeconds,
+    opts: RequestOptions = {},
+  ): Promise<PlayCadenceSecondsResponse> {
+    return this.request<PlayCadenceSecondsResponse>(
+      "/api/settings/play-cadence-seconds",
+      {
+        method: "PUT",
+        body: JSON.stringify({ value }),
+        signal: opts.signal,
+      },
+    );
+  }
+
+  // Phase J step J5: REST seed for the scrolling queue + active card.
+  // The backend returns ``{items: Activity[], active: Activity | null}``
+  // when ``include_active=true``; otherwise ``{items: [...]}`` with
+  // ``active: null``. We accept either shape and normalize.
+  //
+  // The query param is only added when ``include_active === true``.
+  // Passing ``false`` (or omitting) MUST NOT add the param: FastAPI's
+  // bool parser coerces the literal string "false" to True.
+  async listProposedActivities(
+    params: { include_active?: boolean } = {},
+    opts: RequestOptions = {},
+  ): Promise<ProposedActivitiesResponse> {
+    const qs =
+      params.include_active === true ? "?include_active=true" : "";
+    return this.request<ProposedActivitiesResponse>(
+      `/api/activities/proposed${qs}`,
+      {
+        method: "GET",
         signal: opts.signal,
       },
     );

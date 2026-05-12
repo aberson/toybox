@@ -44,6 +44,13 @@ export interface ParentState {
   // inner map for one toy; ``applyToyActionEnvelope`` (WS push)
   // merges one slot at a time.
   toyActions: Record<string, Record<string, ToyActionRow>>;
+  // Phase J step J6: play-queue slots. ``proposedList`` is the
+  // scrolling suggestion queue (newest first); ``active`` is the
+  // currently-playing card. Both live alongside the legacy
+  // ``activity`` single-slot for back-compat — J7 rips ``activity``
+  // out once every consumer has been ported.
+  proposedList: Activity[];
+  active: Activity | null;
 }
 
 export const INITIAL_STATE: ParentState = {
@@ -56,6 +63,8 @@ export const INITIAL_STATE: ParentState = {
   toasts: [],
   nextToastId: 1,
   toyActions: {},
+  proposedList: [],
+  active: null,
 };
 
 export function setToken(
@@ -94,6 +103,19 @@ export function setActivity(
 // Apply an incoming ws envelope to the store. Only `activity.state`
 // envelopes mutate the active activity today; other topics route to
 // dedicated reducers (capability via system, etc.).
+//
+// Phase J step J6: the same envelope also drives the new
+// ``proposedList`` + ``active`` slots. The legacy ``activity`` slot is
+// still maintained for back-compat (J7 rips it out). The new-slot
+// routing is:
+//
+//   * state === "proposed"        → upsert into proposedList (newer
+//                                    version wins), clear active if id
+//                                    matches.
+//   * state ∈ approved/running/   → set active (version-guarded),
+//     paused/completed              remove from proposedList by id.
+//   * state ∈ dismissed/ended/    → remove from proposedList, clear
+//     didnt_work                    active if id matches.
 export function applyEnvelope(
   state: ParentState,
   env: Envelope,
@@ -105,24 +127,30 @@ export function applyEnvelope(
       typeof candidate?.state === "string" &&
       typeof candidate?.version === "number"
     ) {
+      // First fold the new slots, then layer the legacy single-slot
+      // behavior on top of the same returned state so both views stay
+      // consistent with the same input.
+      const afterNewSlots = applyEnvelopeToNewSlots(state, candidate);
       // Newer-version-of-same-id wins; otherwise replace if no current
       // activity or the current one is in a terminal state.
-      const cur = state.activity;
+      const cur = afterNewSlots.activity;
       const incomingIsActive = !isTerminalState(candidate.state);
       if (cur === null) {
-        return incomingIsActive ? { ...state, activity: candidate } : state;
+        return incomingIsActive
+          ? { ...afterNewSlots, activity: candidate }
+          : afterNewSlots;
       }
       if (cur.id === candidate.id) {
         if (candidate.version >= cur.version) {
-          return { ...state, activity: candidate };
+          return { ...afterNewSlots, activity: candidate };
         }
-        return state;
+        return afterNewSlots;
       }
       // Different id: take the new one if it's active, ignore terminal updates
       if (incomingIsActive) {
-        return { ...state, activity: candidate };
+        return { ...afterNewSlots, activity: candidate };
       }
-      return state;
+      return afterNewSlots;
     }
   }
   if (env.topic === "system") {
@@ -135,6 +163,120 @@ export function applyEnvelope(
     return applyToyActionEnvelope(state, env);
   }
   return state;
+}
+
+// Phase J step J6: fold an ``activity.state`` envelope into the new
+// ``proposedList`` + ``active`` slots. Version-guarded per slot so
+// out-of-order arrivals don't regress either slot. Pulled out of
+// ``applyEnvelope`` to keep that function's legacy branch readable.
+function applyEnvelopeToNewSlots(
+  state: ParentState,
+  candidate: Activity,
+): ParentState {
+  const id = candidate.id;
+  if (candidate.state === "proposed") {
+    // Upsert into proposedList; ignore older-version-of-same-id; if
+    // the row was the live ``active`` (e.g. regenerate flipped it
+    // back to proposed), clear active. The legacy ``activity`` slot
+    // is left to the caller — applyEnvelope layers that on top.
+    const existing = state.proposedList.find((row) => row.id === id);
+    let nextList: Activity[];
+    if (existing !== undefined) {
+      if (candidate.version < existing.version) {
+        // Stale envelope: ignore the proposed-slot mutation but still
+        // run the active-clearing branch below in case the row was
+        // also living in active (unlikely but defensive).
+        nextList = state.proposedList;
+      } else {
+        nextList = state.proposedList.map((row) =>
+          row.id === id ? candidate : row,
+        );
+      }
+    } else {
+      // New row — push to the head (newest-first ordering).
+      nextList = [candidate, ...state.proposedList];
+    }
+    const nextActive =
+      state.active !== null && state.active.id === id ? null : state.active;
+    return { ...state, proposedList: nextList, active: nextActive };
+  }
+
+  if (
+    candidate.state === "approved" ||
+    candidate.state === "running" ||
+    candidate.state === "paused" ||
+    candidate.state === "completed"
+  ) {
+    // Move into active (with version guard) and drop from proposedList
+    // if present.
+    const cur = state.active;
+    let nextActive: Activity | null;
+    if (cur === null || cur.id !== id) {
+      nextActive = candidate;
+    } else if (candidate.version >= cur.version) {
+      nextActive = candidate;
+    } else {
+      // Stale envelope for the same-id active: keep current.
+      nextActive = cur;
+    }
+    const nextList = state.proposedList.filter((row) => row.id !== id);
+    return { ...state, active: nextActive, proposedList: nextList };
+  }
+
+  if (
+    candidate.state === "dismissed" ||
+    candidate.state === "ended" ||
+    candidate.state === "didnt_work"
+  ) {
+    const nextList = state.proposedList.filter((row) => row.id !== id);
+    const nextActive =
+      state.active !== null && state.active.id === id ? null : state.active;
+    return { ...state, proposedList: nextList, active: nextActive };
+  }
+
+  return state;
+}
+
+// Phase J step J6: remove a proposed row by id (e.g. after a TTL
+// expiry on the UI side). No-op when id is not present in the list.
+// Leaves ``active`` and the legacy ``activity`` slot untouched.
+export function applyProposedExpired(
+  state: ParentState,
+  id: string,
+): ParentState {
+  const filtered = state.proposedList.filter((row) => row.id !== id);
+  if (filtered.length === state.proposedList.length) return state;
+  return { ...state, proposedList: filtered };
+}
+
+// Phase J step J6: the "switch" gesture — end the current active and
+// immediately approve a queue item. The reducer is intentionally
+// tolerant of null on both arguments: ``endResult`` may be null when
+// there was no prior active to end, and ``approveResult`` may be null
+// when the approve call failed mid-switch (active stays cleared).
+//
+// Net behavior:
+//   1. Clear ``active`` unconditionally (the prior card is done).
+//   2. If ``approveResult`` is non-null, set active to it and remove
+//      its id from proposedList.
+//
+// ``endResult`` is accepted for symmetry with the call site (which
+// passes the end-mutation response so other reducers could opt in
+// later), but this reducer does not mutate state from it today.
+export function applySwitch(
+  state: ParentState,
+  // endResult is currently consumed only for symmetry with the
+  // caller; the prefix-underscore is the TS-recommended way to tell
+  // ``noUnusedParameters`` we deliberately ignored it.
+  _endResult: Activity | null,
+  approveResult: Activity | null,
+): ParentState {
+  const cleared: ParentState = { ...state, active: null };
+  if (approveResult === null) return cleared;
+  const filtered = cleared.proposedList.filter(
+    (row) => row.id !== approveResult.id,
+  );
+  return { ...cleared, active: approveResult, proposedList: filtered };
 }
 
 // Phase F Step F8: REST-seed helper. The grid loads the initial 10

@@ -585,6 +585,7 @@ to clarify the action's scope is the row, not the activity flow.
 - **Depends on:** J1, J2.
 
 ### Step J6: Frontend store reducers + API methods (additive)
+- **Status:** DONE (2026-05-12)
 - **Problem:** Additive-only changes to the frontend store + API.
   Existing `activity: Activity | null` slot **stays in place** so
   `App.tsx` keeps compiling. Add alongside it:
