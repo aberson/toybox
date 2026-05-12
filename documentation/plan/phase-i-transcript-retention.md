@@ -193,7 +193,7 @@ Critical path: I1 → I3 → I4 → I5 (4 steps). I2 runs alongside I3+I4 with z
 - **Issue:** [#91](https://github.com/aberson/toybox/issues/91)
 - **Flags:** none (operator-driven; no autonomous build agent)
 - **Files:** CREATE `documentation/runs/<YYYY-MM-DD>-phase-i-uat.md` capturing iPadOS version, browser version, retention values tested, sweep log evidence, and any defects. UPDATE this plan doc's I5 row Status to ✅ DONE on success (with date + run-doc link), or to ⚠ DEFECTS with link to a follow-on issue.
-- **Status:** TODO
+- **Status:** ✅ DONE (2026-05-11) — run doc: [documentation/runs/2026-05-11-phase-i-uat.md](../runs/2026-05-11-phase-i-uat.md). Steps 1-8 PASS on iPad Safari; step 9 verified via direct DB probe (insert 240s-old row + wait one sweep tick → row deleted; insert 5s-old row → row preserved) since the backend was started without log-file capture. Sweep loop confirmed firing at 10s cadence with pipeline-matched ISO cutoff.
 
 ## Risks
 
