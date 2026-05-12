@@ -505,6 +505,44 @@ export function App(): JSX.Element {
   // mutations without one row's spinner blocking the other.
   const handleApprove = useCallback(
     async (target: Activity): Promise<void> => {
+      // Phase J step J9: switch-confirm flow. When an active activity
+      // exists with a DIFFERENT id, approving a queued suggestion would
+      // implicitly displace the current activity. Surface a confirm so
+      // the parent acknowledges the swap; on accept, end-old → approve-
+      // new in sequence, routing both results through ``applySwitch``
+      // so the active slot never momentarily holds a stale row.
+      // Same-id (defensive: approve on the active row) falls through to
+      // the standard approve path so a no-op approve doesn't trigger a
+      // confusing confirm dialog.
+      const currentActive = useParentStore.getState().active;
+      if (currentActive !== null && currentActive.id !== target.id) {
+        const ok = window.confirm(
+          `Switch from "${currentActive.title ?? "current activity"}" to "${target.title ?? "new activity"}"? The current activity will end.`,
+        );
+        if (!ok) return;
+        const endResult = await withConflictHandler({
+          mutation: () => api.end(currentActive.id, currentActive.version),
+          refetch: () => refetchActivity(currentActive.id),
+          onConflict: (conflict, fresh) => {
+            useParentStore.getState().applyVersionConflict(conflict, fresh);
+          },
+        });
+        // End failed (network rejection surfaced as throw → caller; or
+        // 409 already toasted by the conflict handler). Bail before
+        // firing approve so the user can retry instead of silently
+        // ending up with a half-applied switch.
+        if (endResult === null) return;
+        const approveResult = await withConflictHandler({
+          mutation: () => api.approve(target.id, target.version),
+          refetch: () => refetchActivity(target.id),
+          onConflict: (conflict, fresh) => {
+            useParentStore.getState().applyVersionConflict(conflict, fresh);
+          },
+        });
+        if (approveResult === null) return;
+        useParentStore.getState().applySwitch(endResult, approveResult);
+        return;
+      }
       const result = await withConflictHandler({
         mutation: () => api.approve(target.id, target.version),
         refetch: () => refetchActivity(target.id),

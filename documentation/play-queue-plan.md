@@ -680,6 +680,7 @@ to clarify the action's scope is the row, not the activity flow.
 - **Depends on:** J7.
 
 ### Step J9: Switch-confirm flow
+- **Status:** DONE (2026-05-12)
 - **Problem:** When the parent clicks Approve on a suggestion while
   `active !== null`, fire `window.confirm("Switch from '<active.title>' to
   '<new.title>'? The current activity will end.")`. On confirm: call

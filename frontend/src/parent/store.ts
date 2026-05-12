@@ -483,6 +483,13 @@ export interface ParentStore extends ParentState {
   applyRejectedTopics: (rejected: string[]) => void;
   applyReconnectResync: (fresh: Activity | null) => void;
   applyMutationResult: (fresh: Activity) => void;
+  // Phase J step J9: switch-confirm flow routes both the end-old and
+  // approve-new mutation results through one reducer so the active slot
+  // never momentarily holds a stale row between the two operations.
+  applySwitch: (
+    endResult: Activity | null,
+    approveResult: Activity | null,
+  ) => void;
   pushToast: (kind: Toast["kind"], message: string) => void;
   dismissToast: (id: number) => void;
   // Phase F Step F8: per-toy action grid wiring.
@@ -507,6 +514,8 @@ export function createParentStore(initial: ParentState = INITIAL_STATE) {
       set((s) => applyReconnectResync(s, fresh)),
     applyMutationResult: (fresh) =>
       set((s) => applyMutationResult(s, fresh)),
+    applySwitch: (endResult, approveResult) =>
+      set((s) => applySwitch(s, endResult, approveResult)),
     pushToast: (kind, message) => set((s) => pushToast(s, kind, message)),
     dismissToast: (id) => set((s) => dismissToast(s, id)),
     setToyActions: (toyId, rows) =>
