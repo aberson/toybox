@@ -349,15 +349,46 @@ Considered the inverse (approve-first); rejected because the brief window
 where two activities are technically "active" server-side is harder
 for the frontend store to reason about than "no active right now."
 
-**D11 — Cadence task calls `_do_propose` directly.**
-The cadence task in `core/play_cadence.py` opens a SQLite connection per
-tick (via `asyncio.to_thread`) and calls `_do_propose(body, conn, pubsub,
-judge_call)` directly. Production has no UUID-collision concern (random
-seed per propose), so the smoke harness's bespoke `_persist_smoke_activity`
-helper is unnecessary. Considered extracting a `core/activities_persist.py`
-helper as a shared seam; rejected because there's only one new caller and
-the existing `_do_propose` already enforces the contracts the cadence task
-needs (eviction, content resolution, judge scheduling, envelope emission).
+**D11 — Cadence task calls `_do_propose` directly; production `_on_intent`
+extracts `_persist_dispatcher_activity` (sibling-of-smoke).**
+Two seams in this phase persist into `activities`, and they take different
+paths:
+
+- **Cadence loop (`core/play_cadence.py`)** opens a SQLite connection per
+  tick (via `asyncio.to_thread`) and calls `_do_propose(body, conn, pubsub,
+  judge_call)` directly. The loop has no in-memory Activity to honour — it
+  is synthesizing a `ProposeRequest` from scratch — so reusing `_do_propose`
+  is the natural fit (eviction, content resolution, judge scheduling,
+  envelope emission all run unmodified).
+- **Transcript-driven `_on_intent` (`main.py`)** ALREADY HOLDS a chosen
+  `Activity` returned from `EscalationDispatcher.on_transcript`. Re-running
+  `_do_propose` would (a) regenerate from a different random seed and
+  discard the dispatcher's chosen template/persona, (b) under mode ≥ 3
+  with capability, fire Claude TWICE per intent (dispatcher + propose),
+  and (c) leave the dispatcher's `labeled_events` row keyed on an
+  `activity.id` that never lands in `activities` — orphan rows that
+  pollute Phase E SFT exports.
+
+  J3 therefore extracts `_persist_dispatcher_activity(activity, intent,
+  conn, pubsub)` — a sibling of `_persist_smoke_activity`. The shape
+  mirrors smoke (INSERT one `activities` row + step rows, emit
+  `activity.state` envelope) but with three differences:
+  (1) `cap=play_target_depth.get(conn)` for `evict_oldest_for_capacity`
+      (J2's dynamic cap, not the smoke-fixture's `PROPOSED_QUEUE_CAP`);
+  (2) **no UUID dedup** — smoke uses a deterministic offline UUID that
+      collides on re-runs; production has random seeds, so no dedup is
+      needed;
+  (3) envelope emission routes through `_emit_state` + `_row_to_response`
+      so the WS payload matches the REST `GET /api/activities/{id}`
+      contract byte-for-byte.
+
+  The dispatcher writes its `labeled_events` row BEFORE returning the
+  Activity (see `escalation.py:_record`, called at line 437 for offline
+  and line 594 for Claude path). Persisting the `activities` row with
+  the same `activity.id` produces a valid FK reference, eliminating
+  the orphan-row class entirely. The earlier draft of this decision
+  said "no helper extraction needed" — revised in iter-2 after a code
+  review surfaced the orphan / double-call defects.
 
 **D12 — Skip button stays, renamed for clarity.**
 The `SuggestionCard` button currently labeled "skip" calls
@@ -486,6 +517,7 @@ to clarify the action's scope is the row, not the activity flow.
 - **Type:** code
 - **Issue:** #95
 - **Flags:** `--reviewers code`
+- **Status:** DONE (2026-05-12) — extracted `_persist_dispatcher_activity` helper instead of `_do_propose` regen path; revised D11 to match.
 - **Produces:** modified `main.py` (`_metrics_lifespan` wiring +
   `_on_intent` definition); integration test that feeds a synthetic
   transcript through the pipeline and asserts a `proposed` row +

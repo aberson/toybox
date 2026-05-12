@@ -40,12 +40,14 @@ load_dotenv()
 import argparse
 import asyncio
 import contextlib
+import functools
 import json
 import logging
 import os
+import sqlite3
 import sys
 import uuid
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -54,20 +56,26 @@ from fastapi import FastAPI
 
 from .activities.models import Activity
 from .ai.breaker import CircuitBreaker
-from .ai.client import AIClient, StubClient
+from .ai.capability import is_capable
+from .ai.client import AIClient, AnthropicClient, StubClient
+from .ai.judge import judge_and_persist
+from .ai.labeled_events import GeneratorContext, record_generation
+from .ai.oauth import load_token
 from .api.metrics import get_metrics_breaker
 from .app import create_app, image_gen_worker_lifespan, transcript_sweep_lifespan
 from .audio.capture import MicCapture
 from .audio.pipeline import TranscriptPipeline
 from .audio.stt import WhisperTranscriber
 from .audio.test_adapter import WavToBufferStream
+from .core import play_target_depth
 from .core.bind_guard import BindGuardError, check_bind_safe, pin_is_set
 from .core.capability import CapabilityReason
 from .core.escalation import EscalationDispatcher
-from .core.listening import ListeningMode
+from .core.listening import ListeningMode, Publisher, current_mode
 from .core.play_cadence import start_cadence_loop
+from .core.pubsub import PubSub
 from .core.queue import PROPOSED_QUEUE_CAP, PROPOSED_STATE, evict_oldest_for_capacity
-from .core.throttle import MinIntervalThrottle
+from .core.throttle import MinIntervalThrottle, min_interval_from_env
 from .db import connect, resolve_db_path
 from .db.migrations import run_migrations
 from .metrics import (
@@ -686,6 +694,8 @@ def _build_metrics_inputs_factory(
 
 async def _start_production_audio(
     db_path: Path,
+    *,
+    on_intent: Callable[[Intent], Awaitable[None]] | None = None,
 ) -> tuple[MicCapture | None, TranscriptPipeline | None, WhisperTranscriber | None]:
     """Build + start the production audio pipeline; gracefully no-op on failure.
 
@@ -693,6 +703,12 @@ async def _start_production_audio(
     ``None`` when init failed at that step. Callers should pass each
     to :func:`_stop_production_audio` regardless; ``None`` slots are
     safely skipped.
+
+    ``on_intent`` is the per-intent dispatch handler the pipeline calls
+    each time a trigger fires. Production wires the escalation dispatcher
+    here (see :func:`_metrics_lifespan`); ``None`` keeps the legacy
+    behaviour where intents are matched but discarded — useful for
+    test/headless runs.
 
     The graceful degradation is deliberate: a parent-only deployment
     (no mic on the host) or a misconfigured PortAudio install must NOT
@@ -752,6 +768,7 @@ async def _start_production_audio(
             transcriber=transcriber,
             session_id=PRODUCTION_SESSION_ID,
             publisher=lambda env: get_pubsub().publish(env),
+            on_intent=on_intent,
             db_path=db_path,
             mic_id=PRODUCTION_MIC_ID,
         )
@@ -774,6 +791,287 @@ async def _start_production_audio(
         PRODUCTION_MIC_ID,
     )
     return mic, pipeline, transcriber
+
+
+def _record_generation_with_conn_factory(
+    conn_factory: Callable[[], sqlite3.Connection],
+    activity: Activity,
+    ctx: GeneratorContext,
+    generator_path: str,
+) -> int:
+    """Adapter that opens a short-lived connection for one labeled_event write.
+
+    :func:`toybox.ai.labeled_events.record_generation` takes a live
+    connection as its first positional, but the dispatcher's
+    :data:`LabeledEventRecorder` contract is ``(activity, ctx,
+    generator_path) -> int``. The dispatcher's call site is synchronous
+    inside an event-loop tick, so we open + close a fresh sqlite handle
+    here rather than holding one for the lifetime of the dispatcher.
+    """
+    conn = conn_factory()
+    try:
+        return record_generation(
+            conn,
+            activity=activity,
+            ctx=ctx,
+            generator_path=generator_path,
+        )
+    finally:
+        conn.close()
+
+
+def _build_production_dispatcher(
+    *,
+    breaker: CircuitBreaker,
+    publisher: Publisher | None = None,
+    conn_factory: Callable[[], sqlite3.Connection],
+) -> tuple[EscalationDispatcher, AIClient]:
+    """Construct the production :class:`EscalationDispatcher`.
+
+    The OAuth token resolution happens here: if a token is on disk we
+    wire a real :class:`AnthropicClient`; otherwise we fall back to a
+    :class:`StubClient` so the dispatcher's construction never fails
+    on a fresh install. The capability gate is the authoritative seam
+    that prevents an SDK-less call from firing (:data:`token_missing`
+    short-circuits to offline), so the StubClient never receives a real
+    request in that branch.
+    """
+    ai_client: AIClient
+    token = load_token()
+    if token is None:
+        ai_client = StubClient()
+    else:
+        ai_client = AnthropicClient(token)
+    dispatcher = EscalationDispatcher(
+        ai_client=ai_client,
+        breaker=breaker,
+        throttle=MinIntervalThrottle(min_interval_from_env()),
+        capability_check=functools.partial(is_capable, breaker=breaker),
+        publisher=publisher,
+        labeled_event_recorder=functools.partial(
+            _record_generation_with_conn_factory, conn_factory
+        ),
+        judge_call_factory=functools.partial(
+            judge_and_persist,
+            ai_client=ai_client,
+            db_path_resolver=resolve_db_path,
+        ),
+        connection_factory=conn_factory,
+    )
+    return dispatcher, ai_client
+
+
+def _persist_dispatcher_activity(
+    activity: Activity,
+    intent: Intent,
+    conn: sqlite3.Connection,
+    pubsub: PubSub,
+) -> None:
+    """Persist the dispatcher's in-memory :class:`Activity` and emit state.
+
+    Sibling of :func:`_persist_smoke_activity`: both insert one
+    ``activities`` row + the first ``activity_steps`` row + emit an
+    ``activity.state`` envelope. The differences:
+
+    * **Cap**: production reads :func:`play_target_depth.get` so the
+      parent's chosen queue depth applies dynamically (J2). Smoke is a
+      hermetic fixture and pins the legacy :data:`PROPOSED_QUEUE_CAP`.
+    * **UUID dedup**: the smoke harness's offline generator produces
+      deterministic UUIDs (intent + slot + hour + seed), so repeated
+      runs collide on ``activities.id``. Production's seed is random,
+      so no dedup is needed.
+    * **Envelope**: production routes through :func:`_emit_state` +
+      :func:`_row_to_response` so the wire payload matches the REST
+      ``GET /api/activities/{id}`` contract byte-for-byte. Smoke
+      hand-builds the envelope inline (legacy pattern from earlier in
+      the phase; left untouched).
+    * **Persona reasoning + trigger phrase**: production carries
+      these into the persisted ``metadata`` blob so the parent UI's
+      "why this?" panel has something to show. The dispatcher already
+      gave us a chosen ``persona_id`` (and possibly metadata from
+      Claude); we splice the additional reasoning + trigger phrase
+      next to whatever the dispatcher emitted.
+
+    The dispatcher's :data:`labeled_event_recorder` (production wires
+    :func:`_record_generation_with_conn_factory`) writes a
+    ``labeled_events`` row keyed on ``activity.id`` BEFORE this helper
+    runs — :meth:`EscalationDispatcher.on_transcript` calls
+    :meth:`_record` before returning the Activity (offline path:
+    ``escalation.py:437``; Claude path: ``escalation.py:594``). By
+    persisting the ``activities`` row with the SAME id, the
+    labeled_events row is no longer orphan; Phase E SFT exports see
+    valid FK references.
+    """
+    # Step 23 contract: surface trigger_phrase + persona_reasoning
+    # inside the persisted ``metadata`` blob so ``_row_to_response``
+    # can lift them to the top-level response fields (and strip them
+    # for the child-scope WS envelope). Build a fresh dict — the
+    # dispatcher's Activity is frozen with a frozen metadata view.
+    metadata = dict(activity.metadata)
+    trigger_phrase = intent.slot if intent.slot else None
+    if trigger_phrase is not None and trigger_phrase.strip():
+        metadata["trigger_phrase"] = trigger_phrase.strip()
+    if "persona_reasoning" not in metadata:
+        metadata["persona_reasoning"] = (
+            f"matched on intent {intent.name}"
+            if activity.persona_id is None
+            else f"persona {activity.persona_id} picked for {intent.name}"
+        )
+
+    summary_payload = {
+        "title": activity.title,
+        "metadata": metadata,
+        "template_id": activity.template_id,
+    }
+    summary_blob = json.dumps(summary_payload, sort_keys=True)
+    toy_ids_blob = json.dumps(list(activity.toy_ids)) if activity.toy_ids else None
+    # Phase G: persist the resolved slot map so ``_row_to_response`` →
+    # ``_render_template_plan_steps`` can render the parent's suggestion
+    # preview with real fills rather than the migration default ``'{}'``
+    # (which would leave ``{toy}`` / ``{room}`` / ``{adjective}``
+    # placeholders un-substituted in the previewed body). The canonical
+    # writer in ``api/activities.py:_persist_activity`` uses the same
+    # ``sort_keys=True`` shape — keep them byte-identical so dispatcher
+    # and propose paths persist the slot map identically.
+    slot_fills_blob = json.dumps(
+        activity.metadata.get("slot_fills", {}), sort_keys=True
+    )
+    created_at = datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+    # J2: read the parent's chosen queue depth so a fresh PUT lands on
+    # the very next intent without a restart. Evict before INSERT so the
+    # cap holds for the new row.
+    evicted_ids = evict_oldest_for_capacity(conn, cap=play_target_depth.get(conn))
+
+    with conn:
+        conn.execute(
+            "INSERT INTO activities "
+            "(id, session_id, state, version, summary, persona_id, child_ids, "
+            " room_ids, toy_ids, intent_source, created_at, started_at, ended_at, "
+            " slot_fills_json) "
+            "VALUES (?, ?, ?, 1, ?, ?, NULL, NULL, ?, ?, ?, NULL, NULL, ?)",
+            (
+                activity.id,
+                PRODUCTION_SESSION_ID,
+                PROPOSED_STATE,
+                summary_blob,
+                activity.persona_id,
+                toy_ids_blob,
+                intent.name,
+                created_at,
+                slot_fills_blob,
+            ),
+        )
+        # Mirror ``_persist_smoke_activity``: insert each template step
+        # at seq=idx+1. The lazy-insert path (G2) used by ``_do_propose``
+        # writes ONLY steps[0]; the dispatcher's seam pre-dates lazy
+        # advance (and the dispatcher's Activity has the full step list
+        # in memory anyway), so we keep the pre-G2 shape here. The
+        # advance handler tolerates pre-inserted rows.
+        for idx, step in enumerate(activity.steps):
+            conn.execute(
+                "INSERT INTO activity_steps "
+                "(id, activity_id, seq, body, sfx, expected_action, current) "
+                "VALUES (?, ?, ?, ?, ?, ?, 0)",
+                (
+                    str(uuid.uuid4()),
+                    activity.id,
+                    idx + 1,
+                    step.text,
+                    step.sfx,
+                    step.expected_action,
+                ),
+            )
+
+    # Late-import the API helpers so this module's import surface stays
+    # tight (mirrors :mod:`toybox.core.play_cadence`'s pattern). The
+    # response shape is the single seam the parent UI consumes; reusing
+    # ``_row_to_response`` keeps the WS envelope and REST GET byte-
+    # identical.
+    from .api.activities import (  # noqa: PLC0415
+        _emit_state,
+        _fetch_activity_row,
+        _row_to_response,
+    )
+
+    # Emit evictions FIRST so the UI sees rows transition out before
+    # the new row lands (matches ``_do_propose``'s ordering).
+    for eid in evicted_ids:
+        evicted_row = _fetch_activity_row(conn, eid)
+        _emit_state(pubsub, _row_to_response(conn, evicted_row))
+
+    row = _fetch_activity_row(conn, activity.id)
+    _emit_state(pubsub, _row_to_response(conn, row))
+
+
+def _build_production_on_intent(
+    dispatcher: EscalationDispatcher,
+    conn_factory: Callable[[], sqlite3.Connection],
+) -> Callable[[Intent], Awaitable[None]]:
+    """Return the async ``on_intent`` handler the pipeline will invoke.
+
+    The handler funnels each intent through the dispatcher (the mode +
+    capability + breaker + throttle gate). On a non-``None`` return the
+    dispatcher's in-memory :class:`Activity` is persisted via
+    :func:`_persist_dispatcher_activity`, which INSERTs into ``activities``
+    using THE SAME ``activity.id`` the dispatcher wrote into
+    ``labeled_events``. This eliminates orphan ``labeled_events`` rows
+    that the prior implementation produced when it discarded the
+    dispatcher's Activity and re-ran the generator inside
+    ``_do_propose`` (see D11 in the play-queue plan).
+    """
+    pubsub = get_pubsub()
+
+    async def _on_intent(intent: Intent) -> None:
+        conn = conn_factory()
+        try:
+            try:
+                mode = current_mode(conn)
+            except Exception as exc:  # noqa: BLE001 -- defensive
+                _logger.warning(
+                    "on_intent: current_mode read failed (%s: %s); skipping",
+                    type(exc).__name__,
+                    exc,
+                )
+                return
+
+            try:
+                activity = await dispatcher.on_transcript(
+                    transcript=_synthetic_transcript_for(intent),
+                    mode=mode,
+                    intents=[intent],
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:  # noqa: BLE001 -- defensive
+                _logger.warning(
+                    "production on_intent dispatch failed (%s: %s)",
+                    type(exc).__name__,
+                    exc,
+                )
+                return
+            if activity is None:
+                return
+
+            try:
+                await asyncio.to_thread(
+                    _persist_dispatcher_activity, activity, intent, conn, pubsub
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:  # noqa: BLE001 -- defensive
+                _logger.warning(
+                    "on_intent: persist failed for intent=%s id=%s (%s: %s)",
+                    intent.name,
+                    activity.id,
+                    type(exc).__name__,
+                    exc,
+                )
+        finally:
+            with contextlib.suppress(Exception):
+                conn.close()
+
+    return _on_intent
 
 
 async def _stop_production_audio(
@@ -812,7 +1110,23 @@ async def _metrics_lifespan(app: FastAPI) -> AsyncIterator[None]:
     breaker = get_metrics_breaker()
     db_path = resolve_db_path()
 
-    mic, pipeline, transcriber = await _start_production_audio(db_path)
+    # Build the escalation dispatcher BEFORE starting audio so the
+    # ``on_intent`` handler is in scope at TranscriptPipeline construction.
+    # ``get_metrics_breaker()`` returns the process-singleton breaker shared
+    # with the operator-dashboard metrics path; using the same instance keeps
+    # dashboard health and capability gating in lockstep.
+    conn_factory = default_conn_factory()
+    pubsub = get_pubsub()
+    dispatcher, _dispatcher_ai_client = _build_production_dispatcher(
+        breaker=breaker,
+        publisher=lambda env: pubsub.publish(env),
+        conn_factory=conn_factory,
+    )
+    on_intent = _build_production_on_intent(dispatcher, conn_factory)
+
+    mic, pipeline, transcriber = await _start_production_audio(
+        db_path, on_intent=on_intent
+    )
     mic_holder: dict[str, MicCapture | None] = {"mic": mic}
     # Stash on app.state so the REST ``/api/metrics`` handler can
     # resolve the live device name on its very first call — without
