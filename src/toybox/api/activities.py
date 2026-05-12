@@ -2355,6 +2355,119 @@ def post_didnt_work(
     return response
 
 
+# Maximum rows returned by ``GET /api/activities/proposed``. Pinned at
+# 5 to match the legacy ``PROPOSED_QUEUE_CAP``; the parent dashboard's
+# scrolling queue paints at most 5 cards at once so a larger fetch
+# would just be extra wire weight. Keeping it as a module constant
+# (rather than a query param) means the contract is visible to the
+# parent UI's contract test in one place.
+_PROPOSED_LIST_LIMIT = 5
+
+# States that count as "currently in flight" for the ``include_active``
+# branch of the list endpoint. ``proposed`` is excluded — it's the queue
+# itself, and the parent UI distinguishes "what's next" (items) from
+# "what's playing" (active). ``ended`` / ``dismissed`` / ``didnt_work``
+# are terminal so they're skipped too. ``completed`` is the post-final-
+# step state and stays visible until the parent ends or restarts the
+# activity, hence it's still considered active here.
+_ACTIVE_STATES: tuple[str, ...] = (
+    STATE_APPROVED,
+    STATE_RUNNING,
+    STATE_PAUSED,
+    STATE_COMPLETED,
+)
+
+
+class ProposedListResponse(BaseModel):
+    """Wire shape for ``GET /api/activities/proposed``.
+
+    Without ``include_active`` the response is ``{"items": [...]}``
+    where ``items`` is at most :data:`_PROPOSED_LIST_LIMIT` activities
+    in ``created_at DESC`` order. With ``include_active=true`` the same
+    response carries an extra ``active`` field — the most recent
+    non-terminal (``approved/running/paused/completed``) activity for
+    the production session, or ``None`` when no such row exists. The
+    parent dashboard uses this combined fetch to paint the suggestion
+    queue + the currently-playing card in a single REST round-trip on
+    mount, then keeps both in sync via the ``activity.state`` ws topic.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    items: list[ActivityResponse] = Field(default_factory=list)
+    active: ActivityResponse | None = None
+
+
+def _fetch_recent_proposed(
+    conn: sqlite3.Connection,
+    limit: int,
+) -> list[ActivityResponse]:
+    """Return up to ``limit`` ``proposed`` activities, newest first.
+
+    Mirrors :func:`oldest_proposed_ids` from :mod:`toybox.core.queue`
+    but flips the ordering — the parent queue wants newest-on-top so
+    a freshly autonomous-proposed activity appears at the head of the
+    scrolling card stack. Tie-breaks on ``id`` so two rows written in
+    the same second (rare but possible at second precision) have a
+    deterministic order.
+    """
+    rows = conn.execute(
+        "SELECT * FROM activities WHERE state = ? "
+        "ORDER BY created_at DESC, id DESC LIMIT ?",
+        (PROPOSED_STATE, limit),
+    ).fetchall()
+    return [_row_to_response(conn, row) for row in rows]
+
+
+def _fetch_active_activity(
+    conn: sqlite3.Connection,
+) -> ActivityResponse | None:
+    """Return the most recent non-terminal activity, or ``None``.
+
+    Filters to :data:`_ACTIVE_STATES` so terminal rows
+    (``ended``/``dismissed``/``didnt_work``) and the queue itself
+    (``proposed``) are excluded. ``created_at DESC`` then ``id DESC``
+    keeps the ordering deterministic across same-second inserts —
+    matches :func:`_fetch_recent_proposed`'s tiebreak so the wire
+    contract is uniform between ``items`` and ``active``.
+    """
+    placeholders = ",".join("?" for _ in _ACTIVE_STATES)
+    row = conn.execute(
+        f"SELECT * FROM activities WHERE state IN ({placeholders}) "
+        "ORDER BY created_at DESC, id DESC LIMIT 1",
+        _ACTIVE_STATES,
+    ).fetchone()
+    if row is None:
+        return None
+    return _row_to_response(conn, row)
+
+
+@router.get("/proposed", response_model=ProposedListResponse)
+def get_proposed_list(
+    conn: Annotated[sqlite3.Connection, Depends(get_activities_db)],
+    _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
+    include_active: bool = False,
+) -> ProposedListResponse:
+    """List up to 5 most-recent ``proposed`` activities for the parent queue.
+
+    Parent-token scope only — the child kiosk consumes the ws
+    ``activity.state`` topic and never needs the REST list. The
+    ``include_active`` query flag adds an ``active`` field to the
+    response carrying the currently-playing (non-terminal) activity so
+    the parent dashboard can paint both the queue and the in-flight
+    card in a single mount-time round-trip; subsequent updates flow
+    over the ws topic.
+
+    Declared BEFORE the ``/{activity_id}`` GET so FastAPI's path-
+    matching picks this static route over the dynamic one — otherwise
+    ``/proposed`` would route to ``get_activity(activity_id='proposed')``
+    and 404 on the row lookup.
+    """
+    items = _fetch_recent_proposed(conn, _PROPOSED_LIST_LIMIT)
+    active = _fetch_active_activity(conn) if include_active else None
+    return ProposedListResponse(items=items, active=active)
+
+
 @router.get("/{activity_id}", response_model=ActivityResponse)
 def get_activity(
     activity_id: str,
@@ -2372,6 +2485,7 @@ __all__ = [
     "ApproveRequest",
     "DidntWorkRequest",
     "ProposeRequest",
+    "ProposedListResponse",
     "RegenerateRequest",
     "STATE_APPROVED",
     "STATE_COMPLETED",

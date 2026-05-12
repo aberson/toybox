@@ -553,6 +553,7 @@ to clarify the action's scope is the row, not the activity flow.
 - **Depends on:** J3.
 
 ### Step J5: List endpoint + TTL sweep + envelope payload audit
+- **Status:** DONE (2026-05-12)
 - **Problem:** Add `GET /api/activities/proposed?include_active=true` to
   `api/activities.py`. Returns proposed rows ordered by `created_at DESC`
   (limit default 5, max 5). When `include_active=true`, also returns

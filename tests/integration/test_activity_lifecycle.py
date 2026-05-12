@@ -109,6 +109,14 @@ def test_propose_emits_state_envelope(
         assert envelope.topic is Topic.activity_state
         assert envelope.payload["id"] == body["id"]
         assert envelope.payload["state"] == "proposed"
+        # Phase J J5: ``created_at`` must be in the WS payload so the
+        # parent UI can compute TTL fade on a freshly-pushed row without
+        # an extra REST round-trip. Asserted here (rather than in a
+        # standalone test) because every propose path funnels through
+        # the same ``_emit_state`` helper — a regression that dropped
+        # the field from the model_dump would surface here.
+        assert "created_at" in envelope.payload
+        assert envelope.payload["created_at"] == body["created_at"]
     finally:
         sub.close()
 

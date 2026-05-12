@@ -73,6 +73,7 @@ from .core.capability import CapabilityReason
 from .core.escalation import EscalationDispatcher
 from .core.listening import ListeningMode, Publisher, current_mode
 from .core.play_cadence import start_cadence_loop
+from .core.proposed_ttl import start_proposed_ttl_sweep
 from .core.pubsub import PubSub
 from .core.queue import PROPOSED_QUEUE_CAP, PROPOSED_STATE, evict_oldest_for_capacity
 from .core.throttle import MinIntervalThrottle, min_interval_from_env
@@ -1160,6 +1161,11 @@ async def _metrics_lifespan(app: FastAPI) -> AsyncIterator[None]:
                 db_path,
                 judge_call_factory=get_judge_call,
             )
+            # TTL sweep reaps proposed rows older than 3× cadence so
+            # the scrolling queue doesn't accumulate ghost cards when
+            # the parent is away. Same teardown shape as the cadence
+            # task above — cancel + gather with ``return_exceptions``.
+            ttl_task = start_proposed_ttl_sweep(get_pubsub, db_path)
             try:
                 yield
             finally:
@@ -1171,6 +1177,8 @@ async def _metrics_lifespan(app: FastAPI) -> AsyncIterator[None]:
                 # ``Task exception was never retrieved`` warning.
                 cadence_task.cancel()
                 await asyncio.gather(cadence_task, return_exceptions=True)
+                ttl_task.cancel()
+                await asyncio.gather(ttl_task, return_exceptions=True)
                 task.cancel()
                 await asyncio.gather(task, return_exceptions=True)
     finally:
