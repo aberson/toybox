@@ -406,7 +406,7 @@ to clarify the action's scope is the row, not the activity flow.
   `GET / PUT /api/settings/<key-kebab>` with parent-token scope, mirroring
   `api/transcript_retention_settings.py`. Register both routers in `main.py`.
 - **Type:** code
-- **Issue:** 
+- **Issue:** #93
 - **Flags:** `--tdd`
 - **Produces:** 2 migrations, 2 core modules, 2 API modules, router
   registration in `main.py`, pytest coverage for read/write/validation/
@@ -440,7 +440,7 @@ to clarify the action's scope is the row, not the activity flow.
   existing metrics + image-gen workers. Use pytest-asyncio for the unit
   test, monkey-patching `asyncio.sleep` and using an in-memory DB.
 - **Type:** code
-- **Issue:** 
+- **Issue:** #94
 - **Flags:** `--reviewers code`
 - **Produces:** `core/play_cadence.py`; modified `_do_propose` (dynamic
   cap); modified `_metrics_lifespan` (task wiring); pytest-asyncio
@@ -482,7 +482,7 @@ to clarify the action's scope is the row, not the activity flow.
   code path — that's J4. Production still constructs the dispatcher with
   the default arg's env value in J3; J4 rips both out.
 - **Type:** code
-- **Issue:** 
+- **Issue:** #95
 - **Flags:** `--reviewers code`
 - **Produces:** modified `main.py` (`_metrics_lifespan` wiring +
   `_on_intent` definition); integration test that feeds a synthetic
@@ -509,7 +509,7 @@ to clarify the action's scope is the row, not the activity flow.
   before deleting; current callers are inside `core/escalation.py` only,
   but external tests may import the constants.
 - **Type:** code
-- **Issue:** 
+- **Issue:** #96
 - **Flags:** `--reviewers code`
 - **Produces:** modified `core/escalation.py` (dead-code removal);
   updated tests if any import the deleted constants.
@@ -535,7 +535,7 @@ to clarify the action's scope is the row, not the activity flow.
   `main.py:483` does; confirm `api/activities.py:_emit_state` does too,
   and add if missing).
 - **Type:** code
-- **Issue:** 
+- **Issue:** #97
 - **Flags:** `--reviewers code`
 - **Produces:** new endpoint in `api/activities.py` + Pydantic response
   model; `core/proposed_ttl.py`; lifespan wiring; pytest coverage for
@@ -576,7 +576,7 @@ to clarify the action's scope is the row, not the activity flow.
   the reducers green. No UI changes; consumers continue reading
   `state.activity` until J7.
 - **Type:** code
-- **Issue:** 
+- **Issue:** #98
 - **Flags:** `--tdd`
 - **Produces:** extended `store.ts` (additive); extended `api.ts` + types;
   extended `store.test.ts`. No consumer changes.
@@ -598,7 +598,7 @@ to clarify the action's scope is the row, not the activity flow.
   `proposedList[0]` for the suggestion-card case, `state.active` for the
   panel case).
 - **Type:** code
-- **Issue:** 
+- **Issue:** #99
 - **Flags:** `--reviewers code`
 - **Produces:** rewritten `store.ts` (old slot gone); rewritten
   consumers; updated tests. Visible behaviour identical to pre-J7
@@ -629,7 +629,7 @@ to clarify the action's scope is the row, not the activity flow.
   with restyled de-emphasis (small "+ trigger now" link affordance,
   not the top-of-tab button it is today).
 - **Type:** code
-- **Issue:** 
+- **Issue:** #100
 - **Flags:** `--reviewers code --ui`
 - **Produces:** new component, modified App.tsx, restyled
   `TriggerButton.tsx`, `PlayQueueList.test.tsx` (vitest with fake
@@ -651,7 +651,7 @@ to clarify the action's scope is the row, not the activity flow.
   Pattern is the same shape `ActivityPanel`'s `handleEndClick` already
   uses for the End button. On cancel: no-op, the approve doesn't fire.
 - **Type:** code
-- **Issue:** 
+- **Issue:** #101
 - **Flags:** `--reviewers code --ui`
 - **Produces:** modified `App.tsx` approve handler, unit test in
   `App.test.tsx` covering: no-active → simple approve; active → confirm
@@ -674,7 +674,7 @@ to clarify the action's scope is the row, not the activity flow.
   `TranscriptRetentionControl`). Acknowledge in the UI copy that with
   cadence set to "off," only transcripts + the manual Trigger fire.
 - **Type:** code
-- **Issue:** 
+- **Issue:** #102
 - **Flags:** `--reviewers code --ui`
 - **Produces:** modified `SettingsPanel.tsx`, modified `App.tsx` (state
   + callback wiring + threading `cadenceSeconds` down to PlayQueueList
@@ -687,7 +687,7 @@ to clarify the action's scope is the row, not the activity flow.
 
 ### Step J11: End-to-end smoke gate (60s, real components, no mocks)
 - **Type:** operator
-- **Issue:** 
+- **Issue:** #103
 - **Problem:** Run the full play-queue pipeline for 60s and observe
   seven behaviors. See the **Commands to run** + **What you're looking
   for** sections below.
@@ -738,7 +738,7 @@ cd frontend; npm run dev
 
 ### Step J12: iPad UAT + close
 - **Type:** operator
-- **Issue:** 
+- **Issue:** #104
 - **Problem:** Repeat J11 on a real iPad over LAN — speech-driven
   proposals from the home machine's microphone, observed on the parent
   UI on the iPad. Verify the scrolling list + fade-out animations
