@@ -622,6 +622,7 @@ to clarify the action's scope is the row, not the activity flow.
 - **Depends on:** J5.
 
 ### Step J7: Rip out old `activity` slot; rewire consumers
+- **Status:** DONE (2026-05-12)
 - **Problem:** Delete `activity: Activity | null` from the store. Update
   every consumer that read `state.activity` to read `state.active`
   instead (grep found matches in `App.tsx`, `ActivityPanel.tsx`,

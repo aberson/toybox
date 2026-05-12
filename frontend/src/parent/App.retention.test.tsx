@@ -184,9 +184,9 @@ async function driveLoginToTabShell(): Promise<void> {
 beforeEach(() => {
   useParentStore.setState({
     token: null,
-    activity: null,
+    active: null,
+    proposedList: [],
     wsState: "idle",
-    health: null,
     toasts: [],
     capabilityReason: null,
   } as Partial<ReturnType<typeof useParentStore.getState>>);

@@ -18,7 +18,7 @@ import {
   isTerminalState,
   MAX_TOASTS,
   pushToast,
-  setActivity,
+  setActive,
   setHealth,
   setMicState,
   setToken,
@@ -67,21 +67,21 @@ describe("parent store reducers", () => {
     expect(next.capabilityReason).toBe("claude_unreachable");
   });
 
-  it("trivial setters (mic, ws, activity) thread their argument through", () => {
-    // setMicState, setWsState, setActivity are unbranching shallow
+  it("trivial setters (mic, ws, active) thread their argument through", () => {
+    // setMicState, setWsState, setActive are unbranching shallow
     // copies. One smoke test covers all three; replaces three trivial
     // single-line tests that the iteration-1 review flagged as redundant.
     const a = setMicState(INITIAL_STATE, "capturing");
     expect(a.micState).toBe("capturing");
     const b = setWsState(a, "open");
     expect(b.wsState).toBe("open");
-    const c = setActivity(b, fakeActivity());
-    expect(c.activity?.id).toBe("act-1");
-    const d = setActivity(c, null);
-    expect(d.activity).toBeNull();
+    const c = setActive(b, fakeActivity());
+    expect(c.active?.id).toBe("act-1");
+    const d = setActive(c, null);
+    expect(d.active).toBeNull();
   });
 
-  it("applyEnvelope updates activity from activity.state envelope", () => {
+  it("applyEnvelope updates active from approved activity.state envelope", () => {
     const fresh = fakeActivity({ version: 2, state: "approved" });
     const next = applyEnvelope(INITIAL_STATE, {
       topic: "activity.state",
@@ -89,13 +89,13 @@ describe("parent store reducers", () => {
       payload: fresh as unknown as Record<string, unknown>,
       schema_version: 1,
     });
-    expect(next.activity?.id).toBe("act-1");
-    expect(next.activity?.state).toBe("approved");
+    expect(next.active?.id).toBe("act-1");
+    expect(next.active?.state).toBe("approved");
   });
 
-  it("applyEnvelope ignores stale version of same activity", () => {
+  it("applyEnvelope ignores stale version of same active row", () => {
     const cur = fakeActivity({ version: 5, state: "running" });
-    const seeded = setActivity(INITIAL_STATE, cur);
+    const seeded = setActive(INITIAL_STATE, cur);
     const stale = fakeActivity({ version: 2, state: "approved" });
     const next = applyEnvelope(seeded, {
       topic: "activity.state",
@@ -103,12 +103,13 @@ describe("parent store reducers", () => {
       payload: stale as unknown as Record<string, unknown>,
       schema_version: 1,
     });
-    expect(next.activity?.version).toBe(5);
-    expect(next.activity?.state).toBe("running");
+    expect(next.active?.version).toBe(5);
+    expect(next.active?.state).toBe("running");
   });
 
   it("applyEnvelope drops terminal updates in both no-current and different-id branches", () => {
-    // Branch 1: no current activity, terminal-state envelope arrives → ignored.
+    // Branch 1: no active row, terminal-state envelope arrives → ignored
+    // (no slot populated; the row is gone before it ever landed).
     const dismissed = fakeActivity({ id: "x", state: "dismissed", version: 9 });
     const branch1 = applyEnvelope(INITIAL_STATE, {
       topic: "activity.state",
@@ -116,11 +117,12 @@ describe("parent store reducers", () => {
       payload: dismissed as unknown as Record<string, unknown>,
       schema_version: 1,
     });
-    expect(branch1.activity).toBeNull();
+    expect(branch1.active).toBeNull();
+    expect(branch1.proposedList).toHaveLength(0);
 
-    // Branch 2: a *different* activity is current, a terminal-state envelope
+    // Branch 2: a *different* activity is active, a terminal-state envelope
     // for some unrelated id arrives → the existing one is preserved.
-    const seeded = setActivity(INITIAL_STATE, fakeActivity({ id: "act-1", state: "running", version: 4 }));
+    const seeded = setActive(INITIAL_STATE, fakeActivity({ id: "act-1", state: "running", version: 4 }));
     const otherDone = fakeActivity({ id: "act-2", state: "ended", version: 1 });
     const branch2 = applyEnvelope(seeded, {
       topic: "activity.state",
@@ -128,8 +130,8 @@ describe("parent store reducers", () => {
       payload: otherDone as unknown as Record<string, unknown>,
       schema_version: 1,
     });
-    expect(branch2.activity?.id).toBe("act-1");
-    expect(branch2.activity?.state).toBe("running");
+    expect(branch2.active?.id).toBe("act-1");
+    expect(branch2.active?.state).toBe("running");
   });
 
   it("applyEnvelope on system topic updates capability_reason", () => {
@@ -192,14 +194,16 @@ describe("parent store reducers", () => {
     expect(s.toasts[MAX_TOASTS - 1]?.message).toBe(`msg-${MAX_TOASTS + 4}`);
   });
 
-  it("applyVersionConflict refreshes activity and pushes a toast", () => {
+  it("applyVersionConflict refreshes active slot and pushes a toast", () => {
+    // J7: a running-state refetch routes into the active slot via
+    // applyEnvelopeToNewSlots (was: the legacy single-slot ``activity``).
     const fresh = fakeActivity({ version: 7, state: "running" });
     const next = applyVersionConflict(
       INITIAL_STATE,
       { code: "version_conflict", current_version: 7, current_state: "running" },
       fresh,
     );
-    expect(next.activity?.version).toBe(7);
+    expect(next.active?.version).toBe(7);
     expect(next.toasts.length).toBe(1);
     expect(next.toasts[0]?.kind).toBe("warning");
     expect(next.toasts[0]?.message.toLowerCase()).toContain("version conflict");
@@ -211,7 +215,8 @@ describe("parent store reducers", () => {
       { code: "version_conflict", current_version: 3, current_state: "ended" },
       null,
     );
-    expect(next.activity).toBeNull();
+    expect(next.active).toBeNull();
+    expect(next.proposedList).toHaveLength(0);
     expect(next.toasts.length).toBe(1);
   });
 
@@ -389,18 +394,15 @@ describe("toyActions reducers", () => {
 });
 
 // =====================================================================
-// Phase J6: play-queue store additions. The dashboard moves from a
-// single-slot ``activity`` shape to two parallel slots:
+// Phase J6/J7: play-queue store. The dashboard's single-slot
+// ``activity`` shape was replaced by two parallel slots:
 //
 //   * ``proposedList: Activity[]`` — the scrolling suggestion queue
 //     (newest first, up to 5 from the REST seed, then mutated by ws).
 //   * ``active: Activity | null`` — the currently-playing card.
 //
-// This step is **purely additive** for back-compat: ``applyEnvelope``
-// MUST keep populating the legacy ``activity`` slot so App.tsx + every
-// existing consumer keeps compiling against ``state.activity`` until
-// J7 rips it out. The new slots live alongside the old, both
-// populated. The old slot is removed in J7.
+// J7 removed the legacy ``activity`` slot; only ``proposedList`` and
+// ``active`` are populated by envelopes/mutations/refetches now.
 // =====================================================================
 
 describe("parent store — Phase J6 play-queue additions", () => {
@@ -721,10 +723,12 @@ describe("parent store — Phase J6 play-queue additions", () => {
       expect(next.active?.title).not.toBe("stale");
     });
 
-    it("back-compat: old activity slot is also populated by applyEnvelope", () => {
-      // J6 ships ALONGSIDE the old single-slot. App.tsx + consumers
-      // still read ``state.activity`` until J7 rips it out, so we
-      // assert at least one path keeps populating the legacy slot.
+    it("J7: only the new slots are populated by applyEnvelope (no legacy mirror)", () => {
+      // J7 removed the legacy single-slot ``activity`` field. The
+      // ParentState shape no longer carries it; this regression test
+      // pins that an envelope routes ONLY to the new ``active`` slot
+      // (or ``proposedList`` per state) — there is no parallel write
+      // to a back-compat field.
       const fresh = fakeActivity({
         id: "act-1",
         state: "approved",
@@ -736,10 +740,12 @@ describe("parent store — Phase J6 play-queue additions", () => {
         payload: fresh as unknown as Record<string, unknown>,
         schema_version: 1,
       });
-      // Old slot mirrored single-active behavior — approved counts as
-      // active, so it should land in the old slot too.
-      expect(next.activity?.id).toBe("act-1");
-      expect(next.activity?.state).toBe("approved");
+      expect(next.active?.id).toBe("act-1");
+      expect(next.active?.state).toBe("approved");
+      expect(next.proposedList).toHaveLength(0);
+      // Sanity: a TS-only field probe would also catch this — the
+      // ParentState type no longer has an ``activity`` key.
+      expect("activity" in next).toBe(false);
     });
   });
 

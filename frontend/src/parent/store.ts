@@ -1,7 +1,14 @@
 // Zustand store for the parent UI. Holds auth state, capability
-// reason, mic indicator, the active activity, ws connection state, and
-// a capped toast queue. Reducers are exported as standalone pure
-// functions so vitest can exercise them without spinning up zustand.
+// reason, mic indicator, the play-queue (``proposedList`` + ``active``)
+// slots, ws connection state, and a capped toast queue. Reducers are
+// exported as standalone pure functions so vitest can exercise them
+// without spinning up zustand.
+//
+// Phase J step J7: the legacy single-slot ``activity`` was deleted.
+// Consumers now read ``state.active`` for the running card and
+// ``state.proposedList`` for the suggestion queue. The new-slot reducer
+// helper ``applyEnvelopeToNewSlots`` (inlined into ``applyEnvelope``
+// below) owns all routing — there is no longer a back-compat mirror.
 
 import { create } from "zustand";
 
@@ -32,7 +39,6 @@ export interface ParentState {
   tokenExpiresAt: number | null;
   capabilityReason: string | null;
   micState: MicState;
-  activity: Activity | null;
   wsState: WsState;
   toasts: Toast[];
   // monotonically increasing counter so toast IDs are stable
@@ -44,11 +50,10 @@ export interface ParentState {
   // inner map for one toy; ``applyToyActionEnvelope`` (WS push)
   // merges one slot at a time.
   toyActions: Record<string, Record<string, ToyActionRow>>;
-  // Phase J step J6: play-queue slots. ``proposedList`` is the
+  // Phase J step J6/J7: play-queue slots. ``proposedList`` is the
   // scrolling suggestion queue (newest first); ``active`` is the
-  // currently-playing card. Both live alongside the legacy
-  // ``activity`` single-slot for back-compat — J7 rips ``activity``
-  // out once every consumer has been ported.
+  // currently-playing card. The legacy single-slot ``activity`` was
+  // removed in J7 — all consumers now read these two slots directly.
   proposedList: Activity[];
   active: Activity | null;
 }
@@ -58,7 +63,6 @@ export const INITIAL_STATE: ParentState = {
   tokenExpiresAt: null,
   capabilityReason: null,
   micState: "paused",
-  activity: null,
   wsState: "idle",
   toasts: [],
   nextToastId: 1,
@@ -93,21 +97,20 @@ export function setWsState(state: ParentState, ws: WsState): ParentState {
   return { ...state, wsState: ws };
 }
 
-export function setActivity(
+export function setActive(
   state: ParentState,
-  activity: Activity | null,
+  active: Activity | null,
 ): ParentState {
-  return { ...state, activity };
+  return { ...state, active };
 }
 
-// Apply an incoming ws envelope to the store. Only `activity.state`
-// envelopes mutate the active activity today; other topics route to
+// Apply an incoming ws envelope to the store. ``activity.state``
+// envelopes route into the play-queue slots (``proposedList`` +
+// ``active``) via ``applyEnvelopeToNewSlots``; other topics route to
 // dedicated reducers (capability via system, etc.).
 //
-// Phase J step J6: the same envelope also drives the new
-// ``proposedList`` + ``active`` slots. The legacy ``activity`` slot is
-// still maintained for back-compat (J7 rips it out). The new-slot
-// routing is:
+// Phase J step J7: the legacy single-slot ``activity`` branch was
+// removed — only the new-slot routing remains:
 //
 //   * state === "proposed"        → upsert into proposedList (newer
 //                                    version wins), clear active if id
@@ -127,30 +130,7 @@ export function applyEnvelope(
       typeof candidate?.state === "string" &&
       typeof candidate?.version === "number"
     ) {
-      // First fold the new slots, then layer the legacy single-slot
-      // behavior on top of the same returned state so both views stay
-      // consistent with the same input.
-      const afterNewSlots = applyEnvelopeToNewSlots(state, candidate);
-      // Newer-version-of-same-id wins; otherwise replace if no current
-      // activity or the current one is in a terminal state.
-      const cur = afterNewSlots.activity;
-      const incomingIsActive = !isTerminalState(candidate.state);
-      if (cur === null) {
-        return incomingIsActive
-          ? { ...afterNewSlots, activity: candidate }
-          : afterNewSlots;
-      }
-      if (cur.id === candidate.id) {
-        if (candidate.version >= cur.version) {
-          return { ...afterNewSlots, activity: candidate };
-        }
-        return afterNewSlots;
-      }
-      // Different id: take the new one if it's active, ignore terminal updates
-      if (incomingIsActive) {
-        return { ...afterNewSlots, activity: candidate };
-      }
-      return afterNewSlots;
+      return applyEnvelopeToNewSlots(state, candidate);
     }
   }
   if (env.topic === "system") {
@@ -165,10 +145,9 @@ export function applyEnvelope(
   return state;
 }
 
-// Phase J step J6: fold an ``activity.state`` envelope into the new
+// Phase J step J6/J7: fold an ``activity.state`` envelope into the
 // ``proposedList`` + ``active`` slots. Version-guarded per slot so
-// out-of-order arrivals don't regress either slot. Pulled out of
-// ``applyEnvelope`` to keep that function's legacy branch readable.
+// out-of-order arrivals don't regress either slot.
 function applyEnvelopeToNewSlots(
   state: ParentState,
   candidate: Activity,
@@ -177,8 +156,7 @@ function applyEnvelopeToNewSlots(
   if (candidate.state === "proposed") {
     // Upsert into proposedList; ignore older-version-of-same-id; if
     // the row was the live ``active`` (e.g. regenerate flipped it
-    // back to proposed), clear active. The legacy ``activity`` slot
-    // is left to the caller — applyEnvelope layers that on top.
+    // back to proposed), clear active.
     const existing = state.proposedList.find((row) => row.id === id);
     let nextList: Activity[];
     if (existing !== undefined) {
@@ -239,7 +217,7 @@ function applyEnvelopeToNewSlots(
 
 // Phase J step J6: remove a proposed row by id (e.g. after a TTL
 // expiry on the UI side). No-op when id is not present in the list.
-// Leaves ``active`` and the legacy ``activity`` slot untouched.
+// Leaves ``active`` untouched.
 export function applyProposedExpired(
   state: ParentState,
   id: string,
@@ -438,7 +416,11 @@ export function applyVersionConflict(
   conflict: VersionConflictBody,
   fresh: Activity | null,
 ): ParentState {
-  const next = fresh !== null ? { ...state, activity: fresh } : state;
+  // J7: route the refetched row through the new-slot helper so a
+  // conflict response correctly lands in proposedList / active based
+  // on the row's current state. Pre-J7 this wrote to a legacy single
+  // slot; now there is no such slot to write to.
+  const next = fresh !== null ? applyEnvelopeToNewSlots(state, fresh) : state;
   const message = `Version conflict (now v${conflict.current_version}, state=${conflict.current_state}). Panel was refreshed.`;
   return pushToast(next, "warning", message);
 }
@@ -458,31 +440,33 @@ export function applyRejectedTopics(
 // Reconnect-resync helper: only adopt the REST refetch if it isn't a
 // stale read (e.g. the ws envelope already applied a newer version
 // while the GET was in flight). Mirrors the kiosk version guard.
+//
+// J7: routes through the same new-slot helper as envelopes/mutations
+// so the refetch lands in proposedList or active as the row's state
+// dictates — the staleness guards inside ``applyEnvelopeToNewSlots``
+// already drop an older-version refetch over a newer in-memory row.
 export function applyReconnectResync(
   state: ParentState,
   fresh: Activity | null,
 ): ParentState {
   if (fresh === null) return state;
-  const cur = state.activity;
-  if (cur !== null && cur.id === fresh.id && fresh.version < cur.version) {
-    return state;
-  }
-  return { ...state, activity: fresh };
+  return applyEnvelopeToNewSlots(state, fresh);
 }
 
 // Mutation-result helper: drop the response when a newer envelope has
 // already arrived for the same activity. Mirrors the kiosk version
 // guard so an in-flight mutation can't regress in-memory state when
 // the ws stream pushes a fresher version mid-round-trip.
+//
+// J7: routes through the new-slot helper so a mutation result lands
+// in active or proposedList according to its current state (e.g. a
+// regenerate response that arrives with state=proposed correctly
+// returns to the queue rather than the active slot).
 export function applyMutationResult(
   state: ParentState,
   fresh: Activity,
 ): ParentState {
-  const cur = state.activity;
-  if (cur !== null && cur.id === fresh.id && fresh.version < cur.version) {
-    return state;
-  }
-  return { ...state, activity: fresh };
+  return applyEnvelopeToNewSlots(state, fresh);
 }
 
 export interface ParentStore extends ParentState {
@@ -490,7 +474,7 @@ export interface ParentStore extends ParentState {
   setHealth: (h: HealthResponse) => void;
   setMicState: (mic: MicState) => void;
   setWsState: (ws: WsState) => void;
-  setActivity: (a: Activity | null) => void;
+  setActive: (a: Activity | null) => void;
   applyEnvelope: (env: Envelope) => void;
   applyVersionConflict: (
     conflict: VersionConflictBody,
@@ -513,7 +497,7 @@ export function createParentStore(initial: ParentState = INITIAL_STATE) {
     setHealth: (h) => set((s) => setHealth(s, h)),
     setMicState: (mic) => set((s) => setMicState(s, mic)),
     setWsState: (ws) => set((s) => setWsState(s, ws)),
-    setActivity: (a) => set((s) => setActivity(s, a)),
+    setActive: (a) => set((s) => setActive(s, a)),
     applyEnvelope: (env) => set((s) => applyEnvelope(s, env)),
     applyVersionConflict: (conflict, fresh) =>
       set((s) => applyVersionConflict(s, conflict, fresh)),

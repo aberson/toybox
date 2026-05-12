@@ -311,9 +311,9 @@ describe("App tab shell (post-PIN, H2)", () => {
     // tests so a previous login's token doesn't leak.
     useParentStore.setState({
       token: null,
-      activity: null,
+      active: null,
+      proposedList: [],
       wsState: "idle",
-      health: null,
       toasts: [],
       capabilityReason: null,
     } as Partial<ReturnType<typeof useParentStore.getState>>);
@@ -417,10 +417,11 @@ describe("App tab shell (post-PIN, H2)", () => {
     render(<App />);
     await driveLoginToTabShell();
     // Seed a non-null ``proposed`` activity directly into the
-    // singleton store. ``proposed`` matches SUGGESTION_STATES so the
-    // SuggestionCard renders. We bypass the propose() round-trip
-    // because this test only cares about render gating, not the
-    // mutation path (covered elsewhere).
+    // singleton store. After J7 a ``proposed`` row lives in
+    // ``proposedList`` (not the legacy single slot); the SuggestionCard
+    // renders for proposedList[0] when ``active`` is null. We bypass
+    // the propose() round-trip because this test only cares about
+    // render gating, not the mutation path (covered elsewhere).
     const seeded = {
       id: "act-r2",
       state: "proposed",
@@ -440,7 +441,8 @@ describe("App tab shell (post-PIN, H2)", () => {
     };
     act(() => {
       useParentStore.setState({
-        activity: seeded,
+        proposedList: [seeded],
+        active: null,
       } as Partial<ReturnType<typeof useParentStore.getState>>);
     });
     // Play → Play Ideas is the default sub-tab; the card should mount.
@@ -453,14 +455,109 @@ describe("App tab shell (post-PIN, H2)", () => {
       fireEvent.click(screen.getByTestId("tab-settings"));
     });
     expect(screen.queryByTestId("suggestion-card")).toBeNull();
-    expect(useParentStore.getState().activity).toBe(seeded);
+    expect(useParentStore.getState().proposedList[0]).toBe(seeded);
     // Switch back to Play; default sub-tab is play-ideas so the card
     // re-mounts with the same seeded activity referentially intact.
     act(() => {
       fireEvent.click(screen.getByTestId("tab-play"));
     });
     expect(screen.queryByTestId("suggestion-card")).toBeTruthy();
-    expect(useParentStore.getState().activity).toBe(seeded);
+    expect(useParentStore.getState().proposedList[0]).toBe(seeded);
+  });
+
+  // Phase J step J7 regression: ``handleDismiss`` used to call
+  // ``setActive(null)`` which cleared the legacy single slot — instant
+  // visible dismiss. Post-J7 proposed rows live in ``proposedList`` and
+  // ``state.active`` is null while the suggestion card is shown, so
+  // ``setActive(null)`` becomes a no-op and the card sticks on screen
+  // until the server's ``dismissed`` ws envelope arrives (50-500ms).
+  //
+  // The fix routes the dismiss mutation's response through
+  // ``applyMutationResult`` so the dismissed-state row is removed from
+  // ``proposedList`` synchronously with the API resolve — no ws
+  // dependency. This test pins that contract: seed a proposed row,
+  // stub the dismiss endpoint to return a dismissed-state Activity,
+  // click the button, and assert ``proposedList`` is empty before any
+  // ws traffic could land.
+  it("dismiss clears proposedList synchronously (J7 regression)", async () => {
+    const seededProposed = {
+      id: "act-j7-dismiss",
+      state: "proposed",
+      version: 1,
+      title: "J7 dismiss-clears-instantly",
+      summary: null,
+      persona_id: null,
+      intent_source: null,
+      child_ids: [],
+      created_at: new Date().toISOString(),
+      started_at: null,
+      ended_at: null,
+      steps: [],
+      metadata: {},
+      trigger_phrase: null,
+      persona_reasoning: null,
+    };
+    // Compose a fetch stub that layers a dismiss-endpoint handler on
+    // top of the standard auth fetch — the post-PIN render reads
+    // /api/health, /api/metrics, etc., and they all need to succeed
+    // before the tab shell mounts.
+    const baseHandler = stubFullAuthFetch({ pin_set: true });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input.toString();
+        const method = (init?.method ?? "GET").toUpperCase();
+        if (
+          method === "POST" &&
+          url.endsWith(`/api/activities/${seededProposed.id}/dismiss`)
+        ) {
+          // The dismiss mutation echoes the now-dismissed Activity. The
+          // ``applyMutationResult`` reducer will route this through
+          // ``applyEnvelopeToNewSlots`` which, for ``dismissed`` state,
+          // filters the row out of ``proposedList`` and clears ``active``
+          // if its id matches.
+          return new Response(
+            JSON.stringify({
+              ...seededProposed,
+              state: "dismissed",
+              version: seededProposed.version + 1,
+              ended_at: new Date().toISOString(),
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        return baseHandler(input, init);
+      }),
+    );
+    render(<App />);
+    await driveLoginToTabShell();
+    // Seed the proposed row after login so the SuggestionCard mounts
+    // on the Play → Play Ideas default sub-tab.
+    act(() => {
+      useParentStore.setState({
+        proposedList: [seededProposed],
+        active: null,
+      } as Partial<ReturnType<typeof useParentStore.getState>>);
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId("suggestion-card")).toBeTruthy();
+    });
+    expect(useParentStore.getState().proposedList).toHaveLength(1);
+    // Click dismiss and wait for the mutation to settle. The
+    // assertion is on ``proposedList`` (store state), not on the
+    // rendered card disappearing — the rendered-card path goes
+    // through React's commit cycle which adds noise; the store
+    // assertion is the tighter contract.
+    act(() => {
+      fireEvent.click(screen.getByTestId("dismiss-button"));
+    });
+    await waitFor(() => {
+      expect(useParentStore.getState().proposedList).toHaveLength(0);
+    });
+    // Cross-check: no ws envelope was needed. The mutation alone
+    // cleared the slot. If the bug regresses (``setActive(null)``
+    // again), the store stays at length 1 and the test times out.
+    expect(useParentStore.getState().active).toBeNull();
   });
 
   // Plan: toasts are cross-cutting transient feedback and MUST render
@@ -503,9 +600,9 @@ describe("App Kids & Toyboxes tab (H3)", () => {
   beforeEach(() => {
     useParentStore.setState({
       token: null,
-      activity: null,
+      active: null,
+      proposedList: [],
       wsState: "idle",
-      health: null,
       toasts: [],
       capabilityReason: null,
     } as Partial<ReturnType<typeof useParentStore.getState>>);

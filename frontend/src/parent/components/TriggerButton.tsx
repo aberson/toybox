@@ -3,7 +3,8 @@ import { useState } from "react";
 
 export interface TriggerButtonProps {
   // Handler should POST /api/activities/propose with a stub intent and
-  // push the resulting Activity into the store via setActivity.
+  // push the resulting Activity into the store via applyMutationResult
+  // (which routes the row into proposedList / active by its state).
   onTrigger: () => Promise<void>;
   disabled?: boolean;
 }

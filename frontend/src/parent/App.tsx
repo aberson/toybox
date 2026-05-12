@@ -278,7 +278,7 @@ export function App(): JSX.Element {
           useParentStore.getState().applyRejectedTopics(rejected);
         },
         onReconnect: () => {
-          const cur = useParentStore.getState().activity;
+          const cur = useParentStore.getState().active;
           if (cur === null) return;
           void api
             .getActivity(cur.id, { signal: aborter.signal })
@@ -461,7 +461,15 @@ export function App(): JSX.Element {
     }
   }, [api]);
 
-  const activity = state.activity;
+  // Phase J step J7: derive the "card on screen" target from the new
+  // play-queue slots. The visible UI keeps its pre-J7 contract — show
+  // the ActivityPanel when an active card is set, otherwise show the
+  // first proposed card from the queue. Handlers below act on this
+  // single derived target so the per-action busy/version-guard logic
+  // is unchanged. J8 swaps the proposed-card render for a scrollable
+  // queue list; the action handlers will pick a per-row target there.
+  const proposedHead = state.proposedList[0] ?? null;
+  const activity: Activity | null = state.active ?? proposedHead;
 
   const handleApprove = useCallback(
     () =>
@@ -511,7 +519,19 @@ export function App(): JSX.Element {
           },
         });
         if (result !== null) {
-          useParentStore.getState().setActivity(null);
+          // Phase J step J7 fix: route through ``applyMutationResult`` so
+          // the ``dismissed``-state response removes the row from
+          // ``proposedList`` (where proposed cards live post-J7).
+          // Pre-J7 ``setActive(null)`` cleared the legacy single slot —
+          // post-J7 ``state.active`` is already null for a proposed
+          // dismissal, so ``setActive(null)`` was a no-op and the card
+          // stayed rendered until the ws envelope arrived (50-500ms
+          // later). ``applyMutationResult`` runs the same
+          // ``applyEnvelopeToNewSlots`` reducer the ws path uses, so the
+          // dismissed-state row clears the proposedList entry AND clears
+          // ``active`` if the id matches — covering both surfaces with a
+          // single instant update.
+          useParentStore.getState().applyMutationResult(result);
         }
       }),
     [activity, api, refetchActivity, runGuarded],
@@ -547,7 +567,7 @@ export function App(): JSX.Element {
         // panel" locally for terminal states — the activity record is
         // already finalized server-side, no API call needed.
         if (activity.state === "completed" || activity.state === "ended") {
-          useParentStore.getState().setActivity(null);
+          useParentStore.getState().setActive(null);
           useParentStore.getState().pushToast("info", "activity ended");
           return;
         }
