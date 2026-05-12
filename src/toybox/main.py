@@ -65,6 +65,7 @@ from .core.bind_guard import BindGuardError, check_bind_safe, pin_is_set
 from .core.capability import CapabilityReason
 from .core.escalation import EscalationDispatcher
 from .core.listening import ListeningMode
+from .core.play_cadence import start_cadence_loop
 from .core.queue import PROPOSED_QUEUE_CAP, PROPOSED_STATE, evict_oldest_for_capacity
 from .core.throttle import MinIntervalThrottle
 from .db import connect, resolve_db_path
@@ -325,7 +326,7 @@ def _persist_smoke_activity(
 
     conn = connect(db_path, check_same_thread=False)
     try:
-        # Make room for the new proposal so the queue cap holds.
+        # Smoke harness is a hermetic fixture — fixed cap of 5 holds.
         evict_oldest_for_capacity(conn, cap=PROPOSED_QUEUE_CAP)
         with conn:
             conn.execute(
@@ -831,13 +832,32 @@ async def _metrics_lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         async with image_gen_worker_lifespan(app), transcript_sweep_lifespan(app):
             task = start_metrics_publisher(pubsub, deps)
+            # Cadence task fires the autonomous play-queue proposes.
+            # Pass the ``get_judge_call`` FastAPI dependency itself
+            # (not its result) so the cadence loop re-resolves the
+            # judge_call partial PER TICK — an OAuth token added or
+            # removed mid-process is picked up on the next propose
+            # without a backend restart. ``get_judge_call`` does a
+            # fresh ``load_token`` per call, so this is cheap.
+            from .api.activities import get_judge_call  # noqa: PLC0415
+
+            cadence_task = start_cadence_loop(
+                get_pubsub,
+                db_path,
+                judge_call_factory=get_judge_call,
+            )
             try:
                 yield
             finally:
+                # Stop cadence before the metrics publisher so the
+                # publisher's last snapshot doesn't observe a half-
+                # cancelled cadence task. Mirror the ws server's
+                # pattern: gather with ``return_exceptions=True`` so
+                # the CancelledError doesn't escape and produce a
+                # ``Task exception was never retrieved`` warning.
+                cadence_task.cancel()
+                await asyncio.gather(cadence_task, return_exceptions=True)
                 task.cancel()
-                # Mirror the ws server's pattern: gather with
-                # ``return_exceptions=True`` so a CancelledError doesn't
-                # escape and produce ``Task exception was never retrieved``.
                 await asyncio.gather(task, return_exceptions=True)
     finally:
         app.state.mic_capture = None

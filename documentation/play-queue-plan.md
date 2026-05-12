@@ -443,6 +443,7 @@ to clarify the action's scope is the row, not the activity flow.
 - **Type:** code
 - **Issue:** #94
 - **Flags:** `--reviewers code`
+- **Status:** DONE (2026-05-12)
 - **Produces:** `core/play_cadence.py`; modified `_do_propose` (dynamic
   cap); modified `_metrics_lifespan` (task wiring); pytest-asyncio
   coverage that asserts the loop converges to `target_depth` within ~3

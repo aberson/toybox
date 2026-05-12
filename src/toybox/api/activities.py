@@ -63,11 +63,11 @@ from ..ai.labeled_events import (
     schedule_judge_sample,
     update_parent_signal,
 )
+from ..core import play_target_depth
 from ..core.auth import TokenScope
 from ..core.pubsub import PubSub
 from ..core.queue import (
     DISMISSED_STATE,
-    PROPOSED_QUEUE_CAP,
     PROPOSED_STATE,
     evict_oldest_for_capacity,
 )
@@ -1251,8 +1251,11 @@ def _do_propose(
         )
     session_id = _ensure_session(conn, body.session_id)
 
-    # Evict oldest first so the cap of 5 holds for the new row.
-    evicted_ids = evict_oldest_for_capacity(conn, cap=PROPOSED_QUEUE_CAP)
+    # Evict oldest first so the configured cap holds for the new row.
+    # ``play_target_depth.get`` is read fresh per call so the parent UI
+    # can flip the preset and have the very next propose honour it
+    # without a restart.
+    evicted_ids = evict_oldest_for_capacity(conn, cap=play_target_depth.get(conn))
     for eid in evicted_ids:
         evicted_row = _fetch_activity_row(conn, eid)
         _emit_state(pubsub, _row_to_response(conn, evicted_row))
