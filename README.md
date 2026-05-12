@@ -8,7 +8,7 @@ Runs entirely on home hardware. Internet is optional — Claude is reached over 
 
 ## Build status
 
-**Phase H complete 2026-05-10.** Issues #77–#83 closed (umbrella + 6 steps); follow-up [#84](https://github.com/aberson/toybox/issues/84) filed for an unrelated Phase G slot-fill defect surfaced during UAT. Parent app moves from panel-toggle nav to a two-level tabbed shell (Play / Kids & Toyboxes / Settings, with sub-tabs); `banned_themes` promoted from a per-child column to a single `settings.banned_themes_global` key (formalizes the UNION-across-children semantic already present in the escalation pipeline). New `BannedThemesSettings` UI with explicit Save button + dirty indicator + age-group preset picker; `OperatorTab` split into `SettingsPanel` (toggles + banned-themes editor) + `StatsPanel` (metrics snapshot). 1304 backend pytest + 301 frontend vitest passing. 0 type errors, 0 lint violations. iPad UAT PASS — run doc at [`documentation/runs/2026-05-10-phase-h-uat.md`](documentation/runs/2026-05-10-phase-h-uat.md).
+**Phase I complete 2026-05-11.** Issues #86–#91 closed (umbrella + 5 steps). Transcripts are now ephemeral by default: a household-scoped `transcript_retention_seconds` setting (presets 1m / 3m / 5m / 10m / 15m, default 1m) drives a 10s-cadence backend sweep that hard-deletes rows past their `ended_at + retention` cutoff, plus a matching filter-on-read clause on the list + search endpoints. Parent UI gains a "Transcript retention" segmented control in `SettingsPanel`; the per-row delete button + `DELETE /api/transcripts/{id}` endpoint + `deleteTranscript` API method are gone (wipe-all + PIN stays). Expired rows fade out client-side via a 1s tick + 600ms CSS transition. 1337 backend pytest + 314 frontend vitest passing. 0 type errors, 0 lint violations. iPad UAT PASS — run doc at [`documentation/runs/2026-05-11-phase-i-uat.md`](documentation/runs/2026-05-11-phase-i-uat.md).
 
 ### Phase history (post-v1)
 
@@ -18,7 +18,8 @@ Runs entirely on home hardware. Internet is optional — Claude is reached over 
 - **iPad-Kiosk** (2026-05-04 → 2026-05-10): child kiosk as PWA on real iPad over LAN.
 - **Phase F → F.5** (2026-05-06 → 2026-05-09): toy action sprites — F archived after c10.dll crash class ([#61](https://github.com/aberson/toybox/issues/61)); replaced by F.5 (SD 1.5 + LCM-LoRA + Tier C composite). All 5 F.5 steps shipped; #61 closed via F.5-5 soft-pass soak.
 - **Phase G** (2026-05-10): branching gameplay — 200 branching templates (50 per intent) via overnight 4-agent soak (50× scope, 0% validation failures); catalog grew 25 → 225 templates.
-- **Phase H** (2026-05-10): parent UX revamp — this commit.
+- **Phase H** (2026-05-10): parent UX revamp — panel-toggle nav → two-level tabbed shell; `banned_themes` promoted from per-child column to global setting.
+- **Phase I** (2026-05-11): transcript retention + display refresh — this commit.
 
 ### In flight
 
