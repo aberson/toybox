@@ -35,6 +35,12 @@ data/models/*
 !data/sprites/templates/
 !data/sprites/templates/**
 !data/models/.gitkeep
+# LoRA registry — track REGISTRY.md + .gitkeep, ignore trained adapter
+# subdirectories (data/models/lora/<timestamp>/). The lora/ dir itself is
+# un-ignored so git can recurse into it; the trailing slash on the second
+# rule matches only directories.
+!data/models/lora/
+data/models/lora/*/
 
 # Secrets / OAuth
 secrets.json
