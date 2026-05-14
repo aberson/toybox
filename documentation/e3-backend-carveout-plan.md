@@ -235,6 +235,7 @@ When `--sft-export` is set, the `_row_to_jsonl` path scrubs the user-message con
 - **Produces:** `src/toybox/db/migrations/0013_labeled_events_redact_for_sft.sql`, modifications to `src/toybox/ai/labeled_events.py`, `tests/integration/migrations/test_0013_labeled_events_redact_for_sft.py`.
 - **Done when:** Migration runs forward against a fresh DB and against a DB at migration 0012; idempotent (running twice is a no-op via `__migrations` table); `count_rows(sft_filter=True)` returns 0 for a seeded row with `redact_for_sft=1` and the same row otherwise passing; `--sft-filter` CLI help text reads exactly *"Apply the SFT-export filter (parent_signal != -1 AND, when judge scores are present, safety >= 4 AND mean_quality >= 3.6 — i.e. strictly above 3.5; the rubric scores are 1..5 ints, so the sum of the five rubric fields is gated at >= 18; AND redact_for_sft = 0)."* (replaces the current text at [labeled_events.py:597-603](../src/toybox/ai/labeled_events.py#L597-L603); test asserts this exact string is present in `--help` output); all three TODO comments deleted; phase-e.md migration numbers updated and the back-pointer comment added; `uv run ruff check .` clean; `uv run mypy src` clean.
 - **Depends on:** none.
+- **Status:** DONE (2026-05-13)
 
 ### Step 2: PII redaction module + unit tests
 
