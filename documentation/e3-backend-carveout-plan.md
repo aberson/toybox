@@ -268,6 +268,7 @@ When `--sft-export` is set, the `_row_to_jsonl` path scrubs the user-message con
 - **Produces:** `data/models/lora/REGISTRY.md`, `data/models/lora/.gitkeep`, modifications to `.gitignore`.
 - **Done when:** Both new files committable via `git add`; a temp `data/models/lora/test-2026-05-13/` subdir is ignored by `git status`.
 - **Depends on:** none. Parallel-safe with Steps 1, 2.
+- **Status:** DONE (2026-05-13)
 
 ### Step 5: End-to-end smoke gate (autonomous integration test)
 
