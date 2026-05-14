@@ -500,11 +500,10 @@ def count_rows(
             coherence) is ``>= 18`` — i.e. mean ``>= 3.6`` (strictly
             above 3.5). Sums of integers can't equal 17.5; the SQL
             comparison ``>= 17.5`` is therefore equivalent to ``>= 18``,
-            which we keep documented honestly here. The
-            ``redact_for_sft`` column doesn't exist yet — Step 27 adds
-            it via migration 0005, so for now the filter omits it.
-            Future Step 27 work should extend this filter to require
-            ``redact_for_sft = 0`` once the column lands.
+            which we keep documented honestly here. AND
+            (3) ``redact_for_sft = 0`` — the operator opt-out flag
+            added by migration 0013 excludes rows the operator marked
+            ineligible (PII the automated redactor can't catch).
 
     Returns:
         The integer count.
@@ -535,6 +534,7 @@ def count_rows(
             " ) >= 17.5"
             "))"
         )
+        clauses.append("redact_for_sft = 0")
     sql = "SELECT COUNT(*) AS n FROM labeled_events"
     if clauses:
         sql += " WHERE " + " AND ".join(clauses)
@@ -565,10 +565,6 @@ def _cli_main(argv: list[str] | None = None) -> int:
         if [ "$(uv run python -m toybox.ai.labeled_events --count --sft-filter)" -ge 50 ]; then
           echo "ok"
         fi
-
-    Note: ``redact_for_sft`` is added by Step 27 (migration 0005) and is
-    NOT yet part of ``--sft-filter``. When that lands, extend the filter
-    here to require ``redact_for_sft = 0``.
     """
     import argparse
 
@@ -576,8 +572,8 @@ def _cli_main(argv: list[str] | None = None) -> int:
         prog="toybox.ai.labeled_events",
         description=(
             "Count labeled_events rows matching optional filters. "
-            "redact_for_sft is added by Step 27 (migration 0005); when "
-            "it lands, extend --sft-filter to require redact_for_sft = 0."
+            "When --sft-filter is set, rows the operator opted out of "
+            "(redact_for_sft = 1) are excluded from the count."
         ),
     )
     parser.add_argument(
@@ -598,8 +594,8 @@ def _cli_main(argv: list[str] | None = None) -> int:
             "Apply the SFT-export filter (parent_signal != -1 AND, when judge "
             "scores are present, safety >= 4 AND mean_quality >= 3.6 — i.e. "
             "strictly above 3.5; the rubric scores are 1..5 ints, so the sum "
-            "of the five rubric fields is gated at >= 18). "
-            "redact_for_sft is not yet supported (Step 27)."
+            "of the five rubric fields is gated at >= 18; AND "
+            "redact_for_sft = 0)."
         ),
     )
     args = parser.parse_args(argv)
