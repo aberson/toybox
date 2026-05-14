@@ -211,13 +211,15 @@ _local_breaker: CircuitBreaker | None = None
 def get_local_breaker() -> CircuitBreaker:
     """Return the process-wide local-adapter breaker, lazily constructed.
 
-    Phase E carve-out stub: the local probe in :func:`toybox.ai.capability.is_local_capable`
-    always returns ``False`` until E1c lands a real runtime, but the
-    breaker instance is wired now so the dispatch matrix has a
-    populated seam to integrate against. Threshold + cooldown read
-    from their own env vars so an operator can tune Claude and local
-    breakers independently — the Claude path's :data:`_THRESHOLD_ENV`
-    must NOT be inherited.
+    Per-adapter independence is the load-bearing invariant: this
+    breaker instance is fully separate from any Claude
+    :class:`CircuitBreaker` constructed at the API call sites, so
+    tripping one does NOT affect the other. The local probe in
+    :func:`toybox.ai.capability.is_local_capable` records failures /
+    successes against this instance directly. Threshold + cooldown
+    read from their own env vars so an operator can tune Claude and
+    local breakers independently -- the Claude path's
+    :data:`_THRESHOLD_ENV` must NOT be inherited.
     """
     global _local_breaker
     if _local_breaker is None:

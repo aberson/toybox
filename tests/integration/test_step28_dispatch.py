@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +37,21 @@ PROPOSE_BODY: dict[str, Any] = {
     "hour": 12,
     "seed": 42,
 }
+
+
+@pytest.fixture(autouse=True)
+def _reset_local_breaker() -> Iterator[None]:
+    """Each test gets a fresh local breaker singleton.
+
+    The module-level cache in :mod:`toybox.ai.breaker` would otherwise
+    leak failure state across tests in this module. Matches the
+    equivalent autouse fixture in ``tests/unit/ai/test_local.py``.
+    """
+    from toybox.ai.breaker import reset_local_breaker_for_tests
+
+    reset_local_breaker_for_tests()
+    yield
+    reset_local_breaker_for_tests()
 
 
 def _read_labeled_event(db_path: Path, activity_id: str) -> dict[str, Any]:
@@ -423,42 +439,6 @@ def test_loop_invalid_args_recovery(
     )
 
 
-# -------------------------------------------------------------------- local stub
-
-
-def test_local_adapter_raises_not_implemented(
-    client: TestClient,
-    parent_headers: dict[str, str],
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Step 26 hasn't shipped — local + any mode raises clearly."""
-    monkeypatch.setenv("TOYBOX_GENERATOR_ADAPTER", "local")
-    monkeypatch.setenv("TOYBOX_GENERATOR_MODE", "single")
-    # Starlette's TestClient re-raises uncaught exceptions; the propose
-    # path must surface the NotImplementedError so an operator sees the
-    # actual carve-out reason rather than an opaque 500.
-    with pytest.raises(NotImplementedError, match="Step 26"):
-        client.post("/api/activities/propose", json=PROPOSE_BODY, headers=parent_headers)
-
-
-def test_local_loop_also_raises_not_implemented(
-    client: TestClient,
-    parent_headers: dict[str, str],
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """M6: ``local+loop`` raises the same Step-26 carve-out error.
-
-    Pins the carve-out's full surface — both ``single`` and ``loop``
-    modes against the local adapter must raise with the Step-26 hint.
-    Without this case a future regression that only fixes ``single``
-    would slip through.
-    """
-    monkeypatch.setenv("TOYBOX_GENERATOR_ADAPTER", "local")
-    monkeypatch.setenv("TOYBOX_GENERATOR_MODE", "loop")
-    with pytest.raises(NotImplementedError, match="Step 26"):
-        client.post("/api/activities/propose", json=PROPOSE_BODY, headers=parent_headers)
-
-
 # -------------------------------------------------------------------- (d) H3 narrow-except
 
 
@@ -547,3 +527,184 @@ def test_loop_programming_bug_propagates_not_swallowed(
     # the AttributeError rather than a bland 500-with-offline-activity.
     with pytest.raises(AttributeError, match="'NoneType'"):
         client.post("/api/activities/propose", json=PROPOSE_BODY, headers=parent_headers)
+
+
+# ----------------------------- (e) local dispatch via mocked /v1/models probe
+
+
+class _FakeProbeResponse:
+    """Stub of the urllib response object for ``/v1/models`` probes."""
+
+    def __init__(self, body: bytes) -> None:
+        self._body = body
+
+    def __enter__(self) -> _FakeProbeResponse:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return self._body
+
+
+def _patch_local_probe(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    model_ids: list[str] | None = None,
+    raises: Exception | None = None,
+) -> list[str]:
+    """Drive :func:`toybox.ai.capability.is_local_capable` via a mocked urlopen.
+
+    When ``model_ids`` is set, the probe returns a healthy
+    ``/v1/models`` envelope containing those ids. When ``raises`` is
+    set, every probe raises that exception (cannot-connect path).
+    Returns a call log so a test can assert the probe URL.
+    """
+    import urllib.request as _urllib_request  # noqa: PLC0415
+
+    calls: list[str] = []
+
+    def _stub(req: Any, **kwargs: Any) -> Any:  # noqa: ARG001
+        calls.append(req.full_url if hasattr(req, "full_url") else str(req))
+        if raises is not None:
+            raise raises
+        body = json.dumps(
+            {"object": "list", "data": [{"id": mid} for mid in (model_ids or [])]}
+        ).encode("utf-8")
+        return _FakeProbeResponse(body)
+
+    monkeypatch.setattr(_urllib_request, "urlopen", _stub)
+    return calls
+
+
+def test_local_dispatch_with_healthy_probe_reaches_local_adapter(
+    client: TestClient,
+    parent_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """E2E: TOYBOX_GENERATOR_ADAPTER=local + healthy mock → reaches LocalActivityGenerator.
+
+    Drives the FULL production caller end-to-end:
+
+    1. Env vars set the adapter to ``local`` and the runtime URL to a
+       mocked endpoint.
+    2. The :func:`is_local_capable` probe is wired to a stubbed
+       ``urlopen`` that returns ``/v1/models`` with the expected id.
+    3. ``_do_propose`` resolves dispatch → reaches ``_dispatch_local``
+       → instantiates :class:`LocalActivityGenerator` → calls
+       :meth:`generate_activity_loop` which raises
+       :class:`NotImplementedError` with the Step 26 / #38 hint.
+    4. Starlette surfaces the exception to the TestClient.
+
+    Code-quality rule "New components require an integration test
+    through the production caller" -- the assertions pin the
+    end-to-end dispatch chain, not just the adapter in isolation.
+    """
+    monkeypatch.setenv("TOYBOX_GENERATOR_ADAPTER", "local")
+    monkeypatch.setenv("TOYBOX_GENERATOR_MODE", "loop")
+    monkeypatch.setenv("TOYBOX_LOCAL_RUNTIME_URL", "http://10.0.0.42:11434")
+    monkeypatch.setenv("TOYBOX_LOCAL_MODEL_ID", "qwen2.5:7b")
+
+    calls = _patch_local_probe(monkeypatch, model_ids=["qwen2.5:7b"])
+
+    with pytest.raises(NotImplementedError) as exc_info:
+        client.post("/api/activities/propose", json=PROPOSE_BODY, headers=parent_headers)
+    # Pin both the Step-26 wording AND the #38 issue pointer on the same
+    # raised exception -- a future operator's traceback must link
+    # directly to the follow-up work item.
+    msg = str(exc_info.value)
+    assert "Step 26" in msg
+    assert "#38" in msg
+
+    # The probe MUST have been called with the configured URL.
+    assert len(calls) >= 1
+    assert calls[0] == "http://10.0.0.42:11434/v1/models"
+
+
+def test_local_dispatch_falls_back_when_runtime_unreachable(
+    client: TestClient,
+    parent_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    db_path: Path,
+) -> None:
+    """E2E: mocked /v1/models unreachable → fall back to Claude path + WARNING.
+
+    Asserts:
+    1. The dispatch degrades to the Claude (offline) path -- propose
+       returns 201 with a valid activity rather than surfacing
+       NotImplementedError.
+    2. A WARNING-level log line carries the capability reason
+       (``local runtime not yet installed``) so an operator can grep
+       the cause.
+    3. ``generator_path`` ends up ``"offline"`` on the persisted
+       labeled_events row -- proves the degradation actually routed
+       through the v1 generator and not the Claude loop.
+    """
+    import logging as _logging  # noqa: PLC0415
+
+    monkeypatch.setenv("TOYBOX_GENERATOR_ADAPTER", "local")
+    monkeypatch.setenv("TOYBOX_GENERATOR_MODE", "single")
+    monkeypatch.setenv("TOYBOX_LOCAL_RUNTIME_URL", "http://10.0.0.42:11434")
+
+    import urllib.error  # noqa: PLC0415
+
+    _patch_local_probe(monkeypatch, raises=urllib.error.URLError("connection refused"))
+
+    caplog.set_level(_logging.WARNING, logger="toybox.api.activities")
+    response = client.post("/api/activities/propose", json=PROPOSE_BODY, headers=parent_headers)
+    # Fallback succeeded -- propose returned a valid activity.
+    assert response.status_code == 201, response.text
+    body = response.json()
+
+    # WARNING log captures the capability reason.
+    warning_records = [
+        r
+        for r in caplog.records
+        if r.levelno == _logging.WARNING and "local adapter not capable" in r.getMessage()
+    ]
+    assert len(warning_records) >= 1, [r.getMessage() for r in caplog.records]
+    rec = warning_records[0]
+    assert getattr(rec, "capability_reason", None) == "local runtime not yet installed"
+
+    # Row pins the offline path -- degraded fallback routed through the
+    # default offline generator, not the Claude loop.
+    row = _read_labeled_event(db_path, body["id"])
+    assert row["generator_path"] == "offline"
+
+
+def test_local_dispatch_falls_back_when_model_not_loaded(
+    client: TestClient,
+    parent_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """E2E: probe returns 200 but the configured model id is missing.
+
+    Same fallback shape as the unreachable case, but with the
+    ``local model not loaded`` reason. Pins that the dispatch reads
+    the right reason from :func:`is_local_capable` and surfaces it
+    on the WARNING log envelope.
+    """
+    import logging as _logging  # noqa: PLC0415
+
+    monkeypatch.setenv("TOYBOX_GENERATOR_ADAPTER", "local")
+    monkeypatch.setenv("TOYBOX_GENERATOR_MODE", "single")
+    monkeypatch.setenv("TOYBOX_LOCAL_RUNTIME_URL", "http://10.0.0.42:11434")
+    monkeypatch.setenv("TOYBOX_LOCAL_MODEL_ID", "qwen2.5:7b")
+
+    # Probe returns 200 with a DIFFERENT model id -- model-not-loaded path.
+    _patch_local_probe(monkeypatch, model_ids=["llama3"])
+
+    caplog.set_level(_logging.WARNING, logger="toybox.api.activities")
+    response = client.post("/api/activities/propose", json=PROPOSE_BODY, headers=parent_headers)
+    assert response.status_code == 201, response.text
+
+    warning_records = [
+        r
+        for r in caplog.records
+        if r.levelno == _logging.WARNING and "local adapter not capable" in r.getMessage()
+    ]
+    assert len(warning_records) >= 1
+    assert getattr(warning_records[0], "capability_reason", None) == "local model not loaded"
