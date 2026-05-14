@@ -246,6 +246,7 @@ When `--sft-export` is set, the `_row_to_jsonl` path scrubs the user-message con
 - **Produces:** `src/toybox/ai/redact.py`, `tests/unit/ai/test_redact.py`.
 - **Done when:** All listed test cases green; `redact_pii("Hello Sage, I love sage advice.", child_names=["Sage"])` returns `"Hello [REDACTED], I love sage advice."` exactly; `redact_pii("Hi Mr.Unicorn", child_names=["Mr.Unicorn"])` returns `"Hi [REDACTED]"` (proves `re.escape` is applied); redactor exports `PII_FILTER_VERSION` constant; `uv run ruff check .` clean; `uv run mypy src` clean.
 - **Depends on:** none. Parallel-safe with Step 1.
+- **Status:** DONE (2026-05-13)
 
 ### Step 3: `eval_dump.py --sft-export` mode
 

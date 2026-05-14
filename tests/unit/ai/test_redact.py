@@ -20,6 +20,7 @@ names containing regex metacharacters do not crash compilation.
 from __future__ import annotations
 
 import pytest
+
 from toybox.ai.redact import PII_FILTER_VERSION, redact_pii
 
 # --------------------------------------------------------------------- constant
