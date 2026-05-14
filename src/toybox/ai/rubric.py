@@ -1,8 +1,7 @@
 """Six-dimension activity-quality rubric.
 
-This is the canonical rubric definition referenced by
-``documentation/eval-fixtures.md``. Each dimension carries a
-human-readable description and 1-5 anchors. The judge prompt
+This module is the canonical rubric definition. Each dimension carries
+a human-readable description and 1-5 anchors. The judge prompt
 (``toybox.ai.judge``) renders these to instruct Claude; the eval CLIs
 read them to surface dimension-by-dimension breakdowns.
 
@@ -59,10 +58,9 @@ class Dimension:
     anchor_low: str
 
 
-# The six dimensions. Order matches ``documentation/eval-fixtures.md``
-# §"Quality rubric (6 dimensions)" and is preserved by every consumer
-# (judge prompt, eval report, CI gate). Reorder ONLY by also touching
-# the spec doc.
+# The six dimensions. Order is preserved by every consumer (judge
+# prompt, eval report, CI gate). This module is the spec — reorder
+# only with the awareness that downstream report layouts depend on it.
 DIMENSIONS: Final[tuple[Dimension, ...]] = (
     Dimension(
         key="schema",

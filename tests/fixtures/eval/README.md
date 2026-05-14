@@ -1,6 +1,6 @@
 # Activity-quality eval fixtures
 
-Source-of-truth doc: [`documentation/eval-fixtures.md`](../../../documentation/eval-fixtures.md).
+Canonical rubric definition: [`src/toybox/ai/rubric.py`](../../../src/toybox/ai/rubric.py). This README is the source-of-truth for the fixture set itself (layout, distribution, baseline workflow). The historical `documentation/eval-fixtures.md` was retired 2026-05-10 — its content was duplicative of `rubric.py` (rubric anchors) and this README (operational workflow).
 
 ## Layout
 
@@ -11,7 +11,7 @@ holdout.json          # ids of the 5 held-out fixtures used by CI regression
 README.md             # this file
 ```
 
-## Distribution check (covers documentation/eval-fixtures.md targets)
+## Distribution check
 
 | Axis | Targets met |
 |---|---|
@@ -75,7 +75,7 @@ Exits 0 on pass / skip-because-placeholder, exits 1 on regression. The check fai
    uv run python -m toybox.ai.eval_run --fixtures-only fNNN --mode baseline --judge stub
    ```
 3. If the fixture is a useful regression check, add it to `holdout.json` and refresh the baseline.
-4. Update the example table in `documentation/eval-fixtures.md` if the new fixture covers a previously-missing axis combination.
+4. Update the distribution-check table above if the new fixture covers a previously-missing axis combination.
 
 ## What this fixture set does NOT cover
 
@@ -84,4 +84,4 @@ Exits 0 on pass / skip-because-placeholder, exits 1 on regression. The check fai
 - Very long context (multi-day pattern learning) — Phase E or later.
 - Voice tone / engagement signals — only observable post-hoc via parent feedback (`parent_signal` in `labeled_events`).
 
-These are intentional gaps — see `documentation/eval-fixtures.md` for rationale.
+These are intentional gaps. If Phase E A/B testing needs them, expand the matrix then.

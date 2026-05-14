@@ -49,8 +49,7 @@ DEFAULT_BASELINE_PATH = Path("tests/fixtures/eval/baseline_scores.json")
 DEFAULT_HOLDOUT_PATH = Path("tests/fixtures/eval/holdout.json")
 
 # CI regression budget: mean dimension score may drop at most this much
-# from baseline before the build fails. 0.5 mirrors the spec in
-# documentation/eval-fixtures.md §"Held-out CI regression set".
+# from baseline before the build fails.
 DEFAULT_REGRESSION_TOLERANCE = 0.5
 
 
