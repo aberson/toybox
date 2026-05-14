@@ -553,10 +553,7 @@ def _decode_choices_json(raw: Any) -> list[ChoiceOption] | None:
         return None
     if not isinstance(decoded, list) or not decoded:
         return None
-    return [
-        ChoiceOption(label=str(label), choice_index=idx)
-        for idx, label in enumerate(decoded)
-    ]
+    return [ChoiceOption(label=str(label), choice_index=idx) for idx, label in enumerate(decoded)]
 
 
 def _fetch_steps(conn: sqlite3.Connection, activity_id: str) -> list[ActivityStepResponse]:
@@ -997,6 +994,73 @@ def _pick_random_library_persona(conn: sqlite3.Connection) -> dict[str, Any] | N
     }
 
 
+def _resolve_local_dispatch(dispatch: Any) -> Any:
+    """Probe the local runtime and degrade to Claude when it's not ready.
+
+    Phase E Step 28 partial: when ``TOYBOX_GENERATOR_ADAPTER=local`` we
+    call :func:`toybox.ai.capability.is_local_capable` to check the
+    runtime + per-adapter breaker. On ``(True, None)`` we keep the
+    local dispatch (which routes through
+    :class:`toybox.ai.local.LocalActivityGenerator`, currently a
+    NotImplementedError-raising stub pointing at Step 26 / issue #38).
+    On ``(False, reason)`` we degrade to ``ADAPTER_CLAUDE`` with the
+    same ``mode``, log the reason at WARNING level so an operator can
+    grep it, and let the existing Claude dispatch handle the request.
+    """
+    # Late import: keep ``is_local_capable`` (and its urllib + breaker
+    # plumbing) out of the v1 import surface for operators who never
+    # flip the env var.
+    from ..activities.generator import ADAPTER_CLAUDE as _ADAPTER_CLAUDE  # noqa: PLC0415
+    from ..activities.generator import GeneratorDispatch  # noqa: PLC0415
+    from ..ai.capability import is_local_capable  # noqa: PLC0415
+
+    capable, reason = asyncio.run(is_local_capable())
+    if capable:
+        return dispatch
+    _logger.warning(
+        "local adapter not capable (%s); falling back to claude path",
+        reason,
+        extra={"capability_reason": reason, "adapter": "local"},
+    )
+    return GeneratorDispatch(adapter=_ADAPTER_CLAUDE, mode=dispatch.mode)
+
+
+def _dispatch_local(mode: str) -> None:
+    """Route a capability-green local dispatch through LocalActivityGenerator.
+
+    Pre-Step-26 this always raises :class:`NotImplementedError` -- the
+    point is to surface the carve-out hint via the local adapter's
+    own message (so a reader of the traceback sees Step 26 / issue
+    #38) rather than via a hard-coded string in this file. Step 26
+    swaps the body to drive
+    :meth:`toybox.ai.local.LocalActivityGenerator.generate_activity_loop`
+    against a real local runtime + a real ToolDispatcher.
+    """
+    # Late imports keep the local module + tool plumbing out of the
+    # v1 import surface for operators who never flip the env var.
+    from typing import cast as _cast  # noqa: PLC0415
+
+    from ..ai.local import LocalActivityGenerator  # noqa: PLC0415
+    from ..ai.tools import ToolDispatcher  # noqa: PLC0415
+
+    generator = LocalActivityGenerator()
+    # Drive the adapter through the same Protocol method the loop path
+    # would once Step 26 ships. The current implementation raises
+    # NotImplementedError; that exception propagates up through the
+    # route handler and Starlette's TestClient surfaces it to the test
+    # (and an operator sees it as a 500 with the Step 26 hint baked
+    # into the traceback rather than an opaque generic message).
+    #
+    # ``tools`` is set to ``None`` (cast for mypy) because the adapter
+    # raises before reading the second arg; Step 26 will replace this
+    # with a real ToolDispatcher backed by a per-request connection
+    # factory, exactly as :func:`_run_loop_generation` does for Claude.
+    if mode == MODE_LOOP:
+        asyncio.run(generator.generate_activity_loop(object(), _cast(ToolDispatcher, None)))
+    else:
+        asyncio.run(generator.generate_activity(object()))
+
+
 def _run_loop_generation(
     body: ProposeRequest,
     conn: sqlite3.Connection,
@@ -1170,13 +1234,35 @@ def _do_propose(
     # Phase E Step 28: dispatch matrix.
     # - claude+single (default = v1): offline generator (current path)
     # - claude+loop: ClaudeActivityGenerator.generate_activity_loop
-    # - local+*: NotImplementedError (Step 26 / E2 deliverable)
+    # - local+*: capability-gated. is_local_capable() probes the
+    #   configured local runtime + per-adapter breaker; when True the
+    #   path routes through LocalActivityGenerator (which currently
+    #   raises NotImplementedError pointing at Step 26 / issue #38).
+    #   When False (no runtime, model not loaded, breaker open) we
+    #   fall back to the Claude path and log the reason at WARNING
+    #   so an operator can grep the cause.
     dispatch = resolve_dispatch()
+    if dispatch.adapter == ADAPTER_LOCAL:
+        dispatch = _resolve_local_dispatch(dispatch)
     loop_tool_calls: list[dict[str, Any]] | None = None
     generator_path_for_recording = GENERATOR_PATH_OFFLINE
     if dispatch.adapter == ADAPTER_LOCAL:
-        raise NotImplementedError(
-            f"local adapter ships in Step 26 (E2); requested mode={dispatch.mode}"
+        # is_local_capable returned True -- route through the local
+        # adapter. Pre-Step-26 this raises NotImplementedError; the
+        # TestClient re-raises so an operator sees the carve-out hint
+        # rather than a silent fallback indistinguishable from a real
+        # local-runtime outage.
+        _dispatch_local(dispatch.mode)
+        # Defense-in-depth: _dispatch_local MUST raise pre-Step-26.
+        # If Step 26 makes it return cleanly without re-routing through
+        # this caller, every branch below would fall through to the
+        # offline-generation path -- local-mode requests would silently
+        # produce offline activities. Force Step 26 to consciously
+        # rewrite this branch.
+        raise RuntimeError(
+            "Step 28 partial: _dispatch_local must raise NotImplementedError; "
+            "reached unreachable code. Step 26 (#38) will replace this branch "
+            "with a real local-generation path."
         )
     loop_fallback_reason: str | None = None
     if dispatch.adapter == ADAPTER_CLAUDE and dispatch.mode == MODE_LOOP:
@@ -1328,9 +1414,7 @@ def _do_propose(
     # callers that bypass the generator (tests, ad-hoc fixtures).
     raw_slot_fills = metadata.get("slot_fills", {})
     if isinstance(raw_slot_fills, dict):
-        slot_fills_arg: dict[str, str] = {
-            str(k): str(v) for k, v in raw_slot_fills.items()
-        }
+        slot_fills_arg: dict[str, str] = {str(k): str(v) for k, v in raw_slot_fills.items()}
     else:
         slot_fills_arg = {}
     _persist_activity(
@@ -1681,8 +1765,7 @@ def _insert_next_step(
     choices_blob: str | None = None
     if template_step.choices is not None:
         rendered_labels = [
-            render_with_slot_fills(label, slot_fills)
-            for label, _next in template_step.choices
+            render_with_slot_fills(label, slot_fills) for label, _next in template_step.choices
         ]
         choices_blob = json.dumps(rendered_labels)
     # Mark the previous step "not current" AND record the kid's choice
@@ -1695,8 +1778,7 @@ def _insert_next_step(
         prev_params.append(chosen_label)
     prev_params.extend([activity_id, previous_step_id])
     conn.execute(
-        f"UPDATE activity_steps SET {', '.join(prev_set_clauses)} "
-        "WHERE activity_id = ? AND id = ?",
+        f"UPDATE activity_steps SET {', '.join(prev_set_clauses)} WHERE activity_id = ? AND id = ?",
         prev_params,
     )
     conn.execute(
@@ -1961,9 +2043,7 @@ def post_advance(
     elif current_template_step.next is not None:
         # Rule 2: explicit next → choice_index must NOT be set.
         if advance_body.choice_index is not None:
-            raise _bad_advance(
-                "choice_not_allowed", reason="current_step_uses_explicit_next"
-            )
+            raise _bad_advance("choice_not_allowed", reason="current_step_uses_explicit_next")
         target_step_id = current_template_step.next
         for t_step in template.steps:
             if t_step.id == target_step_id:
@@ -2412,8 +2492,7 @@ def _fetch_recent_proposed(
     deterministic order.
     """
     rows = conn.execute(
-        "SELECT * FROM activities WHERE state = ? "
-        "ORDER BY created_at DESC, id DESC LIMIT ?",
+        "SELECT * FROM activities WHERE state = ? ORDER BY created_at DESC, id DESC LIMIT ?",
         (PROPOSED_STATE, limit),
     ).fetchall()
     return [_row_to_response(conn, row) for row in rows]

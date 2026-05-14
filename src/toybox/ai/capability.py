@@ -17,12 +17,16 @@ The pure composition function is reused as-is — DO NOT redefine
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import socket
 import sqlite3
 import time
+import urllib.error
+import urllib.request
 from collections.abc import Awaitable, Callable
+from typing import Any
 
 from ..core.capability import (
     CapabilityReason,
@@ -31,8 +35,13 @@ from ..core.capability import (
 )
 from ..core.listening import ListeningMode, current_mode
 from ..db import connect, resolve_db_path
-from .breaker import CircuitBreaker
+from .breaker import CircuitBreaker, get_local_breaker
 from .client import TEXT_MODEL_ENV
+from .local import (
+    DEFAULT_LOCAL_RUNTIME_URL,
+    LOCAL_MODEL_ID_ENV,
+    LOCAL_RUNTIME_URL_ENV,
+)
 from .oauth import OAuthToken, load_token
 
 _logger = logging.getLogger(__name__)
@@ -160,31 +169,145 @@ async def is_capable_from_state(state: CapabilityState) -> tuple[bool, Capabilit
     return compose_capability(state)
 
 
-# Cause string returned by :func:`is_local_capable` until E1c lands the
-# real probe. Centralised so the integration test that pins the carve-
-# out behavior matches the actual return value.
+# Module-level stable reason constants. Pinned as constants (not inline
+# strings) so integration tests can ``from toybox.ai.capability import
+# LOCAL_NOT_INSTALLED_REASON`` and assert against the canonical value
+# rather than copy-pasting the prose -- this is the same rationale the
+# CapabilityReason enum has for Claude, just without the enum overhead
+# since the local probe's failure causes don't overlap that enum.
+
+#: Cannot connect to ``<TOYBOX_LOCAL_RUNTIME_URL>/v1/models`` -- the
+#: runtime is not running, the URL points at the wrong host/port, or a
+#: firewall is in the way. Mirrors the pre-probe stub's wording so
+#: anything that grep'd the old string still matches.
 LOCAL_NOT_INSTALLED_REASON: str = "local runtime not yet installed"
+
+#: ``TOYBOX_LOCAL_MODEL_ID`` was set but the configured id isn't present
+#: in the ``/v1/models`` response, OR the response is malformed (missing
+#: ``data`` array, non-JSON body, etc).
+LOCAL_MODEL_NOT_LOADED_REASON: str = "local model not loaded"
+
+#: The per-adapter local circuit breaker is OPEN. Independent of the
+#: Claude breaker -- tripping Claude's does NOT disable the local path
+#: and vice versa.
+LOCAL_BREAKER_OPEN_REASON: str = "local breaker open"
+
+#: Timeout for the ``/v1/models`` probe. Matches the Claude probe's 2s
+#: budget (see :data:`_DEFAULT_PROBE_TIMEOUT_SEC`) -- a slow local
+#: runtime should fail the gate fast rather than stall the propose path.
+_LOCAL_PROBE_TIMEOUT_SEC: float = 2.0
+
+
+def _probe_local_models_sync(url: str) -> dict[str, Any]:
+    """Synchronously GET ``<url>/v1/models`` and return the parsed JSON.
+
+    Raises :class:`urllib.error.URLError` /
+    :class:`urllib.error.HTTPError` / :class:`OSError` /
+    :class:`TimeoutError` on connection failure, and
+    :class:`json.JSONDecodeError` on a malformed body. The caller
+    converts these to a stable reason string -- internal exception
+    types are not part of the public contract.
+
+    Uses ``urllib.request`` to mirror the rest of the codebase's HTTP
+    idiom (see :mod:`toybox.ai.client`); no third-party HTTP client
+    is introduced here.
+    """
+    probe_url = url.rstrip("/") + "/v1/models"
+    req = urllib.request.Request(probe_url, method="GET")
+    with urllib.request.urlopen(req, timeout=_LOCAL_PROBE_TIMEOUT_SEC) as resp:
+        raw = resp.read()
+    parsed: Any = json.loads(raw)
+    if not isinstance(parsed, dict):
+        raise json.JSONDecodeError("expected object", "<response>", 0)
+    return parsed
+
+
+def _model_id_in_payload(payload: dict[str, Any], model_id: str) -> bool:
+    """Check if ``model_id`` is present in an OpenAI-shape ``/v1/models`` body.
+
+    OpenAI-compatible runtimes (Ollama, LM Studio, llama.cpp's server)
+    return ``{"object": "list", "data": [{"id": "...", ...}, ...]}``.
+    Tolerates extra keys; ``data`` must be a list of dicts with at
+    least an ``id`` field for any entry to match.
+    """
+    data = payload.get("data")
+    if not isinstance(data, list):
+        return False
+    for entry in data:
+        if isinstance(entry, dict) and entry.get("id") == model_id:
+            return True
+    return False
 
 
 async def is_local_capable() -> tuple[bool, str | None]:
-    """Phase E carve-out stub: local runtime is never capable yet.
+    """Probe the locally-hosted runtime and return ``(capable, reason)``.
 
-    Returns ``(False, "local runtime not yet installed")`` until E1c
-    lands the real ``HTTP GET /v1/models`` probe + the per-adapter
-    breaker integration. The Claude :func:`is_capable` is unchanged;
-    the two probes are intentionally orthogonal so a Claude breaker
-    trip can't disable the local path (and vice versa).
+    Walks four gates in priority order:
 
-    The shape mirrors :func:`is_capable` (``(bool, reason)``); we use
-    a plain ``str`` instead of ``CapabilityReason`` because the local
-    probe's failure causes don't overlap the Claude reason enum and
-    we don't want a fake enum entry stored on the labeled_events
-    capability column.
+    1. **Breaker open** -- if the per-adapter local breaker is OPEN we
+       short-circuit without an HTTP call. Returns
+       :data:`LOCAL_BREAKER_OPEN_REASON`.
+    2. **Cannot connect** -- GET ``<TOYBOX_LOCAL_RUNTIME_URL>/v1/models``
+       fails with a network error or non-2xx. Returns
+       :data:`LOCAL_NOT_INSTALLED_REASON` and records a failure on the
+       breaker (so repeated probes can trip it).
+    3. **Malformed response** -- the body isn't a JSON object, or
+       parses but is shape-wrong. Returns
+       :data:`LOCAL_MODEL_NOT_LOADED_REASON`. Counts as a breaker
+       failure (a runtime that answers but malformed-ly is still not
+       usable).
+    4. **Model not loaded** -- ``TOYBOX_LOCAL_MODEL_ID`` is set but the
+       id isn't in the ``/v1/models`` response. Returns
+       :data:`LOCAL_MODEL_NOT_LOADED_REASON`. NOT a breaker failure --
+       the runtime is healthy, just the desired model isn't loaded.
+
+    Returns ``(True, None)`` on success and resets the breaker's
+    consecutive-failure counter.
+
+    The Claude :func:`is_capable` is unchanged -- the two probes are
+    intentionally orthogonal so a Claude breaker trip can't disable
+    the local path and vice versa (see
+    :func:`toybox.ai.breaker.get_local_breaker`).
     """
-    return False, LOCAL_NOT_INSTALLED_REASON
+    breaker = get_local_breaker()
+    if breaker.is_open():
+        return False, LOCAL_BREAKER_OPEN_REASON
+
+    url = os.environ.get(LOCAL_RUNTIME_URL_ENV, DEFAULT_LOCAL_RUNTIME_URL)
+    model_id = os.environ.get(LOCAL_MODEL_ID_ENV)
+
+    try:
+        payload = await asyncio.to_thread(_probe_local_models_sync, url)
+    except (urllib.error.URLError, OSError, TimeoutError) as exc:
+        _logger.debug("local runtime probe failed (%s): %s", type(exc).__name__, exc)
+        breaker.record_failure()
+        return False, LOCAL_NOT_INSTALLED_REASON
+    except (json.JSONDecodeError, ValueError) as exc:
+        _logger.debug("local runtime probe returned malformed body: %s", exc)
+        breaker.record_failure()
+        return False, LOCAL_MODEL_NOT_LOADED_REASON
+
+    if model_id is not None and model_id.strip():
+        if not _model_id_in_payload(payload, model_id):
+            # The runtime is healthy enough to answer; the model just
+            # isn't loaded. Do NOT trip the breaker for this -- it's an
+            # operator-config issue, not a transient runtime fault.
+            # Also clear any prior consecutive failures: the runtime
+            # answered cleanly, so a (connect-fail × 2) → (200 but
+            # wrong-model) sequence must not leave the breaker one
+            # connect-fail away from tripping.
+            breaker.record_success()
+            return False, LOCAL_MODEL_NOT_LOADED_REASON
+
+    # Successful probe -- clear any prior failures so a transient outage
+    # that auto-recovered doesn't sit on the breaker indefinitely.
+    breaker.record_success()
+    return True, None
 
 
 __all__ = [
+    "LOCAL_BREAKER_OPEN_REASON",
+    "LOCAL_MODEL_NOT_LOADED_REASON",
     "LOCAL_NOT_INSTALLED_REASON",
     "NetworkProbe",
     "default_network_probe",
