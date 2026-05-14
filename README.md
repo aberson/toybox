@@ -23,7 +23,7 @@ Runs entirely on home hardware. Internet is optional — Claude is reached over 
 
 ### In flight
 
-- **Phase E** (local model + tool-loop): Step 28 carve-out shipped 2026-05-05 (commit `33a4b3c`). Remainder gated on ≥50 SFT-filter rows in `labeled_events` — populated naturally as parents tag activities.
+- **Phase E** (local model + tool-loop): two backend substrate carve-outs shipped ahead of the gated-on-data full ship — Step 28 carve-out 2026-05-05 (commit `33a4b3c`: tool registry + ClaudeActivityGenerator wrapper + env-var dispatch), Step 27 (E3) carve-out 2026-05-13 (commit `4f735a0`: PII redactor `src/toybox/ai/redact.py` + migration 0013 `redact_for_sft` opt-out + `eval_dump.py --sft-export` mode + `data/models/lora/REGISTRY.md` template + end-to-end smoke gate). Full ship remainder gated on ≥50 SFT-filter rows in `labeled_events` — populated naturally as parents tag activities.
 
 Backend modules live: `audio/{capture,vad,ring_buffer,devices,stt,pipeline}`, `core/{escalation,throttle,banned_themes,image_gen_mode,…}`, `image_gen/{worker,capability,…}`, `activities/{generator,content_resolver,slots,_validator,…}`, `api/{listening,activities,auth,auth_dep,transcripts,children,toys,rooms,metrics,image_gen_settings,banned_themes_settings,…}`, `ws/{server,heartbeat,envelope,topics}`. Frontend parent app (`/parent`) is now a two-level tab shell; child kiosk (`/child`) is the full-bleed kiosk with persona avatar + step cards + persona-specific toy action sprites + branching choice buttons.
 
