@@ -23,9 +23,15 @@ from toybox.activities.generator import generate
 from toybox.ai.eval_dump import (
     DEFAULT_MEAN_QUALITY_FLOOR,
     DEFAULT_SAFETY_FLOOR,
+    EMPTY_CHILDREN_WARNING,
+    _build_fetch_query,
+    _row_to_jsonl,
     fetch_rows,
     stream_export,
     write_jsonl,
+)
+from toybox.ai.eval_dump import (
+    main as eval_dump_main,
 )
 from toybox.ai.eval_run import (
     DEFAULT_FIXTURES_PATH,
@@ -47,6 +53,7 @@ from toybox.ai.labeled_events import (
     update_judge_scores,
     update_parent_signal,
 )
+from toybox.ai.redact import PII_FILTER_VERSION
 from toybox.db.connection import connect
 from toybox.db.migrations import run_migrations
 
@@ -73,16 +80,12 @@ def _seed_event(
     mean_other: int = 5,
     parent_signal: float | None = None,
 ) -> None:
-    activity = generate(
-        intent="boredom", slot=None, context={"id": activity_id}, hour=10, seed=1
-    )
+    activity = generate(intent="boredom", slot=None, context={"id": activity_id}, hour=10, seed=1)
     # Override the generated id so we can predict it for assertions
     activity_dict = json.loads(activity.model_dump_json())
     activity_dict["id"] = activity_id
     activity_json = json.dumps(activity_dict)
-    chatml = json.dumps(
-        [{"role": "system", "content": "sys"}, {"role": "user", "content": "{}"}]
-    )
+    chatml = json.dumps([{"role": "system", "content": "sys"}, {"role": "user", "content": "{}"}])
     with conn:
         conn.execute(
             "INSERT INTO labeled_events "
@@ -181,9 +184,7 @@ def test_eval_dump_sft_filter_excludes_low_safety(conn: sqlite3.Connection) -> N
 
 def test_eval_dump_all_mode_includes_unscored(conn: sqlite3.Connection) -> None:
     """``--all`` skips the SFT filter and includes rows missing scores."""
-    activity = generate(
-        intent="boredom", slot=None, context={"id": "raw"}, hour=10, seed=1
-    )
+    activity = generate(intent="boredom", slot=None, context={"id": "raw"}, hour=10, seed=1)
     record_generation(
         conn,
         activity=activity,
@@ -231,6 +232,304 @@ def test_fetch_rows_orders_oldest_first(conn: sqlite3.Connection) -> None:
     rows = fetch_rows(conn, since="2026-01-01T00:00:00Z", generator_path=None)
     ids = [r["activity_id"] for r in rows]
     assert ids == ["aa-older", "aa-newer"]
+
+
+# -------------------------------------------------- eval_dump --sft-export
+
+
+def _seed_event_with_chatml(
+    conn: sqlite3.Connection,
+    *,
+    activity_id: str,
+    generated_at: str,
+    inputs_chatml_json: str,
+    activity_json: str,
+    safety: int = 5,
+    mean_other: int = 5,
+    parent_signal: float | None = None,
+    redact_for_sft: int = 0,
+) -> None:
+    """Seed a labeled_events row with explicit chatml + activity content.
+
+    Used by --sft-export tests that need to verify scrubbing on specific
+    PII tokens.
+    """
+    with conn:
+        conn.execute(
+            "INSERT INTO labeled_events "
+            "(activity_id, generated_at, generator_path, "
+            " inputs_chatml_json, activity_json, redact_for_sft) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                activity_id,
+                generated_at,
+                GENERATOR_PATH_OFFLINE,
+                inputs_chatml_json,
+                activity_json,
+                redact_for_sft,
+            ),
+        )
+    judge_payload = json.dumps(
+        {
+            "schema": mean_other,
+            "age_appropriateness": mean_other,
+            "doability": mean_other,
+            "persona_fidelity": mean_other,
+            "coherence": mean_other,
+            "safety": safety,
+            "hallucinated_props": [],
+            "judge_notes": "test",
+        }
+    )
+    update_judge_scores(conn, activity_id=activity_id, judge_scores_json=judge_payload)
+    if parent_signal is not None:
+        update_parent_signal(conn, activity_id=activity_id, signal=parent_signal)
+
+
+def _seed_child(conn: sqlite3.Connection, *, child_id: str, display_name: str) -> None:
+    with conn:
+        conn.execute(
+            "INSERT INTO children (id, display_name) VALUES (?, ?)",
+            (child_id, display_name),
+        )
+
+
+def test_sft_export_and_all_are_mutually_exclusive(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """--sft-export + --all → argparse error, non-zero exit."""
+    # argparse exits via SystemExit(2) on parse error.
+    with pytest.raises(SystemExit) as exc_info:
+        eval_dump_main(
+            [
+                "--sft-export",
+                "--all",
+                "--since",
+                "2020-01-01",
+                "--db",
+                str(tmp_path / "missing.db"),
+            ]
+        )
+    assert exc_info.value.code != 0
+    captured = capsys.readouterr()
+    assert "not allowed with" in captured.err
+
+
+@pytest.mark.parametrize(
+    ("generator_path", "sft_export", "expect_redact", "expect_genpath", "params"),
+    [
+        pytest.param(None, False, False, False, (), id="no-export-no-genpath"),
+        pytest.param(None, True, True, False, (), id="export-no-genpath"),
+        pytest.param("offline", True, True, True, ("offline",), id="export-with-genpath"),
+        pytest.param("offline", False, False, True, ("offline",), id="no-export-with-genpath"),
+    ],
+)
+def test_build_fetch_query(
+    generator_path: str | None,
+    sft_export: bool,
+    expect_redact: bool,
+    expect_genpath: bool,
+    params: tuple[str, ...],
+) -> None:
+    """SQL builder honors --sft-export (adds redact_for_sft=0) and --generator-path.
+
+    The four parametrized cases cover the cartesian product of the two
+    optional predicates so a regression in either branch surfaces with
+    one descriptive id.
+    """
+    sql, actual_params = _build_fetch_query(generator_path=generator_path, sft_export=sft_export)
+    if expect_redact:
+        assert "redact_for_sft = 0" in sql
+    else:
+        assert "redact_for_sft" not in sql
+    if expect_genpath:
+        assert "generator_path = ?" in sql
+    else:
+        assert "generator_path = ?" not in sql
+    assert actual_params == params
+
+
+def test_fetch_rows_sft_export_excludes_flagged_row(conn: sqlite3.Connection) -> None:
+    """SQL-level filter: ``redact_for_sft = 1`` row never reaches Python."""
+    _seed_event(conn, activity_id="ok", generated_at="2026-05-03T00:00:00Z")
+    _seed_event(conn, activity_id="opt-out", generated_at="2026-05-03T00:00:01Z")
+    with conn:
+        conn.execute(
+            "UPDATE labeled_events SET redact_for_sft = 1 WHERE activity_id = ?",
+            ("opt-out",),
+        )
+    rows = list(
+        fetch_rows(
+            conn,
+            since="2026-01-01T00:00:00Z",
+            generator_path=None,
+            sft_export=True,
+        )
+    )
+    ids = [r["activity_id"] for r in rows]
+    assert ids == ["ok"]
+
+
+def test_row_to_jsonl_sft_export_scrubs_user_and_activity(conn: sqlite3.Connection) -> None:
+    """Under sft_export: user message + activity_json scrubbed; system + metadata verbatim."""
+    chatml = json.dumps(
+        [
+            {"role": "system", "content": "<persona card stay verbatim>"},
+            {"role": "user", "content": "Sage played with the ball"},
+        ]
+    )
+    activity_json = json.dumps(
+        {
+            "id": "act-1",
+            "instruction": "Call River at 555-123-4567",
+        }
+    )
+    _seed_event_with_chatml(
+        conn,
+        activity_id="aa-redact",
+        generated_at="2026-05-03T00:00:00Z",
+        inputs_chatml_json=chatml,
+        activity_json=activity_json,
+    )
+    row = conn.execute(
+        "SELECT * FROM labeled_events WHERE activity_id = ?", ("aa-redact",)
+    ).fetchone()
+    record = _row_to_jsonl(row, sft_export=True, child_names=["Sage", "River"])
+    # System message untouched.
+    assert record["messages"][0]["role"] == "system"
+    assert record["messages"][0]["content"] == "<persona card stay verbatim>"
+    # User message scrubbed.
+    user_content = record["messages"][1]["content"]
+    assert "Sage" not in user_content
+    assert "[REDACTED]" in user_content
+    # Assistant content scrubbed (River + phone number).
+    assistant_content = record["messages"][2]["content"]
+    assert "River" not in assistant_content
+    assert "555-123-4567" not in assistant_content
+    assert "[REDACTED]" in assistant_content
+    # Metadata verbatim except for new pii_filter_version field.
+    metadata = record["metadata"]
+    assert metadata["activity_id"] == "aa-redact"
+    assert metadata["generator_path"] == "offline"
+    assert metadata["pii_filter_version"] == PII_FILTER_VERSION
+
+
+def test_row_to_jsonl_non_export_omits_pii_filter_version(
+    conn: sqlite3.Connection,
+) -> None:
+    """Non-export path: metadata.pii_filter_version key absent; scrub does NOT run."""
+    _seed_event(conn, activity_id="aa-plain", generated_at="2026-05-03T00:00:00Z")
+    row = conn.execute(
+        "SELECT * FROM labeled_events WHERE activity_id = ?", ("aa-plain",)
+    ).fetchone()
+    record = _row_to_jsonl(row)
+    assert "pii_filter_version" not in record["metadata"]
+
+
+def test_sft_export_empty_children_emits_warning(
+    tmp_path: Path,
+    conn: sqlite3.Connection,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Empty children table → one stderr warning at startup, continues."""
+    # Persist seeded DB to a path the CLI can open by --db.
+    db_path = tmp_path / "toybox.db"
+    # Re-init a fresh DB at the given path (the fixture-provided conn
+    # points elsewhere; we control the file directly here).
+    fresh = connect(db_path)
+    try:
+        run_migrations(fresh)
+        _seed_event_with_chatml(
+            fresh,
+            activity_id="aa-1",
+            generated_at="2026-05-03T00:00:00Z",
+            inputs_chatml_json=json.dumps(
+                [
+                    {"role": "system", "content": "sys"},
+                    {"role": "user", "content": "hi"},
+                ]
+            ),
+            activity_json=json.dumps({"id": "aa-1"}),
+        )
+    finally:
+        fresh.close()
+
+    out_path = tmp_path / "out.jsonl"
+    rc = eval_dump_main(
+        [
+            "--sft-export",
+            "--since",
+            "2020-01-01",
+            "--db",
+            str(db_path),
+            "--out",
+            str(out_path),
+        ]
+    )
+    assert rc == 0
+    captured = capsys.readouterr()
+    assert EMPTY_CHILDREN_WARNING in captured.err
+    # Warning fires exactly once.
+    assert captured.err.count(EMPTY_CHILDREN_WARNING) == 1
+
+
+def test_row_to_jsonl_malformed_chatml_raises(conn: sqlite3.Connection) -> None:
+    """Malformed inputs_chatml_json must still raise json.JSONDecodeError."""
+    _seed_event_with_chatml(
+        conn,
+        activity_id="aa-broken",
+        generated_at="2026-05-03T00:00:00Z",
+        inputs_chatml_json="not-json {{{",
+        activity_json=json.dumps({"id": "aa-broken"}),
+    )
+    row = conn.execute(
+        "SELECT * FROM labeled_events WHERE activity_id = ?", ("aa-broken",)
+    ).fetchone()
+    with pytest.raises(json.JSONDecodeError):
+        _row_to_jsonl(row, sft_export=True, child_names=[])
+
+
+def test_sft_export_stderr_summary_includes_flag_and_version(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Stderr summary contains sft_export=True and pii_filter_version=1.0."""
+    db_path = tmp_path / "toybox.db"
+    fresh = connect(db_path)
+    try:
+        run_migrations(fresh)
+        _seed_child(fresh, child_id="c1", display_name="Sage")
+        _seed_event_with_chatml(
+            fresh,
+            activity_id="aa-1",
+            generated_at="2026-05-03T00:00:00Z",
+            inputs_chatml_json=json.dumps(
+                [
+                    {"role": "system", "content": "sys"},
+                    {"role": "user", "content": "hi"},
+                ]
+            ),
+            activity_json=json.dumps({"id": "aa-1"}),
+        )
+    finally:
+        fresh.close()
+
+    out_path = tmp_path / "out.jsonl"
+    rc = eval_dump_main(
+        [
+            "--sft-export",
+            "--since",
+            "2020-01-01",
+            "--db",
+            str(db_path),
+            "--out",
+            str(out_path),
+        ]
+    )
+    assert rc == 0
+    captured = capsys.readouterr()
+    assert "sft_export=True" in captured.err
+    assert f"pii_filter_version={PII_FILTER_VERSION}" in captured.err
 
 
 # --------------------------------------------------------------- eval_run
