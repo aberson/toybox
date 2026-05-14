@@ -257,6 +257,7 @@ When `--sft-export` is set, the `_row_to_jsonl` path scrubs the user-message con
 - **Produces:** modifications to `src/toybox/ai/eval_dump.py`, internal unit test additions in `tests/integration/test_eval_cli.py` (existing file).
 - **Done when:** `python -m toybox.ai.eval_dump --sft-export --since <iso>` exits 0 against a seeded DB; row-level unit tests cover the scrub path (user-message scrubbed, system message untouched, metadata untouched); `--sft-export` + `--all` raises a parser error; the `redact_for_sft = 0` clause is included in the SQL `WHERE` of `fetch_rows()`, not just an in-memory post-filter; stderr summary line includes `sft_export=true` and `pii_filter_version=1.0` when the flag is set; empty-`children` warning fires when applicable (covered by a unit test that seeds zero children); malformed `inputs_chatml_json` still raises (regression test exists); `uv run ruff check .` clean; `uv run mypy src` clean.
 - **Depends on:** Step 1 (column must exist), Step 2 (redactor must exist).
+- **Status:** DONE (2026-05-13)
 
 ### Step 4: LoRA registry template
 
