@@ -279,6 +279,7 @@ When `--sft-export` is set, the `_row_to_jsonl` path scrubs the user-message con
 - **Produces:** `tests/integration/test_eval_dump_sft_export.py`.
 - **Done when:** Test green on a fresh `uv run pytest tests/integration/test_eval_dump_sft_export.py` invocation; test fails informatively if you intentionally break the redactor wiring in `eval_dump.py` (verify by manually disabling the redact call in `eval_dump.py`, re-running the test, confirming it fails with a "PII string still present" assertion message, then restoring the code).
 - **Depends on:** Steps 1, 2, 3, 4.
+- **Status:** DONE (2026-05-13)
 
 ## 8. Risks and Open Questions
 
