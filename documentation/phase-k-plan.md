@@ -493,6 +493,8 @@ Per [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md), each
 
 **Flags:** `--reviewers code`
 
+**Status:** DONE (2026-05-15) — also added migration 0016 (activity_steps.kind + metadata_json) to plumb K12's kiosk-side step.kind reader; `/api/static/songs/audio` mount; trigger-collision guard for "let's play a song" double-dispatch
+
 ### Step K14: Embedded + endings surfaces (B + E)
 
 **Problem:** Shared interjection-step builder `src/toybox/activities/interjection.py:build_interjection_step()` produces byte-identical step shape for embedded / ending picks. Embedded path: when an activity-step has `kind: "song"|"joke"` with `auto: true`, the engine (at the appropriate render time — creation for already-persisted step, advance for lazy steps) picks a corpus entry whose `theme ∈ template.recommended_themes`. Endings path: when a template has `ending_step` and the surface is on, the engine appends an interjection-marked step after the last template step at activity-creation time. Both gated on `<content_master> AND <surface_flag>`. When disabled, embedded steps silently skip; ending steps simply aren't appended.
