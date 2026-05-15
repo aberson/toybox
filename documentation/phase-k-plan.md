@@ -370,6 +370,8 @@ Per [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md), each
 
 **Flags:** `--reviewers code`
 
+**Status:** DONE (2026-05-15)
+
 ### Step K4: Slot-fill engine extension
 
 **Problem:** Extend `content_resolver.py` with `resolve_role_slots(template, available_toys, persona, seed)`. Persona `role_weights` bias the normalized random pick; deterministic given inputs; unfilled optional slots fall back to `GENERIC_DESCRIPTORS`. Skips templates whose `required_roles` count exceeds the toy pool.
