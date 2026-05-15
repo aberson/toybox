@@ -358,6 +358,8 @@ Per [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md), each
 
 **Flags:** `--reviewers full --start-cmd "uv run python -m toybox.main --host 127.0.0.1 --port 8000" --url "http://127.0.0.1:4000/parent"`
 
+**Status:** DONE (2026-05-15)
+
 ### Step K3: Template schema extension + validator
 
 **Problem:** Extend template JSON schema to support `required_roles: [Role]`, `optional_roles: [Role]`, `recommended_themes: [Theme]` top-level fields; allow optional `ending_step: {kind: "song"|"joke", auto: true}`; permit `kind: "text"|"song"|"joke"|"fork"` on steps; allow `{role_name}` placeholders in step `text`. Validator gates that placeholders ⊆ declared roles, `required_roles` count ≤ template's distinct-toy ceiling, `recommended_themes` entries are valid `Theme`s, `song`/`joke` step kinds reference corpus or `auto: true`, `ending_step.kind` ∈ {song, joke}. **Does not touch the 200 existing templates** — backward-compat path keeps `{toy}` and missing fields working as defaults.
