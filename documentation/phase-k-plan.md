@@ -445,6 +445,8 @@ Per [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md), each
 
 **Flags:** `--reviewers full --start-cmd "uv run python -m toybox.main --host 127.0.0.1 --port 8000" --url "http://127.0.0.1:4000/child"`
 
+**Status:** DONE (2026-05-15) — code reviewers + frontend gates; visual evidence deferred to K17 + K18
+
 ### Step K10: Joke corpus + loader + theme tagging
 
 **Problem:** `data/jokes/jokes.json` ships with ~50 entries (`{id, setup, punchline, theme: <one of 12>, optional_toy_slot: bool, age_band, persona_compat}`). `src/toybox/activities/joke_corpus.py` loads + validates + filters by `(age_band, persona_compat, theme?)`; seeded pick with alphabetical tie-break. `optional_toy_slot: true` means joke uses `{toy}` substitution when a toy is available; degrades to literal text otherwise. TDD candidate — pure-function corpus picker is the perfect TDD shape.
