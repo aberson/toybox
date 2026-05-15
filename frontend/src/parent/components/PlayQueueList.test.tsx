@@ -73,6 +73,8 @@ interface Handlers {
   onStepBack: Mock<[Activity], Promise<void>>;
   onDidntWork: Mock<[Activity], Promise<void>>;
   onThumbsUp: Mock<[Activity], Promise<void>>;
+  onRecast: Mock<[Activity], Promise<void>>;
+  onNewActivity: Mock<[Activity], Promise<void>>;
 }
 
 function buildHandlers(): Handlers {
@@ -85,6 +87,8 @@ function buildHandlers(): Handlers {
     onStepBack: vi.fn(noop),
     onDidntWork: vi.fn(noop),
     onThumbsUp: vi.fn(noop),
+    onRecast: vi.fn(noop),
+    onNewActivity: vi.fn(noop),
   };
 }
 

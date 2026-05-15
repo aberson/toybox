@@ -666,6 +666,45 @@ export function App(): JSX.Element {
     [api, refetchActivity],
   );
 
+  // Phase K K7: "new cast" button — re-roll role-slot fills on the
+  // same activity. The server returns the activity with new ``roles``
+  // + ``cast_summary`` + re-rendered ``steps[].body`` and a bumped
+  // version. 409 ``recast_only_when_proposed`` and ``version_conflict``
+  // are both routed through ``withConflictHandler``, which refetches
+  // the activity so the busy flag clears and the button greys out on
+  // next render if the state moved past ``proposed``.
+  const handleRecast = useCallback(
+    async (target: Activity): Promise<void> => {
+      const result = await withConflictHandler({
+        mutation: () => api.recastActivity(target.id, target.version),
+        refetch: () => refetchActivity(target.id),
+        onConflict: (conflict, fresh) => {
+          useParentStore.getState().applyVersionConflict(conflict, fresh);
+        },
+      });
+      if (result !== null) {
+        useParentStore.getState().applyMutationResult(result);
+      }
+    },
+    [api, refetchActivity],
+  );
+
+  // Phase K K7: "new activity" button — the plan says
+  // "dismiss + propose with fresh seed". The existing precedent
+  // (the SuggestionCard's "try a different one" / onSkip button) is
+  // wired through ``handleRegenerate``, which hits POST
+  // ``/api/activities/{id}/regenerate`` — the server dismisses the
+  // current activity and emits a fresh proposal in one envelope.
+  // Mirroring that path keeps the dismiss + propose atomic and
+  // avoids two client-side round-trips that could leave the queue
+  // in a half-applied state if the propose fails.
+  const handleNewActivity = useCallback(
+    async (target: Activity): Promise<void> => {
+      await handleRegenerate(target);
+    },
+    [handleRegenerate],
+  );
+
   const handleEnd = useCallback(
     async (target: Activity): Promise<void> => {
       // ``ended`` is only reachable from approved/running per the
@@ -905,6 +944,8 @@ export function App(): JSX.Element {
                       onStepBack={handleStepBack}
                       onDidntWork={handleDidntWork}
                       onThumbsUp={handleThumbsUp}
+                      onRecast={handleRecast}
+                      onNewActivity={handleNewActivity}
                     />
                     {/* Phase J step J8: TriggerButton restyled and
                         repositioned below the queue. Pre-J8 it was the

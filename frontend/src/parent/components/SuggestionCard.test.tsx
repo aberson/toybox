@@ -1,4 +1,5 @@
-// Component tests for the Step 23 SuggestionCard "why this?" panel.
+// Component tests for the Step 23 SuggestionCard "why this?" panel and
+// the Phase K K7 cast list + re-roll buttons.
 
 import {
   cleanup,
@@ -8,8 +9,18 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { Activity } from "../api";
+import type { Activity, RoleAssignment } from "../api";
 import { SuggestionCard } from "./SuggestionCard";
+
+function fakeRole(overrides: Partial<RoleAssignment> = {}): RoleAssignment {
+  return {
+    role_name: "quest_giver",
+    toy_id: null,
+    generic_descriptor: null,
+    display_name: "Wise Owl",
+    ...overrides,
+  };
+}
 
 function fakeActivity(overrides: Partial<Activity> = {}): Activity {
   return {
@@ -187,4 +198,300 @@ describe("SuggestionCard why-toggle", () => {
     expect(persona.textContent?.toLowerCase()).not.toContain("undefined");
   });
 
+});
+
+describe("SuggestionCard K7 cast list", () => {
+  it("renders the cast_summary verbatim when populated", () => {
+    // The backend produces ``cast_summary`` from the resolved roles
+    // table; rendering it as a single string avoids client-side
+    // role-name pretty-printing drift. This is the v1 spec'd path.
+    render(
+      <SuggestionCard
+        activity={fakeActivity({
+          cast_summary: "Quest Giver: Wise Owl, Friend: Captain Bear",
+          roles: {
+            quest_giver: fakeRole(),
+            friend: fakeRole({ role_name: "friend", display_name: "Captain Bear" }),
+          },
+        })}
+        onApprove={async () => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+      />,
+    );
+    const cast = screen.getByTestId("suggestion-cast");
+    expect(cast.textContent).toContain("Quest Giver: Wise Owl");
+    expect(cast.textContent).toContain("Friend: Captain Bear");
+  });
+
+  it("falls back to building the cast list from roles when cast_summary missing", () => {
+    // Pre-K5 activities (or those delivered via a WS envelope that
+    // strips ``cast_summary``) still carry the structured ``roles``
+    // map. The card should still render a usable label rather than
+    // silently dropping the cast.
+    render(
+      <SuggestionCard
+        activity={fakeActivity({
+          cast_summary: undefined,
+          roles: {
+            quest_giver: fakeRole(),
+          },
+        })}
+        onApprove={async () => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+      />,
+    );
+    const cast = screen.getByTestId("suggestion-cast");
+    expect(cast.textContent).toContain("Quest Giver: Wise Owl");
+  });
+
+  it("renders no cast section when roles is empty (role-less template)", () => {
+    // Role-less templates (e.g. Phase F branching activities that
+    // predate K5) ship with ``roles = {}`` and ``cast_summary = ""``.
+    // The card must not render an empty "cast:" line.
+    render(
+      <SuggestionCard
+        activity={fakeActivity({ roles: {}, cast_summary: "" })}
+        onApprove={async () => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+      />,
+    );
+    expect(screen.queryByTestId("suggestion-cast")).toBeNull();
+  });
+
+  it("renders no cast section when roles + cast_summary are both absent", () => {
+    // Pre-K5 wire shape — neither field is present on the envelope.
+    render(
+      <SuggestionCard
+        activity={fakeActivity({ roles: undefined, cast_summary: undefined })}
+        onApprove={async () => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+      />,
+    );
+    expect(screen.queryByTestId("suggestion-cast")).toBeNull();
+  });
+});
+
+describe("SuggestionCard K7 re-roll buttons", () => {
+  it('"New cast" button click invokes onRecast', () => {
+    const onRecast = vi.fn(async () => undefined);
+    render(
+      <SuggestionCard
+        activity={fakeActivity({
+          cast_summary: "Quest Giver: Wise Owl",
+          roles: { quest_giver: fakeRole() },
+        })}
+        onApprove={async () => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+        onRecast={onRecast}
+        onNewActivity={async () => undefined}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("recast-button"));
+    expect(onRecast).toHaveBeenCalledTimes(1);
+  });
+
+  it('"New activity" button click invokes onNewActivity (dismiss + propose chain)', () => {
+    const onNewActivity = vi.fn(async () => undefined);
+    render(
+      <SuggestionCard
+        activity={fakeActivity()}
+        onApprove={async () => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+        onRecast={async () => undefined}
+        onNewActivity={onNewActivity}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("new-activity-button"));
+    expect(onNewActivity).toHaveBeenCalledTimes(1);
+  });
+
+  it("both re-roll buttons are disabled when activity.state !== 'proposed'", () => {
+    // Once the parent approves (or anything past proposed), the
+    // server's recast endpoint returns 409
+    // ``recast_only_when_proposed``. The card mirrors that guard
+    // client-side so the button greys out instead of firing a
+    // doomed mutation.
+    render(
+      <SuggestionCard
+        activity={fakeActivity({ state: "approved" })}
+        onApprove={async () => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+        onRecast={async () => undefined}
+        onNewActivity={async () => undefined}
+      />,
+    );
+    const recast = screen.getByTestId("recast-button") as HTMLButtonElement;
+    const newActivity = screen.getByTestId(
+      "new-activity-button",
+    ) as HTMLButtonElement;
+    expect(recast.disabled).toBe(true);
+    expect(newActivity.disabled).toBe(true);
+  });
+
+  it("both re-roll buttons are enabled in the proposed state", () => {
+    render(
+      <SuggestionCard
+        activity={fakeActivity({ state: "proposed" })}
+        onApprove={async () => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+        onRecast={async () => undefined}
+        onNewActivity={async () => undefined}
+      />,
+    );
+    expect((screen.getByTestId("recast-button") as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+    expect(
+      (screen.getByTestId("new-activity-button") as HTMLButtonElement).disabled,
+    ).toBe(false);
+  });
+
+  it("re-roll buttons hide entirely when the handlers are not wired", () => {
+    // Defensive: a non-K7 caller (e.g. a kiosk-side surface) that
+    // mounts the card without re-roll handlers shouldn't see ghost
+    // buttons. Mirrors the optional-handler pattern from the
+    // existing surface.
+    render(
+      <SuggestionCard
+        activity={fakeActivity()}
+        onApprove={async () => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+      />,
+    );
+    expect(screen.queryByTestId("recast-button")).toBeNull();
+    expect(screen.queryByTestId("new-activity-button")).toBeNull();
+  });
+
+  it("recast button disables while busy.recast is true", () => {
+    // Mid-recast: parent component sets ``busy.recast = true`` via
+    // PlayQueueList's runGuarded. Button greys out so a rapid
+    // double-click can't fire two If-Match-Version mutations.
+    render(
+      <SuggestionCard
+        activity={fakeActivity()}
+        onApprove={async () => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+        onRecast={async () => undefined}
+        onNewActivity={async () => undefined}
+        busy={{
+          approve: false,
+          skip: false,
+          dismiss: false,
+          recast: true,
+          newActivity: false,
+        }}
+      />,
+    );
+    const recast = screen.getByTestId("recast-button") as HTMLButtonElement;
+    expect(recast.disabled).toBe(true);
+    expect(recast.textContent?.toLowerCase()).toContain("rerolling");
+  });
+
+  it("re-enables on next render when state stays 'proposed' after a 409 refetch", () => {
+    // 409 conflict handling: ``withConflictHandler`` refetches the
+    // activity + clears the busy flag in the store. The card then
+    // re-renders with the same proposed state — the button must be
+    // enabled again so the parent can retry. This is the "button
+    // re-enables after refetch" branch of the K7 spec.
+    const { rerender } = render(
+      <SuggestionCard
+        activity={fakeActivity({ state: "proposed", version: 1 })}
+        onApprove={async () => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+        onRecast={async () => undefined}
+        onNewActivity={async () => undefined}
+        busy={{
+          approve: false,
+          skip: false,
+          dismiss: false,
+          recast: true,
+          newActivity: false,
+        }}
+      />,
+    );
+    expect((screen.getByTestId("recast-button") as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    // Refetch returns the same state but a bumped version (some
+    // other client mutated it); busy flag clears.
+    rerender(
+      <SuggestionCard
+        activity={fakeActivity({ state: "proposed", version: 2 })}
+        onApprove={async () => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+        onRecast={async () => undefined}
+        onNewActivity={async () => undefined}
+        busy={{
+          approve: false,
+          skip: false,
+          dismiss: false,
+          recast: false,
+          newActivity: false,
+        }}
+      />,
+    );
+    expect((screen.getByTestId("recast-button") as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+  });
+
+  it("stays disabled on next render when state moves past 'proposed' after a 409 refetch", () => {
+    // The other branch of the K7 spec: if the activity got approved
+    // between the recast click and the refetch, the button stays
+    // greyed out (state guard wins over busy flag). Without this
+    // the parent would see an enabled button that 409s on every
+    // click.
+    const { rerender } = render(
+      <SuggestionCard
+        activity={fakeActivity({ state: "proposed", version: 1 })}
+        onApprove={async () => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+        onRecast={async () => undefined}
+        onNewActivity={async () => undefined}
+        busy={{
+          approve: false,
+          skip: false,
+          dismiss: false,
+          recast: true,
+          newActivity: false,
+        }}
+      />,
+    );
+    rerender(
+      <SuggestionCard
+        activity={fakeActivity({ state: "approved", version: 2 })}
+        onApprove={async () => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+        onRecast={async () => undefined}
+        onNewActivity={async () => undefined}
+        busy={{
+          approve: false,
+          skip: false,
+          dismiss: false,
+          recast: false,
+          newActivity: false,
+        }}
+      />,
+    );
+    expect((screen.getByTestId("recast-button") as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    expect(
+      (screen.getByTestId("new-activity-button") as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
 });

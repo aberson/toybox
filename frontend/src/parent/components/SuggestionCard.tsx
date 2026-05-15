@@ -1,12 +1,18 @@
 import type { JSX } from "react";
 import { useState } from "react";
 
-import type { Activity } from "../api";
+import type { Activity, RoleAssignment } from "../api";
 
 export interface SuggestionCardBusy {
   approve: boolean;
   skip: boolean;
   dismiss: boolean;
+  // Phase K K7: re-roll buttons. Optional on the busy struct so
+  // existing call sites that don't pass them default to idle without
+  // a type break. The PlayQueueList wires both alongside the existing
+  // approve/skip/dismiss flags.
+  recast?: boolean;
+  newActivity?: boolean;
 }
 
 export interface SuggestionCardProps {
@@ -14,9 +20,47 @@ export interface SuggestionCardProps {
   onApprove: () => Promise<void>;
   onSkip: () => Promise<void>;
   onDismiss: () => Promise<void>;
+  // Phase K K7: "New cast" calls ``recastActivity`` (re-rolls the
+  // role slots; same activity id, bumped version). "New activity"
+  // dismisses + proposes fresh (mirrors the existing onSkip /
+  // ``regenerate`` precedent). Both optional so non-K7 callers can
+  // omit them; the card hides the buttons when the handler isn't
+  // wired AND the activity has no roles, so a kiosk-side surface
+  // could still mount the card without these handlers.
+  onRecast?: () => Promise<void>;
+  onNewActivity?: () => Promise<void>;
   // Optional in-flight flags so rapid double-clicks can't fire two
   // mutations with the same If-Match-Version. Defaults to all-idle.
   busy?: SuggestionCardBusy;
+}
+
+// Phase K K7: prefer the backend-rendered ``cast_summary`` string when
+// it's populated (avoids client-side role-name pretty-printing drift
+// from server). Fall back to building from ``activity.roles`` for
+// activities that came in over a pre-K5 envelope without the field.
+// Returns null when no cast info is available so the card can render
+// nothing rather than an empty "cast:" line.
+function renderCastLabel(activity: Activity): string | null {
+  const summary = activity.cast_summary;
+  if (typeof summary === "string" && summary !== "") {
+    return summary;
+  }
+  const roles = activity.roles;
+  if (roles === undefined || roles === null) return null;
+  const entries: RoleAssignment[] = Object.values(roles);
+  if (entries.length === 0) return null;
+  // Local fallback. Title-case the snake_case role name so a
+  // pre-K5 envelope still renders something readable, even without
+  // the backend's display-name table.
+  return entries
+    .map((entry) => {
+      const label = entry.role_name
+        .split("_")
+        .map((part) => (part.length === 0 ? "" : part[0]!.toUpperCase() + part.slice(1)))
+        .join(" ");
+      return `${label}: ${entry.display_name}`;
+    })
+    .join(", ");
 }
 
 // Step 23: the "why this?" panel renders the trigger phrase that fired
@@ -25,14 +69,25 @@ export interface SuggestionCardProps {
 // The intent (``intent_source``) is also surfaced as a third row when
 // available, since the slot/intent drove the template selection.
 export function SuggestionCard(props: SuggestionCardProps): JSX.Element {
-  const { activity, onApprove, onSkip, onDismiss } = props;
+  const { activity, onApprove, onSkip, onDismiss, onRecast, onNewActivity } = props;
   const busy: SuggestionCardBusy = props.busy ?? {
     approve: false,
     skip: false,
     dismiss: false,
   };
+  const busyRecast = busy.recast ?? false;
+  const busyNewActivity = busy.newActivity ?? false;
   const [whyOpen, setWhyOpen] = useState(false);
   const title = activity.title ?? activity.summary ?? "Untitled activity";
+  const castLabel = renderCastLabel(activity);
+  // Phase K K7: re-roll buttons disable when the activity isn't in
+  // the ``proposed`` state. The backend recast endpoint returns 409
+  // ``recast_only_when_proposed`` otherwise, so we mirror that guard
+  // client-side to avoid a doomed round-trip. ``newActivity`` shares
+  // the same gate — once the parent has approved (or anything past
+  // proposed), the "swap for a different idea" affordance no longer
+  // makes sense.
+  const rerollDisabledByState = activity.state !== "proposed";
   const personaMeta = (activity.metadata as Record<string, unknown>)["persona"];
   const personaName =
     typeof personaMeta === "object" &&
@@ -58,6 +113,14 @@ export function SuggestionCard(props: SuggestionCardProps): JSX.Element {
       }}
     >
       <h2 style={{ margin: "0 0 8px 0", fontSize: 17 }}>{title}</h2>
+      {castLabel !== null && (
+        <p
+          data-testid="suggestion-cast"
+          style={{ margin: "0 0 4px 0", color: "#444", fontSize: 13 }}
+        >
+          cast: {castLabel}
+        </p>
+      )}
       {personaName !== null && (
         <p
           data-testid="suggestion-persona"
@@ -110,6 +173,32 @@ export function SuggestionCard(props: SuggestionCardProps): JSX.Element {
         >
           {busy.dismiss ? "dismissing..." : "dismiss"}
         </button>
+        {onRecast !== undefined && (
+          <button
+            type="button"
+            data-testid="recast-button"
+            aria-label="Re-roll cast for this activity"
+            disabled={rerollDisabledByState || busyRecast}
+            onClick={() => {
+              void onRecast();
+            }}
+          >
+            {busyRecast ? "rerolling..." : "new cast"}
+          </button>
+        )}
+        {onNewActivity !== undefined && (
+          <button
+            type="button"
+            data-testid="new-activity-button"
+            aria-label="Dismiss and propose a new activity"
+            disabled={rerollDisabledByState || busyNewActivity}
+            onClick={() => {
+              void onNewActivity();
+            }}
+          >
+            {busyNewActivity ? "swapping..." : "new activity"}
+          </button>
+        )}
         <button
           type="button"
           data-testid="why-toggle"

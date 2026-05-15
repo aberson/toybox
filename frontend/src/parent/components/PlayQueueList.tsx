@@ -47,6 +47,14 @@ export interface PlayQueueListProps {
   onStepBack: (activity: Activity) => Promise<void>;
   onDidntWork: (activity: Activity) => Promise<void>;
   onThumbsUp: (activity: Activity) => Promise<void>;
+  // Phase K K7: re-roll affordances on the SuggestionCard. ``onRecast``
+  // re-rolls the role-slot cast on the same activity (server bumps
+  // version + rewrites step bodies via ``render_with_slot_fills``).
+  // ``onNewActivity`` is the "dismiss + propose fresh" chain — same
+  // semantics as ``onRegenerate`` but surfaced with a clearer label
+  // on the new K7 button row.
+  onRecast: (activity: Activity) => Promise<void>;
+  onNewActivity: (activity: Activity) => Promise<void>;
 }
 
 // Keyed busy map: (action, id) → in-flight flag. A nested record keeps
@@ -59,7 +67,9 @@ type ActionKey =
   | "end"
   | "stepBack"
   | "didntWork"
-  | "thumbsUp";
+  | "thumbsUp"
+  | "recast"
+  | "newActivity";
 
 type BusyMap = Record<ActionKey, Set<string>>;
 
@@ -72,6 +82,8 @@ function emptyBusy(): BusyMap {
     stepBack: new Set(),
     didntWork: new Set(),
     thumbsUp: new Set(),
+    recast: new Set(),
+    newActivity: new Set(),
   };
 }
 
@@ -87,6 +99,8 @@ export function PlayQueueList(props: PlayQueueListProps): JSX.Element {
     onStepBack,
     onDidntWork,
     onThumbsUp,
+    onRecast,
+    onNewActivity,
   } = props;
 
   const [busy, setBusy] = useState<BusyMap>(() => emptyBusy());
@@ -317,10 +331,18 @@ export function PlayQueueList(props: PlayQueueListProps): JSX.Element {
               onDismiss={() =>
                 runGuarded("dismiss", row.id, () => onDismiss(row))
               }
+              onRecast={() =>
+                runGuarded("recast", row.id, () => onRecast(row))
+              }
+              onNewActivity={() =>
+                runGuarded("newActivity", row.id, () => onNewActivity(row))
+              }
               busy={{
                 approve: busy.approve.has(row.id),
                 skip: busy.regenerate.has(row.id),
                 dismiss: busy.dismiss.has(row.id),
+                recast: busy.recast.has(row.id),
+                newActivity: busy.newActivity.has(row.id),
               }}
             />
           </div>
