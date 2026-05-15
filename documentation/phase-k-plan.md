@@ -574,6 +574,8 @@ Per [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md), each
 
 **Flags:** `--reviewers code` (per-agent validator + orchestrator pytest gate post-merge, same as K16)
 
+**Status:** DONE (2026-05-15) — 8 parallel worktree agents (2 per intent × 100 new templates each); 2 agents hit a transient API socket error early (request_story slot, before any write) and were redispatched cleanly. Final: 800 new templates, 800/800 pass `Template.model_validate` + `validate_template` + `validate_template_graph`. 711/800 (89%) declare `ending_step` on the new content; combined catalog is 873/1000 (87%). Per-intent: boredom 227/250, request_play 248/250, request_story 184/250, request_activity 214/250. All 10 roles + 12 themes represented. Zero id collisions; numeric ranges 051..250 used exhaustively per intent. Merge-time pytest gate: 1820 passed, 2 skipped (no regressions; the ws-origin flake from K16 did NOT recur). Catalog scale: **200 → 1000 templates (5×)**.
+
 ### Step K17: End-to-end smoke gate
 
 **Problem:** Full-stack smoke: backend on 127.0.0.1:8000, kiosk on :4000. Sequence: (a) propose role-aware activity from backfilled catalog, (b) recast it pre-approval, (c) approve, (d) kiosk renders persona avatar with voice profile, (e) walk through steps including one embedded joke step + one embedded song step, (f) tap a word and the Read Me button on a text step, hear both, (g) parent inserts a joke mid-activity, kiosk shows it next, (h) finish through an ending song step, (i) toggle each of the 8 settings from SettingsPanel, refresh kiosk, verify behavior change. Acceptance: all 9 sub-steps green; no kiosk console errors; activity reaches `completed` state; `data/songs/audio/` size assertion passes.
