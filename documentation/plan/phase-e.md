@@ -86,7 +86,10 @@ Tool registry and resolver. Each tool is a typed callable returning JSON-seriali
 Symmetric adapter package. `claude.py` wraps the existing `client.py` to expose both single-shot (`generate_activity(ctx)`) and loop-mode (`generate_activity_loop(ctx, tools)`) entry points. `local.py` implements the same interface against a local runtime (Ollama HTTP / LM Studio HTTP / raw llama-server HTTP) with constrained decoding via Outlines or llama.cpp GBNF. Both adapters honor the existing breaker + capability gate so v1's safety net stays intact.
 
 ### `src/toybox/ai/local.py`
-`LocalActivityGenerator` — concrete adapter for the local runtime. Owns the HTTP client to whichever runtime E1 picks. Loads grammars from a side directory (`data/grammars/activity.gbnf` etc.) so swapping schemas doesn't require redeploying the adapter. Lazy-loads constrained-decoding deps so `import toybox.ai.local` is cheap when the local path isn't active. CLI: `uv run python -m toybox.ai.local --probe` (E1 smoke), `--benchmark --prompts <jsonl>` (E1 benchmark), `--serve-check` (runtime up + model loaded).
+`LocalActivityGenerator` — concrete adapter for the local runtime. Owns the HTTP client to whichever runtime E1 picks. Loads grammars from a side directory (`data/grammars/activity.gbnf` etc.) so swapping schemas doesn't require redeploying the adapter. Lazy-loads constrained-decoding deps so `import toybox.ai.local` is cheap when the local path isn't active. CLI: `uv run python -m toybox.ai.local --probe` (E1 smoke; shipped 2026-05-14 at `2330de7`).
+
+### `src/toybox/ai/local_benchmark.py`
+E1c benchmark CLI; sibling to `local.py` to avoid the `python -m toybox.ai.local` self-import warning surfaced at E1b ship. CLIs: `--benchmark --model <tag>` (per-model measurement; refuses to run if probe-pass marker is absent or >1 h stale) and `--write-decision-doc --7b-results <path> --3b-results <path>` (applies the E1c threshold gate, writes `documentation/local-model-decision.md`). Code prereq to Step 25c — see Step 25c §"Code prerequisites" below.
 
 ### `src/toybox/ai/eval_compare.py`
 A/B evaluation driver. Reads two judge-scored runs (Claude baseline + local candidate) over the same fixture IDs, computes per-dimension mean delta with bootstrap 95% CI, and writes a markdown report under `documentation/eval-runs/<date>-claude-vs-local.md`. Reuses existing `judge.py` and `rubric.py` — no new scoring logic.
@@ -138,7 +141,7 @@ The benchmark itself runs 10 prompts and is therefore not "long-running observat
 |---|------|------|----------------------|-------------------|
 | 25a | E1a — Install runtime + GGUFs | operator | n/a | Runtime installed; both GGUFs on disk + sha256-verified |
 | 25b | E1b — Smoke probe | code | `--reviewers code` | `local.py --probe` passes one fixture prompt through the runtime end-to-end; output parses against activity schema; <60 s wall-clock |
-| 25c | E1c — Benchmark + decision doc | operator | n/a | Benchmark CLI run for 7B + 3B; `documentation/local-model-decision.md` landed with measured numbers + 7B-vs-3B-vs-cloud-burst decision |
+| 25c | E1c — Benchmark + decision doc | code prereq + operator | code prereq: `--reviewers code` · operator: n/a | **Code prereq:** `local_benchmark.py` shipped with `--benchmark` + `--write-decision-doc` CLIs + unit tests. **Operator:** benchmark run for 7B + 3B; `documentation/local-model-decision.md` landed with measured numbers + 7B-vs-3B-vs-cloud-burst decision + 8 GB host contention answer. |
 | 26 | E2 — Constrained-decoding pilot vs Claude baseline | code | `--reviewers code` | `LocalActivityGenerator` ships; A/B eval comparison written; mode-2-only / mode-2+3 / not-ready decision recorded |
 | 27 | E3 — First SFT iteration | code (with operator-driven training run) | `--reviewers code` | LoRA adapter trained, merged to GGUF, deployed alongside base; eval re-run; per-dimension delta vs base reported; judge-vs-parent agreement re-checked |
 | 28 | E4 — Tool-loop refactor | code | `--reviewers code` | Tool registry + Claude+local loop-mode adapters; both env axes (`TOYBOX_GENERATOR_ADAPTER`, `TOYBOX_GENERATOR_MODE`) wired; tool args validated; `is_local_capable()` shipped; tool-call telemetry into `labeled_events`; latency budget + cache strategy documented |
@@ -169,13 +172,46 @@ The benchmark itself runs 10 prompts and is therefore not "long-running observat
 
 #### Step 25c: E1c — Benchmark + decision doc
 
-- **Problem:** Operator runs `uv run python -m toybox.ai.local --benchmark --prompts tests/fixtures/eval/prompts.jsonl` (10-prompt fixed set drawn from the eval fixtures) for both 7B Q4_K_M and 3B Q5_K_M. Benchmark CLI refuses to run if the most recent `data/models/.probe-pass-<iso>.json` marker is older than 1 hour (forces 25b re-run, catching runtime drift). Per-prompt: cold-start time, warm first-token latency, steady-state TPS, peak VRAM at 4K context, schema-bound JSON validity %. Aggregate stats written to `documentation/local-model-decision.md`. Decision recorded per the gate at [phase-e.md "Manual M6"](phase-e.md#manual-m6--local-model-tps-check-during-e1): 7B if it clears <30 s cold / <2 s warm / ≥30 TPS / <11 GB VRAM / 100% validity; else 3B if it clears <15 s cold / <1 s warm / ≥60 TPS / <7 GB VRAM / 100% validity; else cloud-burst (RunPod) and Phase E scope re-discussion (privacy thesis vs compute reality is a discussion, not a default — see master plan §"Decision gate"). Decision doc also captures: runtime chosen + rationale, known gotchas surfaced during install, post-mortem on any benchmark numbers that surprised the operator. Future-Phase-F reads this doc instead of re-running E1.
-- **Type:** operator
-- **Issue:** #37
-- **Flags:** n/a (operator step; benchmark CLI itself is reviewed in 25b's tests, but the run + decision are human-driven)
+- **Problem:** Operator runs `uv run python -m toybox.ai.local_benchmark --prompts tests/fixtures/eval/prompts.jsonl` (10-prompt fixed set drawn from the eval fixtures, deterministic subset `f001` … `f010`) for both 7B Q4_K_M and 3B Q5_K_M. Benchmark CLI refuses to run if the most recent `data/models/.probe-pass-<iso>.json` marker is older than 1 hour (forces 25b re-run, catching runtime drift). Per-prompt: cold-start time, warm first-token latency, steady-state TPS, peak VRAM at 4K context, schema-bound JSON validity %. Aggregate stats written to `documentation/local-model-decision.md`. Decision recorded per the gate at [phase-e.md "Manual M6"](phase-e.md#manual-m6--local-model-tps-check-during-e1): 7B if it clears <30 s cold / <2 s warm / ≥30 TPS / <11 GB VRAM / 100% validity; else 3B if it clears <15 s cold / <1 s warm / ≥60 TPS / <7 GB VRAM / 100% validity; else cloud-burst (RunPod) and Phase E scope re-discussion (privacy thesis vs compute reality is a discussion, not a default — see master plan §"Decision gate"). Decision doc also captures: runtime chosen + rationale, known gotchas surfaced during install, post-mortem on any benchmark numbers that surprised the operator. Future-Phase-F reads this doc instead of re-running E1.
+
+  **Note on 8 GB hosts:** the 7B-vs-3B-vs-cloud-burst gate above measures each model in isolation. On the Plan-default RTX 4070 Laptop (8 GB VRAM shared with F.5 image-gen, which peaks at ~6.1 GB per [`2026-05-06-phase-f-8gb-feasibility.md`](../runs/2026-05-06-phase-f-8gb-feasibility.md)), the decision doc must ALSO record the **contention answer** chosen from: (a) sequentialize image-gen and local-model behind the capability gate, (b) default to 3B-only so both can coexist, or (c) cloud-burst 7B. E1b's marker on this host already recorded 7B at 6115 MiB VRAM at idle-plus-loaded — leaving no headroom for image-gen — so the contention question is operative regardless of which model wins the in-isolation benchmark.
+
+- **Type:** code prerequisite then operator
+- **Issue:** #37 (operator); code prereq sub-issue TBD via `/repo-sync`, or attached to #37 via `--issue 37` on the build-step
+- **Flags:** code prereq runs as `/build-step --reviewers code`; the operator step itself is n/a (human-driven measurement + decision write-up)
 - **Status:** PENDING
-- **Depends on:** Step 25a (#35); Step 25b (#36 — probe pass marker)
-- **Done when:** Benchmark numbers captured for both GGUFs; `documentation/local-model-decision.md` landed with measured numbers + decision (7B / 3B / cloud-burst) + runtime choice rationale + known gotchas.
+
+##### Code prerequisites (must ship before the operator run)
+
+The Step 25b probe CLI shipped at master `2330de7` covers `--probe` only. The `--benchmark` and `--write-decision-doc` CLIs called out in the Problem statement above are code work that needs to land before the operator can run E1c. Suggested split:
+
+- **Module:** new `src/toybox/ai/local_benchmark.py` (separate from `local.py` to avoid the `python -m toybox.ai.local` self-import RuntimeWarning surfaced at E1b ship — see [`documentation/operator/local-runtime.md`](../operator/local-runtime.md) "Recorded on this host" §"Notes / deviations").
+- **`--benchmark --model <tag>` behaviour:**
+  - Reads the most recent `data/models/.probe-pass-*.json` marker. If absent OR `iso_ts` older than 1 hour, exit 1 with `code=probe_stale detail=...`. Forces an E1b re-run, catching runtime drift since the probe last passed.
+  - Iterates the 10-prompt subset `f001` … `f010` from `tests/fixtures/eval/prompts.jsonl` in order.
+  - Per-prompt metrics: cold-start time (first request after model load — force-unload via `/api/generate` with `keep_alive=0` between models), warm first-token latency (median across the 10 prompts after the cold call), steady-state TPS (response tokens / wall-clock excluding first-token), peak VRAM at 4 K context (sample `nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits` mid-generation via a background thread), schema-bound JSON validity (`Activity.model_validate` boolean per prompt).
+  - Writes per-model results to `data/models/.benchmark-<model-slug>-<iso>.json` (colon-stripped ISO, matching the marker filename convention E1b established).
+- **`--write-decision-doc --7b-results <path> --3b-results <path>` behaviour:** reads both per-model result files, applies the threshold gate from the Problem statement above, and writes `documentation/local-model-decision.md` with: per-model metrics table, decision (7B / 3B / cloud-burst), contention-answer placeholder for 8 GB hosts (a/b/c above — operator fills in), runtime choice rationale, known gotchas section (operator fills in).
+- **HTTP convention:** urllib only, mirroring `src/toybox/ai/local.py`'s `--probe` pattern. No `requests`, no `httpx`.
+- **Tests at `tests/unit/ai/test_local_benchmark.py`:** unit-tested with stub measurements + fake-runtime `http.server` fixture matching `tests/unit/ai/test_local_probe.py`'s pattern. Branches to cover:
+  - probe-stale (no marker / marker older than 1 hour) → exit 1 `code=probe_stale`
+  - schema-validity tally (mix of valid + invalid `Activity` responses → correct % computed)
+  - decision gate (each of 7B-pass / 3B-pass / cloud-burst paths exercised with stub metrics)
+  - decision-doc write (assert file contents include both models' metrics tables, the verdict, and the contention-answer placeholder)
+  - the real-GPU benchmark itself is NOT unit-tested — the operator step that follows is the live run.
+- **Reviewer flags:** `--reviewers code`. No UI, no runtime gauntlet.
+- **Done when (code):** `local_benchmark.py` + `test_local_benchmark.py` shipped; ruff/mypy/pytest clean; `LocalActivityGenerator` and `local.py` unchanged from `2330de7`.
+
+##### Operator run (after the code prereq lands)
+
+- **Depends on:** Step 25a (#35); Step 25b (#36 — probe pass marker); code prereq above
+- **Steps:**
+  1. Run `uv run python -m toybox.ai.local --probe` to land a fresh marker (must be within the last hour).
+  2. `uv run python -m toybox.ai.local_benchmark --model qwen2.5:7b-instruct-q4_K_M`
+  3. `uv run python -m toybox.ai.local_benchmark --model qwen2.5:3b-instruct-q5_K_M`
+  4. `uv run python -m toybox.ai.local_benchmark --write-decision-doc --7b-results <path> --3b-results <path>`
+  5. Operator inspects `documentation/local-model-decision.md`, fills in the contention-answer + runtime-choice + gotchas sections, commits the file.
+- **Done when (operator):** Benchmark numbers captured for both GGUFs; `documentation/local-model-decision.md` landed with measured numbers + decision (7B / 3B / cloud-burst) + contention answer for 8 GB hosts + runtime choice rationale + known gotchas.
 - **Manual companion:** Manual M6 — Local model TPS check ([phase-e.md "Manual M6"](phase-e.md#manual-m6--local-model-tps-check-during-e1)) IS this step; no separate manual run.
 
 #### Step 26: E2 — Constrained-decoding pilot vs Claude baseline
