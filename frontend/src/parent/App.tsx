@@ -12,9 +12,12 @@ import type {
   MetricsAudioStatus,
   ParentAuthStatus,
   ParentTokenResponse,
+  PhaseKFeatureFlag,
+  PhaseKFeatureFlags,
   PlayCadenceSeconds,
   PlayTargetDepth,
 } from "./api";
+import { PHASE_K_FEATURE_FLAG_DEFAULTS } from "./api";
 import { CapabilityBanner } from "./components/CapabilityBanner";
 import { ChildProfileEditor } from "./components/ChildProfileEditor";
 import { Header } from "./components/Header";
@@ -104,6 +107,15 @@ export function App(): JSX.Element {
   // — wiring the consumer in J10 doesn't require touching the
   // bootstrap path again.
   const [playTargetDepth, setPlayTargetDepth] = useState<number>(3);
+  // Phase K step K2: eight parent-controlled feature flags. Seeded
+  // optimistically from PHASE_K_FEATURE_FLAG_DEFAULTS (which matches
+  // the seeded values in migration 0015) so a slow / failed bootstrap
+  // fetch never paints a value the kid wouldn't have seen. The
+  // bootstrap's parallel-fetch fills this in post-login; SettingsPanel
+  // writes update via ``handleFeatureFlagChanged``.
+  const [featureFlags, setFeatureFlags] = useState<PhaseKFeatureFlags>(
+    PHASE_K_FEATURE_FLAG_DEFAULTS,
+  );
   const [authMode, setAuthMode] = useState<AuthMode>("bootstrap");
   const [authStatus, setAuthStatus] = useState<ParentAuthStatus | null>(null);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
@@ -235,6 +247,14 @@ export function App(): JSX.Element {
         cadenceResult,
         targetDepthResult,
         proposedResult,
+        jokesEnabledResult,
+        songsEnabledResult,
+        playStandaloneResult,
+        playEmbeddedResult,
+        playEndingsResult,
+        playSpontaneityResult,
+        clickableWordsResult,
+        readMeButtonResult,
       ] = await Promise.allSettled([
         api.getTranscriptRetention({ signal: aborter.signal }),
         api.getPlayCadenceSeconds({ signal: aborter.signal }),
@@ -243,6 +263,19 @@ export function App(): JSX.Element {
           { include_active: true },
           { signal: aborter.signal },
         ),
+        // Phase K step K2: eight feature flags fetched in parallel
+        // alongside the existing settings GETs. Each result is handled
+        // independently below so one bad endpoint doesn't poison the
+        // others — optimistic defaults (matching the backend's seeded
+        // migration 0015 values) stay in place when a probe rejects.
+        api.getJokesEnabled({ signal: aborter.signal }),
+        api.getSongsEnabled({ signal: aborter.signal }),
+        api.getPlayStandaloneEnabled({ signal: aborter.signal }),
+        api.getPlayEmbeddedEnabled({ signal: aborter.signal }),
+        api.getPlayEndingsEnabled({ signal: aborter.signal }),
+        api.getPlaySpontaneityEnabled({ signal: aborter.signal }),
+        api.getClickableWordsEnabled({ signal: aborter.signal }),
+        api.getReadMeButtonEnabled({ signal: aborter.signal }),
       ]);
       // ``Promise.allSettled`` swallows aborts as rejected results, so
       // a mid-bootstrap unmount (e.g. parent navigates away while these
@@ -278,6 +311,44 @@ export function App(): JSX.Element {
           "play target depth initial fetch failed, using default",
           targetDepthResult.reason,
         );
+      }
+      // Phase K step K2: fold the eight feature-flag results into one
+      // setState call so a partial-fetch only fires one render rather
+      // than eight cascading ones. Each ``fulfilled`` row overwrites
+      // its matching default in the working snapshot; rejections fall
+      // through (the default seeded above stays in place) with a
+      // single console.warn per failing flag so a bad bootstrap is
+      // diagnosable without changing the visible behaviour.
+      const flagBootstrapResults: ReadonlyArray<
+        readonly [PhaseKFeatureFlag, PromiseSettledResult<{ value: boolean }>]
+      > = [
+        ["jokes_enabled", jokesEnabledResult],
+        ["songs_enabled", songsEnabledResult],
+        ["play_standalone_enabled", playStandaloneResult],
+        ["play_embedded_enabled", playEmbeddedResult],
+        ["play_endings_enabled", playEndingsResult],
+        ["play_spontaneity_enabled", playSpontaneityResult],
+        ["clickable_words_enabled", clickableWordsResult],
+        ["read_me_button_enabled", readMeButtonResult],
+      ];
+      const nextFlags: PhaseKFeatureFlags = {
+        ...PHASE_K_FEATURE_FLAG_DEFAULTS,
+      };
+      let flagBootstrapTouched = false;
+      for (const [key, result] of flagBootstrapResults) {
+        if (result.status === "fulfilled") {
+          nextFlags[key] = result.value.value;
+          flagBootstrapTouched = true;
+        } else if (!isAbortError(result.reason)) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            `feature flag ${key} initial fetch failed, using default`,
+            result.reason,
+          );
+        }
+      }
+      if (flagBootstrapTouched) {
+        setFeatureFlags(nextFlags);
       }
       if (proposedResult.status === "fulfilled") {
         // Hydrate ``proposedList`` + ``active`` from the REST snapshot.
@@ -706,6 +777,21 @@ export function App(): JSX.Element {
     [],
   );
 
+  // Phase K step K2: SettingsPanel reconciliation callback. The
+  // PlayFeaturesControls component owns the optimistic pendingValue
+  // + inline error surface per row; once a PUT resolves the parent
+  // updates the lifted ``featureFlags`` dict so subsequent renders +
+  // future K-step consumers (K13/K14/K15) read the current value.
+  // The callback takes a (key, value) tuple so adding a ninth flag
+  // is a single-line edit to the canonical list in ./api — this
+  // function stays unchanged.
+  const handleFeatureFlagChanged = useCallback(
+    (key: PhaseKFeatureFlag, value: boolean): void => {
+      setFeatureFlags((prev) => ({ ...prev, [key]: value }));
+    },
+    [],
+  );
+
   // Step 21: gate on PIN status before rendering the main app.
   if (authMode === "bootstrap") {
     return (
@@ -895,6 +981,8 @@ export function App(): JSX.Element {
                     onPlayCadenceSecondsChanged={
                       handlePlayCadenceSecondsChanged
                     }
+                    currentFeatureFlags={featureFlags}
+                    onFeatureFlagChanged={handleFeatureFlagChanged}
                   />
                 )}
                 {settingsTab.value === "stats" && (

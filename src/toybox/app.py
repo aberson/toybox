@@ -21,13 +21,33 @@ from .api.audio import router as audio_router
 from .api.auth import router as auth_router
 from .api.banned_themes_settings import router as banned_themes_settings_router
 from .api.children import router as children_router
+from .api.clickable_words_enabled_settings import (
+    router as clickable_words_enabled_settings_router,
+)
 from .api.health import router as health_router
 from .api.image_gen_settings import router as image_gen_settings_router
+from .api.jokes_enabled_settings import router as jokes_enabled_settings_router
 from .api.listening import router as listening_router
 from .api.metrics import router as metrics_router
 from .api.play_cadence_seconds_settings import router as play_cadence_seconds_settings_router
+from .api.play_embedded_enabled_settings import (
+    router as play_embedded_enabled_settings_router,
+)
+from .api.play_endings_enabled_settings import (
+    router as play_endings_enabled_settings_router,
+)
+from .api.play_spontaneity_enabled_settings import (
+    router as play_spontaneity_enabled_settings_router,
+)
+from .api.play_standalone_enabled_settings import (
+    router as play_standalone_enabled_settings_router,
+)
 from .api.play_target_depth_settings import router as play_target_depth_settings_router
+from .api.read_me_button_enabled_settings import (
+    router as read_me_button_enabled_settings_router,
+)
 from .api.rooms import router as rooms_router
+from .api.songs_enabled_settings import router as songs_enabled_settings_router
 from .api.toys import router as toys_router
 from .api.transcript_retention_settings import router as transcript_retention_settings_router
 from .api.transcripts import router as transcripts_router
@@ -59,6 +79,17 @@ def create_app() -> FastAPI:
     app.include_router(transcript_retention_settings_router)
     app.include_router(play_target_depth_settings_router)
     app.include_router(play_cadence_seconds_settings_router)
+    # Phase K Step K2: eight parent-controlled feature flags. Order
+    # within the cohort is alphabetical so the router list stays
+    # mechanically scannable.
+    app.include_router(clickable_words_enabled_settings_router)
+    app.include_router(jokes_enabled_settings_router)
+    app.include_router(play_embedded_enabled_settings_router)
+    app.include_router(play_endings_enabled_settings_router)
+    app.include_router(play_spontaneity_enabled_settings_router)
+    app.include_router(play_standalone_enabled_settings_router)
+    app.include_router(read_me_button_enabled_settings_router)
+    app.include_router(songs_enabled_settings_router)
     app.include_router(auth_router)
     app.include_router(activities_router)
     app.include_router(children_router)

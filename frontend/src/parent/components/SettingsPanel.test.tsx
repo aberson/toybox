@@ -16,7 +16,10 @@ import type {
   ImageGenMode,
   ListeningMode,
   MetricsSnapshot,
+  PhaseKFeatureFlag,
+  PhaseKFeatureFlags,
 } from "../api";
+import { PHASE_K_FEATURE_FLAG_DEFAULTS } from "../api";
 import { SettingsPanel } from "./SettingsPanel";
 
 function fakeSnapshot(overrides: Partial<MetricsSnapshot> = {}): MetricsSnapshot {
@@ -78,6 +81,17 @@ interface StubApi {
   setTranscriptRetention: Mock;
   setPlayTargetDepth: Mock;
   setPlayCadenceSeconds: Mock;
+  // Phase K step K2 feature-flag setters. Mocked as identity echos so
+  // a click on a row resolves cleanly without the test needing to
+  // hand-wire eight per-flag handlers.
+  setJokesEnabled: Mock;
+  setSongsEnabled: Mock;
+  setPlayStandaloneEnabled: Mock;
+  setPlayEmbeddedEnabled: Mock;
+  setPlayEndingsEnabled: Mock;
+  setPlaySpontaneityEnabled: Mock;
+  setClickableWordsEnabled: Mock;
+  setReadMeButtonEnabled: Mock;
 }
 
 function buildStubApi(snapshot: MetricsSnapshot): StubApi {
@@ -105,6 +119,26 @@ function buildStubApi(snapshot: MetricsSnapshot): StubApi {
     setPlayCadenceSeconds: vi.fn(
       async (value: number) => ({ value }),
     ) as Mock,
+    setJokesEnabled: vi.fn(async (value: boolean) => ({ value })) as Mock,
+    setSongsEnabled: vi.fn(async (value: boolean) => ({ value })) as Mock,
+    setPlayStandaloneEnabled: vi.fn(
+      async (value: boolean) => ({ value }),
+    ) as Mock,
+    setPlayEmbeddedEnabled: vi.fn(
+      async (value: boolean) => ({ value }),
+    ) as Mock,
+    setPlayEndingsEnabled: vi.fn(
+      async (value: boolean) => ({ value }),
+    ) as Mock,
+    setPlaySpontaneityEnabled: vi.fn(
+      async (value: boolean) => ({ value }),
+    ) as Mock,
+    setClickableWordsEnabled: vi.fn(
+      async (value: boolean) => ({ value }),
+    ) as Mock,
+    setReadMeButtonEnabled: vi.fn(
+      async (value: boolean) => ({ value }),
+    ) as Mock,
   };
 }
 
@@ -122,6 +156,8 @@ function renderSettingsPanel(
     onPlayTargetDepthChanged?: (n: number) => void;
     currentPlayCadenceSeconds?: number;
     onPlayCadenceSecondsChanged?: (n: number) => void;
+    currentFeatureFlags?: PhaseKFeatureFlags;
+    onFeatureFlagChanged?: (key: PhaseKFeatureFlag, value: boolean) => void;
   } = {},
 ): void {
   render(
@@ -137,6 +173,10 @@ function renderSettingsPanel(
       onPlayCadenceSecondsChanged={
         overrides.onPlayCadenceSecondsChanged ?? (() => {})
       }
+      currentFeatureFlags={
+        overrides.currentFeatureFlags ?? PHASE_K_FEATURE_FLAG_DEFAULTS
+      }
+      onFeatureFlagChanged={overrides.onFeatureFlagChanged ?? (() => {})}
     />,
   );
 }
@@ -206,6 +246,8 @@ describe("SettingsPanel", () => {
         onPlayTargetDepthChanged={() => {}}
         currentPlayCadenceSeconds={30}
         onPlayCadenceSecondsChanged={() => {}}
+        currentFeatureFlags={PHASE_K_FEATURE_FLAG_DEFAULTS}
+        onFeatureFlagChanged={() => {}}
       />,
     );
     unmount();

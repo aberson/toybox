@@ -65,6 +65,31 @@ function stubFetchCapturingAuthCalls(
         headers: { "Content-Type": "application/json" },
       });
     }
+    // Phase K step K2: the kiosk bootstrap parallel-fetches the eight
+    // feature flags after token issuance. Return the spec'd seeded
+    // defaults so the existing PIN-source tests don't 404 on the
+    // bootstrap's new probes. The wire body is ``{value: bool}`` per
+    // flag — seven true + one false (play_spontaneity_enabled). The
+    // dedicated feature-flag bootstrap test below overrides this
+    // when it needs a specific shape.
+    const k2DefaultFlags: Record<string, boolean> = {
+      "/api/settings/jokes-enabled": true,
+      "/api/settings/songs-enabled": true,
+      "/api/settings/play-standalone-enabled": true,
+      "/api/settings/play-embedded-enabled": true,
+      "/api/settings/play-endings-enabled": true,
+      "/api/settings/play-spontaneity-enabled": false,
+      "/api/settings/clickable-words-enabled": true,
+      "/api/settings/read-me-button-enabled": true,
+    };
+    for (const [path, value] of Object.entries(k2DefaultFlags)) {
+      if (url.endsWith(path)) {
+        return new Response(JSON.stringify({ value }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+    }
     // Anything else (e.g. ws upgrades go through a different path; activity
     // refetches don't fire without an envelope) is unexpected for these
     // tests — surface it as 404 so a stray call shows up clearly.

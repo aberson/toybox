@@ -4,11 +4,12 @@ import type { CSSProperties, JSX } from "react";
 import {
   ApiClient,
   ApiError,
+  KIOSK_FEATURE_FLAG_DEFAULTS,
   isAbortError,
   retryWithBackoff,
   withConflictHandler,
 } from "./api";
-import type { Activity } from "./api";
+import type { Activity, KioskFeatureFlag, KioskFeatureFlags } from "./api";
 import type { ChoiceResult } from "./components/ChoiceButton";
 import { KioskPinPrompt } from "./components/KioskPinPrompt";
 import { PersonaAvatar } from "./components/PersonaAvatar";
@@ -202,6 +203,16 @@ export function App(): JSX.Element {
   const [pinPromptVisible, setPinPromptVisible] = useState(false);
   const [pinPromptError, setPinPromptError] = useState<string | null>(null);
   const [bootCounter, setBootCounter] = useState(0);
+  // Phase K step K2: eight parent-controlled feature flags fetched on
+  // mount. Seeded optimistically from KIOSK_FEATURE_FLAG_DEFAULTS
+  // (matching backend migration 0015) so a slow / failed bootstrap
+  // fetch never paints a value the kid wouldn't have seen anyway.
+  // Later K-steps (K9 click-to-read, K12 song/joke step kinds, K13
+  // standalone surface, K14/K15 embedded + spontaneity hooks) consume
+  // these flags via prop drilling — no React context per K2 plan.
+  const [featureFlags, setFeatureFlags] = useState<KioskFeatureFlags>(
+    KIOSK_FEATURE_FLAG_DEFAULTS,
+  );
 
   if (apiRef.current === null) {
     apiRef.current = new ApiClient({
@@ -244,6 +255,52 @@ export function App(): JSX.Element {
         setPinPromptVisible(false);
         setPinPromptError(null);
         useChildStore.getState().setToken(tokenResp);
+        // Phase K step K2: parallel-fetch the eight feature flags
+        // before WS construction. Each rejection is handled
+        // independently (matches the parent App.tsx pattern) so one
+        // bad endpoint doesn't poison the others — the optimistic
+        // defaults stay in place. ``Promise.allSettled`` swallows
+        // aborts as rejected results; ``isAbortError`` filters those
+        // out of the console.warn cadence.
+        const flagKeys: readonly KioskFeatureFlag[] = [
+          "jokes_enabled",
+          "songs_enabled",
+          "play_standalone_enabled",
+          "play_embedded_enabled",
+          "play_endings_enabled",
+          "play_spontaneity_enabled",
+          "clickable_words_enabled",
+          "read_me_button_enabled",
+        ];
+        const flagResults = await Promise.allSettled(
+          flagKeys.map((key) =>
+            api.getFeatureFlag(key, { signal: aborter.signal }),
+          ),
+        );
+        // Mid-bootstrap unmount (StrictMode double-mount, or user
+        // navigates away) surfaces here as a batch of aborts. Bail
+        // explicitly so we don't construct a ws after the cleanup
+        // ran — mirrors the parent App.tsx's ``if (aborter.signal.
+        // aborted) return`` guard after its parallel-fetch.
+        if (!mounted || aborter.signal.aborted) return;
+        const nextFlags: KioskFeatureFlags = { ...KIOSK_FEATURE_FLAG_DEFAULTS };
+        let flagsTouched = false;
+        flagKeys.forEach((key, idx) => {
+          const result = flagResults[idx]!;
+          if (result.status === "fulfilled") {
+            nextFlags[key] = result.value.value;
+            flagsTouched = true;
+          } else if (!isAbortError(result.reason)) {
+            // eslint-disable-next-line no-console
+            console.warn(
+              `feature flag ${key} initial fetch failed, using default`,
+              result.reason,
+            );
+          }
+        });
+        if (flagsTouched) {
+          setFeatureFlags(nextFlags);
+        }
         const ws = new ChildWsClient({
           url: deriveWsUrl(),
           getToken: () => useChildStore.getState().token,
@@ -545,8 +602,25 @@ export function App(): JSX.Element {
     );
   }
 
+  // Phase K step K2: surface the bootstrap'd feature-flag snapshot as
+  // data-* attributes on the root so vitest can assert end-to-end
+  // wiring (code-quality §4 — the bootstrap fetch must visibly land
+  // in component state, not just resolve into the void). Later
+  // K-steps replace these data-* attributes with real prop drilling
+  // into StepCard / ChoiceButton; for K2 they are the test seam that
+  // proves the bootstrap → state pipe is alive.
+  const featureFlagDatasetAttrs: Record<string, string> = {};
+  for (const key of Object.keys(featureFlags) as KioskFeatureFlag[]) {
+    featureFlagDatasetAttrs[`data-flag-${key.replace(/_/g, "-")}`] =
+      featureFlags[key] ? "true" : "false";
+  }
+
   return (
-    <main data-testid="child-root" style={FULL_BLEED_BACKGROUND_STYLE}>
+    <main
+      data-testid="child-root"
+      style={FULL_BLEED_BACKGROUND_STYLE}
+      {...featureFlagDatasetAttrs}
+    >
       <div style={FULL_BLEED_CONTENT_STYLE}>
         {activity === null && (
           <section

@@ -24,10 +24,13 @@ import type {
   ImageGenMode,
   ListeningMode,
   MetricsSnapshot,
+  PhaseKFeatureFlag,
+  PhaseKFeatureFlags,
   PlayCadenceSeconds,
   PlayTargetDepth,
 } from "../api";
 import { BannedThemesSettings } from "./BannedThemesSettings";
+import { PlayFeaturesControls } from "./PlayFeaturesControls";
 import {
   PlayCadenceSecondsControl,
   PlayTargetDepthControl,
@@ -421,6 +424,14 @@ export interface SettingsPanelProps {
     | "setTranscriptRetention"
     | "setPlayTargetDepth"
     | "setPlayCadenceSeconds"
+    | "setJokesEnabled"
+    | "setSongsEnabled"
+    | "setPlayStandaloneEnabled"
+    | "setPlayEmbeddedEnabled"
+    | "setPlayEndingsEnabled"
+    | "setPlaySpontaneityEnabled"
+    | "setClickableWordsEnabled"
+    | "setReadMeButtonEnabled"
   >;
   // Phase I step I3: transcript retention picker source-of-truth. The
   // value lives in App.tsx (fetched once on mount via the
@@ -439,6 +450,13 @@ export interface SettingsPanelProps {
   onPlayTargetDepthChanged: (value: PlayTargetDepth) => void;
   currentPlayCadenceSeconds: number;
   onPlayCadenceSecondsChanged: (value: PlayCadenceSeconds) => void;
+  // Phase K step K2: eight feature flags lifted to App.tsx so the
+  // bootstrap parallel-fetch can seed them once and SettingsPanel can
+  // bubble each PUT response back up. The callback is a single
+  // (key, value) pair so adding a ninth flag is a single-line edit
+  // upstream.
+  currentFeatureFlags: PhaseKFeatureFlags;
+  onFeatureFlagChanged: (key: PhaseKFeatureFlag, value: boolean) => void;
 }
 
 // Settings sub-tab. Renders the three toggle cards + the global
@@ -455,6 +473,8 @@ export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
     onPlayTargetDepthChanged,
     currentPlayCadenceSeconds,
     onPlayCadenceSecondsChanged,
+    currentFeatureFlags,
+    onFeatureFlagChanged,
   } = props;
   const [listeningMode, setListeningMode] = useState<number>(3);
   const [micEnabled, setMicEnabled] = useState<boolean>(true);
@@ -535,6 +555,13 @@ export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
           api={api}
           currentValue={currentPlayCadenceSeconds}
           onValueChanged={onPlayCadenceSecondsChanged}
+        />
+      </div>
+      <div style={{ marginTop: 12 }}>
+        <PlayFeaturesControls
+          api={api}
+          values={currentFeatureFlags}
+          onValueChanged={onFeatureFlagChanged}
         />
       </div>
       <div style={{ marginTop: 12 }}>

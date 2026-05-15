@@ -503,6 +503,28 @@ export interface PlayTargetDepthResponse {
   value: PlayTargetDepth;
 }
 
+// Phase K step K2: parent-controlled feature flags. Canonical types
+// + defaults live in ``../shared/feature_flags`` — both the parent UI
+// and the kiosk import from there so a future ninth flag is a single
+// edit (code-quality §2). The source-of-truth-lock test in
+// ``tests/integration/test_phase_k_feature_flag_lists_agree.py``
+// guards drift against the backend.
+//
+// ``FeatureFlagResponse`` is imported locally (referenced in this
+// file's per-flag ApiClient method bodies) AND re-exported. The
+// remaining types/values are re-export-only since this file doesn't
+// reference them directly — downstream callers (App.tsx,
+// PlayFeaturesControls) import them from ``./api`` for grep-
+// friendliness.
+import type { FeatureFlagResponse } from "../shared/feature_flags";
+
+export type {
+  FeatureFlagResponse,
+  PhaseKFeatureFlag,
+  PhaseKFeatureFlags,
+} from "../shared/feature_flags";
+export { PHASE_K_FEATURE_FLAG_DEFAULTS } from "../shared/feature_flags";
+
 // Phase J step J5: the proposed-activities REST seed. Items are the
 // scrolling-queue rows (newest first, up to backend cap). ``active``
 // is the currently-playing card when ``include_active=true`` was
@@ -1367,6 +1389,194 @@ export class ApiClient {
   ): Promise<PlayCadenceSecondsResponse> {
     return this.request<PlayCadenceSecondsResponse>(
       "/api/settings/play-cadence-seconds",
+      {
+        method: "PUT",
+        body: JSON.stringify({ value }),
+        signal: opts.signal,
+      },
+    );
+  }
+
+  // Phase K step K2: eight parent-controlled boolean feature flags.
+  // Same wire-shape conventions as the play-queue settings — GET is
+  // unauthenticated (household read), PUT requires parent scope, body
+  // is ``{value: boolean}`` in both directions.
+  async getJokesEnabled(
+    opts: RequestOptions = {},
+  ): Promise<FeatureFlagResponse> {
+    return this.request<FeatureFlagResponse>(
+      "/api/settings/jokes-enabled",
+      { method: "GET", signal: opts.signal },
+    );
+  }
+
+  async setJokesEnabled(
+    value: boolean,
+    opts: RequestOptions = {},
+  ): Promise<FeatureFlagResponse> {
+    return this.request<FeatureFlagResponse>(
+      "/api/settings/jokes-enabled",
+      {
+        method: "PUT",
+        body: JSON.stringify({ value }),
+        signal: opts.signal,
+      },
+    );
+  }
+
+  async getSongsEnabled(
+    opts: RequestOptions = {},
+  ): Promise<FeatureFlagResponse> {
+    return this.request<FeatureFlagResponse>(
+      "/api/settings/songs-enabled",
+      { method: "GET", signal: opts.signal },
+    );
+  }
+
+  async setSongsEnabled(
+    value: boolean,
+    opts: RequestOptions = {},
+  ): Promise<FeatureFlagResponse> {
+    return this.request<FeatureFlagResponse>(
+      "/api/settings/songs-enabled",
+      {
+        method: "PUT",
+        body: JSON.stringify({ value }),
+        signal: opts.signal,
+      },
+    );
+  }
+
+  async getPlayStandaloneEnabled(
+    opts: RequestOptions = {},
+  ): Promise<FeatureFlagResponse> {
+    return this.request<FeatureFlagResponse>(
+      "/api/settings/play-standalone-enabled",
+      { method: "GET", signal: opts.signal },
+    );
+  }
+
+  async setPlayStandaloneEnabled(
+    value: boolean,
+    opts: RequestOptions = {},
+  ): Promise<FeatureFlagResponse> {
+    return this.request<FeatureFlagResponse>(
+      "/api/settings/play-standalone-enabled",
+      {
+        method: "PUT",
+        body: JSON.stringify({ value }),
+        signal: opts.signal,
+      },
+    );
+  }
+
+  async getPlayEmbeddedEnabled(
+    opts: RequestOptions = {},
+  ): Promise<FeatureFlagResponse> {
+    return this.request<FeatureFlagResponse>(
+      "/api/settings/play-embedded-enabled",
+      { method: "GET", signal: opts.signal },
+    );
+  }
+
+  async setPlayEmbeddedEnabled(
+    value: boolean,
+    opts: RequestOptions = {},
+  ): Promise<FeatureFlagResponse> {
+    return this.request<FeatureFlagResponse>(
+      "/api/settings/play-embedded-enabled",
+      {
+        method: "PUT",
+        body: JSON.stringify({ value }),
+        signal: opts.signal,
+      },
+    );
+  }
+
+  async getPlayEndingsEnabled(
+    opts: RequestOptions = {},
+  ): Promise<FeatureFlagResponse> {
+    return this.request<FeatureFlagResponse>(
+      "/api/settings/play-endings-enabled",
+      { method: "GET", signal: opts.signal },
+    );
+  }
+
+  async setPlayEndingsEnabled(
+    value: boolean,
+    opts: RequestOptions = {},
+  ): Promise<FeatureFlagResponse> {
+    return this.request<FeatureFlagResponse>(
+      "/api/settings/play-endings-enabled",
+      {
+        method: "PUT",
+        body: JSON.stringify({ value }),
+        signal: opts.signal,
+      },
+    );
+  }
+
+  async getPlaySpontaneityEnabled(
+    opts: RequestOptions = {},
+  ): Promise<FeatureFlagResponse> {
+    return this.request<FeatureFlagResponse>(
+      "/api/settings/play-spontaneity-enabled",
+      { method: "GET", signal: opts.signal },
+    );
+  }
+
+  async setPlaySpontaneityEnabled(
+    value: boolean,
+    opts: RequestOptions = {},
+  ): Promise<FeatureFlagResponse> {
+    return this.request<FeatureFlagResponse>(
+      "/api/settings/play-spontaneity-enabled",
+      {
+        method: "PUT",
+        body: JSON.stringify({ value }),
+        signal: opts.signal,
+      },
+    );
+  }
+
+  async getClickableWordsEnabled(
+    opts: RequestOptions = {},
+  ): Promise<FeatureFlagResponse> {
+    return this.request<FeatureFlagResponse>(
+      "/api/settings/clickable-words-enabled",
+      { method: "GET", signal: opts.signal },
+    );
+  }
+
+  async setClickableWordsEnabled(
+    value: boolean,
+    opts: RequestOptions = {},
+  ): Promise<FeatureFlagResponse> {
+    return this.request<FeatureFlagResponse>(
+      "/api/settings/clickable-words-enabled",
+      {
+        method: "PUT",
+        body: JSON.stringify({ value }),
+        signal: opts.signal,
+      },
+    );
+  }
+
+  async getReadMeButtonEnabled(
+    opts: RequestOptions = {},
+  ): Promise<FeatureFlagResponse> {
+    return this.request<FeatureFlagResponse>(
+      "/api/settings/read-me-button-enabled",
+      { method: "GET", signal: opts.signal },
+    );
+  }
+
+  async setReadMeButtonEnabled(
+    value: boolean,
+    opts: RequestOptions = {},
+  ): Promise<FeatureFlagResponse> {
+    return this.request<FeatureFlagResponse>(
+      "/api/settings/read-me-button-enabled",
       {
         method: "PUT",
         body: JSON.stringify({ value }),

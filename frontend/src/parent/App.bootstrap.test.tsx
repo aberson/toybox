@@ -222,6 +222,25 @@ function stubFullAuthFetch(opts: FetchOpts = {}): Mock {
         active: opts.proposedActive ?? null,
       });
     }
+    // Phase K step K2: the eight feature-flag settings GETs joined
+    // the parallel bootstrap. Match each kebab path and return the
+    // spec'd seeded-default body shape ``{value: bool}``. ``true`` for
+    // seven, ``false`` for play-spontaneity-enabled.
+    const featureFlagDefaults: Record<string, boolean> = {
+      "/api/settings/jokes-enabled": true,
+      "/api/settings/songs-enabled": true,
+      "/api/settings/play-standalone-enabled": true,
+      "/api/settings/play-embedded-enabled": true,
+      "/api/settings/play-endings-enabled": true,
+      "/api/settings/play-spontaneity-enabled": false,
+      "/api/settings/clickable-words-enabled": true,
+      "/api/settings/read-me-button-enabled": true,
+    };
+    for (const [path, value] of Object.entries(featureFlagDefaults)) {
+      if (url.endsWith(path)) {
+        return respondWithDelay({ value });
+      }
+    }
     // Catch-all for any other initial fetch the bootstrap fires.
     return new Response(JSON.stringify({ items: [], next: null }), {
       status: 200,

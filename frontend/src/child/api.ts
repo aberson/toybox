@@ -99,6 +99,65 @@ export interface ParentTokenResponse {
   subject: { kind: "parent" };
 }
 
+// Phase K step K2: parent-controlled feature flags consumed by the
+// kiosk. Types + defaults live in ``../shared/feature_flags`` — both
+// the parent UI and the kiosk import from there so a future ninth
+// flag is a single edit (code-quality §2). The source-of-truth-lock
+// test in ``tests/integration/test_phase_k_feature_flag_lists_agree.py``
+// guards drift against the backend.
+//
+// ``KioskFeatureFlag`` / ``KioskFeatureFlags`` are re-exported aliases
+// so kiosk call sites stay grep-friendly (the kiosk-leaning name
+// remains in the kiosk module) while the underlying type IS the
+// shared declaration — TS will fail the build at compile time if
+// they ever drift.
+//
+// We BOTH ``import type`` (so the names resolve inside this file's
+// body — the ``getFeatureFlag`` method references both
+// ``KioskFeatureFlag`` and ``FeatureFlagResponse``) AND re-export.
+import type {
+  FeatureFlagResponse,
+  PhaseKFeatureFlag,
+  PhaseKFeatureFlags,
+} from "../shared/feature_flags";
+
+export type {
+  FeatureFlagResponse,
+  PhaseKFeatureFlag,
+  PhaseKFeatureFlags,
+} from "../shared/feature_flags";
+export { PHASE_K_FEATURE_FLAG_DEFAULTS } from "../shared/feature_flags";
+
+// Kiosk-facing aliases — identical type, kept for grep-friendliness
+// at kiosk call sites. They resolve to the shared declarations.
+export type KioskFeatureFlag = PhaseKFeatureFlag;
+export type KioskFeatureFlags = PhaseKFeatureFlags;
+
+// Backwards-compat re-export under the kiosk-leaning name so existing
+// kiosk callers keep working. Resolves to the same object as the
+// parent UI's ``PHASE_K_FEATURE_FLAG_DEFAULTS`` (literally the same
+// reference at runtime — one source of truth).
+export { PHASE_K_FEATURE_FLAG_DEFAULTS as KIOSK_FEATURE_FLAG_DEFAULTS } from "../shared/feature_flags";
+
+// Kiosk-only routing concern: the kebab-case URL paths used by the
+// kiosk's bootstrap fetcher. Not part of shared/ because the parent
+// UI's ApiClient embeds these paths in per-flag setter methods rather
+// than routing through a flag-keyed dict; this lookup is a kiosk-only
+// pattern. Drift is guarded by the source-of-truth-lock test which
+// reads paths from the backend per-setting modules.
+export const KIOSK_FEATURE_FLAG_PATHS: Readonly<
+  Record<KioskFeatureFlag, string>
+> = {
+  jokes_enabled: "/api/settings/jokes-enabled",
+  songs_enabled: "/api/settings/songs-enabled",
+  play_standalone_enabled: "/api/settings/play-standalone-enabled",
+  play_embedded_enabled: "/api/settings/play-embedded-enabled",
+  play_endings_enabled: "/api/settings/play-endings-enabled",
+  play_spontaneity_enabled: "/api/settings/play-spontaneity-enabled",
+  clickable_words_enabled: "/api/settings/clickable-words-enabled",
+  read_me_button_enabled: "/api/settings/read-me-button-enabled",
+};
+
 // Step 21: ``POST /api/auth/parent`` is now PIN-gated. The kiosk does
 // not own the PIN and will get its token from the parent UI via the
 // kiosk pairing flow (``POST /api/auth/pair``). Until that landing
@@ -229,6 +288,23 @@ export class ApiClient {
       body: JSON.stringify(body),
       signal: opts.signal,
     });
+  }
+
+  // Phase K step K2: kiosk bootstrap fetcher for one of the eight
+  // feature flags. Wire shape is identical for all eight, so a single
+  // method indexed by ``KioskFeatureFlag`` keeps the kiosk's
+  // ApiClient narrow (the parent UI's ApiClient exposes a per-flag
+  // method per the per-setting-module convention; the kiosk has no
+  // writers, only reads). One source of truth: the path comes from
+  // ``KIOSK_FEATURE_FLAG_PATHS`` — no per-call-site string literal.
+  async getFeatureFlag(
+    flag: KioskFeatureFlag,
+    opts: RequestOptions = {},
+  ): Promise<FeatureFlagResponse> {
+    return this.request<FeatureFlagResponse>(
+      KIOSK_FEATURE_FLAG_PATHS[flag],
+      { method: "GET", signal: opts.signal },
+    );
   }
 
   async getActivity(id: string, opts: RequestOptions = {}): Promise<Activity> {
