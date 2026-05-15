@@ -8,6 +8,10 @@ __pycache__/
 venv/
 env/
 .uv/
+# Coqui TTS one-shot render venv — populated by scripts/generate_song_corpus.py.
+# Multi-GB model weights; kept out of git per the script's docstring rationale.
+.coqui-venv/
+.coqui-venv-*/
 *.egg-info/
 .pytest_cache/
 .mypy_cache/
