@@ -29,14 +29,19 @@ from toybox.activities.content_resolver import (
     SAFE_DEFAULT_TEMPLATE,
     TOYS_LIMIT_ENV,
     ChildProfileRow,
+    GenericDescriptor,
     ResolvedChildren,
+    ResolvedToy,
     aggregate_child_constraints,
     apply_banned_themes_filter,
     build_claude_directive,
     resolve_child_profiles,
+    resolve_role_slots,
     resolve_rooms,
     resolve_toys,
 )
+from toybox.activities.generic_descriptors import GENERIC_DESCRIPTORS
+from toybox.activities.roles import Role
 from toybox.db.connection import connect
 from toybox.db.migrations import run_migrations
 
@@ -648,3 +653,325 @@ def test_directive_ignores_non_string_entries() -> None:
     skipped rather than crashing on ``.strip()``."""
     out = build_claude_directive(["scary", None, 42, "loud"], None)  # type: ignore[list-item]
     assert out == "Do NOT include any of: loud, scary."
+
+
+# ---------------------------------------------------------------------------
+# Phase K Step K4 — resolve_role_slots
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class _StubPersona:
+    """Minimal :class:`_PersonaLike` stub for K4 tests.
+
+    Plain frozen dataclass — the picker's :class:`_PersonaLike` protocol
+    only requires the two attributes (``id`` + ``role_weights``), so the
+    test gets to avoid pulling in the SQLite-backed loader / Pydantic
+    ``RoleWeights`` machinery.
+    """
+
+    id: str
+    role_weights: dict[str, float]
+
+
+@dataclass(frozen=True)
+class _StubTemplateWithRoles:
+    """Minimal template-shape stub for K4 tests.
+
+    The picker reads ``id`` + ``required_roles`` + ``optional_roles``
+    via ``getattr``, so a small dataclass is enough — keeps the test
+    free of the full Pydantic ``Template`` model and its 15+ required
+    fields.
+    """
+
+    id: str
+    required_roles: tuple[Role, ...] = ()
+    optional_roles: tuple[Role, ...] = ()
+
+
+def _toy(toy_id: str, display_name: str | None = None) -> ResolvedToy:
+    return ResolvedToy(id=toy_id, display_name=display_name or toy_id.upper())
+
+
+def test_resolve_role_slots_role_enum_is_identity_locked() -> None:
+    """code-quality.md §2: tests use ``is`` on at least one Role member
+    to lock the single-source-of-truth import (no shadow re-declaration).
+
+    Catches a future regression that re-defines ``Role`` locally under
+    ``content_resolver``; the new local enum would compare ``==`` but
+    NOT ``is`` against the canonical one.
+    """
+    from toybox.activities.content_resolver import Role as ImportedRole
+
+    assert ImportedRole.quest_giver is Role.quest_giver
+    assert ImportedRole is Role
+
+
+def test_resolve_role_slots_empty_template_returns_empty_dict() -> None:
+    """A template with neither required nor optional roles produces
+    an empty dict — backward-compat with the 200 shipped branching
+    templates that omit role declarations entirely."""
+    tpl = _StubTemplateWithRoles(id="t1")
+    persona = _StubPersona(id="p1", role_weights={})
+    out = resolve_role_slots(tpl, [_toy("a")], persona, seed=42)
+    assert out == {}
+
+
+def test_resolve_role_slots_required_only_assigns_all() -> None:
+    """Two required roles + two toys → every role filled with a real
+    toy, no GenericDescriptor falls back. ``quest_giver`` and
+    ``guide_mentor`` are valid :class:`Role` members."""
+    tpl = _StubTemplateWithRoles(
+        id="t1",
+        required_roles=(Role.quest_giver, Role.guide_mentor),
+    )
+    persona = _StubPersona(id="p1", role_weights={})
+    out = resolve_role_slots(tpl, [_toy("a"), _toy("b")], persona, seed=42)
+    assert out is not None
+    assert set(out.keys()) == {Role.quest_giver.value, Role.guide_mentor.value}
+    for v in out.values():
+        assert isinstance(v, ResolvedToy)
+    # Distinct-toy invariant: no toy fills two roles.
+    picked_ids = {v.id for v in out.values() if isinstance(v, ResolvedToy)}
+    assert len(picked_ids) == 2
+
+
+def test_resolve_role_slots_determinism_same_inputs_same_output() -> None:
+    """Same ``(template_id, sorted(toy_ids), persona_id, seed)`` →
+    byte-identical output across repeated calls."""
+    tpl = _StubTemplateWithRoles(
+        id="t1",
+        required_roles=(Role.quest_giver,),
+        optional_roles=(Role.guide_mentor, Role.sidekick),
+    )
+    persona = _StubPersona(id="wiz", role_weights={"quest_giver": 1.5})
+    toys = [_toy("alpha"), _toy("bravo"), _toy("charlie")]
+
+    first = resolve_role_slots(tpl, toys, persona, seed=42)
+    second = resolve_role_slots(tpl, toys, persona, seed=42)
+    third = resolve_role_slots(tpl, list(reversed(toys)), persona, seed=42)
+
+    assert first == second
+    # Caller-order on ``available_toys`` is NOT part of the determinism
+    # key; the picker sorts internally.
+    assert first == third
+
+
+def test_resolve_role_slots_determinism_persona_id_matters() -> None:
+    """Two personas with identical ``role_weights`` but distinct ids
+    produce distinct casts at the same seed — persona_id is part of
+    the determinism fingerprint per the K4 spec."""
+    tpl = _StubTemplateWithRoles(
+        id="t1",
+        required_roles=(Role.quest_giver,),
+        optional_roles=(Role.guide_mentor,),
+    )
+    pa = _StubPersona(id="alice", role_weights={})
+    pb = _StubPersona(id="bob", role_weights={})
+    toys = [_toy("t01"), _toy("t02"), _toy("t03"), _toy("t04")]
+
+    out_a = resolve_role_slots(tpl, toys, pa, seed=42)
+    out_b = resolve_role_slots(tpl, toys, pb, seed=42)
+
+    # Same shape (same role keys) but at least one role's pick differs
+    # — guaranteed by the deterministic seed mixing persona_id.
+    assert out_a is not None
+    assert out_b is not None
+    assert out_a.keys() == out_b.keys()
+    assert out_a != out_b
+
+
+def test_resolve_role_slots_persona_weight_biases_picks_across_seeds() -> None:
+    """Persona with ``role_weights={"quest_giver": 10.0}`` biases the
+    pick toward the sorted-first toy across an explicit list of seeds.
+
+    The K4 spec says the persona's role-weights "bias the normalized
+    distribution". With a heavy weight (10.0) the picker should
+    pick the sorted-first toy id more often than the other across an
+    enumerated seed range — no actual RNG sampling in the test, just
+    a deterministic enumeration.
+    """
+    tpl = _StubTemplateWithRoles(
+        id="t1",
+        required_roles=(Role.quest_giver,),
+    )
+    biased = _StubPersona(id="biased", role_weights={"quest_giver": 10.0})
+    toys = [_toy("aa"), _toy("zz")]  # Sorted-first id is "aa".
+
+    seeds = list(range(50))
+    aa_wins = 0
+    zz_wins = 0
+    for s in seeds:
+        out = resolve_role_slots(tpl, toys, biased, seed=s)
+        assert out is not None
+        picked = out[Role.quest_giver.value]
+        assert isinstance(picked, ResolvedToy)
+        if picked.id == "aa":
+            aa_wins += 1
+        else:
+            zz_wins += 1
+    # With weight 10.0 vs 1.0, the sorted-first ("aa") candidate gets
+    # ~10/11 of the probability mass. Across 50 deterministic seeds
+    # the bias is dominant — pin a strict majority threshold.
+    assert aa_wins > zz_wins
+    assert aa_wins >= 35, (
+        f"expected dominant bias for sorted-first toy, got aa={aa_wins} zz={zz_wins}"
+    )
+
+
+def test_resolve_role_slots_uniform_when_no_weights() -> None:
+    """A persona with empty ``role_weights`` falls back to uniform.
+
+    The deterministic seed still produces a stable answer per seed,
+    but across enumerated seeds neither candidate dominates by 4:1.
+    """
+    tpl = _StubTemplateWithRoles(
+        id="t1",
+        required_roles=(Role.quest_giver,),
+    )
+    neutral = _StubPersona(id="neutral", role_weights={})
+    toys = [_toy("aa"), _toy("zz")]
+    aa_wins = 0
+    for s in range(50):
+        out = resolve_role_slots(tpl, toys, neutral, seed=s)
+        assert out is not None
+        picked = out[Role.quest_giver.value]
+        assert isinstance(picked, ResolvedToy)
+        if picked.id == "aa":
+            aa_wins += 1
+    zz_wins = 50 - aa_wins
+    # Roughly 50/50 — neither side has overwhelming dominance.
+    assert 10 <= aa_wins <= 40, f"expected ~uniform split, got aa={aa_wins} zz={zz_wins}"
+
+
+def test_resolve_role_slots_required_roles_exceeds_pool_returns_none() -> None:
+    """Eligibility filter: more required roles than toys → ``None``.
+
+    Mirrors :func:`toybox.activities.generator._pick_toy_entry`'s
+    "return None on empty pool" precedent; the codebase does not have
+    a dedicated eligibility-exception class for this case.
+    """
+    tpl = _StubTemplateWithRoles(
+        id="t1",
+        required_roles=(Role.quest_giver, Role.guide_mentor, Role.sidekick),
+    )
+    persona = _StubPersona(id="p1", role_weights={})
+    out = resolve_role_slots(tpl, [_toy("only_one")], persona, seed=0)
+    assert out is None
+
+
+def test_resolve_role_slots_required_roles_equal_pool_works() -> None:
+    """Edge case of the eligibility gate: required-count == toy-count
+    is eligible (every required role gets exactly one toy, no slack
+    for optional roles)."""
+    tpl = _StubTemplateWithRoles(
+        id="t1",
+        required_roles=(Role.quest_giver, Role.guide_mentor),
+        optional_roles=(Role.sidekick,),
+    )
+    persona = _StubPersona(id="p1", role_weights={})
+    toys = [_toy("a"), _toy("b")]
+    out = resolve_role_slots(tpl, toys, persona, seed=0)
+    assert out is not None
+    # Required roles filled by toys.
+    assert isinstance(out[Role.quest_giver.value], ResolvedToy)
+    assert isinstance(out[Role.guide_mentor.value], ResolvedToy)
+    # Optional role falls back to GENERIC_DESCRIPTORS (no toys left).
+    assert isinstance(out[Role.sidekick.value], GenericDescriptor)
+
+
+def test_resolve_role_slots_optional_roles_fall_back_to_generic_descriptors() -> None:
+    """When optional roles outnumber the leftover toy pool, the
+    overflow falls back to :data:`GENERIC_DESCRIPTORS`."""
+    tpl = _StubTemplateWithRoles(
+        id="t1",
+        required_roles=(Role.quest_giver,),
+        optional_roles=(Role.guide_mentor, Role.sidekick),
+    )
+    persona = _StubPersona(id="p1", role_weights={})
+    # Only one toy → required quest_giver gets it; both optionals fall back.
+    out = resolve_role_slots(tpl, [_toy("only")], persona, seed=0)
+    assert out is not None
+    assert isinstance(out[Role.quest_giver.value], ResolvedToy)
+    assert out[Role.quest_giver.value].id == "only"  # type: ignore[union-attr]
+    guide = out[Role.guide_mentor.value]
+    side = out[Role.sidekick.value]
+    assert isinstance(guide, GenericDescriptor)
+    assert isinstance(side, GenericDescriptor)
+    # The descriptor strings come from GENERIC_DESCRIPTORS verbatim —
+    # single-source-of-truth (no re-declared role names in the picker).
+    assert guide.display_name == GENERIC_DESCRIPTORS["guide_mentor"]
+    assert side.display_name == GENERIC_DESCRIPTORS["sidekick"]
+
+
+def test_resolve_role_slots_tie_break_alphabetical_on_toy_id() -> None:
+    """When the weighted draw collapses to a deterministic pick, the
+    tie-break is the sorted-first toy id.
+
+    With a single role and a neutral persona, the seed=0 draw on a
+    sorted pool of {bbb, aaa, ccc} → "aaa" wins (sorted-first under
+    enough seeds to anchor the contract).
+    """
+    tpl = _StubTemplateWithRoles(
+        id="t1",
+        required_roles=(Role.quest_giver,),
+    )
+    # Heavy persona weight collapses the distribution onto the
+    # sorted-first id deterministically.
+    biased = _StubPersona(id="biased", role_weights={"quest_giver": 100.0})
+    toys = [_toy("zzz"), _toy("aaa"), _toy("mmm")]  # Out-of-order input.
+    out = resolve_role_slots(tpl, toys, biased, seed=0)
+    assert out is not None
+    picked = out[Role.quest_giver.value]
+    assert isinstance(picked, ResolvedToy)
+    # Sorted-first id under ASC order is "aaa" — picker normalises
+    # the input order before sampling.
+    assert picked.id == "aaa"
+
+
+def test_resolve_role_slots_no_toy_used_twice() -> None:
+    """A single cast must not assign the same toy to two roles —
+    mirrors the K3 distinct-toy-ceiling intent at runtime."""
+    tpl = _StubTemplateWithRoles(
+        id="t1",
+        required_roles=(Role.quest_giver, Role.guide_mentor, Role.sidekick),
+    )
+    persona = _StubPersona(id="p1", role_weights={})
+    toys = [_toy("a"), _toy("b"), _toy("c")]
+    out = resolve_role_slots(tpl, toys, persona, seed=7)
+    assert out is not None
+    ids = [v.id for v in out.values() if isinstance(v, ResolvedToy)]
+    assert len(ids) == 3
+    assert len(set(ids)) == 3  # all distinct
+
+
+def test_resolve_role_slots_unknown_role_name_in_weights_ignored() -> None:
+    """A persona with a stale / typo'd role-weights key (not a member
+    of :class:`Role`) must NOT crash the picker — it falls through to
+    the uniform branch for the affected roles."""
+    tpl = _StubTemplateWithRoles(
+        id="t1",
+        required_roles=(Role.quest_giver,),
+    )
+    # "wizard_helper" is not a Role member; the picker silently
+    # ignores unknown keys.
+    persona = _StubPersona(
+        id="p1",
+        role_weights={"wizard_helper": 10.0, "quest_giver": 1.0},
+    )
+    out = resolve_role_slots(tpl, [_toy("only")], persona, seed=0)
+    assert out is not None
+    assert out[Role.quest_giver.value].id == "only"  # type: ignore[union-attr]
+
+
+def test_resolve_role_slots_generic_descriptor_has_no_toy_id() -> None:
+    """The :class:`GenericDescriptor` discriminator: it has no ``id``
+    attribute, so the caller's :class:`ResolvedToy` / descriptor union
+    pattern-match on ``hasattr(v, 'id')`` (or ``isinstance(v,
+    ResolvedToy)``) sees them distinctly."""
+    descriptor = GenericDescriptor(display_name="a friendly stranger")
+    assert not hasattr(descriptor, "id")
+    assert descriptor.kind == "generic_descriptor"
+    # ``display_name`` is the substitution-time field, mirroring the
+    # ResolvedToy.display_name shape.
+    assert descriptor.display_name == "a friendly stranger"

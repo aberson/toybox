@@ -62,14 +62,18 @@ When an activity has more than one ``child_id``:
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
+import random
 import sqlite3
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Final, Literal, cast
+from typing import Final, Literal, Protocol, cast
 
 from ..core.banned_themes import current_banned_themes_global
+from .generic_descriptors import GENERIC_DESCRIPTORS
+from .roles import Role
 
 _logger = logging.getLogger(__name__)
 
@@ -612,6 +616,335 @@ def build_claude_directive(
     return "\n".join(lines)
 
 
+# ---------------------------------------------------------------------------
+# Phase K Step K4 — role slot-fill engine
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class GenericDescriptor:
+    """Fallback filler for an unfilled ``optional_roles`` slot.
+
+    Returned by :func:`resolve_role_slots` when the toy pool is exhausted
+    before every optional role has been assigned a real toy. The
+    ``display_name`` is the string from
+    :data:`toybox.activities.generic_descriptors.GENERIC_DESCRIPTORS`
+    for that role and lands in the rendered step body via the standard
+    ``{role_name}`` substitution path.
+
+    The ``kind`` discriminator literal distinguishes this from
+    :class:`ResolvedToy` for callers that pattern-match on the union
+    type; the absence of an ``id`` field is the other obvious tag
+    (``GenericDescriptor`` is not a row in the ``toys`` table).
+    """
+
+    display_name: str
+    kind: Literal["generic_descriptor"] = "generic_descriptor"
+
+
+class _PersonaLike(Protocol):
+    """Minimal persona shape needed by :func:`resolve_role_slots`.
+
+    The slot-fill engine reads two attributes:
+
+    * ``id`` — string id, mixed into the deterministic seed so two
+      personas with the same ``role_weights`` but distinct ids produce
+      distinct casts.
+    * ``role_weights`` — mapping ``{role_name: float}``. Keys SHOULD be
+      :class:`Role` member values (lowercase snake_case); unknown keys
+      are silently ignored at picking time so a stale persona JSON
+      doesn't crash propose. Empty mapping → uniform pick across the
+      candidate pool.
+
+    A Protocol (not a concrete dataclass) so the call site can pass
+    either a Pydantic persona model, a sqlite Row-backed object, or a
+    plain dataclass — anything with the two attrs.
+    """
+
+    @property
+    def id(self) -> str: ...
+
+    @property
+    def role_weights(self) -> Mapping[str, float]: ...
+
+
+# The role-slot dict's value type. Exported on the module surface so
+# downstream consumers (K5's render path, K7's parent UI serializer)
+# can name the union directly.
+RoleSlotValue = ResolvedToy | GenericDescriptor
+
+
+def _seed_role_picks(
+    template_id: str,
+    available_toy_ids: Sequence[str],
+    persona_id: str,
+    seed: int,
+) -> random.Random:
+    """Build a :class:`random.Random` seeded on the full input fingerprint.
+
+    The fingerprint is the sha-256 of a canonical string built from
+    ``(template_id, sorted(available_toy_ids), persona_id, seed)``. Sorting
+    the toy ids inside the fingerprint matches the determinism contract
+    documented on :func:`resolve_role_slots` — caller-order on
+    ``available_toys`` does NOT change the output.
+
+    A fresh seeded :class:`random.Random` per call keeps the picker
+    independent of any caller-supplied generator state; consumers can
+    use the function from inside another seeded RNG without worrying
+    about consuming draws from the wrong stream.
+    """
+    canonical = "|".join(
+        [
+            template_id,
+            ",".join(sorted(available_toy_ids)),
+            persona_id,
+            str(int(seed)),
+        ]
+    )
+    digest = hashlib.sha256(canonical.encode("utf-8")).digest()
+    # Use the first 8 bytes of the digest as a 64-bit seed — plenty of
+    # entropy for the small numbers of draws the slot-fill engine makes
+    # per call (≤ 10 roles in v1).
+    return random.Random(int.from_bytes(digest[:8], "big", signed=False))
+
+
+def _pick_weighted(
+    candidates: Sequence[ResolvedToy],
+    weight_for_role: float | None,
+    rng: random.Random,
+) -> ResolvedToy:
+    """Pick one toy from ``candidates`` weighted by the role's persona bias.
+
+    Semantics per documentation/phase-k-plan.md §6:
+
+    * ``weight_for_role`` is the persona's relative preference for this
+      role (e.g. wizard.json: ``quest_giver: 1.5``).
+    * Within a single role slot, the persona's preference for the role
+      maps to a bias toward the sorted-first candidate id — the
+      "primary" toy. With no per-toy role-affinity data in v1, this is
+      the only signal available; the alphabetical tie-break on ``id``
+      (per the K4 spec) is the deterministic-first index.
+    * Concrete distribution: candidate at sorted-index 0 gets
+      ``max(weight_for_role, 1.0)`` mass; every other candidate gets
+      ``1.0``. ``random.Random.choices`` normalizes the sum to 1.0 for
+      us.
+    * When ``weight_for_role`` is ``None`` / ``0`` / negative, the
+      distribution collapses to uniform (every candidate gets 1.0).
+
+    ``candidates`` MUST be pre-sorted by ``id`` ASC so the bias
+    target is deterministic across calls.
+
+    Caller is responsible for ensuring ``candidates`` is non-empty —
+    this helper is a building block, not an entry point.
+    """
+    if not candidates:
+        raise ValueError("_pick_weighted: candidates is empty (caller bug)")
+    if len(candidates) == 1:
+        # No actual choice — short-circuit so the RNG stream doesn't
+        # consume a draw on a one-element pool. The next role's draw
+        # is therefore unaffected by the size of the previous role's
+        # one-element pool, which keeps tests that compose multiple
+        # roles tractable.
+        return candidates[0]
+    if weight_for_role is None or weight_for_role <= 0:
+        return rng.choice(list(candidates))
+    # Bias mass: first candidate gets the persona weight (≥1.0), rest
+    # get 1.0. Uniform when weight <= 1.0 since both masses become
+    # equal. ``random.Random.choices`` normalizes the weights for us.
+    primary_mass = max(weight_for_role, 1.0)
+    masses: list[float] = [primary_mass] + [1.0] * (len(candidates) - 1)
+    picked_list = rng.choices(list(candidates), weights=masses, k=1)
+    return picked_list[0]
+
+
+def resolve_role_slots(
+    template: object,
+    available_toys: Sequence[ResolvedToy],
+    persona: _PersonaLike,
+    seed: int,
+) -> dict[str, RoleSlotValue] | None:
+    """Assign one toy or :class:`GenericDescriptor` per declared template role.
+
+    Phase K Step K4 entry point. Walks the template's ``required_roles``
+    then ``optional_roles`` (both sorted by :class:`Role` member value
+    for determinism) and assigns each one either:
+
+    * A :class:`ResolvedToy` from ``available_toys`` (no toy is used
+      twice within a single call — a toy assigned to ``quest_giver``
+      will not also fill ``hero``).
+    * A :class:`GenericDescriptor` from
+      :data:`toybox.activities.generic_descriptors.GENERIC_DESCRIPTORS`
+      when the toy pool is exhausted before every optional role is
+      filled. Required roles MUST be filled by a real toy — see the
+      eligibility filter below.
+
+    Args:
+        template: A :class:`toybox.activities.models.Template` (or any
+            object exposing ``id``, ``required_roles``, ``optional_roles``
+            attributes — the picker only reads those three). Untyped on
+            purpose so the K5 wire-up can pass either the Pydantic model
+            or the lightweight generator-side dataclass without an
+            import dance.
+        available_toys: Pool of toys the catalog resolver returned. Order
+            does NOT matter — the picker sorts internally by ``id`` ASC
+            for the determinism contract.
+        persona: Object exposing ``id`` (str) and ``role_weights``
+            (mapping ``{role_name: float}``). See :class:`_PersonaLike`.
+        seed: Integer seed; same ``(template_id, sorted(available_toy_ids),
+            persona_id, seed)`` MUST produce byte-identical output.
+
+    Returns:
+        A dict keyed by :class:`Role` member *value* (e.g. ``"quest_giver"``)
+        whose values are either a :class:`ResolvedToy` (real catalog
+        pick) or a :class:`GenericDescriptor` (fallback flavor string).
+        Returns ``None`` when ``len(required_roles) > len(available_toys)``
+        — i.e. the template is not eligible for this dispatch and the
+        caller (K5's propose path) should skip it / re-pick. Mirrors the
+        ``return None on empty pool`` pattern from
+        :func:`toybox.activities.generator._pick_toy_entry`; the
+        codebase does not have a dedicated eligibility-exception class
+        for this case.
+
+    Backward-compat: when ``template.required_roles`` and
+    ``template.optional_roles`` are both empty (the shipping 200
+    branching templates), returns an empty dict. The legacy ``{toy}``
+    substitution path is unaffected — this is an additive helper for
+    K5 to wire in, not a replacement for the existing substitutor.
+    """
+    template_id = str(getattr(template, "id", ""))
+    required_roles: Sequence[object] = tuple(getattr(template, "required_roles", ()) or ())
+    optional_roles: Sequence[object] = tuple(getattr(template, "optional_roles", ()) or ())
+
+    # ----- eligibility gate ------------------------------------------------
+    # Mirrors the K3 validator's distinct-toy-ceiling reasoning at runtime:
+    # a template that NEEDS 3 quest-giver/hero/villain toys cannot run on
+    # a 2-toy household. Returning ``None`` lets the caller skip + re-pick.
+    # The "return None on empty pool" precedent is
+    # ``generator._pick_toy_entry`` — the codebase does not have a
+    # dedicated eligibility-exception class for "template doesn't fit".
+    if len(required_roles) > len(available_toys):
+        return None
+
+    # Build the deterministic RNG once. The fingerprint includes the
+    # persona id so two personas with different role_weights produce
+    # different casts even at the same seed; the sorted toy-id list is
+    # part of the canonical key so caller-order on ``available_toys``
+    # never changes the output.
+    available_toy_ids = [t.id for t in available_toys]
+    rng = _seed_role_picks(template_id, available_toy_ids, persona.id, seed)
+
+    # Process roles in a deterministic order: required first (sorted by
+    # role-name value), then optional (also sorted). The plan calls
+    # this "deterministic given (template_id, sorted_toys, persona_id,
+    # seed)" — sorted role-name iteration is the order in which draws
+    # are made, so flipping required-role order in a template's JSON
+    # cannot perturb subsequent draws.
+    role_weights = persona.role_weights or {}
+
+    # Pool of toys still available (no toy fills two roles in the same
+    # cast — mirrors the K3 distinct-toy-ceiling intent). Sorted by
+    # ``id`` ASC so the tie-break contract holds: when weights collapse
+    # to uniform, ``rng.choice`` over a sorted list is byte-stable.
+    remaining_toys: list[ResolvedToy] = sorted(available_toys, key=lambda t: t.id)
+
+    assignments: dict[str, RoleSlotValue] = {}
+
+    # Required: every entry MUST be filled by a real toy. We already
+    # gated ``len(required_roles) > len(available_toys)`` above, so the
+    # pool size is guaranteed adequate.
+    for role in _ordered_roles(required_roles):
+        weight = _coerce_weight(role_weights.get(role.value))
+        picked = _pick_weighted(remaining_toys, weight, rng)
+        assignments[role.value] = picked
+        remaining_toys = [t for t in remaining_toys if t.id != picked.id]
+
+    # Optional: fill from the pool while toys remain; once exhausted,
+    # fall back to GENERIC_DESCRIPTORS for the rest. GENERIC_DESCRIPTORS
+    # has one string per role — alphabetical tie-break is trivially the
+    # single value, but the lookup is deterministic regardless.
+    for role in _ordered_roles(optional_roles):
+        if remaining_toys:
+            weight = _coerce_weight(role_weights.get(role.value))
+            picked = _pick_weighted(remaining_toys, weight, rng)
+            assignments[role.value] = picked
+            remaining_toys = [t for t in remaining_toys if t.id != picked.id]
+        else:
+            descriptor_text = GENERIC_DESCRIPTORS.get(role.value)
+            if descriptor_text is None:
+                # Defensive: every Role member is keyed in
+                # GENERIC_DESCRIPTORS (taxonomy-completeness test in
+                # tests/unit/test_roles.py enforces this). A miss here
+                # would indicate a future Role added without updating
+                # the descriptor table — surface visibly rather than
+                # silently dropping the slot.
+                _logger.warning(
+                    "resolve_role_slots: no GENERIC_DESCRIPTORS entry for role %r; "
+                    "skipping optional slot in template %r",
+                    role.value,
+                    template_id,
+                )
+                continue
+            assignments[role.value] = GenericDescriptor(display_name=descriptor_text)
+
+    return assignments
+
+
+def _ordered_roles(raw_roles: Sequence[object]) -> list[Role]:
+    """Coerce a sequence of ``Role``-or-str entries to a sorted ``list[Role]``.
+
+    Templates parsed via Pydantic carry :class:`Role` members directly;
+    the lightweight generator-side ``_Template`` dataclass carries the
+    raw JSON strings. Both shapes flow into :func:`resolve_role_slots`,
+    so the picker normalises here. Unknown values (a hand-built dict
+    with a typo) are dropped with a WARNING — the picker doesn't crash
+    on stale data, but the operator sees the issue.
+    """
+    out: list[Role] = []
+    for entry in raw_roles:
+        if isinstance(entry, Role):
+            out.append(entry)
+            continue
+        if isinstance(entry, str):
+            try:
+                out.append(Role(entry))
+            except ValueError:
+                _logger.warning("resolve_role_slots: ignoring unknown role name %r", entry)
+                continue
+            continue
+        _logger.warning(
+            "resolve_role_slots: ignoring non-role entry %r (type %s)",
+            entry,
+            type(entry).__name__,
+        )
+    # Sorted by the member value (lowercase snake_case) for determinism.
+    return sorted(out, key=lambda r: r.value)
+
+
+def _coerce_weight(raw: object) -> float | None:
+    """Best-effort numeric coercion for a persona ``role_weights`` value.
+
+    The persona JSON shape is gated by :class:`RoleWeights` at the load
+    boundary, but the picker accepts the raw mapping too (tests, future
+    in-memory callers) so it tolerates a non-numeric value by treating
+    it as "no preference" (uniform). A negative value is also clamped
+    to "no preference" — the picker's contract is 0+, and negative
+    weights are meaningless.
+    """
+    if raw is None:
+        return None
+    if isinstance(raw, bool):
+        # Python's ``bool`` is a subtype of ``int``; an accidental
+        # ``True``/``False`` weight would otherwise coerce to 1.0/0.0
+        # which silently bypasses the "no preference" branch.
+        return None
+    if isinstance(raw, int | float):
+        weight = float(raw)
+        if weight <= 0:
+            return None
+        return weight
+    return None
+
+
 __all__ = [
     "DEFAULT_ROOMS_LIMIT",
     "DEFAULT_TOYS_LIMIT",
@@ -619,15 +952,18 @@ __all__ = [
     "SAFE_DEFAULT_TEMPLATE",
     "TOYS_LIMIT_ENV",
     "ChildProfileRow",
+    "GenericDescriptor",
     "ReadingLevel",
     "ResolvedChildren",
     "ResolvedRoom",
     "ResolvedToy",
+    "RoleSlotValue",
     "SafeDefaultTemplate",
     "aggregate_child_constraints",
     "apply_banned_themes_filter",
     "build_claude_directive",
     "resolve_child_profiles",
+    "resolve_role_slots",
     "resolve_rooms",
     "resolve_toys",
 ]
