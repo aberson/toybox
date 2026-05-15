@@ -418,6 +418,8 @@ Per [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md), each
 
 **Flags:** `--reviewers full --start-cmd "uv run python -m toybox.main --host 127.0.0.1 --port 8000" --url "http://127.0.0.1:4000/parent"`
 
+**Status:** DONE (2026-05-15) — code reviewers + frontend gates; visual evidence deferred to K17 + K18
+
 ### Step K8: Kiosk TTS substrate + per-persona voice profile
 
 **Problem:** `frontend/src/child/tts.ts` wraps `speechSynthesis` with iOS-PWA gesture-unlock state. First call inside a user gesture primes `unlocked = true`; subsequent calls work without gesture. `cancel()` interrupts in-flight speech. `getVoiceProfile(personaId)` reads from persona library JSON. Includes vitest mock-based tests for the unlock state machine. **No auto-narration on text-step focus** — text steps are silent until the kid taps something. Consumers in later steps: K9 (click-to-read), K12 (joke step auto-play).
