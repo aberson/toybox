@@ -394,6 +394,8 @@ Per [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md), each
 
 **Flags:** `--reviewers code`
 
+**Status:** DONE (2026-05-15)
+
 ### Step K6: Recast API endpoint (proposed-only)
 
 **Problem:** `POST /api/activities/{id}/recast` re-runs `resolve_role_slots` with a new seed, writes new `slot_fills_json`, re-renders the **already-persisted** `activity_steps.body` rows via existing `render_with_slot_fills(template_step_text, new_slot_fills)`, increments version, emits `activity.state` envelope. Honors `If-Match-Version`. **Returns 409 `{code: "recast_only_when_proposed"}` if activity state is not `proposed`**. Frontend `api.ts` gets `recastActivity(id, version)`. Store handles via existing `applyMutationResult` + `withConflictHandler`. (Note: v2 idea in §11 to allow recast on `running`/`paused` once the mid-activity re-render UX is designed.)
