@@ -5,14 +5,18 @@
       "id": "request_play_soak_pirate_01",
       "title": "Pirate ship of {room}",
       "buckets": ["afternoon", "always"],
+      "required_roles": ["quest_giver", "friend"],
+      "optional_roles": ["helper_townsperson"],
+      "recommended_themes": ["pirates", "adventure"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "Hoist the sails! {toy} is captain of a pirate ship sailing across {room}.", "action_slot": "cheering" },
-        { "text": "Climb to the crow's nest (a chair or cushion) and shout what you see.", "action_slot": "looking" },
-        { "text": "A storm hits! Rock {toy} side to side and brace against the waves.", "sfx": "thunder", "action_slot": "jumping" },
-        { "text": "The lookout spots an island. Steer toward it with {toy} at the wheel.", "action_slot": "pointing" },
+        { "text": "Hoist the sails! {quest_giver} is captain of a pirate ship sailing across {room}.", "action_slot": "cheering" },
+        { "text": "Climb to the crow's nest (a chair or cushion) and shout what you see to {friend}.", "action_slot": "looking" },
+        { "text": "A storm hits! Rock {quest_giver} side to side and brace against the waves.", "sfx": "thunder", "action_slot": "jumping" },
+        { "text": "The lookout spots an island. Steer toward it with {quest_giver} at the wheel.", "action_slot": "pointing" },
         {
           "id": "fork",
-          "text": "On the beach, two paths split — which way does {toy} lead?",
+          "text": "On the beach, two paths split — which way does {quest_giver} lead?",
           "action_slot": "thinking",
           "choices": [
             { "label": "Into the jungle", "next": "jungle_end" },
@@ -21,29 +25,33 @@
         },
         {
           "id": "jungle_end",
-          "text": "You hack through vines and find buried treasure! {toy} crowns you First Mate.",
+          "text": "You hack through vines and find buried treasure! {quest_giver} crowns {friend} First Mate.",
           "action_slot": "cheering"
         },
         {
           "id": "cliff_end",
-          "text": "You climb high and spot another ship — {toy} signals with a flag and you trade gold.",
+          "text": "You climb high and spot another ship — {quest_giver} signals with a flag and you trade gold.",
           "action_slot": "waving"
         }
       ]
     },
     {
       "id": "request_play_soak_spaceship_02",
-      "title": "Rocket launch with {toy}",
+      "title": "Rocket launch with {friend}",
       "buckets": ["afternoon", "always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["helper_townsperson"],
+      "recommended_themes": ["space", "adventure"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "Strap {toy} into the rocket! {room} is mission control.", "action_slot": "pointing" },
+        { "text": "Strap {friend} into the rocket! {room} is mission control.", "action_slot": "pointing" },
         { "text": "Count down from {count} loud and clear.", "expected_action": "child_counts_down", "action_slot": "thinking" },
-        { "text": "Blast off! Crouch low then leap up high holding {toy}.", "sfx": "rocket_whoosh", "action_slot": "jumping" },
+        { "text": "Blast off! Crouch low then leap up high holding {friend}.", "sfx": "rocket_whoosh", "action_slot": "jumping" },
         { "text": "Float weightless — wave your arms slowly like an astronaut.", "action_slot": "waving" },
         { "text": "An alien ship appears on the radar. Squint and focus.", "action_slot": "looking" },
         {
           "id": "alien_fork",
-          "text": "What does {toy} do about the aliens?",
+          "text": "What does {friend} do about the aliens?",
           "choices": [
             { "label": "Open a friendship channel", "next": "friend_end" },
             { "label": "Zoom away fast", "next": "zoom_end" }
@@ -51,28 +59,32 @@
         },
         {
           "id": "friend_end",
-          "text": "The aliens cheer and teach {toy} a {adjective} space dance — show me your moves!",
+          "text": "The aliens cheer and teach {friend} a {adjective} space dance — show me your moves!",
           "action_slot": "cheering"
         },
         {
           "id": "zoom_end",
-          "text": "You blast home in record time and {toy} earns the Speed Pilot badge.",
+          "text": "You blast home in record time and {friend} earns the Speed Pilot badge.",
           "action_slot": "running"
         }
       ]
     },
     {
       "id": "request_play_soak_castle_03",
-      "title": "Defend the castle with {toy}",
+      "title": "Defend the castle with {friend}",
       "buckets": ["afternoon", "always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["helper_townsperson", "boss_mini_boss"],
+      "recommended_themes": ["knights", "adventure"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "{toy} is the brave knight defending the castle of {room}.", "action_slot": "pointing" },
+        { "text": "{friend} is the brave knight defending the castle of {room}.", "action_slot": "pointing" },
         { "text": "Build a fort wall with cushions or chairs — three pieces will do.", "action_slot": "idle" },
-        { "text": "Patrol the perimeter with {toy} held high like a banner.", "action_slot": "running" },
+        { "text": "Patrol the perimeter with {friend} held high like a banner.", "action_slot": "running" },
         { "text": "A dragon roars in the distance! Listen carefully.", "sfx": "dragon_roar", "action_slot": "looking" },
         {
           "id": "knight_choice",
-          "text": "How does {toy} face the dragon?",
+          "text": "How does {friend} face the dragon?",
           "action_slot": "thinking",
           "choices": [
             { "label": "Charge with a sword", "next": "charge_path" },
@@ -92,24 +104,28 @@
         },
         {
           "id": "peace_path",
-          "text": "You offer a {prop} and the dragon snuggles up. {toy} has a new friend.",
+          "text": "You offer a {prop} and the dragon snuggles up. {friend} has a new friend.",
           "action_slot": "waving"
         }
       ]
     },
     {
       "id": "request_play_soak_jungle_04",
-      "title": "Jungle expedition with {toy}",
+      "title": "Jungle expedition with {friend}",
       "buckets": ["afternoon", "always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["sidekick", "helper_townsperson"],
+      "recommended_themes": ["adventure", "animals"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "{toy} packs the explorer kit — you're heading deep into the jungle of {room}.", "action_slot": "pointing" },
+        { "text": "{friend} packs the explorer kit — you're heading deep into the jungle of {room}.", "action_slot": "pointing" },
         { "text": "Hack through tall grass by waving your arms like machetes.", "action_slot": "waving" },
         { "text": "Listen for jungle sounds — chirps, hoots, distant drums.", "sfx": "jungle_birds", "action_slot": "looking" },
-        { "text": "Spot a {adjective} animal hiding behind a {prop} — describe it to {toy}.", "action_slot": "pointing" },
+        { "text": "Spot a {adjective} animal hiding behind a {prop} — describe it to {friend}.", "action_slot": "pointing" },
         { "text": "A river blocks the path. The water roars below.", "sfx": "river_rush", "action_slot": "thinking" },
         {
           "id": "river_fork",
-          "text": "How does {toy} cross the river?",
+          "text": "How does {friend} cross the river?",
           "choices": [
             { "label": "Swing on a vine", "next": "vine_end" },
             { "label": "Build a raft", "next": "raft_end" }
@@ -117,25 +133,29 @@
         },
         {
           "id": "vine_end",
-          "text": "You leap and swing yodeling — {toy} cheers from the other side. You made it!",
+          "text": "You leap and swing yodeling — {friend} cheers from the other side. You made it!",
           "action_slot": "jumping"
         },
         {
           "id": "raft_end",
-          "text": "You stack three pillows into a raft and paddle across with {toy} steering.",
+          "text": "You stack three pillows into a raft and paddle across with {friend} steering.",
           "action_slot": "idle"
         }
       ]
     },
     {
       "id": "request_play_soak_underwater_05",
-      "title": "Deep sea dive with {toy}",
+      "title": "Deep sea dive with {friend}",
       "buckets": ["afternoon", "always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["sidekick"],
+      "recommended_themes": ["adventure", "animals"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "{toy} suits up — it's a deep sea dive into the secret ocean of {room}.", "action_slot": "thinking" },
+        { "text": "{friend} suits up — it's a deep sea dive into the secret ocean of {room}.", "action_slot": "thinking" },
         {
           "id": "dive_choice",
-          "text": "Which sea creature does {toy} want to find first?",
+          "text": "Which sea creature does {friend} want to find first?",
           "choices": [
             { "label": "A glowing jellyfish", "next": "jelly_path" },
             { "label": "A hidden shipwreck", "next": "wreck_path" },
@@ -156,27 +176,31 @@
         },
         {
           "id": "whale_path",
-          "text": "The whale sings a low rumble and lets {toy} ride on its back.",
+          "text": "The whale sings a low rumble and lets {friend} ride on its back.",
           "action_slot": "waving",
           "next": "treasure_climax"
         },
         {
           "id": "treasure_climax",
-          "text": "All paths lead to a sunken treasure chest! Pry it open with {toy}.",
+          "text": "All paths lead to a sunken treasure chest! Pry it open with {friend}.",
           "action_slot": "pointing"
         },
-        { "text": "Inside are pearls and a magic {prop}. {toy} declares you Captain of the Deep!", "action_slot": "cheering" }
+        { "text": "Inside are pearls and a magic {prop}. {friend} declares you Captain of the Deep!", "action_slot": "cheering" }
       ]
     },
     {
       "id": "request_play_soak_dino_06",
-      "title": "Dino tracker with {toy}",
+      "title": "Dino tracker with {friend}",
       "buckets": ["afternoon", "always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["sidekick"],
+      "recommended_themes": ["animals", "adventure"],
+      "ending_step": { "kind": "joke", "auto": true },
       "steps": [
-        { "text": "{toy} smells dinosaurs nearby — grab the binoculars and scout {room}.", "action_slot": "looking" },
+        { "text": "{friend} smells dinosaurs nearby — grab the binoculars and scout {room}.", "action_slot": "looking" },
         {
           "id": "track_choice",
-          "text": "Which trail does {toy} follow?",
+          "text": "Which trail does {friend} follow?",
           "choices": [
             { "label": "Big footprints by the couch", "next": "big_path" },
             { "label": "Tiny tracks under the table", "next": "small_path" }
@@ -199,22 +223,26 @@
           "text": "Both trails lead to a nest! Three speckled eggs sit inside.",
           "action_slot": "pointing"
         },
-        { "text": "An egg cracks — a baby dino peeks out and snuggles up to {toy}.", "sfx": "crack_pop", "action_slot": "cheering" }
+        { "text": "An egg cracks — a baby dino peeks out and snuggles up to {friend}.", "sfx": "crack_pop", "action_slot": "cheering" }
       ]
     },
     {
       "id": "request_play_soak_secret_agent_07",
-      "title": "Secret agent {toy}",
+      "title": "Secret agent {friend}",
       "buckets": ["afternoon", "always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["quest_giver", "trickster"],
+      "recommended_themes": ["adventure", "silly"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "Mission accepted! {toy} gets a secret coded message about {room}.", "action_slot": "thinking" },
+        { "text": "Mission accepted! {friend} gets a secret coded message about {room}.", "action_slot": "thinking" },
         { "text": "Sneak across the floor without making a sound — silent as a cat.", "action_slot": "looking" },
         { "text": "Hide behind a {prop} and peek out for clues.", "action_slot": "looking" },
         { "text": "Decode the secret message by counting to {count} backward.", "expected_action": "child_decodes", "action_slot": "thinking" },
         { "text": "An alarm trips! Red lights flash everywhere.", "sfx": "alarm_beep", "action_slot": "running" },
         {
           "id": "escape_fork",
-          "text": "How does {toy} escape headquarters?",
+          "text": "How does {friend} escape headquarters?",
           "choices": [
             { "label": "Out the air vent", "next": "vent_end" },
             { "label": "Disguise as a guard", "next": "disguise_end" }
@@ -227,24 +255,28 @@
         },
         {
           "id": "disguise_end",
-          "text": "You wrap a blanket cape on {toy} and march right past the guards. Smooth!",
+          "text": "You wrap a blanket cape on {friend} and march right past the guards. Smooth!",
           "action_slot": "waving"
         }
       ]
     },
     {
       "id": "request_play_soak_volcano_08",
-      "title": "Volcano rescue with {toy}",
+      "title": "Volcano rescue with {friend}",
       "buckets": ["afternoon", "always"],
+      "required_roles": ["friend", "needs_saving"],
+      "optional_roles": ["helper_townsperson"],
+      "recommended_themes": ["adventure", "weather"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "The kitchen is a volcano and {toy} is on a rescue mission to {room}!", "action_slot": "pointing" },
+        { "text": "The kitchen is a volcano and {friend} is on a rescue mission to {room}!", "action_slot": "pointing" },
         { "text": "Lava is everywhere — leap from cushion to cushion only.", "action_slot": "jumping" },
-        { "text": "Spot a stranded toy that needs saving — point it out.", "action_slot": "pointing" },
-        { "text": "Toss a rope (a scarf or sock) toward the rescue.", "action_slot": "waving" },
+        { "text": "Spot {needs_saving} stranded on a ledge — point out where they are!", "action_slot": "pointing" },
+        { "text": "Toss a rope (a scarf or sock) toward {needs_saving} for the rescue.", "action_slot": "waving" },
         { "text": "The volcano rumbles louder! Smoke fills the air.", "sfx": "volcano_rumble", "action_slot": "thinking" },
         {
           "id": "vol_fork",
-          "text": "How does {toy} get everyone out?",
+          "text": "How does {friend} get everyone out?",
           "choices": [
             { "label": "Run for the door", "next": "run_end" },
             { "label": "Climb to the rooftop", "next": "roof_end" }
@@ -252,25 +284,29 @@
         },
         {
           "id": "run_end",
-          "text": "You sprint with {toy} tucked under your arm. Safe outside! Cheers all around.",
+          "text": "You sprint with {friend} tucked under your arm. Safe outside! Cheers all around.",
           "action_slot": "running"
         },
         {
           "id": "roof_end",
-          "text": "A helicopter lowers a ladder. {toy} climbs up and waves from the sky.",
+          "text": "A helicopter lowers a ladder. {friend} climbs up and waves from the sky.",
           "action_slot": "waving"
         }
       ]
     },
     {
       "id": "request_play_soak_circus_09",
-      "title": "{toy}'s circus showtime",
+      "title": "{quest_giver}'s circus showtime",
       "buckets": ["afternoon", "evening", "always"],
+      "required_roles": ["quest_giver"],
+      "optional_roles": ["sidekick", "helper_townsperson"],
+      "recommended_themes": ["music", "silly"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "Step right up! {toy} is the ringmaster of the {room} circus.", "action_slot": "cheering" },
+        { "text": "Step right up! {quest_giver} is the ringmaster of the {room} circus.", "action_slot": "cheering" },
         {
           "id": "act_choice",
-          "text": "Which circus act does {toy} perform first?",
+          "text": "Which circus act does {quest_giver} perform first?",
           "choices": [
             { "label": "Tightrope walk", "next": "rope_act" },
             { "label": "Lion taming", "next": "lion_act" },
@@ -279,7 +315,7 @@
         },
         {
           "id": "rope_act",
-          "text": "Walk a straight line heel-to-toe with {toy} balanced on your head!",
+          "text": "Walk a straight line heel-to-toe with {quest_giver} balanced on your head!",
           "action_slot": "thinking",
           "next": "finale"
         },
@@ -291,7 +327,7 @@
         },
         {
           "id": "juggle_act",
-          "text": "Toss three soft toys gently up and down. {toy} keeps score.",
+          "text": "Toss three soft toys gently up and down. {quest_giver} keeps score.",
           "action_slot": "pointing",
           "next": "finale"
         },
@@ -305,10 +341,14 @@
     },
     {
       "id": "request_play_soak_robot_10",
-      "title": "Build-a-robot with {toy}",
+      "title": "Build-a-robot with {friend}",
       "buckets": ["afternoon", "always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["sidekick"],
+      "recommended_themes": ["silly", "adventure"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "{toy} found robot blueprints hidden in {room}!", "action_slot": "thinking" },
+        { "text": "{friend} found robot blueprints hidden in {room}!", "action_slot": "thinking" },
         { "text": "Gather {count} household objects to be robot parts.", "expected_action": "child_gathers_parts", "action_slot": "looking" },
         { "text": "Snap the parts together with imaginary bolts and screws.", "sfx": "robot_beeps", "action_slot": "idle" },
         { "text": "Power on! Make a long beeeeeep sound and shake your {body_part}.", "action_slot": "jumping" },
@@ -323,31 +363,35 @@
         },
         {
           "id": "strong_end",
-          "text": "The robot lifts the entire couch (pretend!) and {toy} rides on top!",
+          "text": "The robot lifts the entire couch (pretend!) and {friend} rides on top!",
           "action_slot": "cheering"
         },
         {
           "id": "laser_end",
-          "text": "PEW PEW! Laser eyes melt invisible obstacles. {toy} salutes the new hero.",
+          "text": "PEW PEW! Laser eyes melt invisible obstacles. {friend} salutes the new hero.",
           "action_slot": "pointing"
         },
         {
           "id": "dance_end",
-          "text": "The robot does the {adjective} disco shuffle and {toy} joins in!",
+          "text": "The robot does the {adjective} disco shuffle and {friend} joins in!",
           "action_slot": "cheering"
         }
       ]
     },
     {
       "id": "request_play_soak_wizard_11",
-      "title": "Wizard school with {toy}",
+      "title": "Wizard school with {friend}",
       "buckets": ["afternoon", "always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["guide_mentor", "helper_townsperson"],
+      "recommended_themes": ["magic", "animals"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "{toy} just got accepted to wizard school! Class is in {room}.", "action_slot": "thinking" },
+        { "text": "{friend} just got accepted to wizard school! Class is in {room}.", "action_slot": "thinking" },
         { "text": "Pick up your wand (any nearby {prop}) and practice swishing it.", "action_slot": "waving" },
         { "text": "Chant the magic word: ABRA-{action_verb}-CADABRA! Say it three times.", "expected_action": "child_chants", "action_slot": "cheering" },
         { "text": "Sparks fly! Your potion is bubbling over.", "sfx": "magic_fizz", "action_slot": "looking" },
-        { "text": "A {adjective} owl swoops in carrying a sealed letter for {toy}.", "action_slot": "looking" },
+        { "text": "A {adjective} owl swoops in carrying a sealed letter for {friend}.", "action_slot": "looking" },
         {
           "id": "wizard_fork",
           "text": "The letter says pick a magical specialty:",
@@ -358,29 +402,33 @@
         },
         {
           "id": "fire_end",
-          "text": "Whoosh! Snap your fingers and pretend a fireball appears. {toy} bows to your power.",
+          "text": "Whoosh! Snap your fingers and pretend a fireball appears. {friend} bows to your power.",
           "action_slot": "jumping"
         },
         {
           "id": "animal_end",
-          "text": "A flock of birds (pretend!) circles {toy} and you can talk to every one.",
+          "text": "A flock of birds (pretend!) circles {friend} and you can talk to every one.",
           "action_slot": "waving"
         }
       ]
     },
     {
       "id": "request_play_soak_superhero_12",
-      "title": "{toy} the superhero",
+      "title": "{friend} the superhero",
       "buckets": ["morning", "afternoon", "always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["needs_saving", "helper_townsperson"],
+      "recommended_themes": ["adventure", "silly"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "Crisis! The city of {room} needs a superhero — that's {toy}!", "action_slot": "pointing" },
+        { "text": "Crisis! The city of {room} needs a superhero — that's {friend}!", "action_slot": "pointing" },
         { "text": "Tie a blanket cape around your shoulders.", "action_slot": "idle" },
         { "text": "Strike your hero pose — hands on hips, chin up high.", "action_slot": "cheering" },
         { "text": "An emergency call! Listen for the siren.", "sfx": "siren", "action_slot": "looking" },
-        { "text": "Run to the scene as fast as you can with {toy}.", "action_slot": "running" },
+        { "text": "Run to the scene as fast as you can with {friend}.", "action_slot": "running" },
         {
           "id": "save_fork",
-          "text": "Two emergencies at once! Who does {toy} save first?",
+          "text": "Two emergencies at once! Who does {friend} save first?",
           "choices": [
             { "label": "A cat stuck in a tree", "next": "cat_end" },
             { "label": "A baby in a runaway stroller", "next": "stroller_end" }
@@ -388,7 +436,7 @@
         },
         {
           "id": "cat_end",
-          "text": "You leap up and gently lift the cat down. The whole crowd cheers for {toy}!",
+          "text": "You leap up and gently lift the cat down. The whole crowd cheers for {friend}!",
           "action_slot": "jumping"
         },
         {
@@ -400,13 +448,17 @@
     },
     {
       "id": "request_play_soak_train_13",
-      "title": "All aboard with {toy}",
+      "title": "All aboard with {quest_giver}",
       "buckets": ["afternoon", "always"],
+      "required_roles": ["quest_giver"],
+      "optional_roles": ["helper_townsperson"],
+      "recommended_themes": ["vehicles", "silly"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "All aboard! {toy} is conductor of the express train through {room}.", "action_slot": "cheering" },
+        { "text": "All aboard! {quest_giver} is conductor of the express train through {room}.", "action_slot": "cheering" },
         {
           "id": "track_choice",
-          "text": "Which destination does {toy} call out?",
+          "text": "Which destination does {quest_giver} call out?",
           "choices": [
             { "label": "Mountain station", "next": "mountain_path" },
             { "label": "Beach station", "next": "beach_path" },
@@ -437,17 +489,20 @@
           "sfx": "train_whistle",
           "action_slot": "cheering"
         },
-        { "text": "You arrive at last. {toy} stamps your ticket and you cheer together!", "action_slot": "cheering" }
+        { "text": "You arrive at last. {quest_giver} stamps your ticket and you cheer together!", "action_slot": "cheering" }
       ]
     },
     {
       "id": "request_play_soak_camping_14",
-      "title": "Backyard camping with {toy}",
+      "title": "Backyard camping with {friend}",
       "buckets": ["evening", "always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["sidekick"],
+      "recommended_themes": ["friendship", "weather"],
       "steps": [
-        { "text": "{toy} wants to go camping right here in {room}!", "action_slot": "thinking" },
+        { "text": "{friend} wants to go camping right here in {room}!", "action_slot": "thinking" },
         { "text": "Build a tent from blankets and chairs. Make it cozy.", "action_slot": "idle" },
-        { "text": "Crawl inside with {toy} and a flashlight (or pretend one).", "action_slot": "looking" },
+        { "text": "Crawl inside with {friend} and a flashlight (or pretend one).", "action_slot": "looking" },
         { "text": "Listen for nighttime sounds — owls, crickets, leaves rustling.", "sfx": "crickets", "action_slot": "thinking" },
         {
           "id": "camp_fork",
@@ -459,7 +514,7 @@
         },
         {
           "id": "story_end",
-          "text": "You whisper a tale of a {adjective} ghost. {toy} hides under the blanket — boo!",
+          "text": "You whisper a tale of a {adjective} ghost. {friend} hides under the blanket — boo!",
           "action_slot": "thinking"
         },
         {
@@ -471,13 +526,17 @@
     },
     {
       "id": "request_play_soak_chef_15",
-      "title": "Chef {toy}'s mystery dish",
+      "title": "Chef {quest_giver}'s mystery dish",
       "buckets": ["afternoon", "always"],
+      "required_roles": ["quest_giver"],
+      "optional_roles": ["helper_townsperson", "sidekick"],
+      "recommended_themes": ["food", "silly"],
+      "ending_step": { "kind": "joke", "auto": true },
       "steps": [
-        { "text": "Chef {toy} is opening a five-star restaurant in {room}. Tie on your apron!", "action_slot": "cheering" },
+        { "text": "Chef {quest_giver} is opening a five-star restaurant in {room}. Tie on your apron!", "action_slot": "cheering" },
         {
           "id": "menu_choice",
-          "text": "What kind of dish is {toy} making tonight?",
+          "text": "What kind of dish is {quest_giver} making tonight?",
           "choices": [
             { "label": "Spicy soup", "next": "soup_path" },
             { "label": "Fancy cake", "next": "cake_path" },
@@ -508,22 +567,26 @@
           "sfx": "ding",
           "action_slot": "pointing"
         },
-        { "text": "The food critic ({toy}) takes a bite and gives you {count} stars!", "action_slot": "cheering" }
+        { "text": "The food critic ({quest_giver}) takes a bite and gives you {count} stars!", "action_slot": "cheering" }
       ]
     },
     {
       "id": "request_play_soak_carwash_16",
-      "title": "{toy}'s super car wash",
+      "title": "{quest_giver}'s super car wash",
       "buckets": ["morning", "afternoon", "always"],
+      "required_roles": ["quest_giver"],
+      "optional_roles": ["helper_townsperson"],
+      "recommended_themes": ["vehicles", "silly"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "{toy} is opening the world's best car wash in {room}!", "action_slot": "cheering" },
+        { "text": "{quest_giver} is opening the world's best car wash in {room}!", "action_slot": "cheering" },
         { "text": "Wave drivers in by pointing at imaginary cars zooming up.", "action_slot": "pointing" },
         { "text": "Spray water (pretend) all over the first car. Make a SHHHHH sound.", "sfx": "spray", "action_slot": "waving" },
         { "text": "Scrub-scrub-scrub the {adjective} car with big arm circles.", "action_slot": "running" },
         { "text": "Rinse off the soap with a big imaginary hose.", "action_slot": "waving" },
         {
           "id": "wash_fork",
-          "text": "Drying time! How does {toy} get the car shiny?",
+          "text": "Drying time! How does {quest_giver} get the car shiny?",
           "choices": [
             { "label": "Giant air blower", "next": "blower_end" },
             { "label": "Soft towels", "next": "towel_end" }
@@ -536,20 +599,24 @@
         },
         {
           "id": "towel_end",
-          "text": "Pat-pat-pat with imaginary towels. Sparkly clean! {toy} hands you a tip.",
+          "text": "Pat-pat-pat with imaginary towels. Sparkly clean! {quest_giver} hands you a tip.",
           "action_slot": "waving"
         }
       ]
     },
     {
       "id": "request_play_soak_zoo_17",
-      "title": "{toy}'s wild zoo tour",
+      "title": "{guide_mentor}'s wild zoo tour",
       "buckets": ["morning", "afternoon", "always"],
+      "required_roles": ["guide_mentor"],
+      "optional_roles": ["helper_townsperson", "sidekick"],
+      "recommended_themes": ["animals", "friendship"],
+      "ending_step": { "kind": "joke", "auto": true },
       "steps": [
-        { "text": "Welcome to the zoo! {toy} is your tour guide through {room}.", "action_slot": "pointing" },
+        { "text": "Welcome to the zoo! {guide_mentor} is your tour guide through {room}.", "action_slot": "pointing" },
         {
           "id": "first_animal",
-          "text": "Which exhibit does {toy} visit first?",
+          "text": "Which exhibit does {guide_mentor} visit first?",
           "choices": [
             { "label": "Roaring lions", "next": "lion_path" },
             { "label": "Silly monkeys", "next": "monkey_path" },
@@ -577,25 +644,29 @@
         },
         {
           "id": "feeding",
-          "text": "It's feeding time! Help {toy} pretend-feed a treat to the animals.",
+          "text": "It's feeding time! Help {guide_mentor} pretend-feed a treat to the animals.",
           "action_slot": "pointing"
         },
-        { "text": "Wave goodbye to all the animals. {toy} thanks you for the visit!", "action_slot": "waving" }
+        { "text": "Wave goodbye to all the animals. {guide_mentor} thanks you for the visit!", "action_slot": "waving" }
       ]
     },
     {
       "id": "request_play_soak_detective_18",
-      "title": "Detective {toy} mystery case",
+      "title": "Detective {quest_giver} mystery case",
       "buckets": ["afternoon", "evening", "always"],
+      "required_roles": ["quest_giver"],
+      "optional_roles": ["frenemy", "helper_townsperson"],
+      "recommended_themes": ["adventure", "silly"],
+      "ending_step": { "kind": "joke", "auto": true },
       "steps": [
-        { "text": "Detective {toy} just got a case — a missing {prop} in {room}!", "action_slot": "thinking" },
+        { "text": "Detective {quest_giver} just got a case — a missing {prop} in {room}!", "action_slot": "thinking" },
         { "text": "Pull out your magnifying glass (cup your hand) and search the area.", "action_slot": "looking" },
         { "text": "Find {count} suspicious clues — point at each one.", "expected_action": "child_finds_clues", "action_slot": "pointing" },
         { "text": "Question a suspect (a stuffed animal or pillow) with serious questions.", "action_slot": "thinking" },
         { "text": "Suddenly, a new clue! A {adjective} smudge on the wall.", "action_slot": "looking" },
         {
           "id": "case_fork",
-          "text": "All eyes on the suspects! Who does {toy} accuse?",
+          "text": "All eyes on the suspects! Who does {quest_giver} accuse?",
           "choices": [
             { "label": "The teddy bear", "next": "teddy_end" },
             { "label": "The toy car", "next": "car_end" }
@@ -603,7 +674,7 @@
         },
         {
           "id": "teddy_end",
-          "text": "The teddy confesses! {toy} cracks the case and you both shake hands.",
+          "text": "The teddy confesses! {quest_giver} cracks the case and you both shake hands.",
           "action_slot": "waving"
         },
         {
@@ -615,14 +686,18 @@
     },
     {
       "id": "request_play_soak_olympic_19",
-      "title": "{toy}'s living-room olympics",
+      "title": "{friend}'s living-room olympics",
       "buckets": ["morning", "afternoon", "always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["helper_townsperson", "sidekick"],
+      "recommended_themes": ["adventure", "music"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "Welcome to the {room} Olympics! {toy} is your champion.", "action_slot": "cheering" },
+        { "text": "Welcome to the {room} Olympics! {friend} is your champion.", "action_slot": "cheering" },
         { "text": "Stretch your arms up high and touch your toes for warmup.", "action_slot": "jumping" },
         {
           "id": "event_pick",
-          "text": "Which event does {toy} compete in?",
+          "text": "Which event does {friend} compete in?",
           "choices": [
             { "label": "Long jump", "next": "jump_path" },
             { "label": "Sprint race", "next": "sprint_path" },
@@ -650,7 +725,7 @@
         },
         {
           "id": "medal_ceremony",
-          "text": "Step onto the podium. {toy} hangs an imaginary gold medal around your neck!",
+          "text": "Step onto the podium. {friend} hangs an imaginary gold medal around your neck!",
           "sfx": "anthem",
           "action_slot": "cheering"
         }
@@ -658,13 +733,17 @@
     },
     {
       "id": "request_play_soak_haunted_20",
-      "title": "Haunted house with {toy}",
+      "title": "Haunted house with {frenemy}",
       "buckets": ["evening", "always"],
+      "required_roles": ["frenemy"],
+      "optional_roles": ["trickster"],
+      "recommended_themes": ["adventure", "silly"],
+      "ending_step": { "kind": "joke", "auto": true },
       "steps": [
-        { "text": "{toy} dares you to enter the haunted house — actually it's just {room}!", "action_slot": "thinking" },
+        { "text": "{frenemy} dares you to enter the haunted house — actually it's just {room}!", "action_slot": "thinking" },
         { "text": "Creak open the imaginary door slowly... eeeeerrrr...", "sfx": "creak", "action_slot": "looking" },
         { "text": "Tiptoe past a spooky portrait. Its eyes seem to follow you.", "action_slot": "looking" },
-        { "text": "Hear a ghostly OOOOOOOO! Hold {toy} tight.", "sfx": "ghost_moo", "action_slot": "thinking" },
+        { "text": "Hear a ghostly OOOOOOOO! Hold {frenemy} tight.", "sfx": "ghost_moo", "action_slot": "thinking" },
         { "text": "A {adjective} cobweb tickles your face! Brush it off your {body_part}.", "action_slot": "waving" },
         {
           "id": "haunt_fork",
@@ -676,28 +755,32 @@
         },
         {
           "id": "red_end",
-          "text": "It opens to a friendly ghost party! Everyone dances. {toy} joins in!",
+          "text": "It opens to a friendly ghost party! Everyone dances. {frenemy} joins in!",
           "action_slot": "cheering"
         },
         {
           "id": "black_end",
-          "text": "It leads to sunny daylight outside. You and {toy} cheer — escape!",
+          "text": "It leads to sunny daylight outside. You and {frenemy} cheer — escape!",
           "action_slot": "running"
         }
       ]
     },
     {
       "id": "request_play_soak_ninja_21",
-      "title": "{toy} the silent ninja",
+      "title": "{friend} the silent ninja",
       "buckets": ["afternoon", "always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["sidekick", "trickster"],
+      "recommended_themes": ["adventure", "silly"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "Mission briefing: {toy} the ninja must cross {room} unseen!", "action_slot": "thinking" },
+        { "text": "Mission briefing: {friend} the ninja must cross {room} unseen!", "action_slot": "thinking" },
         { "text": "Tie an imaginary headband and crouch down low.", "action_slot": "idle" },
         { "text": "Tiptoe past invisible laser beams — duck under and step over.", "action_slot": "looking" },
         { "text": "Roll behind a {prop} when the guard turns around.", "action_slot": "running" },
         {
           "id": "ninja_fork",
-          "text": "How does {toy} reach the scroll?",
+          "text": "How does {friend} reach the scroll?",
           "choices": [
             { "label": "Climb up the wall", "next": "climb_end" },
             { "label": "Use a smoke bomb", "next": "smoke_end" }
@@ -710,7 +793,7 @@
         },
         {
           "id": "smoke_end",
-          "text": "POOF! Throw down the smoke and dash through. {toy} bows in approval.",
+          "text": "POOF! Throw down the smoke and dash through. {friend} bows in approval.",
           "sfx": "poof",
           "action_slot": "running"
         }
@@ -718,13 +801,17 @@
     },
     {
       "id": "request_play_soak_safari_22",
-      "title": "Safari adventure with {toy}",
+      "title": "Safari adventure with {guide_mentor}",
       "buckets": ["afternoon", "always"],
+      "required_roles": ["guide_mentor"],
+      "optional_roles": ["sidekick", "helper_townsperson"],
+      "recommended_themes": ["animals", "adventure"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "Grab the binoculars — {toy} is leading a safari through {room}!", "action_slot": "looking" },
+        { "text": "Grab the binoculars — {guide_mentor} is leading a safari through {room}!", "action_slot": "looking" },
         {
           "id": "habitat_choice",
-          "text": "Which habitat does {toy} explore?",
+          "text": "Which habitat does {guide_mentor} explore?",
           "choices": [
             { "label": "Sandy desert", "next": "desert_path" },
             { "label": "Grassy savanna", "next": "savanna_path" },
@@ -751,7 +838,7 @@
         },
         {
           "id": "watering_hole",
-          "text": "All trails lead to the watering hole. Sit quietly with {toy} and watch the animals drink.",
+          "text": "All trails lead to the watering hole. Sit quietly with {guide_mentor} and watch the animals drink.",
           "action_slot": "looking"
         },
         { "text": "An elephant trumpets goodbye! Wave back with both arms.", "sfx": "elephant", "action_slot": "waving" }
@@ -759,16 +846,20 @@
     },
     {
       "id": "request_play_soak_arctic_23",
-      "title": "Arctic mission with {toy}",
+      "title": "Arctic mission with {friend}",
       "buckets": ["afternoon", "always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["helper_townsperson", "guide_mentor"],
+      "recommended_themes": ["weather", "adventure"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "Brrrr! {toy} bundles up — the temperature in {room} just dropped to arctic!", "action_slot": "thinking" },
+        { "text": "Brrrr! {friend} bundles up — the temperature in {room} just dropped to arctic!", "action_slot": "thinking" },
         { "text": "Strap on imaginary snowshoes and trudge through deep snow.", "action_slot": "running" },
         { "text": "Scan the icy horizon for a {adjective} polar bear.", "action_slot": "looking" },
         { "text": "Crack! Thin ice underfoot — leap to a sturdy floe!", "sfx": "ice_crack", "action_slot": "jumping" },
         {
           "id": "arctic_fork",
-          "text": "How does {toy} reach the research base?",
+          "text": "How does {friend} reach the research base?",
           "choices": [
             { "label": "Sled dogs across the snow", "next": "sled_end" },
             { "label": "Sail an icebreaker", "next": "ship_end" }
@@ -781,20 +872,24 @@
         },
         {
           "id": "ship_end",
-          "text": "Crunch through ice with the ship's mighty hull. {toy} steers from the bridge.",
+          "text": "Crunch through ice with the ship's mighty hull. {friend} steers from the bridge.",
           "action_slot": "pointing"
         }
       ]
     },
     {
       "id": "request_play_soak_market_24",
-      "title": "Market day with {toy}",
+      "title": "Market day with {friend}",
       "buckets": ["morning", "afternoon", "always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["helper_townsperson"],
+      "recommended_themes": ["food", "friendship"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "It's market day! {toy} sets up a stall in busy {room}.", "action_slot": "cheering" },
+        { "text": "It's market day! {friend} sets up a stall in busy {room}.", "action_slot": "cheering" },
         {
           "id": "stall_choice",
-          "text": "What does {toy} sell at the market?",
+          "text": "What does {friend} sell at the market?",
           "choices": [
             { "label": "Magic potions", "next": "potion_path" },
             { "label": "Tasty fruit", "next": "fruit_path" },
@@ -824,18 +919,22 @@
           "text": "A customer wants to haggle! Offer {count} coins back and forth.",
           "action_slot": "thinking"
         },
-        { "text": "Sold! High-five {toy} — the stall is a hit!", "action_slot": "cheering" }
+        { "text": "Sold! High-five {friend} — the stall is a hit!", "action_slot": "cheering" }
       ]
     },
     {
       "id": "request_play_soak_fairy_25",
-      "title": "{toy} meets the fairies",
+      "title": "{friend} meets the fairies",
       "buckets": ["evening", "always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["helper_townsperson", "trickster"],
+      "recommended_themes": ["magic", "music"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "Listen carefully — {toy} hears tiny bells in the corner of {room}.", "action_slot": "looking" },
+        { "text": "Listen carefully — {friend} hears tiny bells in the corner of {room}.", "action_slot": "looking" },
         {
           "id": "fairy_choice",
-          "text": "Which fairy does {toy} meet first?",
+          "text": "Which fairy does {friend} meet first?",
           "choices": [
             { "label": "The flower fairy", "next": "flower_path" },
             { "label": "The water fairy", "next": "water_path" }
@@ -849,24 +948,28 @@
         },
         {
           "id": "water_path",
-          "text": "Tiny droplets sparkle. The water fairy splashes {toy} and giggles.",
+          "text": "Tiny droplets sparkle. The water fairy splashes {friend} and giggles.",
           "action_slot": "thinking",
           "next": "fairy_dance"
         },
         {
           "id": "fairy_dance",
-          "text": "All the fairies invite you to a dance. Spin slowly with {toy} held high.",
+          "text": "All the fairies invite you to a dance. Spin slowly with {friend} held high.",
           "action_slot": "cheering"
         },
-        { "text": "The fairies leave a {adjective} flower as thanks. Tuck it safe with {toy}.", "action_slot": "waving" }
+        { "text": "The fairies leave a {adjective} flower as thanks. Tuck it safe with {friend}.", "action_slot": "waving" }
       ]
     },
     {
       "id": "request_play_soak_racecar_26",
-      "title": "{toy} at the speedway",
+      "title": "{friend} at the speedway",
       "buckets": ["afternoon", "always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["frenemy", "helper_townsperson"],
+      "recommended_themes": ["vehicles", "adventure"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "Engines roar! {toy} is the star driver at the {room} speedway.", "sfx": "engine", "action_slot": "cheering" },
+        { "text": "Engines roar! {friend} is the star driver at the {room} speedway.", "sfx": "engine", "action_slot": "cheering" },
         { "text": "Buckle up. Squeeze the steering wheel tight!", "action_slot": "thinking" },
         { "text": "On your marks... GO! Run in place super fast — vroooom!", "action_slot": "running" },
         { "text": "A sharp turn ahead! Lean to one side dramatically.", "action_slot": "jumping" },
@@ -893,10 +996,14 @@
     },
     {
       "id": "request_play_soak_treasure_island_27",
-      "title": "Treasure island with {toy}",
+      "title": "Treasure island with {quest_giver}",
       "buckets": ["afternoon", "always"],
+      "required_roles": ["quest_giver"],
+      "optional_roles": ["sidekick", "frenemy"],
+      "recommended_themes": ["pirates", "adventure"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "Land ho! {toy} unfolds a tattered map of {room} with X marks the spot.", "action_slot": "pointing" },
+        { "text": "Land ho! {quest_giver} unfolds a tattered map of {room} with X marks the spot.", "action_slot": "pointing" },
         { "text": "Wade through pretend tide pools — careful of the crabs!", "action_slot": "looking" },
         { "text": "Push through palm fronds — wave your arms to part the leaves.", "action_slot": "waving" },
         { "text": "Spot the X on the ground. Dig with imaginary shovels!", "action_slot": "running" },
@@ -911,7 +1018,7 @@
         },
         {
           "id": "gold_end",
-          "text": "Coins everywhere! Toss them in the air with {toy} laughing beside you.",
+          "text": "Coins everywhere! Toss them in the air with {quest_giver} laughing beside you.",
           "action_slot": "cheering"
         },
         {
@@ -923,13 +1030,17 @@
     },
     {
       "id": "request_play_soak_market_taste_28",
-      "title": "{toy}'s tasting tour",
+      "title": "{quest_giver}'s tasting tour",
       "buckets": ["morning", "afternoon", "always"],
+      "required_roles": ["quest_giver"],
+      "optional_roles": ["helper_townsperson"],
+      "recommended_themes": ["food", "silly"],
+      "ending_step": { "kind": "joke", "auto": true },
       "steps": [
-        { "text": "{toy} declares it's a tasting tour through {room} — {count} stops total!", "action_slot": "pointing" },
+        { "text": "{quest_giver} declares it's a tasting tour through {room} — {count} stops total!", "action_slot": "pointing" },
         {
           "id": "first_taste",
-          "text": "Which station does {toy} sample first?",
+          "text": "Which station does {quest_giver} sample first?",
           "choices": [
             { "label": "Spicy snack stall", "next": "spicy_path" },
             { "label": "Sweet candy stall", "next": "sweet_path" },
@@ -956,22 +1067,26 @@
         },
         {
           "id": "judging",
-          "text": "Now {toy} judges — give the dish a thumbs up or thumbs down!",
+          "text": "Now {quest_giver} judges — give the dish a thumbs up or thumbs down!",
           "expected_action": "child_thumbs",
           "action_slot": "pointing"
         },
-        { "text": "The chef hands you a winner's ribbon. {toy} pins it on you proudly!", "action_slot": "cheering" }
+        { "text": "The chef hands you a winner's ribbon. {quest_giver} pins it on you proudly!", "action_slot": "cheering" }
       ]
     },
     {
       "id": "request_play_soak_balloon_29",
-      "title": "{toy}'s balloon journey",
+      "title": "{friend}'s balloon journey",
       "buckets": ["morning", "afternoon", "always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["sidekick"],
+      "recommended_themes": ["adventure", "weather"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "Fire up the burner! {toy}'s hot air balloon rises above {room}.", "sfx": "burner_whoosh", "action_slot": "looking" },
+        { "text": "Fire up the burner! {friend}'s hot air balloon rises above {room}.", "sfx": "burner_whoosh", "action_slot": "looking" },
         {
           "id": "drift_choice",
-          "text": "Which way does the wind blow {toy}?",
+          "text": "Which way does the wind blow {friend}?",
           "choices": [
             { "label": "Toward the cloud kingdom", "next": "cloud_path" },
             { "label": "Toward the rainbow river", "next": "rainbow_path" }
@@ -994,21 +1109,25 @@
           "text": "Time to descend! Pull the rope gently and the balloon settles down.",
           "action_slot": "thinking"
         },
-        { "text": "You and {toy} step out and bow to the crowd that's gathered. What a journey!", "action_slot": "cheering" }
+        { "text": "You and {friend} step out and bow to the crowd that's gathered. What a journey!", "action_slot": "cheering" }
       ]
     },
     {
       "id": "request_play_soak_kingfor_a_day_30",
-      "title": "{toy} king for a day",
+      "title": "{quest_giver} king for a day",
       "buckets": ["morning", "afternoon", "always"],
+      "required_roles": ["quest_giver"],
+      "optional_roles": ["helper_townsperson", "sidekick"],
+      "recommended_themes": ["knights", "silly"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "Crown {toy}! Today {toy} rules the kingdom of {room}.", "action_slot": "cheering" },
-        { "text": "Sit {toy} on a throne (a chair with a blanket).", "action_slot": "idle" },
+        { "text": "Crown {quest_giver}! Today {quest_giver} rules the kingdom of {room}.", "action_slot": "cheering" },
+        { "text": "Sit {quest_giver} on a throne (a chair with a blanket).", "action_slot": "idle" },
         { "text": "Bow before the king and present a {prop} as a royal gift.", "action_slot": "thinking" },
         { "text": "A royal messenger arrives! Read the urgent letter aloud.", "action_slot": "pointing" },
         {
           "id": "decree_fork",
-          "text": "Royal decree time! What does King {toy} command?",
+          "text": "Royal decree time! What does King {quest_giver} command?",
           "choices": [
             { "label": "Throw a giant feast", "next": "feast_end" },
             { "label": "Send out brave knights", "next": "knights_end" }
@@ -1021,7 +1140,7 @@
         },
         {
           "id": "knights_end",
-          "text": "March {count} knights out the door — {toy} watches from the balcony, proud.",
+          "text": "March {count} knights out the door — {quest_giver} watches from the balcony, proud.",
           "action_slot": "pointing"
         }
       ]
@@ -1030,14 +1149,18 @@
       "id": "request_play_soak_bodypart_obstacle_31",
       "title": "{body_part} obstacle course",
       "buckets": ["morning", "afternoon", "always"],
+      "required_roles": ["quest_giver"],
+      "optional_roles": ["helper_townsperson", "sidekick"],
+      "recommended_themes": ["silly", "friendship"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "{toy} sets up an obstacle course in {room} — but you can ONLY use your {body_part}!", "action_slot": "thinking" },
+        { "text": "{quest_giver} sets up an obstacle course in {room} — but you can ONLY use your {body_part}!", "action_slot": "thinking" },
         { "text": "First trial: {action_verb} across the room using only your {body_part} for balance.", "action_slot": "running" },
         { "text": "Pick up a {prop} using ONLY your {body_part}. No hands allowed!", "expected_action": "child_uses_body_part", "action_slot": "looking" },
         { "text": "Carry the {prop} {count} steps without dropping it.", "action_slot": "idle" },
         {
           "id": "final_fork",
-          "text": "Final challenge time — what does {toy} pick?",
+          "text": "Final challenge time — what does {quest_giver} pick?",
           "choices": [
             { "label": "Hop on one foot", "next": "hop_end" },
             { "label": "Wiggle like jelly", "next": "wiggle_end" }
@@ -1050,7 +1173,7 @@
         },
         {
           "id": "wiggle_end",
-          "text": "Wiggle every part of you while holding {toy}. {toy} laughs uncontrollably!",
+          "text": "Wiggle every part of you while holding {quest_giver}. {quest_giver} laughs uncontrollably!",
           "action_slot": "jumping"
         }
       ]
@@ -1059,13 +1182,17 @@
       "id": "request_play_soak_propchain_32",
       "title": "{prop} {action_verb} relay",
       "buckets": ["morning", "afternoon", "always"],
+      "required_roles": ["quest_giver"],
+      "optional_roles": ["helper_townsperson", "sidekick"],
+      "recommended_themes": ["silly", "friendship"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
         { "text": "Find a {prop}, a second {prop}, and a third — line them up across {room}.", "action_slot": "looking" },
         { "text": "Now {action_verb} from the first {prop} to the second.", "action_slot": "running" },
         { "text": "{action_verb} from the second {prop} to the third — keep your {body_part} steady!", "action_slot": "jumping" },
         {
           "id": "speed_fork",
-          "text": "{toy} times the next round. Go fast or go fancy?",
+          "text": "{quest_giver} times the next round. Go fast or go fancy?",
           "choices": [
             { "label": "Speed run!", "next": "speed_end" },
             { "label": "Style points!", "next": "style_end" }
@@ -1073,12 +1200,12 @@
         },
         {
           "id": "speed_end",
-          "text": "Race back through the props in {count} seconds! {toy} cheers — new record!",
+          "text": "Race back through the props in {count} seconds! {quest_giver} cheers — new record!",
           "action_slot": "running"
         },
         {
           "id": "style_end",
-          "text": "Spin and twirl past each {prop} like a {adjective} dancer. {toy} claps in awe.",
+          "text": "Spin and twirl past each {prop} like a {adjective} dancer. {quest_giver} claps in awe.",
           "action_slot": "cheering"
         }
       ]
@@ -1087,11 +1214,15 @@
       "id": "request_play_soak_action_chain_33",
       "title": "Three {action_verb} adventure",
       "buckets": ["morning", "afternoon", "always"],
+      "required_roles": ["quest_giver"],
+      "optional_roles": ["helper_townsperson"],
+      "recommended_themes": ["silly", "adventure"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "{toy} challenges you to {action_verb} {count} times in a row across {room}!", "action_slot": "thinking" },
-        { "text": "First {action_verb}: do it {adjective} — {toy} judges the style.", "action_slot": "jumping" },
+        { "text": "{quest_giver} challenges you to {action_verb} {count} times in a row across {room}!", "action_slot": "thinking" },
+        { "text": "First {action_verb}: do it {adjective} — {quest_giver} judges the style.", "action_slot": "jumping" },
         { "text": "Second {action_verb}: do it sideways while waving a {prop}.", "action_slot": "waving" },
-        { "text": "Third {action_verb}: do it backward holding {toy} on your {body_part}.", "action_slot": "running" },
+        { "text": "Third {action_verb}: do it backward holding {quest_giver} on your {body_part}.", "action_slot": "running" },
         {
           "id": "encore_fork",
           "text": "Encore time! Pick the grand finale:",
@@ -1102,12 +1233,12 @@
         },
         {
           "id": "mega_end",
-          "text": "Crouch low and LAUNCH! Biggest {action_verb} of the day — {toy} gives a 10!",
+          "text": "Crouch low and LAUNCH! Biggest {action_verb} of the day — {quest_giver} gives a 10!",
           "action_slot": "jumping"
         },
         {
           "id": "slow_end",
-          "text": "Move sloooowly like a sloth. Every motion stretches forever. {toy} giggles.",
+          "text": "Move sloooowly like a sloth. Every motion stretches forever. {quest_giver} giggles.",
           "action_slot": "thinking"
         }
       ]
@@ -1116,8 +1247,12 @@
       "id": "request_play_soak_room_transform_34",
       "title": "{room} transformation",
       "buckets": ["morning", "afternoon", "always"],
+      "required_roles": ["guide_mentor"],
+      "optional_roles": ["trickster", "sidekick"],
+      "recommended_themes": ["magic", "adventure"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "{toy} casts a spell — {room} is now an entirely new place!", "action_slot": "waving" },
+        { "text": "{guide_mentor} casts a spell — {room} is now an entirely new place!", "action_slot": "waving" },
         {
           "id": "transform_choice",
           "text": "What does {room} transform into?",
@@ -1150,21 +1285,25 @@
           "text": "A {adjective} creature appears with a {prop} in its claws!",
           "action_slot": "looking"
         },
-        { "text": "{toy} trades a smile for the {prop}. New friend made — quest done!", "action_slot": "cheering" }
+        { "text": "{guide_mentor} trades a smile for the {prop}. New friend made — quest done!", "action_slot": "cheering" }
       ]
     },
     {
       "id": "request_play_soak_count_quest_35",
-      "title": "{count}-step quest with {toy}",
+      "title": "{count}-step quest with {quest_giver}",
       "buckets": ["morning", "afternoon", "always"],
+      "required_roles": ["quest_giver"],
+      "optional_roles": ["sidekick", "helper_townsperson"],
+      "recommended_themes": ["adventure", "silly"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "{toy} hands you a quest scroll — exactly {count} tasks await in {room}.", "action_slot": "thinking" },
+        { "text": "{quest_giver} hands you a quest scroll — exactly {count} tasks await in {room}.", "action_slot": "thinking" },
         { "text": "Task one: find {count} {adjective} objects and pile them up.", "expected_action": "child_finds_objects", "action_slot": "looking" },
         { "text": "Task two: {action_verb} around the pile {count} times.", "action_slot": "running" },
         { "text": "Task three: balance a {prop} on your {body_part} for {count} seconds.", "action_slot": "thinking" },
         {
           "id": "final_task",
-          "text": "Final task — {toy} lets you pick:",
+          "text": "Final task — {quest_giver} lets you pick:",
           "choices": [
             { "label": "Roar like a beast", "next": "roar_end" },
             { "label": "Sing a victory song", "next": "song_end" }
@@ -1172,28 +1311,32 @@
         },
         {
           "id": "roar_end",
-          "text": "ROOOOAARRR {count} times! {toy} flinches then bursts into laughter.",
+          "text": "ROOOOAARRR {count} times! {quest_giver} flinches then bursts into laughter.",
           "sfx": "roar",
           "action_slot": "cheering"
         },
         {
           "id": "song_end",
-          "text": "Sing LA-LA-LA at the top of your lungs! {toy} conducts with a {prop}.",
+          "text": "Sing LA-LA-LA at the top of your lungs! {quest_giver} conducts with a {prop}.",
           "action_slot": "cheering"
         }
       ]
     },
     {
       "id": "request_play_soak_adjective_morph_36",
-      "title": "{toy}'s {adjective} morph",
+      "title": "{friend}'s {adjective} morph",
       "buckets": ["afternoon", "always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["trickster"],
+      "recommended_themes": ["silly", "friendship"],
+      "ending_step": { "kind": "joke", "auto": true },
       "steps": [
-        { "text": "{toy} is feeling {adjective} today. Match the energy in {room}!", "action_slot": "thinking" },
-        { "text": "Walk {adjective}-style across the room — show {toy} how.", "action_slot": "running" },
+        { "text": "{friend} is feeling {adjective} today. Match the energy in {room}!", "action_slot": "thinking" },
+        { "text": "Walk {adjective}-style across the room — show {friend} how.", "action_slot": "running" },
         { "text": "Pick up a {prop} the {adjective} way and carry it on your {body_part}.", "action_slot": "looking" },
         {
           "id": "morph_fork",
-          "text": "Now {toy} changes mood. Pick a new feeling:",
+          "text": "Now {friend} changes mood. Pick a new feeling:",
           "choices": [
             { "label": "Sneaky and quiet", "next": "sneaky_end" },
             { "label": "Loud and proud", "next": "loud_end" },
@@ -1202,17 +1345,17 @@
         },
         {
           "id": "sneaky_end",
-          "text": "Tiptoe past {toy} without a sound. Don't even let your {body_part} squeak!",
+          "text": "Tiptoe past {friend} without a sound. Don't even let your {body_part} squeak!",
           "action_slot": "looking"
         },
         {
           "id": "loud_end",
-          "text": "Shout your name {count} times and stomp around. {toy} cheers wildly!",
+          "text": "Shout your name {count} times and stomp around. {friend} cheers wildly!",
           "action_slot": "cheering"
         },
         {
           "id": "dreamy_end",
-          "text": "Drift around with arms outstretched, humming softly. {toy} sways with you.",
+          "text": "Drift around with arms outstretched, humming softly. {friend} sways with you.",
           "action_slot": "waving"
         }
       ]
@@ -1221,13 +1364,17 @@
       "id": "request_play_soak_multi_slot_setup_37",
       "title": "{adjective} {prop} in {room}",
       "buckets": ["afternoon", "always"],
+      "required_roles": ["guide_mentor"],
+      "optional_roles": ["helper_townsperson", "trickster"],
+      "recommended_themes": ["magic", "silly"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
         { "text": "Quick — find a {adjective} {prop} hidden somewhere in {room}.", "expected_action": "child_finds_prop", "action_slot": "looking" },
-        { "text": "Hold the {adjective} {prop} on your {body_part} and walk to {toy}.", "action_slot": "thinking" },
-        { "text": "{toy} inspects it carefully — is it the right one? Spin it slowly.", "action_slot": "looking" },
+        { "text": "Hold the {adjective} {prop} on your {body_part} and walk to {guide_mentor}.", "action_slot": "thinking" },
+        { "text": "{guide_mentor} inspects it carefully — is it the right one? Spin it slowly.", "action_slot": "looking" },
         {
           "id": "verdict_fork",
-          "text": "{toy}'s verdict is in — what happens with the {prop} next?",
+          "text": "{guide_mentor}'s verdict is in — what happens with the {prop} next?",
           "choices": [
             { "label": "Use it as a magic wand", "next": "wand_end" },
             { "label": "Trade for a better one", "next": "trade_end" }
@@ -1240,22 +1387,26 @@
         },
         {
           "id": "trade_end",
-          "text": "Find a different {prop} and swap. {toy} approves — better choice!",
+          "text": "Find a different {prop} and swap. {guide_mentor} approves — better choice!",
           "action_slot": "pointing"
         }
       ]
     },
     {
       "id": "request_play_soak_body_dance_38",
-      "title": "{toy}'s {body_part} dance",
+      "title": "{friend}'s {body_part} dance",
       "buckets": ["morning", "afternoon", "always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["sidekick", "helper_townsperson"],
+      "recommended_themes": ["music", "silly"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "{toy} starts a brand new dance craze: the {body_part} shimmy!", "action_slot": "cheering" },
+        { "text": "{friend} starts a brand new dance craze: the {body_part} shimmy!", "action_slot": "cheering" },
         { "text": "Move only your {body_part} for {count} seconds. The rest of you stays still!", "action_slot": "jumping" },
         { "text": "Now add a {prop} — twirl it as your {body_part} keeps shaking!", "action_slot": "waving" },
         {
           "id": "tempo_fork",
-          "text": "Tempo change! How does {toy} call it?",
+          "text": "Tempo change! How does {friend} call it?",
           "choices": [
             { "label": "Triple speed!", "next": "fast_end" },
             { "label": "Slow motion!", "next": "slow_end" }
@@ -1263,12 +1414,12 @@
         },
         {
           "id": "fast_end",
-          "text": "Shake your {body_part} as fast as you can! {toy} can barely keep up!",
+          "text": "Shake your {body_part} as fast as you can! {friend} can barely keep up!",
           "action_slot": "running"
         },
         {
           "id": "slow_end",
-          "text": "Move your {body_part} sloooooooowly like underwater. {toy} hums along.",
+          "text": "Move your {body_part} sloooooooowly like underwater. {friend} hums along.",
           "action_slot": "thinking"
         }
       ]
@@ -1277,11 +1428,15 @@
       "id": "request_play_soak_layered_action_39",
       "title": "Layered {action_verb} game",
       "buckets": ["morning", "afternoon", "always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["sidekick", "trickster"],
+      "recommended_themes": ["silly", "friendship"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "{toy} invents a game: every step you {action_verb} adds a new layer!", "action_slot": "thinking" },
+        { "text": "{friend} invents a game: every step you {action_verb} adds a new layer!", "action_slot": "thinking" },
         { "text": "Layer one: just {action_verb} across {room}.", "action_slot": "running" },
         { "text": "Layer two: {action_verb} while waving a {prop}.", "action_slot": "waving" },
-        { "text": "Layer three: {action_verb} {adjective}-style with {toy} on your {body_part}!", "action_slot": "jumping" },
+        { "text": "Layer three: {action_verb} {adjective}-style with {friend} on your {body_part}!", "action_slot": "jumping" },
         {
           "id": "boss_fork",
           "text": "Boss layer time — pick the wildest twist:",
@@ -1292,7 +1447,7 @@
         },
         {
           "id": "face_end",
-          "text": "{action_verb} with the silliest face you can make! {toy} can't stop laughing!",
+          "text": "{action_verb} with the silliest face you can make! {friend} can't stop laughing!",
           "action_slot": "jumping"
         },
         {
@@ -1307,11 +1462,15 @@
       "id": "request_play_soak_room_relay_40",
       "title": "{room} relay race",
       "buckets": ["morning", "afternoon", "always"],
+      "required_roles": ["quest_giver"],
+      "optional_roles": ["helper_townsperson", "sidekick"],
+      "recommended_themes": ["silly", "adventure"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "{toy} marks {count} stations around {room}. It's a relay!", "action_slot": "pointing" },
+        { "text": "{quest_giver} marks {count} stations around {room}. It's a relay!", "action_slot": "pointing" },
         { "text": "At station one: {action_verb} in place {count} times.", "action_slot": "jumping" },
         { "text": "Sprint to station two: balance a {prop} on your {body_part}.", "action_slot": "running" },
-        { "text": "Sprint to station three: do a {adjective} pose for {toy} to admire.", "action_slot": "thinking" },
+        { "text": "Sprint to station three: do a {adjective} pose for {quest_giver} to admire.", "action_slot": "thinking" },
         {
           "id": "finish_fork",
           "text": "Finish line approaches! How do you cross it?",
@@ -1322,24 +1481,28 @@
         },
         {
           "id": "leap_end",
-          "text": "Crouch low and LAUNCH across the line! {toy} celebrates the photo finish!",
+          "text": "Crouch low and LAUNCH across the line! {quest_giver} celebrates the photo finish!",
           "action_slot": "jumping"
         },
         {
           "id": "spin_end",
-          "text": "Twirl all the way across. Wave at {toy} mid-spin — what a stylish finish!",
+          "text": "Twirl all the way across. Wave at {quest_giver} mid-spin — what a stylish finish!",
           "action_slot": "waving"
         }
       ]
     },
     {
       "id": "request_play_soak_short_quickdraw_41",
-      "title": "Quick-draw with {toy}",
+      "title": "Quick-draw with {frenemy}",
       "buckets": ["morning", "afternoon", "always"],
+      "required_roles": ["frenemy"],
+      "optional_roles": ["trickster"],
+      "recommended_themes": ["silly", "adventure"],
+      "ending_step": { "kind": "joke", "auto": true },
       "steps": [
         {
           "id": "duel",
-          "text": "Showdown! {toy} stands at the other end of {room}. Pick your move:",
+          "text": "Showdown! {frenemy} stands at the other end of {room}. Pick your move:",
           "action_slot": "thinking",
           "choices": [
             { "label": "Lightning draw!", "next": "lightning" },
@@ -1348,25 +1511,29 @@
         },
         {
           "id": "lightning",
-          "text": "ZIP! Whip out a finger-pistol and shout BANG! {toy} clutches its chest dramatically.",
+          "text": "ZIP! Whip out a finger-pistol and shout BANG! {frenemy} clutches its chest dramatically.",
           "action_slot": "jumping"
         },
         {
           "id": "bluff",
-          "text": "Wink, then dance instead. {toy} laughs so hard it falls over!",
+          "text": "Wink, then dance instead. {frenemy} laughs so hard it falls over!",
           "action_slot": "cheering"
         }
       ]
     },
     {
       "id": "request_play_soak_short_freeze_42",
-      "title": "{toy} freeze game",
+      "title": "{quest_giver} freeze game",
       "buckets": ["morning", "afternoon", "always"],
+      "required_roles": ["quest_giver"],
+      "optional_roles": ["sidekick", "trickster"],
+      "recommended_themes": ["silly", "music"],
+      "ending_step": { "kind": "joke", "auto": true },
       "steps": [
-        { "text": "Dance wildly with {toy} until you hear the magic word!", "action_slot": "jumping" },
+        { "text": "Dance wildly with {quest_giver} until you hear the magic word!", "action_slot": "jumping" },
         {
           "id": "freeze_choice",
-          "text": "FREEZE! {toy} calls a pose — which one?",
+          "text": "FREEZE! {quest_giver} calls a pose — which one?",
           "choices": [
             { "label": "Statue pose", "next": "statue" },
             { "label": "Animal pose", "next": "animal" }
@@ -1374,12 +1541,12 @@
         },
         {
           "id": "statue",
-          "text": "Hold perfectly still! Don't even blink. {toy} inspects with a magnifying eye.",
+          "text": "Hold perfectly still! Don't even blink. {quest_giver} inspects with a magnifying eye.",
           "action_slot": "idle"
         },
         {
           "id": "animal",
-          "text": "Freeze in a {adjective} animal shape — {toy} guesses which one!",
+          "text": "Freeze in a {adjective} animal shape — {quest_giver} guesses which one!",
           "action_slot": "thinking"
         }
       ]
@@ -1388,11 +1555,15 @@
       "id": "request_play_soak_short_burst_43",
       "title": "{count}-second burst",
       "buckets": ["morning", "afternoon", "always"],
+      "required_roles": ["quest_giver"],
+      "optional_roles": ["sidekick"],
+      "recommended_themes": ["silly", "adventure"],
+      "ending_step": { "kind": "joke", "auto": true },
       "steps": [
-        { "text": "{toy} sets a {count}-second timer. Ready, set...", "action_slot": "thinking" },
+        { "text": "{quest_giver} sets a {count}-second timer. Ready, set...", "action_slot": "thinking" },
         {
           "id": "burst_choice",
-          "text": "GO! What burst does {toy} pick?",
+          "text": "GO! What burst does {quest_giver} pick?",
           "choices": [
             { "label": "{action_verb} sprint", "next": "sprint" },
             { "label": "Silly noise burst", "next": "noise" }
@@ -1400,25 +1571,29 @@
         },
         {
           "id": "sprint",
-          "text": "{action_verb} as fast as you can until time's up! {toy} shouts STOP!",
+          "text": "{action_verb} as fast as you can until time's up! {quest_giver} shouts STOP!",
           "action_slot": "running"
         },
         {
           "id": "noise",
-          "text": "Make the wackiest noises possible — {toy} laughs the whole way through!",
+          "text": "Make the wackiest noises possible — {quest_giver} laughs the whole way through!",
           "action_slot": "cheering"
         }
       ]
     },
     {
       "id": "request_play_soak_short_mirror_44",
-      "title": "Mirror {toy}",
+      "title": "Mirror {friend}",
       "buckets": ["morning", "afternoon", "always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["trickster"],
+      "recommended_themes": ["friendship", "silly"],
+      "ending_step": { "kind": "joke", "auto": true },
       "steps": [
-        { "text": "Stand face-to-face with {toy}. Whatever {toy} does, you copy!", "action_slot": "looking" },
+        { "text": "Stand face-to-face with {friend}. Whatever {friend} does, you copy!", "action_slot": "looking" },
         {
           "id": "mirror_choice",
-          "text": "Pick the mirror challenge {toy} starts with:",
+          "text": "Pick the mirror challenge {friend} starts with:",
           "choices": [
             { "label": "Slow motion match", "next": "slow_mirror" },
             { "label": "Funny face battle", "next": "face_mirror" }
@@ -1426,12 +1601,12 @@
         },
         {
           "id": "slow_mirror",
-          "text": "Move sloooowly — every motion of your {body_part} mirrors {toy}'s.",
+          "text": "Move sloooowly — every motion of your {body_part} mirrors {friend}'s.",
           "action_slot": "thinking"
         },
         {
           "id": "face_mirror",
-          "text": "Pull the silliest face you can! {toy} matches it back. Crack up first loses!",
+          "text": "Pull the silliest face you can! {friend} matches it back. Crack up first loses!",
           "action_slot": "cheering"
         }
       ]
@@ -1440,11 +1615,14 @@
       "id": "request_play_soak_short_secret_45",
       "title": "Whisper a secret",
       "buckets": ["evening", "wind_down", "always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["sidekick"],
+      "recommended_themes": ["friendship", "magic"],
       "steps": [
-        { "text": "Lean in close — {toy} has a secret to share in {room}.", "action_slot": "thinking" },
+        { "text": "Lean in close — {friend} has a secret to share in {room}.", "action_slot": "thinking" },
         {
           "id": "reveal_choice",
-          "text": "{toy} whispers — what's the secret about?",
+          "text": "{friend} whispers — what's the secret about?",
           "choices": [
             { "label": "Hidden treasure", "next": "treasure_secret" },
             { "label": "Surprise party", "next": "party_secret" },
@@ -1458,7 +1636,7 @@
         },
         {
           "id": "party_secret",
-          "text": "{toy} is throwing you a surprise party! Pretend to be surprised!",
+          "text": "{friend} is throwing you a surprise party! Pretend to be surprised!",
           "action_slot": "cheering"
         },
         {
@@ -1470,16 +1648,20 @@
     },
     {
       "id": "request_play_soak_long_grand_quest_46",
-      "title": "{toy}'s grand quest",
+      "title": "{friend}'s grand quest",
       "buckets": ["afternoon", "always"],
+      "required_roles": ["friend", "guide_mentor"],
+      "optional_roles": ["big_bad_boss", "helper_townsperson"],
+      "recommended_themes": ["adventure", "magic"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "An ancient prophecy! {toy} must save {room} from a curse.", "action_slot": "thinking" },
+        { "text": "An ancient prophecy! {friend} must save {room} from a curse.", "action_slot": "thinking" },
         { "text": "Pack your bag — grab a {prop}, a snack, and a brave heart.", "action_slot": "looking" },
         { "text": "Cross the threshold and step outside the safe zone.", "action_slot": "running" },
-        { "text": "A wise wizard greets you with a riddle. Think hard about your answer.", "action_slot": "thinking" },
+        { "text": "{guide_mentor} greets you with a riddle. Think hard about your answer.", "action_slot": "thinking" },
         {
           "id": "path_choice",
-          "text": "The wizard points to two roads:",
+          "text": "{guide_mentor} points to two roads:",
           "choices": [
             { "label": "Forest of whispers", "next": "forest_path" },
             { "label": "Mountain of mist", "next": "mountain_path" }
@@ -1505,7 +1687,7 @@
         },
         {
           "id": "fight_fork",
-          "text": "How does {toy} defeat the beast?",
+          "text": "How does {friend} defeat the beast?",
           "choices": [
             { "label": "Strike with the {prop}", "next": "strike_end" },
             { "label": "Tell it a {adjective} joke", "next": "joke_end" }
@@ -1513,30 +1695,34 @@
         },
         {
           "id": "strike_end",
-          "text": "BAM! The {prop} strikes true and the curse lifts. {toy} crowns you a hero!",
+          "text": "BAM! The {prop} strikes true and the curse lifts. {friend} crowns you a hero!",
           "action_slot": "cheering"
         },
         {
           "id": "joke_end",
-          "text": "The beast laughs so hard the curse shatters. {toy} bursts into proud applause!",
+          "text": "The beast laughs so hard the curse shatters. {friend} bursts into proud applause!",
           "action_slot": "cheering"
         }
       ]
     },
     {
       "id": "request_play_soak_long_world_tour_47",
-      "title": "{toy}'s world tour",
+      "title": "{guide_mentor}'s world tour",
       "buckets": ["afternoon", "always"],
+      "required_roles": ["guide_mentor"],
+      "optional_roles": ["sidekick", "helper_townsperson"],
+      "recommended_themes": ["adventure", "animals"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "Buckle up! {toy} announces a world tour starting from {room}.", "action_slot": "cheering" },
+        { "text": "Buckle up! {guide_mentor} announces a world tour starting from {room}.", "action_slot": "cheering" },
         { "text": "First stop: hot desert. Trudge through pretend sand dunes.", "action_slot": "running" },
         { "text": "Spot a camel — wave hello and feed it an imaginary date.", "action_slot": "waving" },
         { "text": "Second stop: snowy tundra. Shiver and rub your arms!", "action_slot": "thinking" },
-        { "text": "Build a tiny snowman with {toy} (or a sock pile).", "action_slot": "idle" },
+        { "text": "Build a tiny snowman with {guide_mentor} (or a sock pile).", "action_slot": "idle" },
         { "text": "Third stop: rainforest. Listen for monkey calls and bird trills.", "sfx": "jungle", "action_slot": "looking" },
         {
           "id": "rainforest_fork",
-          "text": "Which path does {toy} choose in the rainforest?",
+          "text": "Which path does {guide_mentor} choose in the rainforest?",
           "choices": [
             { "label": "Up to the canopy", "next": "canopy" },
             { "label": "Down to the river", "next": "river" }
@@ -1544,7 +1730,7 @@
         },
         {
           "id": "canopy",
-          "text": "Climb tall trees! Swing arm-over-arm like a monkey holding {toy}.",
+          "text": "Climb tall trees! Swing arm-over-arm like a monkey holding {guide_mentor}.",
           "action_slot": "jumping",
           "next": "homeward"
         },
@@ -1564,16 +1750,20 @@
     },
     {
       "id": "request_play_soak_long_factory_48",
-      "title": "{toy}'s toy factory",
+      "title": "{quest_giver}'s toy factory",
       "buckets": ["afternoon", "always"],
+      "required_roles": ["quest_giver"],
+      "optional_roles": ["helper_townsperson", "sidekick"],
+      "recommended_themes": ["silly", "vehicles"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "Punch the time clock! {toy} runs the toy factory in {room}.", "action_slot": "cheering" },
+        { "text": "Punch the time clock! {quest_giver} runs the toy factory in {room}.", "action_slot": "cheering" },
         { "text": "Inspect the conveyor belt — your {body_part} is the scanner.", "action_slot": "looking" },
         { "text": "Stack {count} imaginary boxes neatly in a row.", "action_slot": "idle" },
         { "text": "ALERT! A box is wobbling. Steady it carefully!", "sfx": "alarm", "action_slot": "thinking" },
         {
           "id": "shift_fork",
-          "text": "Lunch break decision — what does {toy} do?",
+          "text": "Lunch break decision — what does {quest_giver} do?",
           "choices": [
             { "label": "Speed shift overtime", "next": "overtime_path" },
             { "label": "Big creative break", "next": "break_path" }
@@ -1587,7 +1777,7 @@
         },
         {
           "id": "break_path",
-          "text": "Sketch a {adjective} new toy design with {toy} cheering you on.",
+          "text": "Sketch a {adjective} new toy design with {quest_giver} cheering you on.",
           "action_slot": "thinking",
           "next": "shipping"
         },
@@ -1596,22 +1786,26 @@
           "text": "Time to ship! Load the imaginary truck with all your boxes.",
           "action_slot": "running"
         },
-        { "text": "Wave goodbye as the truck rolls out. {toy} hangs the EMPLOYEE-OF-THE-MONTH sign on you!", "action_slot": "waving" }
+        { "text": "Wave goodbye as the truck rolls out. {quest_giver} hangs the EMPLOYEE-OF-THE-MONTH sign on you!", "action_slot": "waving" }
       ]
     },
     {
       "id": "request_play_soak_long_school_play_49",
-      "title": "{toy}'s school play",
+      "title": "{quest_giver}'s school play",
       "buckets": ["afternoon", "evening", "always"],
+      "required_roles": ["quest_giver"],
+      "optional_roles": ["sidekick", "helper_townsperson"],
+      "recommended_themes": ["music", "silly"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "Curtain up soon! {toy} casts you in the {room} school play.", "action_slot": "cheering" },
+        { "text": "Curtain up soon! {quest_giver} casts you in the {room} school play.", "action_slot": "cheering" },
         { "text": "Audition warmup — say HELLO {count} different ways.", "action_slot": "thinking" },
-        { "text": "Try a {adjective} accent. {toy} nods approval.", "action_slot": "pointing" },
+        { "text": "Try a {adjective} accent. {quest_giver} nods approval.", "action_slot": "pointing" },
         { "text": "Now act sad — let your {body_part} droop dramatically.", "action_slot": "thinking" },
         { "text": "Costume time — drape a blanket and grab a {prop}.", "action_slot": "idle" },
         {
           "id": "role_fork",
-          "text": "Which role does {toy} cast you in?",
+          "text": "Which role does {quest_giver} cast you in?",
           "choices": [
             { "label": "Brave hero", "next": "hero_path" },
             { "label": "Sneaky villain", "next": "villain_path" },
@@ -1632,7 +1826,7 @@
         },
         {
           "id": "sidekick_path",
-          "text": "Trip over your own feet (on purpose!) and bonk into {toy}.",
+          "text": "Trip over your own feet (on purpose!) and bonk into {quest_giver}.",
           "action_slot": "jumping",
           "next": "showtime"
         },
@@ -1642,22 +1836,26 @@
           "sfx": "applause",
           "action_slot": "cheering"
         },
-        { "text": "Take three bows. {toy} hands you a bouquet of imaginary flowers!", "action_slot": "waving" }
+        { "text": "Take three bows. {quest_giver} hands you a bouquet of imaginary flowers!", "action_slot": "waving" }
       ]
     },
     {
       "id": "request_play_soak_long_underground_50",
-      "title": "Underground tunnels with {toy}",
+      "title": "Underground tunnels with {friend}",
       "buckets": ["afternoon", "always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["sidekick", "guide_mentor"],
+      "recommended_themes": ["adventure", "magic"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "{toy} discovers a secret hatch hidden under a {prop} in {room}!", "action_slot": "looking" },
+        { "text": "{friend} discovers a secret hatch hidden under a {prop} in {room}!", "action_slot": "looking" },
         { "text": "Pry it open with your {body_part} — the hinges creak loudly.", "sfx": "creak", "action_slot": "thinking" },
         { "text": "Climb down a rope ladder, one rung at a time.", "action_slot": "thinking" },
         { "text": "It's pitch dark. Click on your imaginary headlamp.", "action_slot": "looking" },
         { "text": "Tunnels branch in many directions — listen for echoes.", "action_slot": "thinking" },
         {
           "id": "tunnel_fork",
-          "text": "Three tunnels stretch ahead. Which does {toy} pick?",
+          "text": "Three tunnels stretch ahead. Which does {friend} pick?",
           "choices": [
             { "label": "The {adjective} glowing one", "next": "glow_path" },
             { "label": "The watery one", "next": "water_path" },
@@ -1697,7 +1895,7 @@
         },
         {
           "id": "wake_end",
-          "text": "It yawns and grins — turns out it's friendly! It walks you home with {toy}.",
+          "text": "It yawns and grins — turns out it's friendly! It walks you home with {friend}.",
           "action_slot": "waving"
         },
         {
