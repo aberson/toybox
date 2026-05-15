@@ -5,8 +5,12 @@
       "id": "request_story_soak_dragon_01",
       "title": "The dragon and the lantern",
       "buckets": ["evening", "wind_down"],
+      "required_roles": ["friend"],
+      "optional_roles": ["guide_mentor", "needs_saving"],
+      "recommended_themes": ["adventure", "magic"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "Long ago, a small dragon named Pim lived high above {room}. {toy} settles in to listen.", "action_slot": "thinking" },
+        { "text": "Long ago, a small dragon named Pim lived high above {room}. {friend} settles in to listen.", "action_slot": "thinking" },
         { "text": "Pim could not breathe fire — only puffs of warm steam. The other dragons giggled.", "action_slot": "confused" },
         { "text": "One night Pim saw a tiny lantern bobbing across the valley. Someone was lost.", "action_slot": "looking" },
         { "text": "Pim's wings trembled. The valley was {adjective} and full of shadows.", "action_slot": "thinking" },
@@ -34,10 +38,13 @@
       "id": "request_story_soak_river_02",
       "title": "Two paths to the river",
       "buckets": ["afternoon", "always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["helper_townsperson"],
+      "recommended_themes": ["adventure", "animals"],
       "steps": [
         {
           "id": "open",
-          "text": "{toy} stands at the edge of a meadow. The old river song calls from far away.",
+          "text": "{friend} stands at the edge of a meadow. The old river song calls from far away.",
           "action_slot": "looking",
           "choices": [
             { "label": "Take the orchard path", "next": "orchard" },
@@ -52,7 +59,7 @@
         },
         {
           "id": "stones",
-          "text": "The stones are cool and smooth. {toy} hops from one to the next, counting to {count}.",
+          "text": "The stones are cool and smooth. {friend} hops from one to the next, counting to {count}.",
           "action_slot": "jumping",
           "next": "bridge"
         },
@@ -61,21 +68,25 @@
           "text": "Both paths meet at a wooden bridge. The river hums underneath, sleepy and slow.",
           "action_slot": "thinking"
         },
-        { "text": "{toy} sits on the bridge and listens. The river's song says: thank you for coming. The end.", "action_slot": "sleeping" }
+        { "text": "{friend} sits on the bridge and listens. The river's song says: thank you for coming. The end.", "action_slot": "sleeping" }
       ]
     },
     {
       "id": "request_story_soak_lostkey_03",
       "title": "The lost key",
       "buckets": ["always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["guide_mentor", "helper_townsperson"],
+      "recommended_themes": ["magic", "adventure"],
+      "ending_step": { "kind": "joke", "auto": true },
       "steps": [
-        { "text": "{toy} found a {adjective} door at the back of {room}. It needed a key.", "action_slot": "looking" },
+        { "text": "{friend} found a {adjective} door at the back of {room}. It needed a key.", "action_slot": "looking" },
         { "text": "An old turtle whispered: the key is hidden where laughter is loudest.", "action_slot": "thinking" },
-        { "text": "{toy} listened. From the kitchen came a giggle. From the garden came a shout.", "action_slot": "looking" },
+        { "text": "{friend} listened. From the kitchen came a giggle. From the garden came a shout.", "action_slot": "looking" },
         { "text": "Both places were full of friends. Both were full of noise.", "action_slot": "confused" },
         {
           "id": "fork",
-          "text": "Which way does {toy} go?",
+          "text": "Which way does {friend} go?",
           "choices": [
             { "label": "Toward the giggle", "next": "kitchen" },
             { "label": "Toward the shout", "next": "garden" }
@@ -88,7 +99,7 @@
         },
         {
           "id": "garden",
-          "text": "In the garden, the key dangled from a sunflower. {toy} thanked the flower with a bow. The end.",
+          "text": "In the garden, the key dangled from a sunflower. {friend} thanked the flower with a bow. The end.",
           "action_slot": "waving"
         }
       ]
@@ -97,10 +108,14 @@
       "id": "request_story_soak_thiefcake_04",
       "title": "The very polite thief",
       "buckets": ["afternoon", "evening"],
+      "required_roles": ["friend", "frenemy"],
+      "optional_roles": ["helper_townsperson"],
+      "recommended_themes": ["silly", "friendship"],
+      "ending_step": { "kind": "joke", "auto": true },
       "steps": [
         {
           "id": "open",
-          "text": "Someone has been taking one slice of cake every night. {toy} decides to investigate.",
+          "text": "Someone has been taking one slice of cake every night. {friend} decides to investigate.",
           "action_slot": "thinking",
           "choices": [
             { "label": "Hide behind the {prop}", "next": "hide" },
@@ -110,25 +125,25 @@
         },
         {
           "id": "hide",
-          "text": "From behind the {prop}, {toy} sees a small badger tiptoe in, bow politely, and pick up a slice.",
+          "text": "From behind the {prop}, {friend} sees the {frenemy} tiptoe in, bow politely, and pick up a slice.",
           "action_slot": "looking",
           "next": "meet"
         },
         {
           "id": "window",
-          "text": "Near the window, {toy} sees a small badger arrive, pause to wipe its paws on the mat, and step inside.",
+          "text": "Near the window, {friend} sees the {frenemy} arrive, pause to wipe its paws on the mat, and step inside.",
           "action_slot": "looking",
           "next": "meet"
         },
         {
           "id": "note",
-          "text": "The note says 'please share' — and in the morning, {toy} finds a tiny thank-you drawn in crumbs.",
+          "text": "The note says 'please share' — and in the morning, {friend} finds a tiny thank-you drawn in crumbs.",
           "action_slot": "thinking",
           "next": "meet"
         },
         {
           "id": "meet",
-          "text": "The badger isn't a thief at all — it's a baker bringing samples to taste. They share a slice together. The end.",
+          "text": "The {frenemy} isn't a thief at all — it's a baker bringing samples to taste. They share a slice together. The end.",
           "action_slot": "cheering"
         }
       ]
@@ -137,6 +152,9 @@
       "id": "request_story_soak_starwhale_05",
       "title": "The whale who carried stars",
       "buckets": ["evening", "wind_down"],
+      "required_roles": ["friend"],
+      "optional_roles": ["guide_mentor", "needs_saving"],
+      "recommended_themes": ["magic", "space"],
       "steps": [
         { "text": "Far above the clouds swam a whale named Drift. On her back, she carried a basket of stars.", "action_slot": "thinking" },
         { "text": "Each night Drift placed one star in the sky. Tonight her basket was almost empty.", "action_slot": "looking" },
@@ -153,7 +171,7 @@
         },
         {
           "id": "home",
-          "text": "The star settled above {room} and twinkled softly. {toy} saw it through the window and made a wish. The end.",
+          "text": "The star settled above {room} and twinkled softly. {friend} saw it through the window and made a wish. The end.",
           "action_slot": "sleeping"
         },
         {
@@ -167,12 +185,15 @@
       "id": "request_story_soak_quietsong_06",
       "title": "A quiet little song",
       "buckets": ["wind_down"],
+      "required_roles": ["friend"],
+      "optional_roles": ["helper_townsperson"],
+      "recommended_themes": ["music", "friendship"],
       "steps": [
-        { "text": "{toy} couldn't sleep. The night was too quiet.", "action_slot": "thinking" },
+        { "text": "{friend} couldn't sleep. The night was too quiet.", "action_slot": "thinking" },
         { "text": "A moth landed on the windowsill. 'I know a song for quiet nights,' it whispered.", "action_slot": "looking" },
         {
           "id": "fork",
-          "text": "Does {toy} learn the song?",
+          "text": "Does {friend} learn the song?",
           "choices": [
             { "label": "Yes, hum along", "next": "hum" },
             { "label": "Just listen", "next": "listen" }
@@ -180,24 +201,28 @@
         },
         {
           "id": "hum",
-          "text": "{toy} hummed and the moth hummed back. The room filled with a soft, sleepy buzz. The end.",
+          "text": "{friend} hummed and the moth hummed back. The room filled with a soft, sleepy buzz. The end.",
           "action_slot": "sleeping"
         },
         {
           "id": "listen",
-          "text": "{toy} listened with eyes closing slowly. The moth sang until {toy} dreamed of warm sunlight. The end.",
+          "text": "{friend} listened with eyes closing slowly. The moth sang until {friend} dreamed of warm sunlight. The end.",
           "action_slot": "sleeping"
         }
       ]
     },
     {
       "id": "request_story_soak_marketmouse_07",
-      "title": "Market day with {toy}",
+      "title": "Market day with {friend}",
       "buckets": ["morning", "afternoon"],
+      "required_roles": ["friend"],
+      "optional_roles": ["helper_townsperson", "sidekick"],
+      "recommended_themes": ["friendship", "food"],
+      "ending_step": { "kind": "joke", "auto": true },
       "steps": [
         {
           "id": "open",
-          "text": "It's market day! {toy} has three coins and a list of one item: a {adjective} something for a friend.",
+          "text": "It's market day! {friend} has three coins and a list of one item: a {adjective} something for a friend.",
           "action_slot": "thinking",
           "choices": [
             { "label": "Visit the cheese mouse", "next": "cheese" },
@@ -213,7 +238,7 @@
         },
         {
           "id": "ribbon",
-          "text": "The ribbon shop has every color. {toy} picks a {adjective} ribbon for two coins.",
+          "text": "The ribbon shop has every color. {friend} picks a {adjective} ribbon for two coins.",
           "action_slot": "looking",
           "next": "fountain"
         },
@@ -225,7 +250,7 @@
         },
         {
           "id": "fountain",
-          "text": "{toy} sits by the fountain and wraps the gift carefully. A friend will be very happy. The end.",
+          "text": "{friend} sits by the fountain and wraps the gift carefully. A friend will be very happy. The end.",
           "action_slot": "cheering"
         }
       ]
@@ -234,13 +259,16 @@
       "id": "request_story_soak_attic_08",
       "title": "The attic door",
       "buckets": ["afternoon", "evening"],
+      "required_roles": ["friend"],
+      "optional_roles": ["guide_mentor"],
+      "recommended_themes": ["adventure", "magic"],
       "steps": [
-        { "text": "{toy} discovered an attic door above {room} that no one had opened in years.", "action_slot": "looking" },
+        { "text": "{friend} discovered an attic door above {room} that no one had opened in years.", "action_slot": "looking" },
         { "text": "Dust hung in the air like floating sugar. The ladder creaked.", "sfx": "creak", "action_slot": "thinking" },
-        { "text": "Inside the attic, {toy} found three boxes labeled 'memories,' 'maybe-someday,' and 'do not open.'", "action_slot": "confused" },
+        { "text": "Inside the attic, {friend} found three boxes labeled 'memories,' 'maybe-someday,' and 'do not open.'", "action_slot": "confused" },
         {
           "id": "fork",
-          "text": "Which box does {toy} open?",
+          "text": "Which box does {friend} open?",
           "choices": [
             { "label": "The memories box", "next": "memories" },
             { "label": "The maybe-someday box", "next": "someday" }
@@ -248,12 +276,12 @@
         },
         {
           "id": "memories",
-          "text": "Inside were photos of a younger {toy} and a tiny note: 'Remember to be brave.' {toy} smiled and tucked the note in a pocket. The end.",
+          "text": "Inside were photos of a younger {friend} and a tiny note: 'Remember to be brave.' {friend} smiled and tucked the note in a pocket. The end.",
           "action_slot": "thinking"
         },
         {
           "id": "someday",
-          "text": "Inside was a folded paper kite, never flown. 'Today,' {toy} decided, 'is someday.' The end.",
+          "text": "Inside was a folded paper kite, never flown. 'Today,' {friend} decided, 'is someday.' The end.",
           "action_slot": "cheering"
         }
       ]
@@ -262,10 +290,13 @@
       "id": "request_story_soak_snowfox_09",
       "title": "The fox who counted snowflakes",
       "buckets": ["wind_down", "evening"],
+      "required_roles": ["friend"],
+      "optional_roles": ["sidekick"],
+      "recommended_themes": ["animals", "weather"],
       "steps": [
         { "text": "A small white fox lived where the snow never melted. Her favorite thing was counting flakes.", "action_slot": "looking" },
         { "text": "Tonight, the sky dropped flakes faster than her paws could count. She got to {count} and lost track.", "action_slot": "confused" },
-        { "text": "{toy} arrived bundled in a scarf and offered to help count.", "action_slot": "waving" },
+        { "text": "{friend} arrived bundled in a scarf and offered to help count.", "action_slot": "waving" },
         { "text": "Together they counted slowly, two by two, until their voices got drowsy.", "action_slot": "thinking" },
         {
           "id": "fork",
@@ -291,13 +322,17 @@
       "id": "request_story_soak_robotgarden_10",
       "title": "The robot in the garden",
       "buckets": ["morning", "afternoon"],
+      "required_roles": ["friend", "needs_saving"],
+      "optional_roles": ["helper_townsperson"],
+      "recommended_themes": ["friendship", "adventure"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "{toy} found a small robot crouched between the tomato plants. It was not moving.", "action_slot": "looking" },
+        { "text": "{friend} found the {needs_saving} crouched between the tomato plants. It was not moving.", "action_slot": "looking" },
         { "text": "On its chest blinked a tiny red light. Beside it lay a {prop} it had been holding.", "action_slot": "thinking" },
-        { "text": "{toy} read the side of the robot. It said: 'GENTLE HANDS ONLY.'", "action_slot": "confused" },
+        { "text": "{friend} read the side of the robot. It said: 'GENTLE HANDS ONLY.'", "action_slot": "confused" },
         {
           "id": "fork",
-          "text": "How does {toy} help?",
+          "text": "How does {friend} help?",
           "choices": [
             { "label": "Wipe off the dirt softly", "next": "wipe" },
             { "label": "Press the red light", "next": "press" }
@@ -319,11 +354,15 @@
       "id": "request_story_soak_lighthouse_11",
       "title": "The lighthouse keeper's secret",
       "buckets": ["evening"],
+      "required_roles": ["friend", "guide_mentor"],
+      "optional_roles": ["helper_townsperson"],
+      "recommended_themes": ["music", "friendship"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "Old Marlo was the keeper of a tiny seaside lighthouse. {toy} came to visit one foggy night.", "action_slot": "thinking" },
-        { "text": "Marlo's lantern was warm and bright, but the room was full of {adjective} clutter.", "action_slot": "looking" },
-        { "text": "On a high shelf sat a wooden box Marlo never opened. {toy} asked about it gently.", "action_slot": "pointing" },
-        { "text": "Marlo sighed. 'Inside is a song my mother taught me. I'm afraid I've forgotten it.'", "action_slot": "confused" },
+        { "text": "The {guide_mentor} was the keeper of a tiny seaside lighthouse. {friend} came to visit one foggy night.", "action_slot": "thinking" },
+        { "text": "The lantern was warm and bright, but the room was full of {adjective} clutter.", "action_slot": "looking" },
+        { "text": "On a high shelf sat a wooden box the {guide_mentor} never opened. {friend} asked about it gently.", "action_slot": "pointing" },
+        { "text": "The {guide_mentor} sighed. 'Inside is a song my mother taught me. I'm afraid I've forgotten it.'", "action_slot": "confused" },
         { "text": "Together they reached for the box. The lid creaked open.", "sfx": "creak", "action_slot": "looking" },
         {
           "id": "fork",
@@ -335,12 +374,12 @@
         },
         {
           "id": "music",
-          "text": "A tiny crank turned and the song played itself. Marlo's eyes filled. 'There you are,' Marlo whispered. The end.",
+          "text": "A tiny crank turned and the song played itself. The {guide_mentor}'s eyes filled. 'There you are,' they whispered. The end.",
           "action_slot": "cheering"
         },
         {
           "id": "letter",
-          "text": "The letter held the lyrics. Marlo read them aloud and remembered the tune in the middle of the third line. The end.",
+          "text": "The letter held the lyrics. The {guide_mentor} read them aloud and remembered the tune in the middle of the third line. The end.",
           "action_slot": "thinking"
         }
       ]
@@ -349,10 +388,14 @@
       "id": "request_story_soak_threebridges_12",
       "title": "Three bridges to the castle",
       "buckets": ["afternoon"],
+      "required_roles": ["friend"],
+      "optional_roles": ["helper_townsperson", "guide_mentor"],
+      "recommended_themes": ["knights", "adventure", "magic"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
         {
           "id": "open",
-          "text": "{toy} stood before three bridges leading to a castle on a hill. Each bridge whispered a different promise.",
+          "text": "{friend} stood before three bridges leading to a castle on a hill. Each bridge whispered a different promise.",
           "action_slot": "thinking",
           "choices": [
             { "label": "The bridge of riddles", "next": "riddles" },
@@ -362,19 +405,19 @@
         },
         {
           "id": "riddles",
-          "text": "A friendly troll asked: what has hands but cannot wave? {toy} guessed: a clock! The troll laughed and stepped aside.",
+          "text": "A friendly troll asked: what has hands but cannot wave? {friend} guessed: a clock! The troll laughed and stepped aside.",
           "action_slot": "thinking",
           "next": "gate"
         },
         {
           "id": "bells",
-          "text": "Bells rang as {toy} stepped on each plank. By the end, {toy} was humming along with the bridge.",
+          "text": "Bells rang as {friend} stepped on each plank. By the end, {friend} was humming along with the bridge.",
           "action_slot": "cheering",
           "next": "gate"
         },
         {
           "id": "mirrors",
-          "text": "Each mirror showed {toy} a little braver than the last. The final mirror smiled and said, 'Go on, then.'",
+          "text": "Each mirror showed {friend} a little braver than the last. The final mirror smiled and said, 'Go on, then.'",
           "action_slot": "waving",
           "next": "gate"
         },
@@ -389,25 +432,28 @@
       "id": "request_story_soak_pebblepocket_13",
       "title": "The pebble in the pocket",
       "buckets": ["always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["sidekick"],
+      "recommended_themes": ["magic"],
       "steps": [
-        { "text": "{toy} found a small smooth pebble that hummed when held tightly.", "action_slot": "thinking" },
-        { "text": "The pebble's hum changed depending on what {toy} thought about.", "action_slot": "looking" },
+        { "text": "{friend} found a small smooth pebble that hummed when held tightly.", "action_slot": "thinking" },
+        { "text": "The pebble's hum changed depending on what {friend} thought about.", "action_slot": "looking" },
         {
           "id": "fork",
-          "text": "What does {toy} think about?",
+          "text": "What does {friend} think about?",
           "choices": [
             { "label": "A faraway forest", "next": "forest" },
-            { "label": "An old friend", "next": "friend" }
+            { "label": "An old friend", "next": "friend_thought" }
           ]
         },
         {
           "id": "forest",
-          "text": "The pebble sang of pines and rain. {toy} closed its eyes and walked through tall green halls in its mind. The end.",
+          "text": "The pebble sang of pines and rain. {friend} closed its eyes and walked through tall green halls in its mind. The end.",
           "action_slot": "sleeping"
         },
         {
-          "id": "friend",
-          "text": "The pebble hummed soft and slow, like a remembered laugh. {toy} smiled and tucked the pebble away. The end.",
+          "id": "friend_thought",
+          "text": "The pebble hummed soft and slow, like a remembered laugh. {friend} smiled and tucked the pebble away. The end.",
           "action_slot": "thinking"
         }
       ]
@@ -416,13 +462,16 @@
       "id": "request_story_soak_libraryowl_14",
       "title": "The library owl",
       "buckets": ["evening", "wind_down"],
+      "required_roles": ["friend", "guide_mentor"],
+      "optional_roles": ["helper_townsperson"],
+      "recommended_themes": ["magic", "animals"],
       "steps": [
-        { "text": "Past midnight, the library belonged to an old owl named Quill. {toy} had a special pass.", "action_slot": "thinking" },
-        { "text": "Quill led {toy} between the tall shelves. The books rustled softly, awake and listening.", "action_slot": "looking" },
-        { "text": "'Tonight,' said Quill, 'you may pick any one book to read. But choose with your heart.'", "action_slot": "thinking" },
+        { "text": "Past midnight, the library belonged to the old {guide_mentor}. {friend} had a special pass.", "action_slot": "thinking" },
+        { "text": "The {guide_mentor} led {friend} between the tall shelves. The books rustled softly, awake and listening.", "action_slot": "looking" },
+        { "text": "'Tonight,' said the {guide_mentor}, 'you may pick any one book to read. But choose with your heart.'", "action_slot": "thinking" },
         {
           "id": "fork",
-          "text": "Which book does {toy} pick?",
+          "text": "Which book does {friend} pick?",
           "choices": [
             { "label": "The book that glowed", "next": "glow" },
             { "label": "The book that sighed", "next": "sigh" }
@@ -430,12 +479,12 @@
         },
         {
           "id": "glow",
-          "text": "Inside were maps to places that didn't exist yet — places {toy} would invent in dreams. The end.",
+          "text": "Inside were maps to places that didn't exist yet — places {friend} would invent in dreams. The end.",
           "action_slot": "sleeping"
         },
         {
           "id": "sigh",
-          "text": "It was a story of a tired bear who wanted to nap. By page three, {toy} was yawning along. The end.",
+          "text": "It was a story of a tired bear who wanted to nap. By page three, {friend} was yawning along. The end.",
           "action_slot": "sleeping"
         }
       ]
@@ -444,11 +493,15 @@
       "id": "request_story_soak_kitewind_15",
       "title": "Where the kite went",
       "buckets": ["morning", "afternoon"],
+      "required_roles": ["friend"],
+      "optional_roles": ["helper_townsperson", "trickster"],
+      "recommended_themes": ["animals", "weather"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "{toy} flew a paper kite on a blustery hill. The string slipped — and the kite was gone.", "action_slot": "confused" },
+        { "text": "{friend} flew a paper kite on a blustery hill. The string slipped — and the kite was gone.", "action_slot": "confused" },
         {
           "id": "fork",
-          "text": "Where does {toy} look first?",
+          "text": "Where does {friend} look first?",
           "choices": [
             { "label": "Up in a tall tree", "next": "tree" },
             { "label": "Down by the pond", "next": "pond" },
@@ -463,19 +516,19 @@
         },
         {
           "id": "pond",
-          "text": "The kite floated like a tiny boat. A frog rode on top, happy as could be. {toy} waved hello.",
+          "text": "The kite floated like a tiny boat. A frog rode on top, happy as could be. {friend} waved hello.",
           "action_slot": "waving",
           "next": "home"
         },
         {
           "id": "field",
-          "text": "The kite was tangled in tall grass. A rabbit was nibbling the string. {toy} thanked the rabbit politely.",
+          "text": "The kite was tangled in tall grass. A rabbit was nibbling the string. {friend} thanked the rabbit politely.",
           "action_slot": "thinking",
           "next": "home"
         },
         {
           "id": "home",
-          "text": "{toy} carried the kite home, not in a hurry. The wind blew gentle now, like it was tired too. The end.",
+          "text": "{friend} carried the kite home, not in a hurry. The wind blew gentle now, like it was tired too. The end.",
           "action_slot": "sleeping"
         }
       ]
@@ -484,6 +537,10 @@
       "id": "request_story_soak_chimneymouse_16",
       "title": "The chimney mouse",
       "buckets": ["evening", "wind_down"],
+      "required_roles": ["friend"],
+      "optional_roles": ["sidekick", "helper_townsperson"],
+      "recommended_themes": ["animals", "magic"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
         { "text": "A small mouse named Ash lived in the chimney of {room}. He was very proud of his soot-grey coat.", "action_slot": "thinking" },
         { "text": "One evening, Ash noticed something strange — his {body_part} was glowing.", "action_slot": "confused" },
@@ -493,7 +550,7 @@
           "text": "What does Ash do?",
           "choices": [
             { "label": "Hide in the chimney", "next": "hide" },
-            { "label": "Show {toy}", "next": "show" }
+            { "label": "Show {friend}", "next": "show" }
           ]
         },
         {
@@ -503,7 +560,7 @@
         },
         {
           "id": "show",
-          "text": "{toy} gasped softly. 'You're magic,' {toy} whispered. Ash felt nine feet tall, even though he was three inches. The end.",
+          "text": "{friend} gasped softly. 'You're magic,' {friend} whispered. Ash felt nine feet tall, even though he was three inches. The end.",
           "action_slot": "cheering"
         }
       ]
@@ -512,10 +569,14 @@
       "id": "request_story_soak_lostshoe_17",
       "title": "The lost shoe and the mountain",
       "buckets": ["always"],
+      "required_roles": ["friend", "needs_saving"],
+      "optional_roles": ["trickster"],
+      "recommended_themes": ["adventure", "friendship"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "A traveler reached the foot of a tall mountain wearing only one shoe.", "action_slot": "looking" },
+        { "text": "The {needs_saving} reached the foot of a tall mountain wearing only one shoe.", "action_slot": "looking" },
         { "text": "The other shoe had been carried off by a magpie three valleys ago.", "action_slot": "confused" },
-        { "text": "{toy} met the traveler at a crossroads and offered to help.", "action_slot": "waving" },
+        { "text": "{friend} met the {needs_saving} at a crossroads and offered to help.", "action_slot": "waving" },
         {
           "id": "fork",
           "text": "How do they get up the mountain?",
@@ -531,7 +592,7 @@
         },
         {
           "id": "hop",
-          "text": "{toy} and the traveler hopped one-shoe-style all the way up, laughing the whole climb. At the top: a beautiful view. The end.",
+          "text": "{friend} and the {needs_saving} hopped one-shoe-style all the way up, laughing the whole climb. At the top: a beautiful view. The end.",
           "action_slot": "jumping"
         }
       ]
@@ -540,10 +601,14 @@
       "id": "request_story_soak_singingsoup_18",
       "title": "The singing soup",
       "buckets": ["afternoon", "evening"],
+      "required_roles": ["friend", "guide_mentor"],
+      "optional_roles": ["helper_townsperson"],
+      "recommended_themes": ["food", "music"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
         {
           "id": "open",
-          "text": "Grandmother said tonight's soup would sing — but only if the right things went in. {toy} chose first.",
+          "text": "The {guide_mentor} said tonight's soup would sing — but only if the right things went in. {friend} chose first.",
           "action_slot": "thinking",
           "choices": [
             { "label": "Carrots and a {adjective} herb", "next": "carrot" },
@@ -553,25 +618,25 @@
         },
         {
           "id": "carrot",
-          "text": "The soup hummed orange and sweet, like an autumn afternoon. Grandmother nodded approval.",
+          "text": "The soup hummed orange and sweet, like an autumn afternoon. The {guide_mentor} nodded approval.",
           "action_slot": "thinking",
           "next": "table"
         },
         {
           "id": "onion",
-          "text": "The soup whistled in three short notes — a tune Grandmother had not heard since she was small.",
+          "text": "The soup whistled in three short notes — a tune the {guide_mentor} had not heard since they were small.",
           "action_slot": "looking",
           "next": "table"
         },
         {
           "id": "mushroom",
-          "text": "The soup sang in a low, woody voice, like a tree at night. {toy} listened with eyes closed.",
+          "text": "The soup sang in a low, woody voice, like a tree at night. {friend} listened with eyes closed.",
           "action_slot": "thinking",
           "next": "table"
         },
         {
           "id": "table",
-          "text": "All the soups taste like home, Grandmother said. {toy} understood: the song was made of love. The end.",
+          "text": "All the soups taste like home, the {guide_mentor} said. {friend} understood: the song was made of love. The end.",
           "action_slot": "cheering"
         }
       ]
@@ -580,17 +645,21 @@
       "id": "request_story_soak_paperboat_19",
       "title": "The paper boat",
       "buckets": ["afternoon"],
+      "required_roles": ["friend"],
+      "optional_roles": ["sidekick", "helper_townsperson"],
+      "recommended_themes": ["adventure", "silly"],
+      "ending_step": { "kind": "joke", "auto": true },
       "steps": [
-        { "text": "{toy} folded a tiny paper boat and set it in the gutter after a rainstorm.", "action_slot": "thinking" },
-        { "text": "The boat sailed away faster than expected. {toy} jogged alongside, watching.", "action_slot": "running" },
+        { "text": "{friend} folded a tiny paper boat and set it in the gutter after a rainstorm.", "action_slot": "thinking" },
+        { "text": "The boat sailed away faster than expected. {friend} jogged alongside, watching.", "action_slot": "running" },
         { "text": "At the corner, the boat met a leaf — and a tiny crew climbed aboard.", "action_slot": "looking" },
-        { "text": "Three ladybugs and one beetle. They saluted {toy} solemnly.", "action_slot": "waving" },
+        { "text": "Three ladybugs and one beetle. They saluted {friend} solemnly.", "action_slot": "waving" },
         {
           "id": "fork",
           "text": "What happens at the storm drain?",
           "choices": [
-            { "label": "{toy} catches the boat", "next": "catch" },
-            { "label": "{toy} lets it sail on", "next": "sail" }
+            { "label": "{friend} catches the boat", "next": "catch" },
+            { "label": "{friend} lets it sail on", "next": "sail" }
           ]
         },
         {
@@ -600,7 +669,7 @@
         },
         {
           "id": "sail",
-          "text": "The boat slipped into the dark and away. {toy} imagined oceans for it. Maybe rivers. Maybe further. The end.",
+          "text": "The boat slipped into the dark and away. {friend} imagined oceans for it. Maybe rivers. Maybe further. The end.",
           "action_slot": "thinking"
         }
       ]
@@ -609,11 +678,15 @@
       "id": "request_story_soak_baker_dawn_20",
       "title": "The baker who woke the sun",
       "buckets": ["morning"],
+      "required_roles": ["friend", "quest_giver"],
+      "optional_roles": ["helper_townsperson"],
+      "recommended_themes": ["food", "friendship", "adventure"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "Long before sunrise, a baker named Pip kneaded dough in a warm dark kitchen.", "action_slot": "thinking" },
-        { "text": "Pip had a secret: every morning, the smell of baking bread woke the sun itself.", "action_slot": "looking" },
-        { "text": "But this morning, Pip overslept. The sun had not risen.", "action_slot": "confused" },
-        { "text": "{toy} ran to the bakery to help.", "action_slot": "running" },
+        { "text": "Long before sunrise, the {quest_giver} kneaded dough in a warm dark kitchen.", "action_slot": "thinking" },
+        { "text": "The {quest_giver} had a secret: every morning, the smell of baking bread woke the sun itself.", "action_slot": "looking" },
+        { "text": "But this morning, the {quest_giver} overslept. The sun had not risen.", "action_slot": "confused" },
+        { "text": "{friend} ran to the bakery to help.", "action_slot": "running" },
         {
           "id": "fork",
           "text": "What do they bake?",
@@ -629,7 +702,7 @@
         },
         {
           "id": "loaves",
-          "text": "Crusty and golden — the sun woke gently and smiled at the world. {toy} got the first warm slice. The end.",
+          "text": "Crusty and golden — the sun woke gently and smiled at the world. {friend} got the first warm slice. The end.",
           "action_slot": "cheering"
         }
       ]
@@ -638,10 +711,14 @@
       "id": "request_story_soak_secret_door_21",
       "title": "The door behind the {prop}",
       "buckets": ["always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["guide_mentor", "helper_townsperson"],
+      "recommended_themes": ["magic", "adventure"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
         {
           "id": "open",
-          "text": "{toy} found a hidden door behind the {prop} in {room}. It only opened when you whispered.",
+          "text": "{friend} found a hidden door behind the {prop} in {room}. It only opened when you whispered.",
           "action_slot": "looking",
           "choices": [
             { "label": "Whisper a wish", "next": "wish" },
@@ -651,7 +728,7 @@
         },
         {
           "id": "wish",
-          "text": "The door swung open onto a sunlit garden where every flower glowed. {toy} stepped inside, careful not to wake the bees.",
+          "text": "The door swung open onto a sunlit garden where every flower glowed. {friend} stepped inside, careful not to wake the bees.",
           "action_slot": "looking",
           "next": "inside"
         },
@@ -663,13 +740,13 @@
         },
         {
           "id": "name",
-          "text": "The door opened on a quiet room where someone {toy} had not seen in a long time was waiting with cocoa.",
+          "text": "The door opened on a quiet room where someone {friend} had not seen in a long time was waiting with cocoa.",
           "action_slot": "waving",
           "next": "inside"
         },
         {
           "id": "inside",
-          "text": "Whatever lay inside, it was meant for {toy}. The door always finds the right somewhere. The end.",
+          "text": "Whatever lay inside, it was meant for {friend}. The door always finds the right somewhere. The end.",
           "action_slot": "cheering"
         }
       ]
@@ -678,10 +755,13 @@
       "id": "request_story_soak_seacave_22",
       "title": "The sea cave",
       "buckets": ["afternoon"],
+      "required_roles": ["friend"],
+      "optional_roles": ["sidekick"],
+      "recommended_themes": ["adventure", "magic"],
       "steps": [
         {
           "id": "open",
-          "text": "Low tide opened a secret sea cave below the cliffs. {toy} climbed down with a tide chart and a sense of wonder.",
+          "text": "Low tide opened a secret sea cave below the cliffs. {friend} climbed down with a tide chart and a sense of wonder.",
           "action_slot": "thinking",
           "choices": [
             { "label": "Follow the glowing pool", "next": "pool" },
@@ -690,13 +770,13 @@
         },
         {
           "id": "pool",
-          "text": "The pool sparkled with little fish that shone like stars. They circled {toy}'s reflection like a constellation.",
+          "text": "The pool sparkled with little fish that shone like stars. They circled {friend}'s reflection like a constellation.",
           "action_slot": "looking",
           "next": "treasure"
         },
         {
           "id": "wind",
-          "text": "The wind carried a song that the cave made by itself, with no instrument. {toy} hummed along.",
+          "text": "The wind carried a song that the cave made by itself, with no instrument. {friend} hummed along.",
           "action_slot": "thinking",
           "next": "treasure"
         },
@@ -705,17 +785,20 @@
           "text": "Both paths met at a small wooden chest. Inside: a single perfect shell, smooth as a tooth.",
           "action_slot": "looking"
         },
-        { "text": "{toy} held the shell to its ear. The sea whispered: come back any time. The end.", "action_slot": "sleeping" }
+        { "text": "{friend} held the shell to its ear. The sea whispered: come back any time. The end.", "action_slot": "sleeping" }
       ]
     },
     {
       "id": "request_story_soak_three_doors_23",
       "title": "Three doors, one home",
       "buckets": ["always", "evening"],
+      "required_roles": ["friend", "helper_townsperson"],
+      "optional_roles": ["guide_mentor"],
+      "recommended_themes": ["friendship"],
       "steps": [
         {
           "id": "open",
-          "text": "Tired and a little lost, {toy} stood before three doors in a strange village.",
+          "text": "Tired and a little lost, {friend} stood before three doors in a strange village.",
           "action_slot": "thinking",
           "choices": [
             { "label": "The blue door", "next": "blue" },
@@ -743,7 +826,7 @@
         },
         {
           "id": "table",
-          "text": "Whichever door {toy} chose, it led to the same warm table — and the same kindly host who knew {toy}'s name. The end.",
+          "text": "Whichever door {friend} chose, it led to the same warm table — and the same kindly {helper_townsperson} who knew {friend}'s name. The end.",
           "action_slot": "cheering"
         }
       ]
@@ -752,10 +835,14 @@
       "id": "request_story_soak_short_pebble_24",
       "title": "Pebble in the pond",
       "buckets": ["always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["sidekick"],
+      "recommended_themes": ["silly"],
+      "ending_step": { "kind": "joke", "auto": true },
       "steps": [
         {
           "id": "start",
-          "text": "{toy} found a smooth flat pebble and stood by the pond, deciding what to do.",
+          "text": "{friend} found a smooth flat pebble and stood by the pond, deciding what to do.",
           "action_slot": "thinking",
           "choices": [
             { "label": "Skip it across", "next": "skip" },
@@ -778,8 +865,11 @@
       "id": "request_story_soak_short_yawn_25",
       "title": "The yawn that traveled",
       "buckets": ["wind_down"],
+      "required_roles": ["friend"],
+      "optional_roles": ["sidekick"],
+      "recommended_themes": ["silly", "animals"],
       "steps": [
-        { "text": "{toy} yawned. The cat across the room yawned. The owl outside yawned too.", "action_slot": "sleeping" },
+        { "text": "{friend} yawned. The cat across the room yawned. The owl outside yawned too.", "action_slot": "sleeping" },
         {
           "id": "fork",
           "text": "Where does the yawn go next?",
@@ -804,11 +894,15 @@
       "id": "request_story_soak_short_button_26",
       "title": "The button that wished",
       "buckets": ["always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["trickster"],
+      "recommended_themes": ["magic", "silly"],
+      "ending_step": { "kind": "joke", "auto": true },
       "steps": [
-        { "text": "{toy} found a small {adjective} button on the floor of {room}. It seemed to wink.", "action_slot": "looking" },
+        { "text": "{friend} found a small {adjective} button on the floor of {room}. It seemed to wink.", "action_slot": "looking" },
         {
           "id": "fork",
-          "text": "What does {toy} wish?",
+          "text": "What does {friend} wish?",
           "choices": [
             { "label": "Wish for a snack", "next": "snack" },
             { "label": "Wish for a song", "next": "song" }
@@ -816,12 +910,12 @@
         },
         {
           "id": "snack",
-          "text": "A tiny crumb of cake appeared in {toy}'s palm. Just enough. {toy} grinned. The end.",
+          "text": "A tiny crumb of cake appeared in {friend}'s palm. Just enough. {friend} grinned. The end.",
           "action_slot": "cheering"
         },
         {
           "id": "song",
-          "text": "A short hum, three notes long, danced through the room. {toy} hummed it back. The end.",
+          "text": "A short hum, three notes long, danced through the room. {friend} hummed it back. The end.",
           "action_slot": "thinking"
         }
       ]
@@ -830,12 +924,16 @@
       "id": "request_story_soak_short_cloud_27",
       "title": "The cloud that came home",
       "buckets": ["afternoon"],
+      "required_roles": ["friend", "needs_saving"],
+      "optional_roles": ["helper_townsperson"],
+      "recommended_themes": ["weather", "friendship"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "A small cloud got lost from its sky and bumped softly against {toy}'s window.", "action_slot": "looking" },
-        { "text": "{toy} cracked the window open. The cloud floated in, shy and damp.", "action_slot": "thinking" },
+        { "text": "The {needs_saving} got lost from its sky and bumped softly against {friend}'s window.", "action_slot": "looking" },
+        { "text": "{friend} cracked the window open. The cloud floated in, shy and damp.", "action_slot": "thinking" },
         {
           "id": "fork",
-          "text": "How does {toy} help the cloud get home?",
+          "text": "How does {friend} help the cloud get home?",
           "choices": [
             { "label": "Open all the windows", "next": "windows" },
             { "label": "Sing a sky-song", "next": "sing" }
@@ -848,7 +946,7 @@
         },
         {
           "id": "sing",
-          "text": "{toy} sang gently. The cloud lifted, listened, and floated back to the sky humming along. The end.",
+          "text": "{friend} sang gently. The cloud lifted, listened, and floated back to the sky humming along. The end.",
           "action_slot": "cheering"
         }
       ]
@@ -857,11 +955,15 @@
       "id": "request_story_soak_short_mitten_28",
       "title": "The lost mitten",
       "buckets": ["morning"],
+      "required_roles": ["friend"],
+      "optional_roles": ["helper_townsperson", "trickster"],
+      "recommended_themes": ["silly", "animals"],
+      "ending_step": { "kind": "joke", "auto": true },
       "steps": [
-        { "text": "{toy} lost one mitten on the way to the porch. Only one tiny {body_part} stayed warm.", "action_slot": "confused" },
+        { "text": "{friend} lost one mitten on the way to the porch. Only one tiny {body_part} stayed warm.", "action_slot": "confused" },
         {
           "id": "fork",
-          "text": "Where does {toy} look?",
+          "text": "Where does {friend} look?",
           "choices": [
             { "label": "Under the {prop}", "next": "under" },
             { "label": "Behind the door", "next": "door" }
@@ -874,7 +976,7 @@
         },
         {
           "id": "door",
-          "text": "The mitten waited behind the door, pretending to nap. {toy} put it on with a happy hum. The end.",
+          "text": "The mitten waited behind the door, pretending to nap. {friend} put it on with a happy hum. The end.",
           "action_slot": "cheering"
         }
       ]
@@ -883,14 +985,17 @@
       "id": "request_story_soak_slot_bodypart_29",
       "title": "When {body_part} held the key",
       "buckets": ["always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["guide_mentor"],
+      "recommended_themes": ["magic"],
       "steps": [
-        { "text": "Once a small puzzle box appeared on {toy}'s shelf. It would not open for hands.", "action_slot": "looking" },
+        { "text": "Once a small puzzle box appeared on {friend}'s shelf. It would not open for hands.", "action_slot": "looking" },
         { "text": "It would not open for keys. It would not open for words.", "action_slot": "confused" },
-        { "text": "But the box softened when {toy} pressed it gently with a {body_part}.", "action_slot": "thinking" },
+        { "text": "But the box softened when {friend} pressed it gently with a {body_part}.", "action_slot": "thinking" },
         { "text": "Inside lay a small note: 'You knew the answer all along — listen with your whole self.'", "action_slot": "looking" },
         {
           "id": "fork",
-          "text": "What does {toy} do with the note?",
+          "text": "What does {friend} do with the note?",
           "choices": [
             { "label": "Tuck it under the pillow", "next": "pillow" },
             { "label": "Read it aloud one more time", "next": "aloud" }
@@ -898,12 +1003,12 @@
         },
         {
           "id": "pillow",
-          "text": "{toy} slept with the note close. In dreams, the box opened a hundred more times, each holding a softer secret. The end.",
+          "text": "{friend} slept with the note close. In dreams, the box opened a hundred more times, each holding a softer secret. The end.",
           "action_slot": "sleeping"
         },
         {
           "id": "aloud",
-          "text": "Saying the words made them feel true. {toy} folded the note neatly and went out into the world a little braver. The end.",
+          "text": "Saying the words made them feel true. {friend} folded the note neatly and went out into the world a little braver. The end.",
           "action_slot": "cheering"
         }
       ]
@@ -912,13 +1017,16 @@
       "id": "request_story_soak_slot_count_30",
       "title": "The {count} candles",
       "buckets": ["evening", "wind_down"],
+      "required_roles": ["friend"],
+      "optional_roles": ["helper_townsperson"],
+      "recommended_themes": ["friendship"],
       "steps": [
         { "text": "On a quiet hill stood a small chapel with exactly {count} candles flickering in its windows.", "action_slot": "looking" },
         { "text": "Each candle was lit by a different friend. Each carried a wish.", "action_slot": "thinking" },
-        { "text": "{toy} climbed the hill with a candle of its own to add.", "action_slot": "thinking" },
+        { "text": "{friend} climbed the hill with a candle of its own to add.", "action_slot": "thinking" },
         {
           "id": "fork",
-          "text": "What is {toy}'s wish?",
+          "text": "What is {friend}'s wish?",
           "choices": [
             { "label": "A wish for tomorrow", "next": "tomorrow" },
             { "label": "A wish for someone else", "next": "other" }
@@ -926,7 +1034,7 @@
         },
         {
           "id": "tomorrow",
-          "text": "{toy} placed the candle with the others. Its flame leaned toward the sunrise, ready. The end.",
+          "text": "{friend} placed the candle with the others. Its flame leaned toward the sunrise, ready. The end.",
           "action_slot": "cheering"
         },
         {
@@ -938,14 +1046,18 @@
     },
     {
       "id": "request_story_soak_slot_action_31",
-      "title": "When {toy} learned to {action_verb}",
+      "title": "When {friend} learned to {action_verb}",
       "buckets": ["always"],
+      "required_roles": ["friend", "guide_mentor"],
+      "optional_roles": ["sidekick"],
+      "recommended_themes": ["adventure", "friendship"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "Once upon a time, {toy} could do almost anything except {action_verb}.", "action_slot": "confused" },
-        { "text": "An old crane on a stone bridge said: 'There are two ways to learn. Patient and brave. Both work.'", "action_slot": "thinking" },
+        { "text": "Once upon a time, {friend} could do almost anything except {action_verb}.", "action_slot": "confused" },
+        { "text": "An old {guide_mentor} on a stone bridge said: 'There are two ways to learn. Patient and brave. Both work.'", "action_slot": "thinking" },
         {
           "id": "fork",
-          "text": "Which way does {toy} try?",
+          "text": "Which way does {friend} try?",
           "choices": [
             { "label": "Patient — practice slowly", "next": "patient" },
             { "label": "Brave — try right away", "next": "brave" }
@@ -953,19 +1065,19 @@
         },
         {
           "id": "patient",
-          "text": "Day after day, {toy} practiced for ten minutes. By the end of the month, it became natural.",
+          "text": "Day after day, {friend} practiced for ten minutes. By the end of the month, it became natural.",
           "action_slot": "thinking",
           "next": "river"
         },
         {
           "id": "brave",
-          "text": "{toy} tripped, fell, got back up, tripped, fell, got back up. By sundown, {toy} was doing it without thinking.",
+          "text": "{friend} tripped, fell, got back up, tripped, fell, got back up. By sundown, {friend} was doing it without thinking.",
           "action_slot": "jumping",
           "next": "river"
         },
         {
           "id": "river",
-          "text": "Both ways led {toy} back to the bridge. The crane bowed deeply. 'Now,' it said, 'teach a friend.' The end.",
+          "text": "Both ways led {friend} back to the bridge. The {guide_mentor} bowed deeply. 'Now,' it said, 'teach a friend.' The end.",
           "action_slot": "cheering"
         }
       ]
@@ -974,10 +1086,14 @@
       "id": "request_story_soak_slot_propchain_32",
       "title": "The {prop} and the {prop}",
       "buckets": ["afternoon"],
+      "required_roles": ["friend", "guide_mentor"],
+      "optional_roles": ["sidekick"],
+      "recommended_themes": ["friendship", "silly"],
+      "ending_step": { "kind": "joke", "auto": true },
       "steps": [
-        { "text": "{toy} owned two things it loved: a {prop} and another {prop}. They were jealous of each other.", "action_slot": "confused" },
-        { "text": "Each one wanted to be {toy}'s favorite. {toy} did not know what to do.", "action_slot": "thinking" },
-        { "text": "An old turtle laughed gently. 'Two things can be loved at once,' she said. 'Watch.'", "action_slot": "looking" },
+        { "text": "{friend} owned two things it loved: a {prop} and another {prop}. They were jealous of each other.", "action_slot": "confused" },
+        { "text": "Each one wanted to be {friend}'s favorite. {friend} did not know what to do.", "action_slot": "thinking" },
+        { "text": "An old {guide_mentor} laughed gently. 'Two things can be loved at once,' she said. 'Watch.'", "action_slot": "looking" },
         { "text": "She placed both {prop}s side by side and told them a story about belonging.", "action_slot": "thinking" },
         {
           "id": "fork",
@@ -989,12 +1105,12 @@
         },
         {
           "id": "friends",
-          "text": "The two {prop}s leaned together and never argued again. {toy} carried both proudly. The end.",
+          "text": "The two {prop}s leaned together and never argued again. {friend} carried both proudly. The end.",
           "action_slot": "cheering"
         },
         {
           "id": "quiet",
-          "text": "They learned to share the shelf without bickering. {toy} loved both equally — and they finally believed it. The end.",
+          "text": "They learned to share the shelf without bickering. {friend} loved both equally — and they finally believed it. The end.",
           "action_slot": "thinking"
         }
       ]
@@ -1003,12 +1119,16 @@
       "id": "request_story_soak_slot_room_33",
       "title": "The {adjective} {room}",
       "buckets": ["always"],
+      "required_roles": ["friend", "trickster"],
+      "optional_roles": ["helper_townsperson"],
+      "recommended_themes": ["magic", "silly"],
+      "ending_step": { "kind": "joke", "auto": true },
       "steps": [
-        { "text": "One morning, {toy} woke up to find {room} entirely {adjective}. Even the dust was {adjective}.", "action_slot": "confused" },
+        { "text": "One morning, {friend} woke up to find {room} entirely {adjective}. Even the dust was {adjective}.", "action_slot": "confused" },
         { "text": "Nothing was missing. Nothing was broken. It was just... very {adjective}.", "action_slot": "looking" },
         {
           "id": "fork",
-          "text": "How does {toy} respond?",
+          "text": "How does {friend} respond?",
           "choices": [
             { "label": "Investigate the change", "next": "investigate" },
             { "label": "Enjoy it for a day", "next": "enjoy" }
@@ -1016,12 +1136,12 @@
         },
         {
           "id": "investigate",
-          "text": "{toy} discovered a sleepy fairy in the closet. She had spilled her bottle of feelings. By teatime, things were normal again.",
+          "text": "{friend} discovered a sleepy {trickster} in the closet. She had spilled her bottle of feelings. By teatime, things were normal again.",
           "action_slot": "thinking"
         },
         {
           "id": "enjoy",
-          "text": "{toy} spent the day in the {adjective} {room}, soaking it in. It faded by sundown, but the memory stayed bright. The end.",
+          "text": "{friend} spent the day in the {adjective} {room}, soaking it in. It faded by sundown, but the memory stayed bright. The end.",
           "action_slot": "sleeping"
         }
       ]
@@ -1030,13 +1150,17 @@
       "id": "request_story_soak_slot_actionverb_34",
       "title": "The day everyone had to {action_verb}",
       "buckets": ["morning", "afternoon"],
+      "required_roles": ["friend", "quest_giver"],
+      "optional_roles": ["helper_townsperson"],
+      "recommended_themes": ["silly", "friendship"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
         { "text": "Far away in a village called Plinth, there was one day each year when everyone had to {action_verb} together.", "action_slot": "thinking" },
-        { "text": "{toy} arrived in Plinth on exactly that day, a stranger and a little nervous.", "action_slot": "confused" },
-        { "text": "The mayor handed {toy} a small ribbon. 'You'll need this,' she said. 'It helps.'", "action_slot": "looking" },
+        { "text": "{friend} arrived in Plinth on exactly that day, a stranger and a little nervous.", "action_slot": "confused" },
+        { "text": "The {quest_giver} handed {friend} a small ribbon. 'You'll need this,' she said. 'It helps.'", "action_slot": "looking" },
         {
           "id": "fork",
-          "text": "How does {toy} join in?",
+          "text": "How does {friend} join in?",
           "choices": [
             { "label": "With a partner", "next": "partner" },
             { "label": "On its own", "next": "alone" }
@@ -1049,7 +1173,7 @@
         },
         {
           "id": "alone",
-          "text": "{toy} {action_verb}'d in the middle of the square with quiet confidence. The whole village cheered. The end.",
+          "text": "{friend} {action_verb}'d in the middle of the square with quiet confidence. The whole village cheered. The end.",
           "action_slot": "cheering"
         }
       ]
@@ -1058,12 +1182,15 @@
       "id": "request_story_soak_slot_bodypart2_35",
       "title": "The map on the {body_part}",
       "buckets": ["afternoon"],
+      "required_roles": ["friend"],
+      "optional_roles": ["guide_mentor"],
+      "recommended_themes": ["magic", "adventure"],
       "steps": [
-        { "text": "When {toy} woke up, there was a map drawn lightly on its {body_part}, in faint silver lines.", "action_slot": "looking" },
-        { "text": "It showed a path through {room}, ending at a place {toy} had never noticed before.", "action_slot": "thinking" },
+        { "text": "When {friend} woke up, there was a map drawn lightly on its {body_part}, in faint silver lines.", "action_slot": "looking" },
+        { "text": "It showed a path through {room}, ending at a place {friend} had never noticed before.", "action_slot": "thinking" },
         {
           "id": "fork",
-          "text": "Does {toy} follow the map?",
+          "text": "Does {friend} follow the map?",
           "choices": [
             { "label": "Right away", "next": "now" },
             { "label": "After breakfast", "next": "later" }
@@ -1076,7 +1203,7 @@
         },
         {
           "id": "later",
-          "text": "By the time {toy} finished toast, the lines had faded. But {toy} remembered every turn — and found the spot. The end.",
+          "text": "By the time {friend} finished toast, the lines had faded. But {friend} remembered every turn — and found the spot. The end.",
           "action_slot": "thinking"
         }
       ]
@@ -1085,11 +1212,15 @@
       "id": "request_story_soak_long_circus_36",
       "title": "The midnight circus",
       "buckets": ["evening"],
+      "required_roles": ["friend", "trickster"],
+      "optional_roles": ["helper_townsperson", "sidekick"],
+      "recommended_themes": ["silly", "magic", "music"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
         { "text": "Past the edge of town, just past the old fence, a circus tent appeared only on nights without a moon.", "action_slot": "looking" },
-        { "text": "{toy} found the entrance by accident, chasing a runaway balloon.", "action_slot": "running" },
-        { "text": "A small ticket-taker, half rabbit, half something else, asked: 'Do you have a story?'", "action_slot": "thinking" },
-        { "text": "{toy} told a small one — about a lost shoe and a found friend. The ticket-taker nodded, satisfied.", "action_slot": "waving" },
+        { "text": "{friend} found the entrance by accident, chasing a runaway balloon.", "action_slot": "running" },
+        { "text": "A small {trickster}, half rabbit, half something else, asked: 'Do you have a story?'", "action_slot": "thinking" },
+        { "text": "{friend} told a small one — about a lost shoe and a found friend. The {trickster} nodded, satisfied.", "action_slot": "waving" },
         { "text": "Inside, the air smelled like cinnamon and something a little older. A row of seats waited.", "action_slot": "looking" },
         { "text": "The first act was three foxes balancing teacups. The teacups were full. Nothing spilled.", "action_slot": "thinking" },
         { "text": "The second act was a very tall bear who recited a poem about wind.", "action_slot": "thinking" },
@@ -1103,12 +1234,12 @@
         },
         {
           "id": "stars",
-          "text": "Stars hung in the tent like ornaments. Two acrobats swung from one to the next, bowing as the lights twinkled. {toy} clapped softly. The end.",
+          "text": "Stars hung in the tent like ornaments. Two acrobats swung from one to the next, bowing as the lights twinkled. {friend} clapped softly. The end.",
           "action_slot": "cheering"
         },
         {
           "id": "yarn",
-          "text": "A kitten walked the entire length of a yarn tightrope, never wobbling. The crowd held its breath. {toy} did too. The end.",
+          "text": "A kitten walked the entire length of a yarn tightrope, never wobbling. The crowd held its breath. {friend} did too. The end.",
           "action_slot": "looking"
         }
       ]
@@ -1117,12 +1248,16 @@
       "id": "request_story_soak_long_voyage_37",
       "title": "The longest voyage",
       "buckets": ["afternoon", "evening"],
+      "required_roles": ["friend", "quest_giver"],
+      "optional_roles": ["guide_mentor", "sidekick"],
+      "recommended_themes": ["pirates", "adventure", "music"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "Captain Wren and her crew set out across the Quiet Sea looking for the singing islands.", "action_slot": "thinking" },
-        { "text": "{toy} was the smallest sailor on board, in charge of the lookout perch.", "action_slot": "looking" },
+        { "text": "The {quest_giver} and her crew set out across the Quiet Sea looking for the singing islands.", "action_slot": "thinking" },
+        { "text": "{friend} was the smallest sailor on board, in charge of the lookout perch.", "action_slot": "looking" },
         { "text": "On the third day they passed a fog so thick the ship sailed by ear alone.", "action_slot": "confused" },
         { "text": "On the seventh day, a whale offered them directions in a slow, kind voice.", "action_slot": "thinking" },
-        { "text": "On the tenth day, {toy} spotted a green smudge on the horizon. 'Land!'", "action_slot": "pointing" },
+        { "text": "On the tenth day, {friend} spotted a green smudge on the horizon. 'Land!'", "action_slot": "pointing" },
         {
           "id": "fork",
           "text": "Which island do they visit first?",
@@ -1140,13 +1275,13 @@
         },
         {
           "id": "bells",
-          "text": "Tiny bells hung from every tree. A breeze made the whole island chime. {toy} laughed in delight.",
+          "text": "Tiny bells hung from every tree. A breeze made the whole island chime. {friend} laughed in delight.",
           "action_slot": "cheering",
           "next": "harbor"
         },
         {
           "id": "hums",
-          "text": "Even the stones hummed faintly. {toy} sat down and listened until the sun dipped low.",
+          "text": "Even the stones hummed faintly. {friend} sat down and listened until the sun dipped low.",
           "action_slot": "thinking",
           "next": "harbor"
         },
@@ -1161,16 +1296,19 @@
       "id": "request_story_soak_long_clockwork_38",
       "title": "The clockwork bird",
       "buckets": ["always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["guide_mentor"],
+      "recommended_themes": ["magic", "music"],
       "steps": [
-        { "text": "In the back room of an old shop, {toy} found a tiny clockwork bird, perfectly still.", "action_slot": "looking" },
+        { "text": "In the back room of an old shop, {friend} found a tiny clockwork bird, perfectly still.", "action_slot": "looking" },
         { "text": "Its wings were silver, its eyes were two tiny seeds. A note read: 'Wind once, then wait.'", "action_slot": "thinking" },
-        { "text": "{toy} turned the small key on its back. Tick. Tick. Tick.", "sfx": "tick", "action_slot": "thinking" },
-        { "text": "The bird's eyes blinked. It tilted its head, looking at {toy} as if remembering.", "action_slot": "looking" },
+        { "text": "{friend} turned the small key on its back. Tick. Tick. Tick.", "sfx": "tick", "action_slot": "thinking" },
+        { "text": "The bird's eyes blinked. It tilted its head, looking at {friend} as if remembering.", "action_slot": "looking" },
         { "text": "It hopped to the windowsill. It looked at the sky. Then it looked back.", "action_slot": "thinking" },
         { "text": "It wanted to go. But it also wanted to stay. The note had not said which.", "action_slot": "confused" },
         {
           "id": "fork",
-          "text": "What does {toy} do?",
+          "text": "What does {friend} do?",
           "choices": [
             { "label": "Open the window", "next": "open" },
             { "label": "Place it on the shelf", "next": "shelf" }
@@ -1178,7 +1316,7 @@
         },
         {
           "id": "open",
-          "text": "The bird flew once around {toy}'s head, dipped low in thanks, and zipped out into the bright air. {toy} smiled. The end.",
+          "text": "The bird flew once around {friend}'s head, dipped low in thanks, and zipped out into the bright air. {friend} smiled. The end.",
           "action_slot": "waving"
         },
         {
@@ -1192,16 +1330,19 @@
       "id": "request_story_soak_long_forest_39",
       "title": "The forest of names",
       "buckets": ["afternoon"],
+      "required_roles": ["friend"],
+      "optional_roles": ["guide_mentor", "helper_townsperson"],
+      "recommended_themes": ["magic", "friendship"],
       "steps": [
         { "text": "Deep in a forest no map showed, every tree knew the name of someone who once stood beneath it.", "action_slot": "looking" },
-        { "text": "{toy} entered with a small list of friends to find.", "action_slot": "thinking" },
-        { "text": "The first tree was a willow, who whispered the name of {toy}'s grandmother.", "action_slot": "thinking" },
+        { "text": "{friend} entered with a small list of friends to find.", "action_slot": "thinking" },
+        { "text": "The first tree was a willow, who whispered the name of {friend}'s grandmother.", "action_slot": "thinking" },
         { "text": "The second was an oak, who whispered the name of an old teacher.", "action_slot": "thinking" },
-        { "text": "The third was a small birch with a name {toy} hadn't expected to hear.", "action_slot": "confused" },
-        { "text": "It was {toy}'s own name — though much younger, when first the trees had heard it.", "action_slot": "looking" },
+        { "text": "The third was a small birch with a name {friend} hadn't expected to hear.", "action_slot": "confused" },
+        { "text": "It was {friend}'s own name — though much younger, when first the trees had heard it.", "action_slot": "looking" },
         {
           "id": "fork",
-          "text": "How does {toy} respond?",
+          "text": "How does {friend} respond?",
           "choices": [
             { "label": "Sit beneath the birch", "next": "sit" },
             { "label": "Add a new name", "next": "add" }
@@ -1209,12 +1350,12 @@
         },
         {
           "id": "sit",
-          "text": "{toy} rested against the trunk. The birch hummed softly all afternoon, as if it had missed {toy} too. The end.",
+          "text": "{friend} rested against the trunk. The birch hummed softly all afternoon, as if it had missed {friend} too. The end.",
           "action_slot": "sleeping"
         },
         {
           "id": "add",
-          "text": "{toy} whispered a friend's name into the birch's bark. Years from now, that friend would arrive and feel suddenly welcome. The end.",
+          "text": "{friend} whispered a friend's name into the birch's bark. Years from now, that friend would arrive and feel suddenly welcome. The end.",
           "action_slot": "waving"
         }
       ]
@@ -1223,15 +1364,19 @@
       "id": "request_story_soak_long_balloon_40",
       "title": "The hot air balloon to nowhere",
       "buckets": ["morning", "afternoon"],
+      "required_roles": ["friend", "frenemy"],
+      "optional_roles": ["sidekick"],
+      "recommended_themes": ["adventure", "friendship"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
-        { "text": "{toy} climbed into a basket beneath an enormous striped balloon. The pilot was a grumpy badger named Felix.", "action_slot": "thinking" },
-        { "text": "'Where to?' Felix asked, lighting the burner. {toy} did not know.", "action_slot": "confused" },
+        { "text": "{friend} climbed into a basket beneath an enormous striped balloon. The pilot was a grumpy {frenemy} named Felix.", "action_slot": "thinking" },
+        { "text": "'Where to?' Felix asked, lighting the burner. {friend} did not know.", "action_slot": "confused" },
         { "text": "'Then nowhere,' Felix grunted. 'Nowhere is my favorite place.'", "action_slot": "thinking" },
         { "text": "Up they went. Up and up, until the houses became small and the rivers became ribbons.", "action_slot": "looking" },
-        { "text": "Felix passed {toy} a thermos of cocoa. They drifted in silence for a while.", "action_slot": "thinking" },
+        { "text": "Felix passed {friend} a thermos of cocoa. They drifted in silence for a while.", "action_slot": "thinking" },
         {
           "id": "fork",
-          "text": "What does {toy} ask Felix?",
+          "text": "What does {friend} ask Felix?",
           "choices": [
             { "label": "Why he loves nowhere", "next": "why" },
             { "label": "What he sees from up here", "next": "see" }
@@ -1251,7 +1396,7 @@
         },
         {
           "id": "land",
-          "text": "Hours later they touched down in a meadow. {toy} hopped out feeling lighter than the basket itself. The end.",
+          "text": "Hours later they touched down in a meadow. {friend} hopped out feeling lighter than the basket itself. The end.",
           "action_slot": "cheering"
         }
       ]
@@ -1260,10 +1405,14 @@
       "id": "request_story_soak_conv_pet_41",
       "title": "The lost pet of {room}",
       "buckets": ["afternoon"],
+      "required_roles": ["friend", "quest_giver", "needs_saving"],
+      "optional_roles": ["helper_townsperson"],
+      "recommended_themes": ["animals", "friendship"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
         {
           "id": "open",
-          "text": "Mrs. Periwinkle's pet went missing in {room}. {toy} agreed to help search.",
+          "text": "The {quest_giver}'s {needs_saving} went missing in {room}. {friend} agreed to help search.",
           "action_slot": "thinking",
           "choices": [
             { "label": "Check behind the {prop}", "next": "behind" },
@@ -1273,25 +1422,25 @@
         },
         {
           "id": "behind",
-          "text": "Behind the {prop}, {toy} found tiny prints leading toward a vent. The trail was warm.",
+          "text": "Behind the {prop}, {friend} found tiny prints leading toward a vent. The trail was warm.",
           "action_slot": "looking",
           "next": "found"
         },
         {
           "id": "high",
-          "text": "On a high shelf, two yellow eyes blinked at {toy} from a pile of soft sweaters.",
+          "text": "On a high shelf, two yellow eyes blinked at {friend} from a pile of soft sweaters.",
           "action_slot": "pointing",
           "next": "found"
         },
         {
           "id": "bowl",
-          "text": "By the food bowl, the pet had simply been napping the whole time, ear twitching.",
+          "text": "By the food bowl, the {needs_saving} had simply been napping the whole time, ear twitching.",
           "action_slot": "thinking",
           "next": "found"
         },
         {
           "id": "found",
-          "text": "{toy} carried the pet back to Mrs. Periwinkle, who was overjoyed. She gave {toy} a slice of pie. The end.",
+          "text": "{friend} carried the {needs_saving} back to the {quest_giver}, who was overjoyed and gave {friend} a slice of pie. The end.",
           "action_slot": "cheering"
         }
       ]
@@ -1300,10 +1449,13 @@
       "id": "request_story_soak_conv_lantern_42",
       "title": "The lantern festival",
       "buckets": ["evening"],
+      "required_roles": ["friend"],
+      "optional_roles": ["helper_townsperson"],
+      "recommended_themes": ["magic", "weather"],
       "steps": [
         {
           "id": "open",
-          "text": "On the night of the lantern festival, every house gave {toy} one paper lantern to release.",
+          "text": "On the night of the lantern festival, every house gave {friend} one paper lantern to release.",
           "action_slot": "thinking",
           "choices": [
             { "label": "Release from the bridge", "next": "bridge" },
@@ -1324,7 +1476,7 @@
         },
         {
           "id": "wish",
-          "text": "Wherever it went, {toy}'s wish went with it. The night smelled like honey and woodsmoke. The end.",
+          "text": "Wherever it went, {friend}'s wish went with it. The night smelled like honey and woodsmoke. The end.",
           "action_slot": "sleeping"
         }
       ]
@@ -1333,10 +1485,14 @@
       "id": "request_story_soak_conv_squirrel_43",
       "title": "The squirrel's contest",
       "buckets": ["morning", "afternoon"],
+      "required_roles": ["friend"],
+      "optional_roles": ["sidekick", "helper_townsperson"],
+      "recommended_themes": ["animals", "silly"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
         {
           "id": "open",
-          "text": "Three squirrels held a contest each year. This year, {toy} was invited to be the judge.",
+          "text": "Three squirrels held a contest each year. This year, {friend} was invited to be the judge.",
           "action_slot": "thinking",
           "choices": [
             { "label": "Most acorns gathered", "next": "acorns" },
@@ -1346,7 +1502,7 @@
         },
         {
           "id": "acorns",
-          "text": "The squirrels lined up their piles. The biggest pile belonged to the smallest squirrel — Beanie. {toy} clapped.",
+          "text": "The squirrels lined up their piles. The biggest pile belonged to the smallest squirrel — Beanie. {friend} clapped.",
           "action_slot": "cheering",
           "next": "ribbon"
         },
@@ -1358,13 +1514,13 @@
         },
         {
           "id": "hide",
-          "text": "Each squirrel showed {toy} a hiding spot. {toy} promised to keep all three secret, even from the wind.",
+          "text": "Each squirrel showed {friend} a hiding spot. {friend} promised to keep all three secret, even from the wind.",
           "action_slot": "thinking",
           "next": "ribbon"
         },
         {
           "id": "ribbon",
-          "text": "{toy} gave every squirrel a tiny ribbon. 'Three winners,' {toy} declared. The squirrels chittered with joy. The end.",
+          "text": "{friend} gave every squirrel a tiny ribbon. 'Three winners,' {friend} declared. The squirrels chittered with joy. The end.",
           "action_slot": "cheering"
         }
       ]
@@ -1373,10 +1529,14 @@
       "id": "request_story_soak_conv_riddle_44",
       "title": "The riddle of the well",
       "buckets": ["afternoon"],
+      "required_roles": ["friend", "quest_giver"],
+      "optional_roles": ["helper_townsperson"],
+      "recommended_themes": ["magic", "friendship"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
         {
           "id": "open",
-          "text": "An old well in the meadow only gave water to those who solved its daily riddle. Today's riddle: a {adjective} thing that grows when shared.",
+          "text": "An old {quest_giver} in the meadow only gave water to those who solved its daily riddle. Today's riddle: a {adjective} thing that grows when shared.",
           "action_slot": "thinking",
           "choices": [
             { "label": "A fire", "next": "fire" },
@@ -1386,25 +1546,25 @@
         },
         {
           "id": "fire",
-          "text": "The well bubbled and said, 'Yes — and also.' It accepted the answer kindly.",
+          "text": "The {quest_giver} bubbled and said, 'Yes — and also.' It accepted the answer kindly.",
           "action_slot": "thinking",
           "next": "draw"
         },
         {
           "id": "laughter",
-          "text": "The well laughed back, water splashing high. 'A clever one,' it murmured.",
+          "text": "The {quest_giver} laughed back, water splashing high. 'A clever one,' it murmured.",
           "action_slot": "cheering",
           "next": "draw"
         },
         {
           "id": "song",
-          "text": "The well hummed in agreement. 'A musician's well today, then.'",
+          "text": "The {quest_giver} hummed in agreement. 'A musician's well today, then.'",
           "action_slot": "thinking",
           "next": "draw"
         },
         {
           "id": "draw",
-          "text": "{toy} drew up a bucket of cool, clear water and shared it with thirsty friends back home. The end.",
+          "text": "{friend} drew up a bucket of cool, clear water and shared it with thirsty friends back home. The end.",
           "action_slot": "cheering"
         }
       ]
@@ -1413,10 +1573,13 @@
       "id": "request_story_soak_conv_garden_45",
       "title": "The midnight garden",
       "buckets": ["evening", "wind_down"],
+      "required_roles": ["friend"],
+      "optional_roles": ["trickster", "sidekick"],
+      "recommended_themes": ["magic"],
       "steps": [
         {
           "id": "open",
-          "text": "After dark, the garden behind {room} woke up. The flowers walked. {toy} had to choose where to wander.",
+          "text": "After dark, the garden behind {room} woke up. The flowers walked. {friend} had to choose where to wander.",
           "action_slot": "looking",
           "choices": [
             { "label": "The roses' tea party", "next": "tea" },
@@ -1425,19 +1588,19 @@
         },
         {
           "id": "tea",
-          "text": "The roses poured tiny dewdrop teas. {toy} sipped one and felt very fancy.",
+          "text": "The roses poured tiny dewdrop teas. {friend} sipped one and felt very fancy.",
           "action_slot": "thinking",
           "next": "moonset"
         },
         {
           "id": "lecture",
-          "text": "The sunflower gave a long speech on the proper angle of leaves. {toy} took polite notes on a leaf.",
+          "text": "The sunflower gave a long speech on the proper angle of leaves. {friend} took polite notes on a leaf.",
           "action_slot": "thinking",
           "next": "moonset"
         },
         {
           "id": "moonset",
-          "text": "Just before the moon set, all the flowers bowed and froze still. {toy} crept back to bed, smiling. The end.",
+          "text": "Just before the moon set, all the flowers bowed and froze still. {friend} crept back to bed, smiling. The end.",
           "action_slot": "sleeping"
         }
       ]
@@ -1446,10 +1609,14 @@
       "id": "request_story_soak_conv_balloon46_46",
       "title": "Three balloons, one wish",
       "buckets": ["always"],
+      "required_roles": ["friend", "trickster"],
+      "optional_roles": ["guide_mentor"],
+      "recommended_themes": ["magic", "silly"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
         {
           "id": "open",
-          "text": "A traveling wish-seller offered {toy} three balloons. Only one held a true wish.",
+          "text": "A traveling {trickster} offered {friend} three balloons. Only one held a true wish.",
           "action_slot": "thinking",
           "choices": [
             { "label": "The red balloon", "next": "red" },
@@ -1459,25 +1626,25 @@
         },
         {
           "id": "red",
-          "text": "Red was warm and bright. {toy} held it carefully and felt its small weight.",
+          "text": "Red was warm and bright. {friend} held it carefully and felt its small weight.",
           "action_slot": "looking",
           "next": "release"
         },
         {
           "id": "yellow",
-          "text": "Yellow was light and quick. {toy} held its string and felt the breeze tug.",
+          "text": "Yellow was light and quick. {friend} held its string and felt the breeze tug.",
           "action_slot": "looking",
           "next": "release"
         },
         {
           "id": "blue",
-          "text": "Blue was cool and quiet. {toy} held it and felt strangely seen.",
+          "text": "Blue was cool and quiet. {friend} held it and felt strangely seen.",
           "action_slot": "thinking",
           "next": "release"
         },
         {
           "id": "release",
-          "text": "When {toy} released the balloon, the sky brightened with one tiny new star. The wish-seller winked. They were all true, after all. The end.",
+          "text": "When {friend} released the balloon, the sky brightened with one tiny new star. The {trickster} winked. They were all true, after all. The end.",
           "action_slot": "cheering"
         }
       ]
@@ -1486,10 +1653,13 @@
       "id": "request_story_soak_conv_letter_47",
       "title": "The letter that arrived early",
       "buckets": ["morning"],
+      "required_roles": ["friend"],
+      "optional_roles": ["guide_mentor", "helper_townsperson"],
+      "recommended_themes": ["adventure", "friendship"],
       "steps": [
         {
           "id": "open",
-          "text": "A letter addressed to {toy} arrived a full day early. The postmark was tomorrow's.",
+          "text": "A letter addressed to {friend} arrived a full day early. The postmark was tomorrow's.",
           "action_slot": "confused",
           "choices": [
             { "label": "Open it now", "next": "now" },
@@ -1498,19 +1668,19 @@
         },
         {
           "id": "now",
-          "text": "Inside was a note: 'You will be brave today.' {toy} squared its shoulders, ready for whatever came.",
+          "text": "Inside was a note: 'You will be brave today.' {friend} squared its shoulders, ready for whatever came.",
           "action_slot": "thinking",
           "next": "afternoon"
         },
         {
           "id": "wait",
-          "text": "{toy} placed the letter under the lamp and went about the day. The waiting felt patient and warm.",
+          "text": "{friend} placed the letter under the lamp and went about the day. The waiting felt patient and warm.",
           "action_slot": "thinking",
           "next": "afternoon"
         },
         {
           "id": "afternoon",
-          "text": "By afternoon, {toy} understood: the bravery was in choosing what to do with a note from the future. Either way was right. The end.",
+          "text": "By afternoon, {friend} understood: the bravery was in choosing what to do with a note from the future. Either way was right. The end.",
           "action_slot": "cheering"
         }
       ]
@@ -1519,6 +1689,10 @@
       "id": "request_story_soak_conv_lullaby_48",
       "title": "The lullaby thief",
       "buckets": ["wind_down"],
+      "required_roles": ["friend", "trickster"],
+      "optional_roles": ["helper_townsperson"],
+      "recommended_themes": ["music", "silly"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
         {
           "id": "open",
@@ -1531,19 +1705,19 @@
         },
         {
           "id": "trap",
-          "text": "{toy} hummed a brand new tune very softly. A small velvet creature crept out and tried to gather it up.",
+          "text": "{friend} hummed a brand new tune very softly. The small velvet {trickster} crept out and tried to gather it up.",
           "action_slot": "looking",
           "next": "meet"
         },
         {
           "id": "listen",
-          "text": "Past midnight, {toy} heard the softest rustling and saw a small velvet creature scooping up an old lullaby like a leaf.",
+          "text": "Past midnight, {friend} heard the softest rustling and saw the small velvet {trickster} scooping up an old lullaby like a leaf.",
           "action_slot": "looking",
           "next": "meet"
         },
         {
           "id": "meet",
-          "text": "The creature wasn't stealing — it had been collecting lost ones to bring back. It returned every tune by morning. The end.",
+          "text": "The {trickster} wasn't stealing — it had been collecting lost ones to bring back. It returned every tune by morning. The end.",
           "action_slot": "sleeping"
         }
       ]
@@ -1552,10 +1726,14 @@
       "id": "request_story_soak_conv_train_49",
       "title": "The train that only ran on Tuesdays",
       "buckets": ["always"],
+      "required_roles": ["friend"],
+      "optional_roles": ["helper_townsperson", "sidekick"],
+      "recommended_themes": ["adventure", "magic"],
+      "ending_step": { "kind": "song", "auto": true },
       "steps": [
         {
           "id": "open",
-          "text": "A small train arrived at the platform every Tuesday afternoon and only on Tuesdays. {toy} climbed aboard.",
+          "text": "A small train arrived at the platform every Tuesday afternoon and only on Tuesdays. {friend} climbed aboard.",
           "action_slot": "thinking",
           "choices": [
             { "label": "Sit by the window", "next": "window" },
@@ -1564,19 +1742,19 @@
         },
         {
           "id": "window",
-          "text": "Outside the window, the world slowly turned to a watercolor — soft and just a little blurred. {toy} pressed its nose to the glass.",
+          "text": "Outside the window, the world slowly turned to a watercolor — soft and just a little blurred. {friend} pressed its nose to the glass.",
           "action_slot": "looking",
           "next": "stop"
         },
         {
           "id": "dining",
-          "text": "In the dining car, a fox waiter served tea and a slice of clouds-and-cream pie. {toy} took small grateful bites.",
+          "text": "In the dining car, a fox waiter served tea and a slice of clouds-and-cream pie. {friend} took small grateful bites.",
           "action_slot": "thinking",
           "next": "stop"
         },
         {
           "id": "stop",
-          "text": "The train stopped at a sunlit village neither on any map. {toy} stepped out and waved as it pulled away. The end.",
+          "text": "The train stopped at a sunlit village neither on any map. {friend} stepped out and waved as it pulled away. The end.",
           "action_slot": "waving"
         }
       ]
@@ -1585,10 +1763,14 @@
       "id": "request_story_soak_conv_dragontea_50",
       "title": "Tea with the friendly dragon",
       "buckets": ["afternoon", "evening"],
+      "required_roles": ["friend", "guide_mentor"],
+      "optional_roles": ["helper_townsperson"],
+      "recommended_themes": ["friendship", "food", "adventure"],
+      "ending_step": { "kind": "joke", "auto": true },
       "steps": [
         {
           "id": "open",
-          "text": "A polite dragon named Saskia invited {toy} to tea at the top of a hill. {toy} brought a small gift.",
+          "text": "The polite {guide_mentor} invited {friend} to tea at the top of a hill. {friend} brought a small gift.",
           "action_slot": "thinking",
           "choices": [
             { "label": "A jar of jam", "next": "jam" },
@@ -1598,25 +1780,25 @@
         },
         {
           "id": "jam",
-          "text": "Saskia spread the jam on a piece of dragon toast. 'You have excellent taste,' she rumbled, pleased.",
+          "text": "The {guide_mentor} spread the jam on a piece of dragon toast. 'You have excellent taste,' she rumbled, pleased.",
           "action_slot": "cheering",
           "next": "tea"
         },
         {
           "id": "poems",
-          "text": "Saskia read three poems aloud, her voice deep and slow. {toy} listened with both ears wide open.",
+          "text": "The {guide_mentor} read three poems aloud, her voice deep and slow. {friend} listened with both ears wide open.",
           "action_slot": "thinking",
           "next": "tea"
         },
         {
           "id": "mint",
-          "text": "Saskia tucked the mint into her teapot. 'A perfect afternoon needs a perfect garnish,' she said.",
+          "text": "The {guide_mentor} tucked the mint into her teapot. 'A perfect afternoon needs a perfect garnish,' she said.",
           "action_slot": "thinking",
           "next": "tea"
         },
         {
           "id": "tea",
-          "text": "They sat together as the sun lowered, sipping tea and watching the valley turn gold. {toy} promised to come again. The end.",
+          "text": "They sat together as the sun lowered, sipping tea and watching the valley turn gold. {friend} promised to come again. The end.",
           "action_slot": "cheering"
         }
       ]
