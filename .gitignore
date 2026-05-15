@@ -47,6 +47,14 @@ data/models/lora/*/
 # a separate "download corpus" step.
 !data/jokes/
 !data/jokes/jokes.json
+# Phase K K11: ship the song manifest + credits in git, but NOT the
+# rendered audio. The operator runs scripts/generate_song_corpus.py
+# once locally to populate data/songs/audio/*.mp3. K11 deliberately
+# keeps the heavyweight Coqui dep out of the runtime venv.
+!data/songs/
+!data/songs/manifest.json
+!data/songs/_credits.md
+data/songs/audio/
 
 # Secrets / OAuth
 secrets.json
