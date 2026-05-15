@@ -350,11 +350,11 @@ Per [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md), each
 
 **Problem:** Migration `0015_phase_k_feature_flags.sql` seeds 8 boolean settings (`jokes_enabled`, `songs_enabled`, `play_standalone_enabled`, `play_embedded_enabled`, `play_endings_enabled`, `play_spontaneity_enabled`, `clickable_words_enabled`, `read_me_button_enabled`), defaults per §5. Eight backend modules under `src/toybox/core/` follow the per-setting convention from Phase H/I/J. Eight API endpoints under `src/toybox/api/`. New `PlayFeaturesControls.tsx` parent component (mirrors `PlayQueueSettingsControls.tsx`) with 8 toggle switches. Frontend `api.ts` adds getters/setters. Kiosk `App.tsx` bootstrap fetches all 8 flags and threads via props (no React context).
 
-**Type:** code
+**Type:** runtime
 
 **Issue:** #115
 
-**Flags:** `--reviewers code`
+**Flags:** `--reviewers full --start-cmd "uv run python -m toybox.main --host 127.0.0.1 --port 8000" --url "http://127.0.0.1:4000/parent"`
 
 ### Step K3: Template schema extension + validator
 
