@@ -9,5 +9,19 @@
   "age_range_max": 10,
   "language": "en",
   "source": "library",
-  "default_voice_tone": "curious_calm"
+  "default_voice_tone": "curious_calm",
+  "role_weights": {
+    "quest_giver": 1.3,
+    "helper_townsperson": 1.2,
+    "frenemy": 1.3,
+    "sidekick": 1.0
+  },
+  "voice_profile": {
+    "rate": 1.1,
+    "pitch": 0.9
+  },
+  "spontaneity_rates": {
+    "jokes": 0.0,
+    "songs": 0.0
+  }
 }

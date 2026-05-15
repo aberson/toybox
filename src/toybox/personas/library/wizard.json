@@ -9,5 +9,19 @@
   "age_range_max": 10,
   "language": "en",
   "source": "library",
-  "default_voice_tone": "warm_storyteller"
+  "default_voice_tone": "warm_storyteller",
+  "role_weights": {
+    "quest_giver": 1.5,
+    "guide_mentor": 1.5,
+    "big_bad_boss": 1.2,
+    "frenemy": 1.1
+  },
+  "voice_profile": {
+    "rate": 0.9,
+    "pitch": 0.7
+  },
+  "spontaneity_rates": {
+    "jokes": 0.10,
+    "songs": 0.05
+  }
 }

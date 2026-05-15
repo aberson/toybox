@@ -75,6 +75,70 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 64
+    },
+    "role_weights": {
+      "type": "object",
+      "description": "Phase K K1 — role-name -> 0.0..2.0 weight. Empty = uniform.",
+      "additionalProperties": {
+        "type": "number",
+        "minimum": 0.0,
+        "maximum": 2.0
+      },
+      "propertyNames": {
+        "enum": [
+          "friend",
+          "quest_giver",
+          "guide_mentor",
+          "needs_saving",
+          "boss_mini_boss",
+          "big_bad_boss",
+          "frenemy",
+          "sidekick",
+          "trickster",
+          "helper_townsperson"
+        ]
+      }
+    },
+    "voice_profile": {
+      "type": ["object", "null"],
+      "description": "Phase K K1/K8 — TTS voice profile; NULL = system default.",
+      "additionalProperties": false,
+      "required": ["rate", "pitch"],
+      "properties": {
+        "rate": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 2.0
+        },
+        "pitch": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 2.0
+        },
+        "voice_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "spontaneity_rates": {
+      "type": "object",
+      "description": "Phase K K1 — per-content max-rate input for K15's spontaneity roll.",
+      "additionalProperties": false,
+      "required": ["jokes", "songs"],
+      "properties": {
+        "jokes": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "songs": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        }
+      }
     }
   }
 }

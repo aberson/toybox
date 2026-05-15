@@ -24,6 +24,8 @@ from typing import Any, Final
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
+from .models import DEFAULT_ROLE_WEIGHTS_JSON, DEFAULT_SPONTANEITY_RATES_JSON
+
 _PACKAGE_DIR: Final[Path] = Path(__file__).resolve().parent
 LIBRARY_DIR: Final[Path] = _PACKAGE_DIR / "library"
 SCHEMA_FILENAME: Final[str] = "_schema.json"
@@ -58,16 +60,50 @@ def _iter_persona_files(library_dir: Path) -> list[Path]:
 
 
 def _upsert_persona(conn: sqlite3.Connection, persona: dict[str, Any], now: str) -> None:
+    # Phase K K1: migration 0014 added role_weights / voice_profile /
+    # spontaneity_rates as JSON-typed TEXT columns. Library personas
+    # may declare them in JSON; missing keys fall back to the migration
+    # 0014 column defaults ('{}' / NULL / '{"jokes":0.0,"songs":0.0}').
+    # Encoding here uses compact separators (no spaces) so loader output
+    # is byte-identical to migration 0014's DEFAULT literals and the
+    # DEFAULT_*_JSON module constants in toybox.personas.models — a
+    # future "is this row at its default?" string-compare must work
+    # uniformly across library + custom + backfilled rows (see
+    # .claude/rules/code-quality.md §3 "audit wire shape on storage
+    # change"). sort_keys=True keeps key order deterministic; the
+    # DEFAULT_*_JSON constants are written in matching sorted order.
+    role_weights = persona.get("role_weights")
+    voice_profile = persona.get("voice_profile")
+    spontaneity_rates = persona.get("spontaneity_rates")
+
+    role_weights_json = (
+        json.dumps(role_weights, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        if role_weights is not None
+        else DEFAULT_ROLE_WEIGHTS_JSON
+    )
+    voice_profile_json = (
+        json.dumps(voice_profile, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        if voice_profile is not None
+        else None
+    )
+    spontaneity_rates_json = (
+        json.dumps(spontaneity_rates, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        if spontaneity_rates is not None
+        else DEFAULT_SPONTANEITY_RATES_JSON
+    )
+
     conn.execute(
         """
         INSERT INTO personas (
             id, display_name, archetype, system_prompt, avatar_image_path,
             avatar_image_hash, behavior_tags, age_range_min, age_range_max,
-            language, source, default_voice_tone, created_at
+            language, source, default_voice_tone, created_at,
+            role_weights, voice_profile, spontaneity_rates
         ) VALUES (
             :id, :display_name, :archetype, :system_prompt, :avatar_image_path,
             NULL, :behavior_tags, :age_range_min, :age_range_max,
-            :language, :source, :default_voice_tone, :created_at
+            :language, :source, :default_voice_tone, :created_at,
+            :role_weights, :voice_profile, :spontaneity_rates
         )
         ON CONFLICT(id) DO UPDATE SET
             display_name        = excluded.display_name,
@@ -80,7 +116,10 @@ def _upsert_persona(conn: sqlite3.Connection, persona: dict[str, Any], now: str)
             age_range_max       = excluded.age_range_max,
             language            = excluded.language,
             source              = excluded.source,
-            default_voice_tone  = excluded.default_voice_tone
+            default_voice_tone  = excluded.default_voice_tone,
+            role_weights        = excluded.role_weights,
+            voice_profile       = excluded.voice_profile,
+            spontaneity_rates   = excluded.spontaneity_rates
         """,
         {
             "id": persona["id"],
@@ -95,6 +134,9 @@ def _upsert_persona(conn: sqlite3.Connection, persona: dict[str, Any], now: str)
             "source": persona["source"],
             "default_voice_tone": persona.get("default_voice_tone"),
             "created_at": now,
+            "role_weights": role_weights_json,
+            "voice_profile": voice_profile_json,
+            "spontaneity_rates": spontaneity_rates_json,
         },
     )
 

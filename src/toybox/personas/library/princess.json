@@ -9,5 +9,19 @@
   "age_range_max": 10,
   "language": "en",
   "source": "library",
-  "default_voice_tone": "bright_friendly"
+  "default_voice_tone": "bright_friendly",
+  "role_weights": {
+    "friend": 1.5,
+    "sidekick": 1.5,
+    "helper_townsperson": 1.2,
+    "big_bad_boss": 0.3
+  },
+  "voice_profile": {
+    "rate": 1.0,
+    "pitch": 1.4
+  },
+  "spontaneity_rates": {
+    "jokes": 0.05,
+    "songs": 0.15
+  }
 }

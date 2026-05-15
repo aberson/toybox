@@ -9,5 +9,18 @@
   "age_range_max": 10,
   "language": "en",
   "source": "library",
-  "default_voice_tone": "warm_teacher"
+  "default_voice_tone": "warm_teacher",
+  "role_weights": {
+    "guide_mentor": 1.5,
+    "helper_townsperson": 1.3,
+    "friend": 1.0
+  },
+  "voice_profile": {
+    "rate": 1.2,
+    "pitch": 1.0
+  },
+  "spontaneity_rates": {
+    "jokes": 0.10,
+    "songs": 0.0
+  }
 }
