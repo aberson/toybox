@@ -658,6 +658,12 @@ export function App(): JSX.Element {
               onChoose={handleChoose}
               advanceBusy={busyAdvance}
               choosingIndex={choosingIndex}
+              // Phase K K9: thread the two click-to-read flags from
+              // the bootstrap-fetched ``featureFlags`` snapshot. No
+              // React context per the plan §4 — prop drilling matches
+              // the F7 / G4 / J precedent.
+              clickableWordsEnabled={featureFlags.clickable_words_enabled}
+              readMeButtonEnabled={featureFlags.read_me_button_enabled}
             />
           </>
         )}

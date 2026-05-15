@@ -24,6 +24,9 @@
 
 import { useRef, useState, type JSX } from "react";
 
+import type { VoiceProfile } from "../tts";
+import { ClickableText } from "./ClickableText";
+
 // Result of a tap when the parent's ``onChoose`` resolves.
 //   - ``"ok"``: advance succeeded (the activity moved on).
 //   - ``"conflict"``: 409 was caught by ``withConflictHandler``; the
@@ -46,6 +49,14 @@ export interface ChoiceButtonProps {
   // ``"conflict"`` on 409 (after refetch). Rejects on non-409 errors
   // so the button can show an inline error indicator.
   onChoose: (choiceIndex: number) => Promise<ChoiceResult>;
+  // Phase K K9: persona voice profile + clickable-words flag drilled
+  // through StepCard. When ``clickableWordsEnabled`` is true the
+  // label is wrapped in ClickableText so word taps speak the word
+  // (with stopPropagation so the choice's submit handler does NOT
+  // fire). When false (or both props omitted), the button renders
+  // identically to pre-K9 — preserves the F7/G4 layout fixtures.
+  voiceProfile?: VoiceProfile;
+  clickableWordsEnabled?: boolean;
 }
 
 export function ChoiceButton(props: ChoiceButtonProps): JSX.Element {
@@ -120,7 +131,20 @@ export function ChoiceButton(props: ChoiceButtonProps): JSX.Element {
         width: "100%",
       }}
     >
-      {busy ? "..." : props.label}
+      {busy ? (
+        "..."
+      ) : props.clickableWordsEnabled === true && props.voiceProfile !== undefined ? (
+        // Phase K K9: word-level tap surface. Word ``onClick`` calls
+        // ``stopPropagation`` so a word tap does NOT also fire this
+        // button's onClick (which would advance the activity).
+        <ClickableText
+          text={props.label}
+          profile={props.voiceProfile}
+          enabled={true}
+        />
+      ) : (
+        props.label
+      )}
       {errored && (
         <span
           data-testid="choice-button-error"

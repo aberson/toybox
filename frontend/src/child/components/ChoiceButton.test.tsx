@@ -22,9 +22,29 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ChoiceButton } from "./ChoiceButton";
 import type { ChoiceResult } from "./ChoiceButton";
+import type { VoiceProfile } from "../tts";
+
+// Phase K K9: when ``clickableWordsEnabled`` + a ``voiceProfile`` are
+// supplied, the label is rendered via ClickableText which speaks the
+// word on tap. Mock the substrate so the tests below can assert
+// stopPropagation + tap dispatch without staging speechSynthesis.
+vi.mock("../tts", async () => {
+  return {
+    speak: vi.fn(async () => undefined),
+    cancel: vi.fn(),
+  };
+});
+
+import * as tts from "../tts";
+
+const K9_TEST_PROFILE: VoiceProfile = { rate: 1.0, pitch: 1.0 };
 
 afterEach(() => {
   cleanup();
+  // K9: tts spies persist across tests via the module-level vi.mock.
+  // Clear call records so a previous test's word-tap doesn't leak into
+  // a later test's "speak should not have been called" assertion.
+  vi.clearAllMocks();
 });
 
 // Helper: a deferred promise so the test can hold ``onChoose`` open
@@ -183,6 +203,96 @@ describe("ChoiceButton — 409 conflict path", () => {
     // ran the refetch callback before resolving). Tested at App level.
     expect(onChoose).toHaveBeenCalledTimes(1);
     expect(onChoose).toHaveBeenCalledWith(1);
+  });
+});
+
+describe("ChoiceButton K9 — clickable-words label", () => {
+  it("renders the label as plain text when clickableWordsEnabled is omitted", () => {
+    // Default behavior is the pre-K9 string render — preserves the G4
+    // layout fixtures + the F7 sprite-row contract.
+    render(
+      <ChoiceButton
+        label="Path A"
+        choiceIndex={0}
+        onChoose={async () => "ok"}
+      />,
+    );
+    expect(screen.queryByTestId("clickable-text")).toBeNull();
+    expect(screen.getByTestId("choice-button").textContent).toContain("Path A");
+  });
+
+  it("renders the label wrapped in ClickableText when flag + profile are supplied", () => {
+    render(
+      <ChoiceButton
+        label="Sneak past Penguin"
+        choiceIndex={0}
+        onChoose={async () => "ok"}
+        voiceProfile={K9_TEST_PROFILE}
+        clickableWordsEnabled={true}
+      />,
+    );
+    const wrapper = screen.getByTestId("clickable-text");
+    expect(wrapper.getAttribute("data-clickable")).toBe("true");
+    // Three words → three tappable spans.
+    expect(screen.getAllByTestId("clickable-word")).toHaveLength(3);
+  });
+
+  it("word tap calls speak() and does NOT fire onChoose (stopPropagation)", () => {
+    const onChoose = vi.fn<[number], Promise<ChoiceResult>>().mockResolvedValue("ok");
+    render(
+      <ChoiceButton
+        label="Sneak past"
+        choiceIndex={2}
+        onChoose={onChoose}
+        voiceProfile={K9_TEST_PROFILE}
+        clickableWordsEnabled={true}
+      />,
+    );
+    const [firstWord] = screen.getAllByTestId("clickable-word");
+    fireEvent.click(firstWord!);
+    // Word tap reaches the TTS substrate.
+    expect(tts.speak).toHaveBeenCalledTimes(1);
+    expect(tts.speak).toHaveBeenCalledWith("Sneak", K9_TEST_PROFILE);
+    // Choice submit did NOT fire — stopPropagation in ClickableText.
+    expect(onChoose).not.toHaveBeenCalled();
+  });
+
+  it("whole-button click still fires onChoose (outside the word spans)", () => {
+    const onChoose = vi.fn<[number], Promise<ChoiceResult>>().mockResolvedValue("ok");
+    render(
+      <ChoiceButton
+        label="Charge in"
+        choiceIndex={5}
+        onChoose={onChoose}
+        voiceProfile={K9_TEST_PROFILE}
+        clickableWordsEnabled={true}
+      />,
+    );
+    // Click the button element directly — not on a child word span.
+    // fireEvent.click on the button (not a word child) does not bubble
+    // up through a child handler; only the button's own onClick fires.
+    const btn = screen.getByTestId("choice-button");
+    fireEvent.click(btn);
+    expect(onChoose).toHaveBeenCalledTimes(1);
+    expect(onChoose).toHaveBeenCalledWith(5);
+    // The button-level click also did not fire a word tts call.
+    expect(tts.speak).not.toHaveBeenCalled();
+  });
+
+  it("flag false + profile supplied → plain label (no ClickableText)", () => {
+    // The flag is the gate; passing a profile alone must not enable
+    // word taps. Mirrors the App-level flag-off path.
+    render(
+      <ChoiceButton
+        label="No taps"
+        choiceIndex={0}
+        onChoose={async () => "ok"}
+        voiceProfile={K9_TEST_PROFILE}
+        clickableWordsEnabled={false}
+      />,
+    );
+    expect(screen.queryByTestId("clickable-text")).toBeNull();
+    expect(screen.getByTestId("choice-button").textContent).toContain("No taps");
   });
 });
 

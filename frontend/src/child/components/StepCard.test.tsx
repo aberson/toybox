@@ -15,6 +15,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Activity, ActivityStep } from "../api";
 import { StepCard } from "./StepCard";
 
+// Phase K K9: ReadMeButton + ClickableText consume the TTS substrate.
+// Mock the substrate so render assertions in this file don't require a
+// fake speechSynthesis (substrate has its own coverage in tts.test.ts).
+vi.mock("../tts", async () => {
+  return {
+    speak: vi.fn(async () => undefined),
+    cancel: vi.fn(),
+  };
+});
+
 afterEach(() => {
   cleanup();
 });
@@ -367,5 +377,156 @@ describe("StepCard branching action row", () => {
     // Match "Step 2" not followed by "of" anywhere in the card text.
     expect(card.textContent).toContain("Step 2");
     expect(card.textContent).not.toMatch(/Step\s+\d+\s+of/);
+  });
+});
+
+// Phase K K9: ReadMeButton mounting rules + clickable-words flag
+// threading. The kiosk's K9 affordance is gated per-flag; the
+// StepCard is the chokepoint that selects which step kinds get a
+// Read Me button and threads the words flag into ChoiceButton.
+
+describe("StepCard K9 — ReadMeButton mounting", () => {
+  it("mounts ReadMeButton when readMeButtonEnabled=true and kind is implicit text", () => {
+    // No ``kind`` on the wire defaults to "text" per the K9 contract
+    // (K12 lands the new kinds; pre-K12 wire payloads stay valid).
+    const activity = fakeActivity({
+      steps: [fakeStep({ body: "Look at the stars." })],
+    });
+    render(
+      <StepCard
+        activity={activity}
+        readMeButtonEnabled={true}
+        clickableWordsEnabled={false}
+      />,
+    );
+    expect(screen.getByTestId("read-me-button")).not.toBeNull();
+  });
+
+  it("does NOT mount ReadMeButton when readMeButtonEnabled=false", () => {
+    const activity = fakeActivity({
+      steps: [fakeStep({ body: "Look at the stars." })],
+    });
+    render(
+      <StepCard
+        activity={activity}
+        readMeButtonEnabled={false}
+        clickableWordsEnabled={false}
+      />,
+    );
+    expect(screen.queryByTestId("read-me-button")).toBeNull();
+  });
+
+  it.each(["text", "fork", "joke"])(
+    "mounts ReadMeButton for step.kind=%s",
+    (kind) => {
+      // ``kind`` is read defensively off the previewStep object; the
+      // fake spreads it into the step body. The cast to ActivityStep
+      // narrows past the not-yet-declared field.
+      const activity = fakeActivity({
+        steps: [
+          { ...fakeStep({ body: "x" }), kind } as ActivityStep,
+        ],
+      });
+      render(
+        <StepCard
+          activity={activity}
+          readMeButtonEnabled={true}
+        />,
+      );
+      expect(screen.getByTestId("read-me-button")).not.toBeNull();
+    },
+  );
+
+  it("does NOT mount ReadMeButton for step.kind=song (audio surface owned by K12)", () => {
+    const activity = fakeActivity({
+      steps: [
+        { ...fakeStep({ body: "x" }), kind: "song" } as ActivityStep,
+      ],
+    });
+    render(
+      <StepCard
+        activity={activity}
+        readMeButtonEnabled={true}
+      />,
+    );
+    expect(screen.queryByTestId("read-me-button")).toBeNull();
+  });
+
+  it("sets position:relative on the step-card container (K9 positioning contract)", () => {
+    // ReadMeButton renders position:absolute and pins to bottom-left;
+    // that contract requires the parent to be a positioning context.
+    // Guarding the contract here means a future StepCard refactor
+    // can't silently break the watermark placement.
+    const activity = fakeActivity({
+      steps: [fakeStep({ body: "Look at the stars." })],
+    });
+    render(
+      <StepCard activity={activity} readMeButtonEnabled={true} />,
+    );
+    const card = screen.getByTestId("step-card") as HTMLElement;
+    expect(card.style.position).toBe("relative");
+  });
+});
+
+describe("StepCard K9 — ClickableText threading", () => {
+  it("wraps the step body in ClickableText when clickableWordsEnabled=true", () => {
+    const activity = fakeActivity({
+      steps: [fakeStep({ body: "Pretend to be a cat" })],
+    });
+    render(
+      <StepCard activity={activity} clickableWordsEnabled={true} />,
+    );
+    const wrapper = screen.getByTestId("clickable-text");
+    expect(wrapper.getAttribute("data-clickable")).toBe("true");
+    expect(wrapper.textContent).toBe("Pretend to be a cat");
+    // 5 word spans (one per non-whitespace token).
+    expect(screen.getAllByTestId("clickable-word")).toHaveLength(5);
+  });
+
+  it("renders plain text (data-clickable=false) when clickableWordsEnabled=false", () => {
+    const activity = fakeActivity({
+      steps: [fakeStep({ body: "Pretend to be a cat" })],
+    });
+    render(
+      <StepCard activity={activity} clickableWordsEnabled={false} />,
+    );
+    const wrapper = screen.getByTestId("clickable-text");
+    expect(wrapper.getAttribute("data-clickable")).toBe("false");
+    expect(wrapper.textContent).toBe("Pretend to be a cat");
+    expect(screen.queryAllByTestId("clickable-word")).toHaveLength(0);
+  });
+
+  it("threads clickable-words flag through to ChoiceButton labels", () => {
+    const activity = fakeActivity({
+      steps: [
+        fakeStep({
+          choices: [
+            { label: "Sneak past Penguin", choice_index: 0 },
+            { label: "Charge in bravely", choice_index: 1 },
+          ],
+        }),
+      ],
+    });
+    render(
+      <StepCard
+        activity={activity}
+        onAdvance={vi.fn()}
+        onChoose={vi.fn()}
+        advanceBusy={false}
+        clickableWordsEnabled={true}
+      />,
+    );
+    // Each choice label becomes a ClickableText. We expect both the
+    // step body's ClickableText AND each choice's ClickableText (3
+    // wrappers total: 1 body + 2 choices).
+    const wrappers = screen.getAllByTestId("clickable-text");
+    expect(wrappers.length).toBeGreaterThanOrEqual(3);
+    // The choice labels' words are tappable too.
+    const wordTexts = screen
+      .getAllByTestId("clickable-word")
+      .map((w) => w.textContent);
+    expect(wordTexts).toContain("Sneak");
+    expect(wordTexts).toContain("Penguin");
+    expect(wordTexts).toContain("Charge");
   });
 });
