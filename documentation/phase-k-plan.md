@@ -457,6 +457,8 @@ Per [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md), each
 
 **Flags:** `--reviewers code`
 
+**Status:** DONE (2026-05-15)
+
 ### Step K11: Song corpus + bundled audio + theme tagging + Coqui render script
 
 **Problem:** `data/songs/manifest.json` + `data/songs/audio/*.mp3` (~50 tracks, mono, ≤64 kbps, ≤25s). `src/toybox/activities/song_corpus.py` mirrors `joke_corpus.py`. **One-shot operator render**: `scripts/generate_song_corpus.py` uses **Coqui TTS** (chosen over Piper for higher voice quality at acceptable install footprint; operator-installed once via `pip install TTS`; NOT a runtime dep; specific model version pinned in the script docstring) to render audio files from the manifest. Output committed to repo (zero runtime impact — kiosk just plays the `.mp3`s). License credits in `data/songs/_credits.md`. Validator asserts every manifest `audio_path` exists at load time AND total `data/songs/audio/` size < 50 MB.
