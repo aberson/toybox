@@ -62,6 +62,33 @@ export interface ActivityStep {
   // (which omit the field entirely) continue to typecheck and render
   // the linear-advance path.
   choices?: ChoiceOption[] | null;
+  // Phase K K3 / K12: per-step discriminator. ``"text"`` is the
+  // implicit default for legacy + pre-K12 wire payloads — StepCard
+  // reads this defensively via ``readStepKind`` and falls back to
+  // "text" when the field is absent. K12 dispatches on this field to
+  // mount SongPlayer / JokeStep instead of the default text+choices
+  // path. Optional + nullable so pre-K3 wire payloads typecheck.
+  kind?: "text" | "fork" | "song" | "joke" | null;
+  // Phase K K12: arbitrary per-step metadata. Today's known keys:
+  //   * ``audio_url`` (string) — absolute or backend-relative URL for
+  //     a song step's mp3. Read by SongPlayer when present.
+  //   * ``song_id`` (string) — corpus id; SongPlayer falls back to
+  //     ``/api/static/songs/audio/<id>.mp3`` when ``audio_url`` is
+  //     absent. K13's standalone surface is expected to populate
+  //     either field.
+  //   * ``punchline`` (string) — the reveal beat for a joke step;
+  //     JokeStep reads it 1.5s after the setup speaks.
+  //   * ``interjection`` (string) — one of ``"embedded" |
+  //     "ending" | "parent" | "spontaneity"`` per K14/K15; today
+  //     the kiosk does NOT surface this to the kid (invisible
+  //     metadata so the step feels like any other step).
+  //   * ``source_id`` (string) — corpus entry id of the song/joke for
+  //     learning-loop telemetry.
+  // The shape is ``Record<string, unknown>`` because the wire is
+  // pydantic ``dict[str, Any]`` (invariant 9 leaves ``metadata``
+  // un-codegenned). Consumers read defensively per K12's
+  // "render even on a malformed envelope" contract.
+  metadata?: Record<string, unknown> | null;
 }
 
 /**

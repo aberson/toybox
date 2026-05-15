@@ -10,10 +10,32 @@
 // avatar element. (See ``App.test.tsx`` for the kiosk-level shape.)
 
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Activity, ActivityStep } from "../api";
 import { StepCard } from "./StepCard";
+
+// jsdom shim for HTMLMediaElement.play / .pause — needed by the K12
+// SongPlayer mount path. Without these the autoplay useEffect throws
+// in jsdom (TypeError: el.play is not a function) and the test
+// renderer surfaces a hard failure. Re-installed in beforeEach so a
+// previous test's vi.clearAllMocks() doesn't leave them stale.
+beforeEach(() => {
+  Object.defineProperty(HTMLMediaElement.prototype, "play", {
+    configurable: true,
+    writable: true,
+    value: function play(): Promise<void> {
+      return Promise.resolve();
+    },
+  });
+  Object.defineProperty(HTMLMediaElement.prototype, "pause", {
+    configurable: true,
+    writable: true,
+    value: function pause(): void {
+      // jsdom stub — see beforeEach docstring.
+    },
+  });
+});
 
 // Phase K K9: ReadMeButton + ClickableText consume the TTS substrate.
 // Mock the substrate so render assertions in this file don't require a
@@ -530,3 +552,304 @@ describe("StepCard K9 — ClickableText threading", () => {
     expect(wordTexts).toContain("Charge");
   });
 });
+
+// Phase K K12: kind dispatch + auto-advance. StepCard switches its
+// inner body on ``step.kind``: song → SongPlayer, joke → JokeStep,
+// text/fork → existing path. Auto-advance fires when a song/joke
+// step's content-master flag is OFF and ``currentStep`` is non-null.
+
+describe("StepCard K12 — song step dispatch", () => {
+  it("renders SongPlayer for kind=song and skips the step-body-row + NextStepButton", () => {
+    const onAdvance = vi.fn();
+    const activity = fakeActivity({
+      steps: [
+        {
+          ...fakeStep({ body: "Rocket Launch Countdown" }),
+          kind: "song",
+          metadata: { audio_url: "/api/static/songs/audio/rocket.mp3" },
+        } as ActivityStep,
+      ],
+    });
+    render(<StepCard activity={activity} onAdvance={onAdvance} />);
+    // SongPlayer mounts.
+    expect(screen.getByTestId("song-player")).not.toBeNull();
+    expect(screen.getByTestId("song-player-title").textContent).toBe(
+      "Rocket Launch Countdown",
+    );
+    const audio = screen.getByTestId(
+      "song-player-audio",
+    ) as HTMLAudioElement;
+    expect(audio.getAttribute("src")).toBe(
+      "/api/static/songs/audio/rocket.mp3",
+    );
+    // The default text body-row is NOT rendered (song owns the layout).
+    expect(screen.queryByTestId("step-body-row")).toBeNull();
+    // No linear NextStepButton — SongPlayer's internal next is the
+    // sole advance affordance on song steps.
+    expect(screen.queryByTestId("next-step-button")).toBeNull();
+  });
+
+  it("falls back to /api/static/songs/audio/<id>.mp3 when only song_id is in metadata", () => {
+    const activity = fakeActivity({
+      steps: [
+        {
+          ...fakeStep({ body: "Moon Stroll" }),
+          kind: "song",
+          metadata: { song_id: "moon-stroll-lullaby" },
+        } as ActivityStep,
+      ],
+    });
+    render(<StepCard activity={activity} onAdvance={vi.fn()} />);
+    const audio = screen.getByTestId(
+      "song-player-audio",
+    ) as HTMLAudioElement;
+    expect(audio.getAttribute("src")).toBe(
+      "/api/static/songs/audio/moon-stroll-lullaby.mp3",
+    );
+  });
+
+  it("does NOT mount a ReadMeButton on a song step", () => {
+    const activity = fakeActivity({
+      steps: [
+        {
+          ...fakeStep({ body: "Song" }),
+          kind: "song",
+          metadata: { audio_url: "/x.mp3" },
+        } as ActivityStep,
+      ],
+    });
+    render(
+      <StepCard
+        activity={activity}
+        onAdvance={vi.fn()}
+        readMeButtonEnabled={true}
+      />,
+    );
+    expect(screen.queryByTestId("read-me-button")).toBeNull();
+  });
+});
+
+describe("StepCard K12 — joke step dispatch", () => {
+  it("renders JokeStep for kind=joke and keeps the linear NextStepButton", () => {
+    const activity = fakeActivity({
+      steps: [
+        {
+          ...fakeStep({ body: "Why did the chicken cross the road?" }),
+          kind: "joke",
+          metadata: { punchline: "To get to the other side." },
+        } as ActivityStep,
+      ],
+    });
+    render(<StepCard activity={activity} onAdvance={vi.fn()} />);
+    expect(screen.getByTestId("joke-step")).not.toBeNull();
+    expect(screen.getByTestId("joke-setup").textContent).toBe(
+      "Why did the chicken cross the road?",
+    );
+    // Linear NextStepButton is rendered — the punchline reveal is
+    // time-gated, but advance is still kid-triggered.
+    expect(screen.getByTestId("next-step-button")).not.toBeNull();
+    // The default body-row is NOT rendered for joke kind.
+    expect(screen.queryByTestId("step-body-row")).toBeNull();
+  });
+
+  it("mounts a ReadMeButton variant on joke steps (replays both lines)", () => {
+    const activity = fakeActivity({
+      steps: [
+        {
+          ...fakeStep({ body: "Setup" }),
+          kind: "joke",
+          metadata: { punchline: "Punchline" },
+        } as ActivityStep,
+      ],
+    });
+    render(
+      <StepCard
+        activity={activity}
+        onAdvance={vi.fn()}
+        readMeButtonEnabled={true}
+      />,
+    );
+    const button = screen.getByTestId("read-me-button") as HTMLButtonElement;
+    expect(button).not.toBeNull();
+    // The joke variant carries the data-read-me-variant attr so a
+    // selector can distinguish it from the K9 stock ReadMeButton.
+    expect(button.dataset["readMeVariant"]).toBe("joke");
+  });
+});
+
+describe("StepCard K12 — text + fork kinds unchanged", () => {
+  it("renders the body-row + NextStepButton for kind=text (explicit)", () => {
+    const activity = fakeActivity({
+      steps: [
+        {
+          ...fakeStep({ body: "Plain text step" }),
+          kind: "text",
+        } as ActivityStep,
+      ],
+    });
+    render(<StepCard activity={activity} onAdvance={vi.fn()} />);
+    expect(screen.getByTestId("step-body-row")).not.toBeNull();
+    expect(screen.getByTestId("next-step-button")).not.toBeNull();
+    expect(screen.queryByTestId("song-player")).toBeNull();
+    expect(screen.queryByTestId("joke-step")).toBeNull();
+  });
+
+  it("renders the body-row + ChoiceButtons for kind=fork", () => {
+    const activity = fakeActivity({
+      steps: [
+        {
+          ...fakeStep({
+            body: "Branch?",
+            choices: [
+              { label: "A", choice_index: 0 },
+              { label: "B", choice_index: 1 },
+            ],
+          }),
+          kind: "fork",
+        } as ActivityStep,
+      ],
+    });
+    render(
+      <StepCard
+        activity={activity}
+        onAdvance={vi.fn()}
+        onChoose={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("step-body-row")).not.toBeNull();
+    expect(screen.getAllByTestId("choice-button")).toHaveLength(2);
+    expect(screen.queryByTestId("song-player")).toBeNull();
+    expect(screen.queryByTestId("joke-step")).toBeNull();
+  });
+});
+
+describe("StepCard K12 — auto-advance on disabled content master", () => {
+  it("auto-advances past a song step when songsEnabled=false", () => {
+    const onAdvance = vi.fn();
+    const activity = fakeActivity({
+      steps: [
+        {
+          ...fakeStep({ body: "Song" }),
+          kind: "song",
+          metadata: { audio_url: "/x.mp3" },
+        } as ActivityStep,
+      ],
+    });
+    render(
+      <StepCard
+        activity={activity}
+        onAdvance={onAdvance}
+        songsEnabled={false}
+      />,
+    );
+    // onAdvance fires once during the mount effect (silent skip).
+    expect(onAdvance).toHaveBeenCalledTimes(1);
+    // The step card renders the auto-advance sentinel — no SongPlayer,
+    // no body row, no buttons.
+    const card = screen.getByTestId("step-card");
+    expect(card.dataset["autoAdvance"]).toBe("true");
+    expect(screen.queryByTestId("song-player")).toBeNull();
+    expect(screen.queryByTestId("next-step-button")).toBeNull();
+  });
+
+  it("auto-advances past a joke step when jokesEnabled=false", () => {
+    const onAdvance = vi.fn();
+    const activity = fakeActivity({
+      steps: [
+        {
+          ...fakeStep({ body: "Joke setup" }),
+          kind: "joke",
+          metadata: { punchline: "Joke punchline" },
+        } as ActivityStep,
+      ],
+    });
+    render(
+      <StepCard
+        activity={activity}
+        onAdvance={onAdvance}
+        jokesEnabled={false}
+      />,
+    );
+    expect(onAdvance).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("joke-step")).toBeNull();
+  });
+
+  it("does NOT auto-advance when the disabled-content step is only a preview (currentStep is null)", () => {
+    // When the activity is in approved-but-not-started state, no step
+    // has current=true. The kiosk previews steps[0] as a "ready" hint
+    // — auto-advancing through it would defeat the kid's "I'm Ready"
+    // tap and silently consume the step before the kid sees it.
+    const onAdvance = vi.fn();
+    const activity = fakeActivity({
+      state: "approved",
+      steps: [
+        {
+          ...fakeStep({ body: "Song" }),
+          // current=false → no current step on the activity.
+          current: false,
+          kind: "song",
+          metadata: { audio_url: "/x.mp3" },
+        } as ActivityStep,
+      ],
+    });
+    render(
+      <StepCard
+        activity={activity}
+        onAdvance={onAdvance}
+        songsEnabled={false}
+      />,
+    );
+    // No auto-advance call — the preview is a "Ready" hint, not a
+    // running step.
+    expect(onAdvance).not.toHaveBeenCalled();
+  });
+
+  it("renders the SongPlayer normally when songsEnabled=true", () => {
+    const onAdvance = vi.fn();
+    const activity = fakeActivity({
+      steps: [
+        {
+          ...fakeStep({ body: "Song" }),
+          kind: "song",
+          metadata: { audio_url: "/x.mp3" },
+        } as ActivityStep,
+      ],
+    });
+    render(
+      <StepCard
+        activity={activity}
+        onAdvance={onAdvance}
+        songsEnabled={true}
+      />,
+    );
+    expect(screen.getByTestId("song-player")).not.toBeNull();
+    // No auto-advance — kid is supposed to hear the song.
+    expect(onAdvance).not.toHaveBeenCalled();
+  });
+
+  it("does NOT auto-advance non-song / non-joke kinds even when both flags are false", () => {
+    // Defensive: text + fork kinds should never auto-advance based
+    // on the K12 flags. The flags are content-master gates, not a
+    // general-purpose skip.
+    const onAdvance = vi.fn();
+    const activity = fakeActivity({
+      steps: [
+        {
+          ...fakeStep({ body: "Plain step" }),
+          kind: "text",
+        } as ActivityStep,
+      ],
+    });
+    render(
+      <StepCard
+        activity={activity}
+        onAdvance={onAdvance}
+        songsEnabled={false}
+        jokesEnabled={false}
+      />,
+    );
+    expect(onAdvance).not.toHaveBeenCalled();
+    expect(screen.getByTestId("step-body-row")).not.toBeNull();
+  });
+});
+

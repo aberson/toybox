@@ -664,6 +664,14 @@ export function App(): JSX.Element {
               // the F7 / G4 / J precedent.
               clickableWordsEnabled={featureFlags.clickable_words_enabled}
               readMeButtonEnabled={featureFlags.read_me_button_enabled}
+              // Phase K K12: thread the two content-master flags so
+              // StepCard can silently auto-advance past a song step
+              // when songs are disabled (likewise for jokes). The
+              // ``featureFlags`` snapshot is the bootstrap-fetched
+              // truth; later K-steps (K17 smoke gate) verify a toggle
+              // round-trips by refreshing the kiosk.
+              songsEnabled={featureFlags.songs_enabled}
+              jokesEnabled={featureFlags.jokes_enabled}
             />
           </>
         )}
