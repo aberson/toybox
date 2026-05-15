@@ -55,7 +55,9 @@ from ..activities.generator import (
     render_with_slot_fills,
     resolve_dispatch,
 )
+from ..activities.joke_corpus import apply_toy_substitution, pick_joke
 from ..activities.roles import ROLE_DISPLAY_NAMES, Role
+from ..activities.song_corpus import pick_song
 from ..ai.judge import judge_and_persist
 from ..ai.labeled_events import (
     GENERATOR_PATH_CLAUDE,
@@ -67,7 +69,12 @@ from ..ai.labeled_events import (
     schedule_judge_sample,
     update_parent_signal,
 )
-from ..core import play_target_depth
+from ..core import (
+    jokes_enabled,
+    play_standalone_enabled,
+    play_target_depth,
+    songs_enabled,
+)
 from ..core.auth import TokenScope
 from ..core.pubsub import PubSub
 from ..core.queue import (
@@ -237,6 +244,27 @@ class ActivityStepResponse(BaseModel):
     # ``None`` for linear advance, terminal, and steps not yet
     # advanced past.
     chosen_label: str | None = None
+    # Phase K K13: per-step discriminator the kiosk dispatches on
+    # (K12 StepCard.tsx). ``"text" | "fork" | "song" | "joke"``;
+    # ``None`` on legacy rows (kiosk defaults to ``"text"`` defensively).
+    # K13 populates this for standalone song/joke intents; K14 / K15
+    # populate it for embedded / ending / parent / spontaneity
+    # interjection steps.
+    kind: str | None = None
+    # Phase K K13: per-step metadata blob the kiosk reads for kind-
+    # specific payload. Today's known keys:
+    #
+    #   * ``audio_url`` (str)  — song mp3 URL (SongPlayer reads this
+    #     directly; falls back to ``/api/static/songs/audio/<id>.mp3``
+    #     via ``song_id`` when missing).
+    #   * ``song_id`` (str)    — corpus id for song step.
+    #   * ``joke_id`` (str)    — corpus id for joke step.
+    #   * ``punchline`` (str)  — reveal beat for joke step.
+    #   * ``interjection`` (str) — embedded|ending|parent|spontaneity (K14/K15).
+    #   * ``source_id`` (str)  — corpus entry id (K14/K15 telemetry).
+    #
+    # ``None`` on legacy rows / steps with no per-step metadata.
+    metadata: dict[str, Any] | None = None
 
 
 class RoleAssignment(BaseModel):
@@ -308,6 +336,14 @@ class ActivityResponse(BaseModel):
     # name for determinism, comma-separated. Empty string when ``roles``
     # is empty.
     cast_summary: str = ""
+    # Phase K K13: explanation for a synthetic ``state="dismissed"``
+    # response returned when a standalone intent (``request_song`` /
+    # ``request_joke``) hits a disabled surface flag or content master.
+    # The propose call returns HTTP 200 with this field set to
+    # ``"surface_disabled"`` and no persisted activity row / no
+    # ``activity.state`` WS envelope. ``None`` on every other code path
+    # (real activities never carry a reason).
+    reason: str | None = None
 
 
 class ProposeRequest(BaseModel):
@@ -601,10 +637,33 @@ def _decode_choices_json(raw: Any) -> list[ChoiceOption] | None:
     return [ChoiceOption(label=str(label), choice_index=idx) for idx, label in enumerate(decoded)]
 
 
+def _decode_step_metadata_json(raw: Any) -> dict[str, Any] | None:
+    """Phase K K13: parse a persisted ``activity_steps.metadata_json``
+    cell into the wire-side dict shape.
+
+    Returns ``None`` for both NULL and empty-object inputs — the kiosk
+    treats both as "no per-step metadata" (the K12 StepCard reads keys
+    defensively via optional chaining). Malformed JSON is logged +
+    dropped (returns ``None``) rather than raising — a corrupt cell on
+    one step row must not break the whole activity GET. Non-object
+    payloads (e.g. an array accidentally written) are likewise dropped.
+    """
+    if raw is None:
+        return None
+    try:
+        decoded = json.loads(str(raw))
+    except json.JSONDecodeError:
+        _logger.warning("activity_steps.metadata_json malformed; treating as no metadata")
+        return None
+    if not isinstance(decoded, dict) or not decoded:
+        return None
+    return {str(k): v for k, v in decoded.items()}
+
+
 def _fetch_steps(conn: sqlite3.Connection, activity_id: str) -> list[ActivityStepResponse]:
     rows = conn.execute(
         "SELECT seq, body, sfx, expected_action, current, action_slot, "
-        " choices_json, chosen_label "
+        " choices_json, chosen_label, kind, metadata_json "
         "FROM activity_steps WHERE activity_id = ? ORDER BY seq ASC",
         (activity_id,),
     ).fetchall()
@@ -618,6 +677,8 @@ def _fetch_steps(conn: sqlite3.Connection, activity_id: str) -> list[ActivitySte
             action_slot=r["action_slot"],
             choices=_decode_choices_json(r["choices_json"]),
             chosen_label=r["chosen_label"],
+            kind=r["kind"],
+            metadata=_decode_step_metadata_json(r["metadata_json"]),
         )
         for r in rows
     ]
@@ -962,11 +1023,20 @@ def _persist_activity(
                 # is irrelevant for arrays but kept off so tests can
                 # pin the exact label ordering the kiosk renders.
                 choices_blob = json.dumps(list(choices_rendered))
+            # Phase K K13: encode per-step metadata blob. None /
+            # empty-dict both serialise to NULL so the wire stays
+            # symmetric with the read path's "no metadata" shape.
+            raw_step_metadata = first.get("metadata")
+            metadata_blob: str | None
+            if isinstance(raw_step_metadata, dict) and raw_step_metadata:
+                metadata_blob = json.dumps(raw_step_metadata, sort_keys=True)
+            else:
+                metadata_blob = None
             conn.execute(
                 "INSERT INTO activity_steps "
                 "(id, activity_id, seq, body, sfx, expected_action, current, action_slot, "
-                " choices_json, step_template_id) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " choices_json, step_template_id, kind, metadata_json) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     str(uuid.uuid4()),
                     activity_id,
@@ -985,6 +1055,11 @@ def _persist_activity(
                     first.get("action_slot"),
                     choices_blob,
                     first.get("step_id"),
+                    # Phase K K13: step-kind discriminator + arbitrary
+                    # per-step metadata. ``None`` on template-driven
+                    # rows (current default = "text" implied).
+                    first.get("kind"),
+                    metadata_blob,
                 ),
             )
 
@@ -1413,6 +1488,255 @@ def _build_loop_system_prompt(
     return "\n".join(parts)
 
 
+# Phase K K13: standalone-intent surface gating.
+#
+# The two intents below produce single-step corpus-driven activities
+# (song or joke) rather than the template-driven 5-step plan that
+# `request_play` / `boredom` / `request_story` / `request_activity`
+# yield. Surfaces are gated on (content_master AND play_standalone_enabled);
+# when either flag is OFF the propose call returns HTTP 200 with a
+# synthetic dismissed body (no DB row, no `activity.state` WS envelope).
+# Plan §7 pins the exact body shape.
+_STANDALONE_SONG_INTENT = "request_song"
+_STANDALONE_JOKE_INTENT = "request_joke"
+_STANDALONE_INTENTS: frozenset[str] = frozenset({_STANDALONE_SONG_INTENT, _STANDALONE_JOKE_INTENT})
+
+# The kiosk's K12 SongPlayer falls back to this static-mount URL pattern
+# when ``audio_url`` is absent on a song step's metadata. K13's propose
+# path emits ``audio_url`` directly using this prefix so the kiosk
+# doesn't have to special-case the fallback — but the prefix lives in
+# ONE place so a future mount-path move (e.g. CDN cutover) is a single
+# edit (code-quality.md §2).
+_SONG_AUDIO_URL_PREFIX = "/api/static/songs/audio"
+
+
+def _standalone_surface_enabled(conn: sqlite3.Connection, intent: str) -> bool:
+    """Return True when (content_master AND play_standalone_enabled).
+
+    ``intent`` must be one of :data:`_STANDALONE_INTENTS`; passing any
+    other value raises ``KeyError`` (defense — the caller must gate
+    first).
+    """
+    if intent == _STANDALONE_SONG_INTENT:
+        content_master_on = songs_enabled.get(conn)
+    elif intent == _STANDALONE_JOKE_INTENT:
+        content_master_on = jokes_enabled.get(conn)
+    else:
+        raise KeyError(f"non-standalone intent {intent!r}")
+    return content_master_on and play_standalone_enabled.get(conn)
+
+
+def _dismissed_surface_disabled_response() -> ActivityResponse:
+    """Build the synthetic dismissed-path response per plan §7.
+
+    Returns an ``ActivityResponse`` with ``state="dismissed"``,
+    ``reason="surface_disabled"``, a fresh UUIDv4 id, version=1, and
+    enough other fields populated to satisfy the wire model. No DB row
+    is persisted; no ``activity.state`` envelope is emitted. The
+    response stays a real ``ActivityResponse`` (not a sibling type) so
+    the parent UI's existing suggestion-card branch can read
+    ``state==="dismissed"`` and surface the "couldn't propose right now"
+    flavor; the ``reason`` field gives the parent UI an explicit
+    discriminator for the surface-flag case.
+    """
+    return ActivityResponse(
+        id=str(uuid.uuid4()),
+        state=STATE_DISMISSED,
+        version=1,
+        title=None,
+        summary=None,
+        persona_id=None,
+        intent_source=None,
+        child_ids=[],
+        toy_ids=[],
+        created_at=_now_iso(),
+        started_at=None,
+        ended_at=None,
+        steps=[],
+        metadata={},
+        trigger_phrase=None,
+        persona_reasoning=None,
+        roles={},
+        cast_summary="",
+        reason="surface_disabled",
+    )
+
+
+def _do_propose_standalone(
+    body: ProposeRequest,
+    conn: sqlite3.Connection,
+    pubsub: PubSub,
+) -> ActivityResponse:
+    """Phase K K13: propose flow for the standalone song / joke intents.
+
+    Bypasses the template generator (Activity model requires 3+ steps)
+    and produces a single-step activity directly from the corpus.
+    Persists + emits + returns like the template path, but step.kind
+    is ``"song"`` / ``"joke"`` and step.metadata carries the per-kind
+    payload the K12 kiosk renders (audio_url + song_id for songs;
+    punchline + joke_id for jokes).
+    """
+    # Persona pick mirrors the template flow so the kiosk avatar still
+    # varies across propose calls. Falls through to no persona when the
+    # library is empty.
+    effective_persona_id = body.persona_id
+    persona_meta: dict[str, Any] | None = None
+    if effective_persona_id is None:
+        picked = _pick_random_library_persona(conn)
+        if picked is not None:
+            effective_persona_id = picked["id"]
+            persona_meta = picked
+
+    # Catalog toys — only needed by the joke path for {toy} substitution.
+    # Best-effort: a corrupt toy row mustn't break propose, so we degrade
+    # to no-toy form rather than 500.
+    resolved_toys: list[ResolvedToy] = []
+    try:
+        resolved_toys = resolve_toys(conn)
+    except sqlite3.Error:
+        _logger.warning(
+            "content_resolver.resolve_toys failed on standalone propose; "
+            "joke substitution will use no-toy form",
+            exc_info=True,
+        )
+
+    # Pick the corpus entry. Both pickers honour persona_compat + age_band
+    # filters; we don't pin an age band here (None = any). The seed
+    # comes from the ProposeRequest, so the same trigger phrase at the
+    # same seed always picks the same song/joke (deterministic for
+    # tests + telemetry).
+    activity_id = str(uuid.uuid4())
+    title: str
+    step_kind: str
+    step_body: str
+    step_metadata: dict[str, Any]
+
+    if body.intent == _STANDALONE_SONG_INTENT:
+        # require_audio=True — the kiosk would 404 on a corpus entry
+        # whose .mp3 hasn't been rendered yet, and the standalone
+        # surface is the kid's only path to the song (no template
+        # context to fall through to). Tests stub a renderable corpus.
+        song = pick_song(
+            seed=body.seed,
+            persona_id=effective_persona_id,
+            require_audio=True,
+        )
+        if song is None:
+            # No renderable song matches the filter (fresh install
+            # before audio rendered, or persona has no compatible
+            # entries). Treat as a soft dismiss — reuse the
+            # surface-disabled body so the kid-voice flow is uniform.
+            # The INFO log below is the operator's only signal that
+            # the cause was corpus-empty rather than a parent toggle.
+            _logger.info(
+                "standalone request_song found no audio-renderable corpus entry "
+                "for persona=%r seed=%d; returning dismissed",
+                effective_persona_id,
+                body.seed,
+            )
+            return _dismissed_surface_disabled_response()
+        title = f"Sing a song: {song.title}"
+        step_kind = "song"
+        step_body = song.title
+        step_metadata = {
+            "song_id": song.id,
+            "audio_url": f"{_SONG_AUDIO_URL_PREFIX}/{song.id}.mp3",
+        }
+    else:  # request_joke
+        joke = pick_joke(
+            seed=body.seed,
+            persona_id=effective_persona_id,
+        )
+        if joke is None:
+            _logger.info(
+                "standalone request_joke found no corpus entry for "
+                "persona=%r seed=%d; returning dismissed",
+                effective_persona_id,
+                body.seed,
+            )
+            return _dismissed_surface_disabled_response()
+        # Optional toy substitution: if the joke has {toy} placeholder
+        # AND we have at least one toy in the catalog, pick the first
+        # for deterministic shape. apply_toy_substitution handles all
+        # four cases (slot-yes/no × toy-yes/no).
+        toy_display = resolved_toys[0].display_name if resolved_toys else None
+        setup, punchline = apply_toy_substitution(joke, toy_display)
+        title = "Tell me a joke"
+        step_kind = "joke"
+        step_body = setup
+        step_metadata = {
+            "joke_id": joke.id,
+            "punchline": punchline,
+        }
+
+    # Persist. Reuse the canonical _persist_activity helper so the
+    # `activities` row + first `activity_steps` row land identically to
+    # the template path. step_metadata is round-tripped via the new K13
+    # ``metadata_json`` column.
+    session_id = _ensure_session(conn, body.session_id)
+
+    # Evict oldest first so the configured cap holds for the new row,
+    # matching the template path's behaviour.
+    evicted_ids = evict_oldest_for_capacity(conn, cap=play_target_depth.get(conn))
+    for eid in evicted_ids:
+        evicted_row = _fetch_activity_row(conn, eid)
+        _emit_state(pubsub, _row_to_response(conn, evicted_row))
+
+    metadata_envelope: dict[str, Any] = {}
+    if persona_meta is not None:
+        metadata_envelope["persona"] = persona_meta
+    if body.trigger_phrase is not None and body.trigger_phrase.strip():
+        metadata_envelope["trigger_phrase"] = body.trigger_phrase.strip()
+    metadata_envelope["persona_reasoning"] = _build_persona_reasoning(
+        caller_supplied=body.persona_reasoning,
+        intent=body.intent,
+        persona_meta=persona_meta,
+    )
+
+    summary_payload = {
+        "title": title,
+        "metadata": metadata_envelope,
+        # No template for standalone — the corpus entry id lives on the
+        # step's metadata blob instead. `_render_template_plan_steps`
+        # short-circuits on a missing template_id, so the GET path
+        # falls back to `_fetch_steps` which reads the persisted
+        # single-step row including its kind + metadata. That's the
+        # intended path for standalone activities.
+        "template_id": None,
+    }
+    steps_persist = [
+        {
+            "seq": 1,
+            "body": step_body,
+            "sfx": None,
+            "expected_action": None,
+            "current": False,  # _persist_activity forces current=1 on insert
+            "action_slot": None,
+            "step_id": None,
+            "choices_rendered": None,
+            "kind": step_kind,
+            "metadata": step_metadata,
+        }
+    ]
+    _persist_activity(
+        conn,
+        activity_id=activity_id,
+        session_id=session_id,
+        persona_id=effective_persona_id,
+        intent_source=body.intent,
+        summary_payload=summary_payload,
+        steps=steps_persist,
+        state=PROPOSED_STATE,
+        toy_ids=[],
+        slot_fills={},
+    )
+
+    row = _fetch_activity_row(conn, activity_id)
+    response = _row_to_response(conn, row)
+    _emit_state(pubsub, response)
+    return response
+
+
 def _do_propose(
     body: ProposeRequest,
     conn: sqlite3.Connection,
@@ -1436,7 +1760,23 @@ def _do_propose(
     path (default), the Claude tool-loop path
     (``adapter=claude, mode=loop``), and the not-yet-implemented local
     paths (``adapter=local`` raises :class:`NotImplementedError`).
+
+    Phase K K13: ``intent ∈ {"request_song", "request_joke"}`` routes
+    to :func:`_do_propose_standalone` (corpus-driven single-step
+    activity). When the corresponding surface flag is OFF, the helper
+    returns the synthetic ``state="dismissed"`` response per plan §7
+    — no DB row, no WS envelope.
     """
+    # Phase K K13: standalone-intent gate. Runs BEFORE persona-pick /
+    # template-generator setup so the dismissed path stays purely
+    # synthetic (no catalog reads, no labeled_events row). The judge
+    # sample is skipped for both standalone branches — the corpus
+    # picks are deterministic and don't benefit from the judge loop.
+    if body.intent in _STANDALONE_INTENTS:
+        if not _standalone_surface_enabled(conn, body.intent):
+            return _dismissed_surface_disabled_response()
+        return _do_propose_standalone(body, conn, pubsub)
+
     # Caller-pinned persona wins; otherwise pick a fresh library one
     # so the kiosk avatar varies across propose calls. Falls through to
     # no persona when the library is empty (kiosk fallback letter

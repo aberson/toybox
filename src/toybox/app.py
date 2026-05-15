@@ -16,6 +16,7 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from .activities.song_corpus import songs_audio_root
 from .api.activities import router as activities_router
 from .api.audio import router as audio_router
 from .api.auth import router as auth_router
@@ -110,6 +111,22 @@ def create_app() -> FastAPI:
         "/api/static/images",
         StaticFiles(directory=str(images_root()), check_dir=False),
         name="images",
+    )
+
+    # Phase K Step K13 — Static read-only mount for the bundled song
+    # corpus audio (committed .mp3 files rendered one-shot by
+    # ``scripts/generate_song_corpus.py``). Mirrors the image mount
+    # idiom above. The kiosk's K12 ``SongPlayer`` falls back to
+    # ``/api/static/songs/audio/<song_id>.mp3`` when the per-step
+    # metadata blob doesn't carry an explicit ``audio_url`` — K13's
+    # standalone propose path emits the URL directly using the same
+    # prefix so both paths converge on this single mount.
+    # ``check_dir=False`` keeps the app bootable before the operator
+    # runs the Coqui render script.
+    app.mount(
+        "/api/static/songs/audio",
+        StaticFiles(directory=str(songs_audio_root()), check_dir=False),
+        name="songs_audio",
     )
 
     # Phase F Step F3 — image-gen capability boot probe. Logs the

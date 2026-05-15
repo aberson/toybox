@@ -1,0 +1,49 @@
+-- Phase K Step K13 — per-step kind + metadata for new step shapes.
+--
+-- Until K13, ``activity_steps`` only held plain "text" / "fork" rows;
+-- the kiosk's renderer dispatched on derived state (presence of
+-- ``choices_json``) and didn't need an explicit kind discriminator.
+-- K13 introduces ``request_song`` + ``request_joke`` standalone intents
+-- that produce single-step activities whose step kind is ``"song"`` or
+-- ``"joke"``. The kiosk's K12 StepCard already switches on ``step.kind``
+-- and reads ``step.metadata`` for the per-kind payload (audio_url +
+-- song_id for songs; punchline for jokes); the backend side of that
+-- wire shape lands here.
+--
+-- Per phase-k-plan §4 the original plan claimed "interjection metadata
+-- fits in existing metadata JSON field" of ``activity_steps`` — but no
+-- such field exists today (the table has body / sfx / expected_action /
+-- current / action_slot / chosen_label / choices_json /
+-- step_template_id). That plan claim was inaccurate; this migration
+-- adds the missing field so the per-step shape can carry the
+-- kind+metadata K12 already reads.
+--
+-- Forward-only; no rollback (invariant 10). Existing rows from before
+-- this migration default NULL on both columns. The wire layer surfaces
+-- NULL ``kind`` as ``None`` (the kiosk reads it defensively, falling
+-- back to ``"text"``) and NULL ``metadata_json`` as ``None`` (no
+-- per-step metadata).
+--
+-- Columns added (both on ``activity_steps``):
+--
+--   * ``kind`` — TEXT NULL. One of the literal step-kind strings
+--     ``"text" | "fork" | "song" | "joke"`` (mirrors
+--     :data:`toybox.activities.models.StepKind`). NULL on legacy rows;
+--     read paths default to ``None`` and the kiosk to ``"text"``. No
+--     CHECK constraint here so the validator stays in Pydantic /
+--     :mod:`toybox.activities._validator` rather than at two layers.
+--
+--   * ``metadata_json`` — TEXT NULL. Arbitrary per-step metadata blob
+--     (JSON object). Today's known keys (per
+--     :file:`frontend/src/child/api.ts`):
+--       - ``audio_url`` (str)        — song mp3 URL
+--       - ``song_id`` (str)          — corpus id for song step
+--       - ``joke_id`` (str)          — corpus id for joke step
+--       - ``punchline`` (str)        — reveal beat for joke step
+--       - ``interjection`` (str)     — embedded|ending|parent|spontaneity (K14/K15)
+--       - ``source_id`` (str)        — corpus entry id (K14/K15)
+--     The column is very low cardinality on existing rows (all NULL)
+--     so no index is added.
+
+ALTER TABLE activity_steps ADD COLUMN kind TEXT;
+ALTER TABLE activity_steps ADD COLUMN metadata_json TEXT;

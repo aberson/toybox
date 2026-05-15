@@ -174,6 +174,19 @@ def _songs_dir() -> Path:
     return _data_root() / _SONGS_SUBDIR
 
 
+def songs_audio_root() -> Path:
+    """Public accessor for ``<data_root>/songs/audio`` (K13 static mount).
+
+    Used by the FastAPI app factory to mount the directory as a
+    ``StaticFiles`` route serving ``/api/static/songs/audio/<id>.mp3``.
+    Mirrors :func:`toybox.storage.images.images_root` — a thin public
+    helper around the resolved on-disk path so the static-mount path
+    has ONE source of truth (per code-quality §2). Env-overrideable via
+    ``TOYBOX_DATA_DIR`` like the rest of the bundled data tree.
+    """
+    return _songs_dir() / "audio"
+
+
 def _manifest_path() -> Path:
     return _songs_dir() / _MANIFEST_FILENAME
 
@@ -481,4 +494,5 @@ __all__ = [
     "clear_song_cache",
     "load_songs",
     "pick_song",
+    "songs_audio_root",
 ]

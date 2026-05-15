@@ -123,7 +123,42 @@
     {
       "id": "sing_a_song",
       "regex": "(?i)\\b(?:sing|sing me) a song\\b",
-      "intent": "request_activity",
+      "intent": "request_song",
+      "slot_group": null,
+      "version": 2
+    },
+    {
+      "id": "play_a_song",
+      "regex": "(?i)(?<!let's )(?<!lets )\\bplay (?:a|me a) song\\b",
+      "intent": "request_song",
+      "slot_group": null,
+      "version": 2
+    },
+    {
+      "id": "play_a_tune",
+      "regex": "(?i)(?<!let's )(?<!lets )\\bplay (?:a|me a) tune\\b",
+      "intent": "request_song",
+      "slot_group": null,
+      "version": 2
+    },
+    {
+      "id": "tell_me_a_joke",
+      "regex": "(?i)\\btell me a joke\\b",
+      "intent": "request_joke",
+      "slot_group": null,
+      "version": 1
+    },
+    {
+      "id": "tell_a_joke",
+      "regex": "(?i)\\btell a joke\\b",
+      "intent": "request_joke",
+      "slot_group": null,
+      "version": 1
+    },
+    {
+      "id": "say_a_joke",
+      "regex": "(?i)\\bsay a joke\\b",
+      "intent": "request_joke",
       "slot_group": null,
       "version": 1
     },
