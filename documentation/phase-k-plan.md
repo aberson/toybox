@@ -586,6 +586,8 @@ Per [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md), each
 
 **Flags:** `--reviewers full --start-cmd "uv run python -m toybox.main --host 127.0.0.1 --port 8000 & sleep 5 && cd frontend && npm run dev" --url "http://127.0.0.1:4000/child"`
 
+**Status:** DONE (2026-05-15) — converted from one-shot smoke into permanent CI regression test (`tests/integration/test_phase_k_smoke.py`, 20 new tests covering sub-steps a/b/c/e/g/h/i; sub-steps d/f/no-console-errors deferred to K18 iPad UAT). Reviewer scope cut from `--reviewers full` (4 code + 3 runtime) to single-agent 4-lens code review — runtime reviewers' screenshots could not drive the interactive sub-steps and would have produced noise. Three operator follow-ups surfaced: (1) Vite IPv6-only bind blocks `127.0.0.1:4000` URLs, (2) K16/K16b backfilled `ending_step` but 0/200 templates declare embedded `step.kind ∈ {joke, song}`, (3) reviewer flagged 2 medium test-quality duplications with `test_phase_k_feature_flags_api.py` + `test_propose_standalone_intents.py`.
+
 ### Manual section
 
 ### Step K18 (M1): iPad operator UAT
