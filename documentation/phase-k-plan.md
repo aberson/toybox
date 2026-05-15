@@ -584,7 +584,7 @@ Per [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md), each
 
 **Issue:** #130
 
-**Flags:** `--reviewers full --start-cmd "uv run python -m toybox.main --host 127.0.0.1 --port 8000" --url "http://127.0.0.1:4000/child"`
+**Flags:** `--reviewers full --start-cmd "uv run python -m toybox.main --host 127.0.0.1 --port 8000 & sleep 5 && cd frontend && npm run dev" --url "http://127.0.0.1:4000/child"`
 
 ### Manual section
 
