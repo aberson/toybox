@@ -729,3 +729,46 @@ Explicit map of which [`code-quality.md`](../../.claude/rules/code-quality.md) r
 Draft entry to append to the Status table in `documentation/plan.md` once K18 is operator-passed:
 
 | **K** — roles, songs, jokes, voice | toy role taxonomy + slot-fill engine + proposed-only recast; song + joke corpora across 5 delivery surfaces (standalone, theme-tagged embedded, endings, parent-inserted, persona spontaneity); click-to-read on kiosk (word taps + Read Me button); 8 parent feature flags; 200 existing templates backfilled via overnight 4-agent soak | (IN FLIGHT once K1 starts; ✅ COMPLETE on K18 pass) |
+
+## 13. K1-K15 substrate shipped 2026-05-15
+
+**Issues #114–#128 closed (15 of 18). 1819 backend pytest + 515 frontend vitest passing. Zero type errors, zero lint violations.**
+
+K1-K15 shipped via two `/build-phase` runs against this plan: K1-K3 in a prior session, K4-K15 resumed via `/build-phase --plan documentation/phase-k-plan.md --resume 4`. Per-step `Status:` lines in §6 carry the per-step verdict. Engine substrate is stable; what remains (K16 + K17 + K18) is content backfill + audio render + operator UAT.
+
+### What was built (K1-K15)
+
+| Step | Deliverable |
+|---|---|
+| K1 | `src/toybox/activities/{roles,themes,interjections,generic_descriptors}.py` taxonomy modules; migration `0014_persona_roles_voice_spontaneity.sql`; persona JSON schema + 4 library files (princess/wizard/detective/periodic_table) extended with `voice_profile`, `role_weights`, `spontaneity_rates`; `personas/models.py` + `personas/loader.py` updated. |
+| K2 | Migration `0015_phase_k_feature_flags.sql` (8 settings, defaults all-on except `play_spontaneity_enabled`); 8 per-setting modules under `core/{jokes,songs,play_standalone,play_embedded,play_endings,play_spontaneity,clickable_words,read_me_button}_enabled.py` + matching `api/*_enabled_settings.py` endpoints + `core/_feature_flag.py` shared helper; `frontend/src/parent/components/PlayFeaturesControls.tsx` + `frontend/src/shared/feature_flags.ts` codegen. |
+| K3 | Template `_schema.json` extended (`required_roles`, `recommended_themes`, `ending_step`, `kind`, `auto`, `source_id`); `_validator.py` placeholder/role/theme/ending checks. |
+| K4 | `content_resolver.py` extended with `resolve_role_slots` + `generic_descriptors` table; `generator.py` substitution grammar accepts `{role_name}`. |
+| K5 | `tests/integration/test_propose_roles.py` exercises `_do_propose` end-to-end; `ActivityResponse.roles` wired through generator → API. |
+| K6 | `POST /api/activities/{id}/recast` endpoint (proposed-only; 409 `recast_only_when_proposed` otherwise); `If-Match-Version` enforced via `withConflictHandler`. |
+| K7 | `SuggestionCard.tsx` renders cast labels + two re-roll buttons ("New cast" / "New activity"); buttons greyed once `state ≠ proposed`. |
+| K8 | `frontend/src/child/{tts,persona-voice}.ts` Web Speech unlock state machine + per-persona `{rate, pitch, voice_name?}` profile. |
+| K9 | `ClickableText.tsx` + `ReadMeButton.tsx` kiosk components, both flag-gated. |
+| K10 | `data/jokes/jokes.json` corpus (~50 entries, theme-tagged); `activities/joke_corpus.py` loader with theme filtering. |
+| K11 | `data/songs/manifest.json` + `data/songs/_credits.md`; `activities/song_corpus.py` loader; `scripts/generate_song_corpus.py` Coqui TTS render script (operator-installed). |
+| K12 | `frontend/src/child/components/{SongPlayer,JokeStep}.tsx`; `StepCard.tsx` step-kind dispatch (`text` / `fork` / `song` / `joke`). |
+| K13 | `triggers/defaults.json` adds `request_song` + `request_joke` standalone intents (negative-lookbehind on `play_a_song` / `play_a_tune` to prevent "let's play a song" double-dispatch); `/api/static/songs/audio` mount; migration `0016_activity_step_kind_metadata.sql` adds `activity_steps.kind` + `metadata_json` columns. |
+| K14 | `activities/interjection.py` defines `build_interjection_step` — single source of truth used by all four interjection surfaces; ending-step insertion deferred to advance-time after iter 1 P0 catch (eager `seq=4` insert bypassed intermediate template steps). |
+| K15 | `POST /api/activities/{id}/insert-{joke,song}` endpoints (running/paused only); spontaneity advance-hook (max-rate-across-cast, persona-or-character attribution, deterministic `id`-pinning test pattern); `ActivityPanel.tsx` sidebar `+ song` / `+ joke` buttons. |
+
+### Source-of-truth wiring (per [code-quality.md §2](../../.claude/rules/code-quality.md))
+
+- **`Role` enum + `GENERIC_DESCRIPTORS`** (K1) — imported by K4 (`content_resolver`) and K5 (integration test); identity-locked via `is`-not-`==` regression assertions.
+- **`Theme` enum** (K1) — imported by K10 (`joke_corpus`), K11 (`song_corpus`), K14 (`interjection`); identity-locked.
+- **`build_interjection_step`** (K14) — invoked by all 4 surfaces (endings, embedded, parent-insert, spontaneity). One byte-identity test per surface.
+
+### Iter-2 fixes worth remembering
+
+- **K13** (HIGH): "let's play a song" double-dispatched both `lets_play_X` and `play_a_song`. Resolved with negative-lookbehind on `play_a_song` / `play_a_tune`.
+- **K14** (HIGH, P0): eager ending row at `seq=4` bypassed template steps 2+3 in the advance handler. Resolved by deferring ending insert to advance-time (mirrors embedded surface). Pinning test walks `propose → advance×4` asserting seqs `[1, 2, 3, 4]`.
+
+### K16-K18 prerequisites and order
+
+- **K16** — overnight 4-agent backfill of 200 templates → role-aware + themed + (where engaging) `ending_step`. Engine is stable; soak agent prompt seed is inlined in K16's Problem text in §6. Run from a fresh session.
+- **K17** — end-to-end smoke gate. **Operator prerequisite (one-time):** `pip install TTS && python scripts/generate_song_corpus.py` to populate `data/songs/audio/*.mp3` (per §8 risk #6, total <50 MB asserted by K17). K17 also asserts the bundled audio enforcement (mono, 64 kbps, ≤25s) on each rendered file.
+- **K18 (M1)** — operator iPad UAT against the 10-check matrix in §6.
