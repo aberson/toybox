@@ -65,6 +65,12 @@ export interface Activity {
   // ("Quest Giver: Wise Owl, Friend: Captain Bear"). Optional + may be
   // "" when ``roles`` is empty.
   cast_summary?: string;
+  // Phase K K15 Surface S: true when the activity's CURRENT step is a
+  // spontaneity interjection (the most recent /advance fired a
+  // spontaneity roll). Used by the parent UI to render a "a toy is
+  // being silly!" badge. Optional + defaults to false so pre-K15
+  // callers compile.
+  interjection_pending?: boolean;
 }
 
 export interface VersionConflictBody {
@@ -848,6 +854,47 @@ export class ApiClient {
     opts: RequestOptions = {},
   ): Promise<Activity> {
     return this.request<Activity>(`/api/activities/${encodeURIComponent(id)}/recast`, {
+      method: "POST",
+      body: JSON.stringify({}),
+      ifMatchVersion: version,
+      signal: opts.signal,
+    });
+  }
+
+  // Phase K K15 Surface P: parent inserts a joke at current_step+1 on
+  // a running/paused activity. Server picks the corpus entry (parent
+  // picked "any joke" via the button — themed embedded picks live on
+  // template ``recommended_themes``). Returns the updated activity
+  // with a new ``activity_steps`` row carrying ``kind: "joke"`` +
+  // ``metadata.interjection = "parent"``. 409 codes:
+  // ``insert_only_when_running_or_paused`` (wrong state),
+  // ``content_disabled`` (jokes_enabled flag off), ``version_conflict``
+  // (stale If-Match-Version), ``corpus_unavailable`` (empty corpus /
+  // no persona-compatible joke). Callers wrap in ``withConflictHandler``
+  // to refetch on version-conflict 409.
+  async insertJoke(
+    id: string,
+    version: number,
+    opts: RequestOptions = {},
+  ): Promise<Activity> {
+    return this.request<Activity>(`/api/activities/${encodeURIComponent(id)}/insert-joke`, {
+      method: "POST",
+      body: JSON.stringify({}),
+      ifMatchVersion: version,
+      signal: opts.signal,
+    });
+  }
+
+  // Phase K K15 Surface P: parent inserts a song at current_step+1.
+  // Mirror of :func:`insertJoke` but for the song corpus
+  // (``require_audio=True`` server-side so the kiosk never 404s).
+  // Gated on ``songs_enabled``.
+  async insertSong(
+    id: string,
+    version: number,
+    opts: RequestOptions = {},
+  ): Promise<Activity> {
+    return this.request<Activity>(`/api/activities/${encodeURIComponent(id)}/insert-song`, {
       method: "POST",
       body: JSON.stringify({}),
       ifMatchVersion: version,

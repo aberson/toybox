@@ -689,6 +689,56 @@ export function App(): JSX.Element {
     [api, refetchActivity],
   );
 
+  // Phase K K15 Surface P: parent inserts a joke / song at
+  // current_step+1 on the running/paused active activity. Same
+  // ``withConflictHandler`` shape as recast — 409 ``version_conflict``
+  // routes through, refetches, and the panel re-renders against the
+  // fresh version. 409 ``content_disabled`` / ``insert_only_when_*``
+  // bubble up as ``ApiError`` (the panel's button is already greyed
+  // for those cases; a stale client gets a clean toast instead of a
+  // silent no-op).
+  const handleInsertJoke = useCallback(
+    async (target: Activity): Promise<void> => {
+      try {
+        const result = await withConflictHandler({
+          mutation: () => api.insertJoke(target.id, target.version),
+          refetch: () => refetchActivity(target.id),
+          onConflict: (conflict, fresh) => {
+            useParentStore.getState().applyVersionConflict(conflict, fresh);
+          },
+        });
+        if (result !== null) {
+          useParentStore.getState().applyMutationResult(result);
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "insert failed";
+        useParentStore.getState().pushToast("error", `+ joke: ${message}`);
+      }
+    },
+    [api, refetchActivity],
+  );
+
+  const handleInsertSong = useCallback(
+    async (target: Activity): Promise<void> => {
+      try {
+        const result = await withConflictHandler({
+          mutation: () => api.insertSong(target.id, target.version),
+          refetch: () => refetchActivity(target.id),
+          onConflict: (conflict, fresh) => {
+            useParentStore.getState().applyVersionConflict(conflict, fresh);
+          },
+        });
+        if (result !== null) {
+          useParentStore.getState().applyMutationResult(result);
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "insert failed";
+        useParentStore.getState().pushToast("error", `+ song: ${message}`);
+      }
+    },
+    [api, refetchActivity],
+  );
+
   // Phase K K7: "new activity" button — the plan says
   // "dismiss + propose with fresh seed". The existing precedent
   // (the SuggestionCard's "try a different one" / onSkip button) is
@@ -946,6 +996,10 @@ export function App(): JSX.Element {
                       onThumbsUp={handleThumbsUp}
                       onRecast={handleRecast}
                       onNewActivity={handleNewActivity}
+                      onInsertJoke={handleInsertJoke}
+                      onInsertSong={handleInsertSong}
+                      jokesEnabled={featureFlags.jokes_enabled}
+                      songsEnabled={featureFlags.songs_enabled}
                     />
                     {/* Phase J step J8: TriggerButton restyled and
                         repositioned below the queue. Pre-J8 it was the

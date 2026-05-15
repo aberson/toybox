@@ -55,6 +55,16 @@ export interface PlayQueueListProps {
   // on the new K7 button row.
   onRecast: (activity: Activity) => Promise<void>;
   onNewActivity: (activity: Activity) => Promise<void>;
+  // Phase K K15 Surface P: parent inserts a joke / song at
+  // current_step+1 on the running/paused activity. Optional so older
+  // callers compile; when omitted the ActivityPanel sidebar buttons
+  // are hidden. ``jokesEnabled`` + ``songsEnabled`` thread through
+  // from the SettingsPanel-bound feature flags so each button greys
+  // independently when its content master is off.
+  onInsertJoke?: (activity: Activity) => Promise<void>;
+  onInsertSong?: (activity: Activity) => Promise<void>;
+  jokesEnabled?: boolean;
+  songsEnabled?: boolean;
 }
 
 // Keyed busy map: (action, id) → in-flight flag. A nested record keeps
@@ -69,7 +79,9 @@ type ActionKey =
   | "didntWork"
   | "thumbsUp"
   | "recast"
-  | "newActivity";
+  | "newActivity"
+  | "insertJoke"
+  | "insertSong";
 
 type BusyMap = Record<ActionKey, Set<string>>;
 
@@ -84,6 +96,8 @@ function emptyBusy(): BusyMap {
     thumbsUp: new Set(),
     recast: new Set(),
     newActivity: new Set(),
+    insertJoke: new Set(),
+    insertSong: new Set(),
   };
 }
 
@@ -101,6 +115,10 @@ export function PlayQueueList(props: PlayQueueListProps): JSX.Element {
     onThumbsUp,
     onRecast,
     onNewActivity,
+    onInsertJoke,
+    onInsertSong,
+    jokesEnabled,
+    songsEnabled,
   } = props;
 
   const [busy, setBusy] = useState<BusyMap>(() => emptyBusy());
@@ -285,12 +303,28 @@ export function PlayQueueList(props: PlayQueueListProps): JSX.Element {
           onDidntWork={() => onDidntWork(active)}
           onThumbsUp={() => onThumbsUp(active)}
           onStepBack={() => onStepBack(active)}
+          onInsertJoke={
+            onInsertJoke !== undefined
+              ? () =>
+                  runGuarded("insertJoke", active.id, () => onInsertJoke(active))
+              : undefined
+          }
+          onInsertSong={
+            onInsertSong !== undefined
+              ? () =>
+                  runGuarded("insertSong", active.id, () => onInsertSong(active))
+              : undefined
+          }
+          jokesEnabled={jokesEnabled}
+          songsEnabled={songsEnabled}
           busy={{
             regenerate: busy.regenerate.has(active.id),
             end: busy.end.has(active.id),
             didntWork: busy.didntWork.has(active.id),
             thumbsUp: busy.thumbsUp.has(active.id),
             stepBack: busy.stepBack.has(active.id),
+            insertJoke: busy.insertJoke.has(active.id),
+            insertSong: busy.insertSong.has(active.id),
           }}
         />
       )}

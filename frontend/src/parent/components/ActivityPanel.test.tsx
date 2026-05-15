@@ -118,6 +118,145 @@ describe("ActivityPanel Step Back", () => {
   });
 });
 
+describe("ActivityPanel K15 parent-insert sidebar", () => {
+  it("renders both insert buttons when handlers are supplied", () => {
+    render(
+      <ActivityPanel
+        activity={fakeActivity()}
+        onRegenerate={async () => undefined}
+        onEnd={async () => undefined}
+        onDidntWork={async () => undefined}
+        onInsertJoke={async () => undefined}
+        onInsertSong={async () => undefined}
+        jokesEnabled={true}
+        songsEnabled={true}
+      />,
+    );
+    expect(screen.getByTestId("insert-joke-button")).toBeTruthy();
+    expect(screen.getByTestId("insert-song-button")).toBeTruthy();
+  });
+
+  it("hides the sidebar when no insert handlers are supplied", () => {
+    render(
+      <ActivityPanel
+        activity={fakeActivity()}
+        onRegenerate={async () => undefined}
+        onEnd={async () => undefined}
+        onDidntWork={async () => undefined}
+      />,
+    );
+    expect(screen.queryByTestId("activity-insert-sidebar")).toBeNull();
+  });
+
+  it("clicking insert-joke fires onInsertJoke", () => {
+    const onInsertJoke = vi.fn(async (): Promise<void> => undefined);
+    render(
+      <ActivityPanel
+        activity={fakeActivity()}
+        onRegenerate={async () => undefined}
+        onEnd={async () => undefined}
+        onDidntWork={async () => undefined}
+        onInsertJoke={onInsertJoke}
+        onInsertSong={async () => undefined}
+        jokesEnabled={true}
+        songsEnabled={true}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("insert-joke-button"));
+    expect(onInsertJoke).toHaveBeenCalledTimes(1);
+  });
+
+  it("clicking insert-song fires onInsertSong", () => {
+    const onInsertSong = vi.fn(async (): Promise<void> => undefined);
+    render(
+      <ActivityPanel
+        activity={fakeActivity()}
+        onRegenerate={async () => undefined}
+        onEnd={async () => undefined}
+        onDidntWork={async () => undefined}
+        onInsertJoke={async () => undefined}
+        onInsertSong={onInsertSong}
+        jokesEnabled={true}
+        songsEnabled={true}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("insert-song-button"));
+    expect(onInsertSong).toHaveBeenCalledTimes(1);
+  });
+
+  it("greys insert-joke when jokesEnabled is false", () => {
+    render(
+      <ActivityPanel
+        activity={fakeActivity()}
+        onRegenerate={async () => undefined}
+        onEnd={async () => undefined}
+        onDidntWork={async () => undefined}
+        onInsertJoke={async () => undefined}
+        onInsertSong={async () => undefined}
+        jokesEnabled={false}
+        songsEnabled={true}
+      />,
+    );
+    const jokeBtn = screen.getByTestId("insert-joke-button") as HTMLButtonElement;
+    const songBtn = screen.getByTestId("insert-song-button") as HTMLButtonElement;
+    expect(jokeBtn.disabled).toBe(true);
+    expect(songBtn.disabled).toBe(false);
+  });
+
+  it("greys insert-song when songsEnabled is false", () => {
+    render(
+      <ActivityPanel
+        activity={fakeActivity()}
+        onRegenerate={async () => undefined}
+        onEnd={async () => undefined}
+        onDidntWork={async () => undefined}
+        onInsertJoke={async () => undefined}
+        onInsertSong={async () => undefined}
+        jokesEnabled={true}
+        songsEnabled={false}
+      />,
+    );
+    const songBtn = screen.getByTestId("insert-song-button") as HTMLButtonElement;
+    expect(songBtn.disabled).toBe(true);
+  });
+
+  it("greys both insert buttons when activity state is approved", () => {
+    render(
+      <ActivityPanel
+        activity={fakeActivity({ state: "approved" })}
+        onRegenerate={async () => undefined}
+        onEnd={async () => undefined}
+        onDidntWork={async () => undefined}
+        onInsertJoke={async () => undefined}
+        onInsertSong={async () => undefined}
+        jokesEnabled={true}
+        songsEnabled={true}
+      />,
+    );
+    const jokeBtn = screen.getByTestId("insert-joke-button") as HTMLButtonElement;
+    const songBtn = screen.getByTestId("insert-song-button") as HTMLButtonElement;
+    expect(jokeBtn.disabled).toBe(true);
+    expect(songBtn.disabled).toBe(true);
+  });
+
+  it("greys both insert buttons when activity state is paused (state allowed) -- not greyed", () => {
+    render(
+      <ActivityPanel
+        activity={fakeActivity({ state: "paused" })}
+        onRegenerate={async () => undefined}
+        onEnd={async () => undefined}
+        onDidntWork={async () => undefined}
+        onInsertJoke={async () => undefined}
+        onInsertSong={async () => undefined}
+        jokesEnabled={true}
+        songsEnabled={true}
+      />,
+    );
+    const jokeBtn = screen.getByTestId("insert-joke-button") as HTMLButtonElement;
+    expect(jokeBtn.disabled).toBe(false);
+  });
+});
+
 describe("ActivityPanel End confirm", () => {
   it("clicking End opens a confirm dialog", () => {
     const onEnd = vi.fn(async (): Promise<void> => undefined);

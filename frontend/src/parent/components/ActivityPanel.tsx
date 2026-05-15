@@ -8,6 +8,12 @@ export interface ActivityPanelBusy {
   didntWork: boolean;
   thumbsUp: boolean;
   stepBack: boolean;
+  // Phase K K15 Surface P: in-flight flags for the two parent-insert
+  // buttons. Keep a rapid second click from racing the first with the
+  // same version (same idea as ``regenerate``/``end`` flags). Optional
+  // so older callers compile; defaults to false when omitted.
+  insertJoke?: boolean;
+  insertSong?: boolean;
 }
 
 export interface ActivityPanelProps {
@@ -21,6 +27,17 @@ export interface ActivityPanelProps {
   // Roll the kiosk back one step. Optional so older callers compile;
   // when absent the button is hidden.
   onStepBack?: () => Promise<void>;
+  // Phase K K15 Surface P: parent inserts a joke / song interjection at
+  // current_step+1 on a running/paused activity. Optional so older
+  // callers compile; when absent the sidebar buttons are hidden. The
+  // ``jokesEnabled`` / ``songsEnabled`` content-master flags grey each
+  // button independently — the server backstops with a 409
+  // ``content_disabled`` if the parent toggles a master off between
+  // bootstrap and click.
+  onInsertJoke?: () => Promise<void>;
+  onInsertSong?: () => Promise<void>;
+  jokesEnabled?: boolean;
+  songsEnabled?: boolean;
   // Optional in-flight flags. Same idea as SuggestionCard's busy: keep
   // a rapid second click from racing the first with the same version.
   busy?: ActivityPanelBusy;
@@ -29,7 +46,18 @@ export interface ActivityPanelProps {
 const END_CONFIRM_MESSAGE = "End the activity?";
 
 export function ActivityPanel(props: ActivityPanelProps): JSX.Element {
-  const { activity, onRegenerate, onEnd, onDidntWork, onThumbsUp, onStepBack } = props;
+  const {
+    activity,
+    onRegenerate,
+    onEnd,
+    onDidntWork,
+    onThumbsUp,
+    onStepBack,
+    onInsertJoke,
+    onInsertSong,
+    jokesEnabled,
+    songsEnabled,
+  } = props;
   const busy: ActivityPanelBusy = props.busy ?? {
     regenerate: false,
     end: false,
@@ -42,6 +70,18 @@ export function ActivityPanel(props: ActivityPanelProps): JSX.Element {
     currentSeq !== undefined &&
     currentSeq >= 2 &&
     (activity.state === "running" || activity.state === "paused");
+  // Phase K K15 Surface P: insert buttons are only meaningful while the
+  // activity is in flight (the server enforces this too: 409
+  // ``insert_only_when_running_or_paused`` for other states). Each
+  // button is independently greyed when its content master is OFF —
+  // matches the parent UI's content-master semantics on the
+  // SettingsPanel toggles.
+  const insertGateOpen =
+    activity.state === "running" || activity.state === "paused";
+  const insertJokeEnabled =
+    insertGateOpen && jokesEnabled !== false && !(busy.insertJoke ?? false);
+  const insertSongEnabled =
+    insertGateOpen && songsEnabled !== false && !(busy.insertSong ?? false);
   const title = activity.title ?? activity.summary ?? "Activity";
   const personaMeta = (activity.metadata as Record<string, unknown>)["persona"];
   const personaName =
@@ -102,6 +142,53 @@ export function ActivityPanel(props: ActivityPanelProps): JSX.Element {
             </li>
           ))}
         </ol>
+      )}
+      {(onInsertJoke !== undefined || onInsertSong !== undefined) && (
+        <div
+          data-testid="activity-insert-sidebar"
+          style={{ display: "flex", gap: 6, marginTop: 10 }}
+        >
+          {onInsertJoke !== undefined && (
+            <button
+              type="button"
+              data-testid="insert-joke-button"
+              aria-label="insert joke"
+              title={
+                !insertGateOpen
+                  ? "available while running or paused"
+                  : jokesEnabled === false
+                    ? "jokes are turned off in Settings"
+                    : "insert a joke at the next step"
+              }
+              disabled={!insertJokeEnabled}
+              onClick={() => {
+                void onInsertJoke();
+              }}
+            >
+              {(busy.insertJoke ?? false) ? "..." : "+ joke"}
+            </button>
+          )}
+          {onInsertSong !== undefined && (
+            <button
+              type="button"
+              data-testid="insert-song-button"
+              aria-label="insert song"
+              title={
+                !insertGateOpen
+                  ? "available while running or paused"
+                  : songsEnabled === false
+                    ? "songs are turned off in Settings"
+                    : "insert a song at the next step"
+              }
+              disabled={!insertSongEnabled}
+              onClick={() => {
+                void onInsertSong();
+              }}
+            >
+              {(busy.insertSong ?? false) ? "..." : "+ song"}
+            </button>
+          )}
+        </div>
       )}
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
         {onThumbsUp !== undefined && (

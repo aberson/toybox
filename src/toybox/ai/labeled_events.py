@@ -292,6 +292,110 @@ def get_tool_calls(
     return list(json.loads(row["tool_calls"]))
 
 
+# Phase K K15 surfaces: stable ``source`` values stamped on appended
+# interjection events. Per documentation/phase-k-plan.md §6 K15: the
+# parent-insert endpoints log ``source: "parent_insert"`` and the
+# spontaneity advance-hook logs ``source: "spontaneity"``. The other
+# two interjection surfaces (K14 embedded + endings) currently don't
+# write event rows — they're auto-driven and the step row's
+# ``metadata.interjection`` already carries the surface tag — but the
+# constants live here in case K16 / E exporter pipes ever need a
+# unified label set.
+INTERJECTION_SOURCE_PARENT_INSERT: Final[str] = "parent_insert"
+INTERJECTION_SOURCE_SPONTANEITY: Final[str] = "spontaneity"
+
+
+def append_interjection_event(
+    conn: sqlite3.Connection,
+    *,
+    activity_id: str,
+    source: str,
+    interjection_kind: str,
+    corpus_entry_id: str,
+    step_seq: int,
+    set_at: str | None = None,
+    attribution: dict[str, Any] | None = None,
+) -> bool:
+    """Append one interjection event to the activity's ``tool_calls`` JSON.
+
+    Phase K K15 (P + S) telemetry sink. The ``labeled_events`` table
+    has a UNIQUE constraint on ``activity_id`` (one row per activity),
+    so the K15 plan's "log a labeled_events row with source: X" is
+    realised by APPENDING to the existing row's ``tool_calls`` JSON
+    array column. Each appended entry carries:
+
+    * ``event``: ``"interjection"`` discriminator so future event types
+      coexisting in the column (e.g. judge results) sort cleanly.
+    * ``source``: one of :data:`INTERJECTION_SOURCE_PARENT_INSERT` /
+      :data:`INTERJECTION_SOURCE_SPONTANEITY`.
+    * ``interjection_kind``: ``"parent"`` | ``"spontaneity"`` —
+      matches :class:`toybox.activities.interjections.InterjectionKind`'s
+      value strings so a downstream SFT exporter can join by kind.
+    * ``corpus_entry_id``: joke/song slug picked.
+    * ``step_seq``: position the interjection step was inserted at.
+    * ``set_at``: ISO timestamp.
+    * ``attribution`` (optional): for spontaneity, the
+      ``{"speaker_kind": "persona"|"role", "display_name": str,
+      "role_name": str?}`` shape from the API layer.
+
+    Returns ``True`` iff a row was updated. Returns ``False`` (and logs
+    at DEBUG) when no ``labeled_events`` row exists for ``activity_id``
+    — the same legitimate case :func:`update_parent_signal` covers
+    (activity from before the labeled_events migration, or test fixture
+    that skips ``record_generation``). Caller MUST NOT 500 just because
+    the event sink has no row to log against.
+
+    Concurrency: the read-modify-write happens inside ``with conn`` so
+    a concurrent UPDATE on the same row is serialised by SQLite's WAL.
+    Multiple parent-insert taps in the same second produce two
+    appended events in stable order.
+    """
+    ts = set_at if set_at is not None else _now_iso()
+    entry: dict[str, Any] = {
+        "event": "interjection",
+        "source": source,
+        "interjection_kind": interjection_kind,
+        "corpus_entry_id": corpus_entry_id,
+        "step_seq": step_seq,
+        "set_at": ts,
+    }
+    if attribution is not None:
+        entry["attribution"] = attribution
+    with conn:
+        existing = conn.execute(
+            "SELECT tool_calls FROM labeled_events WHERE activity_id = ?",
+            (activity_id,),
+        ).fetchone()
+        if existing is None:
+            _logger.debug(
+                "no labeled_events row for activity_id=%s; interjection event source=%s skipped",
+                activity_id,
+                source,
+            )
+            return False
+        raw = existing["tool_calls"]
+        if raw is None:
+            existing_calls: list[dict[str, Any]] = []
+        else:
+            try:
+                decoded = json.loads(raw)
+            except json.JSONDecodeError:
+                _logger.warning(
+                    "tool_calls JSON malformed for activity %s; "
+                    "resetting before appending interjection event",
+                    activity_id,
+                )
+                decoded = []
+            existing_calls = list(decoded) if isinstance(decoded, list) else []
+        existing_calls.append(entry)
+        new_blob = json.dumps(existing_calls, sort_keys=True, ensure_ascii=False)
+        conn.execute(
+            "UPDATE labeled_events SET tool_calls = ? WHERE activity_id = ?",
+            (new_blob, activity_id),
+        )
+    return True
+
+
 def update_parent_signal(
     conn: sqlite3.Connection,
     *,
@@ -457,11 +561,14 @@ __all__ = [
     "GENERATOR_PATH_LOCAL",
     "GENERATOR_PATH_OFFLINE",
     "GeneratorContext",
+    "INTERJECTION_SOURCE_PARENT_INSERT",
+    "INTERJECTION_SOURCE_SPONTANEITY",
     "JUDGE_RATE_ENV",
     "PARENT_SIGNAL_DISMISS",
     "PARENT_SIGNAL_END_EARLY",
     "PARENT_SIGNAL_THUMBS_UP",
     "VALID_GENERATOR_PATHS",
+    "append_interjection_event",
     "build_chatml_messages",
     "count_rows",
     "get_tool_calls",

@@ -59,15 +59,22 @@ from ..activities.generator import (
 from ..activities.interjection import build_interjection_step
 from ..activities.interjections import InterjectionKind
 from ..activities.joke_corpus import Joke, apply_toy_substitution, pick_joke
-from ..activities.roles import ROLE_DISPLAY_NAMES, Role
+from ..activities.roles import (
+    DEFAULT_ROLE_SPONTANEITY_RATES,
+    ROLE_DISPLAY_NAMES,
+    Role,
+)
 from ..activities.song_corpus import Song, pick_song
 from ..ai.judge import judge_and_persist
 from ..ai.labeled_events import (
     GENERATOR_PATH_CLAUDE,
     GENERATOR_PATH_OFFLINE,
+    INTERJECTION_SOURCE_PARENT_INSERT,
+    INTERJECTION_SOURCE_SPONTANEITY,
     PARENT_SIGNAL_DISMISS,
     PARENT_SIGNAL_END_EARLY,
     PARENT_SIGNAL_THUMBS_UP,
+    append_interjection_event,
     record_generation,
     schedule_judge_sample,
     update_parent_signal,
@@ -76,6 +83,7 @@ from ..core import (
     jokes_enabled,
     play_embedded_enabled,
     play_endings_enabled,
+    play_spontaneity_enabled,
     play_standalone_enabled,
     play_target_depth,
     songs_enabled,
@@ -341,6 +349,18 @@ class ActivityResponse(BaseModel):
     # name for determinism, comma-separated. Empty string when ``roles``
     # is empty.
     cast_summary: str = ""
+    # Phase K K15 Surface S: True iff the most recent /advance roll
+    # fired a spontaneity interjection (the kiosk dispatched into a
+    # spontaneity-marked step). The K15 parent UI can render a "a toy
+    # is being silly!" badge or skip the next "next-step ready" jingle
+    # off this field without re-reading per-step ``metadata.interjection``.
+    # Computed at handler time (NOT persisted to ``activities``) so the
+    # field is False on every GET / list endpoint and True only on the
+    # advance response that just inserted the spontaneity step. The
+    # parent-insert endpoints (POST /insert-{joke,song}) intentionally
+    # leave this False — those are explicit parent actions, not emergent
+    # surprise, so the badge would be misleading. Defaults to False.
+    interjection_pending: bool = False
     # Phase K K13: explanation for a synthetic ``state="dismissed"``
     # response returned when a standalone intent (``request_song`` /
     # ``request_joke``) hits a disabled surface flag or content master.
@@ -895,6 +915,25 @@ def _row_to_response(
     if steps is None:
         steps = _fetch_steps(conn, activity_id)
 
+    # Phase K K15 Surface S: ``interjection_pending`` reflects whether
+    # the activity's CURRENT step is a spontaneity interjection. Read
+    # off the current step's metadata.interjection rather than carrying
+    # a per-handler bool through every response builder — the source of
+    # truth (persisted step row) is one query away and the flag stays
+    # consistent across REST GETs, the WS envelope, and parent-side
+    # refresh after a server restart. Mid-activity advance flips the
+    # current pointer to the next non-spontaneity step, so the flag
+    # auto-clears without any extra plumbing.
+    interjection_pending = False
+    spontaneity_value = InterjectionKind.spontaneity.value
+    for s in steps:
+        if not s.current:
+            continue
+        meta = s.metadata
+        if isinstance(meta, dict) and meta.get("interjection") == spontaneity_value:
+            interjection_pending = True
+        break
+
     return ActivityResponse(
         id=activity_id,
         state=state,
@@ -914,6 +953,7 @@ def _row_to_response(
         persona_reasoning=persona_reasoning,
         roles=roles_map,
         cast_summary=cast_summary,
+        interjection_pending=interjection_pending,
     )
 
 
@@ -1196,6 +1236,78 @@ def _load_persona_role_weights(
             continue
         if isinstance(value, int | float):
             out[key] = float(value)
+    return out
+
+
+def _load_persona_spontaneity_rates(
+    conn: sqlite3.Connection, persona_id: str | None
+) -> dict[str, float]:
+    """Phase K K15 Surface S: fetch ``personas.spontaneity_rates`` JSON.
+
+    Returns ``{"jokes": float, "songs": float}`` with both keys always
+    present (defaulting to ``0.0``) so the advance-hook's max-rate
+    computation never has to None-guard. Mirrors
+    :func:`_load_persona_role_weights`'s defensive shape: a missing row,
+    NULL column, malformed JSON, or non-dict payload all degrade to the
+    ``{"jokes": 0.0, "songs": 0.0}`` no-spontaneity baseline. Per
+    code-quality §1 the JSON shape is the canonical persona-side mirror
+    of :class:`toybox.activities.roles.SpontaneityRatePair` (with
+    ``jokes_rate``/``songs_rate`` keys on the role side and
+    ``jokes``/``songs`` on the persona side — the plan documents both
+    spellings; this helper normalises to the persona shape internally).
+
+    Values outside the ``[0.0, 1.0]`` interval are clamped to the
+    interval rather than treated as schema violations — defense-in-depth
+    against a parent-authored custom persona that wrote ``1.5``. The
+    K15 advance hook's ``r < effective_jokes + effective_songs``
+    comparison is robust against absent / NaN values via the dict-get
+    fallback (we never produce NaN here).
+    """
+    default = {"jokes": 0.0, "songs": 0.0}
+    if persona_id is None:
+        return default
+    try:
+        row = conn.execute(
+            "SELECT spontaneity_rates FROM personas WHERE id = ?",
+            (persona_id,),
+        ).fetchone()
+    except sqlite3.Error:
+        _logger.warning(
+            "spontaneity_rates read failed for persona %r; treating as 0.0/0.0",
+            persona_id,
+            exc_info=True,
+        )
+        return default
+    if row is None:
+        return default
+    raw = row["spontaneity_rates"]
+    if not raw:
+        return default
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        _logger.warning(
+            "spontaneity_rates JSON malformed for persona %r; treating as 0.0/0.0",
+            persona_id,
+        )
+        return default
+    if not isinstance(payload, dict):
+        return default
+    out: dict[str, float] = dict(default)
+    for key in ("jokes", "songs"):
+        value = payload.get(key)
+        if isinstance(value, bool):
+            # Reject bool (subtype of int) explicitly — see role_weights.
+            continue
+        if isinstance(value, int | float):
+            # Clamp to [0.0, 1.0]. NaN comparisons return False on both
+            # bounds so a NaN input falls through to the default 0.0
+            # via the unchanged ``out`` dict — same defense-in-depth
+            # the K4 picker uses.
+            v = float(value)
+            if v != v:  # NaN check
+                continue
+            out[key] = max(0.0, min(1.0, v))
     return out
 
 
@@ -2792,6 +2904,328 @@ def post_recast(
     return response
 
 
+# ---------------------------------------------------------------------
+# Phase K K15 Surface P — parent-inserted interjections
+# ---------------------------------------------------------------------
+
+# States the parent-insert endpoints accept. Plan §6 K15: ``running`` /
+# ``paused`` only — proposed activities should be dismissed + re-proposed
+# instead, and terminal states (completed/ended/dismissed) have no
+# "current_step + 1" to insert at.
+_INSERT_ALLOWED_STATES: frozenset[str] = frozenset({STATE_RUNNING, STATE_PAUSED})
+
+
+def _parent_insert_corpus_kind(
+    conn: sqlite3.Connection,
+    *,
+    activity_id: str,
+    expected_version: int,
+    kind: str,
+) -> tuple[sqlite3.Row, sqlite3.Row, Joke | Song]:
+    """Shared front-half of the parent-insert endpoints.
+
+    Validates state + version + content-master gate, picks a fresh
+    corpus entry for the requested kind, and returns
+    ``(activity_row, current_step_row, corpus_entry)`` so the caller
+    can run the version-bumped INSERT in one transaction. Raises
+    :class:`HTTPException` on every rejection path so the two endpoints
+    stay one-liners around this function.
+
+    State guard: 409 ``insert_only_when_running_or_paused`` for any
+    other state (terminal or pre-approval).
+    Version guard: 409 ``version_conflict`` (the standard
+    :class:`VersionConflictError`) when ``If-Match-Version`` doesn't
+    match the persisted version.
+    Content-master guard: 409 ``content_disabled`` when the matching
+    content master (``jokes_enabled`` / ``songs_enabled``) is off —
+    parent UI surfaces the button as disabled, but a stale client could
+    still POST after the parent toggled the flag off so we re-check
+    server-side.
+    Corpus-empty guard: 409 ``corpus_unavailable`` when no candidate
+    survives the persona filter (e.g. fresh install before song audio
+    was rendered). Operator sees a clear code rather than a 500.
+    """
+    if kind == "song":
+        content_master_on = songs_enabled.get(conn)
+    elif kind == "joke":
+        content_master_on = jokes_enabled.get(conn)
+    else:
+        # Programmer error — the only callers are the two endpoints
+        # below, which hard-code ``"joke"`` / ``"song"``.
+        raise ValueError(f"_parent_insert_corpus_kind: unsupported kind {kind!r}")
+
+    row = _fetch_activity_row(conn, activity_id)
+    current_state = str(row["state"])
+    current_version = int(row["version"])
+    if current_state not in _INSERT_ALLOWED_STATES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "insert_only_when_running_or_paused",
+                "current_version": current_version,
+                "current_state": current_state,
+            },
+        )
+    if current_version != expected_version:
+        raise VersionConflictError(current_version, current_state)
+    if not content_master_on:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "content_disabled",
+                "current_version": current_version,
+                "current_state": current_state,
+                "kind": kind,
+            },
+        )
+
+    # Locate the current step row — needed for ``seq + 1`` insertion
+    # and the ``previous_step_id`` argument to
+    # :func:`_insert_interjection_step_row`. A running/paused activity
+    # MUST have a current step row (the lazy-insert path always marks
+    # one); defense-in-depth raises 409 if not so a malformed row can't
+    # 500 the endpoint.
+    current_step = conn.execute(
+        "SELECT id, seq FROM activity_steps WHERE activity_id = ? AND current = 1 LIMIT 1",
+        (activity_id,),
+    ).fetchone()
+    if current_step is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "no_current_step", "id": activity_id},
+        )
+
+    # Slot fills for the corpus entry's display text. Parent-insert is
+    # theme-untagged — the parent picked "any joke/song" via the button
+    # (not via a theme-tagged template step), so we don't filter on
+    # ``theme`` here. Persona-compat still applies (so a wizard activity
+    # doesn't get a princess-only joke). Fresh ``secrets.randbits(31)``
+    # seed ensures successive parent taps don't pick the same entry
+    # back-to-back.
+    seed_value = secrets.randbits(31)
+    persona_id = row["persona_id"]
+    corpus_entry: Joke | Song | None
+    if kind == "song":
+        corpus_entry = pick_song(
+            seed=seed_value,
+            persona_id=persona_id,
+            theme=None,
+            require_audio=True,
+        )
+    else:  # joke
+        corpus_entry = pick_joke(
+            seed=seed_value,
+            persona_id=persona_id,
+            theme=None,
+        )
+    if corpus_entry is None:
+        # Empty corpus or no persona-compatible entry. Surface as 409
+        # so the parent UI can render a toast rather than swallowing
+        # the click.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "corpus_unavailable",
+                "current_version": current_version,
+                "current_state": current_state,
+                "kind": kind,
+            },
+        )
+    return row, current_step, corpus_entry
+
+
+def _parent_insert_finish(
+    conn: sqlite3.Connection,
+    pubsub: PubSub,
+    *,
+    activity_id: str,
+    expected_version: int,
+    current_state: str,
+    activity_row: sqlite3.Row,
+    current_step: sqlite3.Row,
+    corpus_entry: Joke | Song,
+    kind: str,
+) -> ActivityResponse:
+    """Shared back-half: build interjection row, INSERT, bump version,
+    emit envelope, log event. Caller already validated state + corpus.
+    """
+    # Read persisted slot fills so role placeholders in the corpus
+    # entry render with the activity's cast. Same defensive parsing as
+    # the advance handler.
+    slot_fills_raw = activity_row["slot_fills_json"]
+    slot_fills: dict[str, str] = {}
+    if slot_fills_raw:
+        try:
+            decoded = json.loads(slot_fills_raw)
+        except json.JSONDecodeError:
+            decoded = None
+        if isinstance(decoded, dict):
+            slot_fills = {str(k): str(v) for k, v in decoded.items()}
+
+    # Toy display name for joke ``{toy}`` placeholder — best-effort
+    # via the catalog resolver, matching the embedded/ending pattern.
+    toy_display_name: str | None = None
+    if kind == "joke":
+        try:
+            toys = resolve_toys(conn)
+        except sqlite3.Error:
+            _logger.warning(
+                "parent-insert: resolve_toys failed; joke degrades to no-toy form",
+                exc_info=True,
+            )
+            toys = []
+        if toys:
+            toy_display_name = toys[0].display_name
+
+    new_seq = int(current_step["seq"]) + 1
+    interjection_row = build_interjection_step(
+        interjection=InterjectionKind.parent,
+        corpus_entry=corpus_entry,
+        slot_fills=slot_fills,
+        seq=new_seq,
+        toy_display_name=toy_display_name,
+    )
+
+    # Atomic version bump + row insert. State stays where it was
+    # (running stays running, paused stays paused) — the parent insert
+    # is a content mutation, not a lifecycle transition. Reusing
+    # :func:`_attempt_transition` with ``new_state=current_state``
+    # gives us the same optimistic-concurrency WHERE clause every other
+    # mutation uses, so a concurrent /advance landing between the
+    # endpoint's fetch and INSERT surfaces as a clean 409.
+    ok, row = _attempt_transition(
+        conn,
+        activity_id=activity_id,
+        expected_version=expected_version,
+        new_state=current_state,
+    )
+    if not ok:
+        raise VersionConflictError(int(row["version"]), str(row["state"]))
+    with conn:
+        # Insert the interjection row at current+1 AND mark it current.
+        # The kid's current step is then "the interjection just inserted"
+        # — they see it next on their kiosk subscription envelope. The
+        # previous step's ``current=0`` is flipped inside
+        # ``_insert_interjection_step_row``. Plan §6 K15: "Insert a
+        # themed interjection at current_step+1; kiosk shows it next."
+        # The previous-step row's ``chosen_label`` is NOT written —
+        # parent insert is not a kid choice.
+        _insert_interjection_step_row(
+            conn,
+            activity_id=activity_id,
+            interjection_row=interjection_row,
+            new_seq=new_seq,
+            previous_step_id=str(current_step["id"]),
+            chosen_label=None,
+        )
+
+    # Telemetry: append an interjection event to the activity's
+    # labeled_events.tool_calls JSON. Best-effort (no row → log + skip)
+    # via :func:`append_interjection_event`. The event sink mustn't
+    # 500 the parent's click; observability loss is acceptable, broken
+    # UX is not.
+    try:
+        append_interjection_event(
+            conn,
+            activity_id=activity_id,
+            source=INTERJECTION_SOURCE_PARENT_INSERT,
+            interjection_kind=InterjectionKind.parent.value,
+            corpus_entry_id=corpus_entry.id,
+            step_seq=new_seq,
+        )
+    except Exception:  # noqa: BLE001 -- telemetry must never break the lifecycle
+        _logger.warning(
+            "parent-insert: append_interjection_event failed for activity %s",
+            activity_id,
+            exc_info=True,
+        )
+
+    response = _row_to_response(conn, row)
+    _emit_state(pubsub, response)
+    _logger.info(
+        "parent_insert activity %s kind=%s corpus_id=%s seq=%d version=%d",
+        activity_id,
+        kind,
+        corpus_entry.id,
+        new_seq,
+        int(row["version"]),
+    )
+    return response
+
+
+@router.post("/{activity_id}/insert-joke", response_model=ActivityResponse)
+def post_insert_joke(
+    activity_id: str,
+    conn: Annotated[sqlite3.Connection, Depends(get_activities_db)],
+    pubsub: Annotated[PubSub, Depends(get_pubsub)],
+    expected_version: Annotated[int, Depends(if_match_version_dependency)],
+    _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
+) -> ActivityResponse:
+    """Phase K K15 Surface P: parent inserts a joke at current_step+1.
+
+    Allowed only while the activity is ``running`` or ``paused`` — the
+    parent UI greys the button outside those states. Body is empty
+    (server picks the corpus entry; parent picks "any joke" via the
+    button, not a specific joke). Gated on ``jokes_enabled``: 409
+    ``content_disabled`` if the master is off. Version-conflict and
+    state-guard 409s match the recast endpoint's pattern.
+
+    Honors ``If-Match-Version`` like every other activity mutation.
+    Server picks a fresh ``secrets.randbits(31)`` seed each call so two
+    successive taps don't deliver the same joke.
+    """
+    activity_row, current_step, corpus_entry = _parent_insert_corpus_kind(
+        conn,
+        activity_id=activity_id,
+        expected_version=expected_version,
+        kind="joke",
+    )
+    return _parent_insert_finish(
+        conn,
+        pubsub,
+        activity_id=activity_id,
+        expected_version=expected_version,
+        current_state=str(activity_row["state"]),
+        activity_row=activity_row,
+        current_step=current_step,
+        corpus_entry=corpus_entry,
+        kind="joke",
+    )
+
+
+@router.post("/{activity_id}/insert-song", response_model=ActivityResponse)
+def post_insert_song(
+    activity_id: str,
+    conn: Annotated[sqlite3.Connection, Depends(get_activities_db)],
+    pubsub: Annotated[PubSub, Depends(get_pubsub)],
+    expected_version: Annotated[int, Depends(if_match_version_dependency)],
+    _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
+) -> ActivityResponse:
+    """Phase K K15 Surface P: parent inserts a song at current_step+1.
+
+    Mirror of :func:`post_insert_joke` but for the song corpus
+    (``require_audio=True`` so the kiosk never 404s on a not-yet-
+    rendered entry). Gated on ``songs_enabled``.
+    """
+    activity_row, current_step, corpus_entry = _parent_insert_corpus_kind(
+        conn,
+        activity_id=activity_id,
+        expected_version=expected_version,
+        kind="song",
+    )
+    return _parent_insert_finish(
+        conn,
+        pubsub,
+        activity_id=activity_id,
+        expected_version=expected_version,
+        current_state=str(activity_row["state"]),
+        activity_row=activity_row,
+        current_step=current_step,
+        corpus_entry=corpus_entry,
+        kind="song",
+    )
+
+
 def _bad_advance(code: str, **extra: Any) -> HTTPException:
     """Phase G G3: build a 400 with the canonical ``{code, ...}`` body
     used by the advance handler's three branching-input error cases.
@@ -3166,6 +3600,450 @@ def _insert_next_step(
             template_step.action_slot,
             choices_blob,
             template_step.id,
+        ),
+    )
+
+
+# ---------------------------------------------------------------------
+# Phase K K15 Surface S — spontaneity advance hook
+# ---------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class _SpontaneityPick:
+    """Output of :func:`_resolve_spontaneity` describing a fired roll.
+
+    ``corpus_entry`` is the picked :class:`Joke` / :class:`Song`,
+    ``content_kind`` is ``"joke"`` / ``"song"``, ``attribution`` is the
+    dict stamped onto the interjection step's
+    ``metadata.spontaneity_attribution``. ``None`` is returned by
+    :func:`_resolve_spontaneity` when no roll fires (most common case).
+    """
+
+    corpus_entry: Joke | Song
+    content_kind: str
+    attribution: dict[str, Any]
+
+
+def _parse_persisted_role_records(activity_row: sqlite3.Row) -> list[dict[str, Any]]:
+    """Phase K K15: pull the role_assignments list off a persisted
+    activity's summary envelope. Defensive against missing/malformed
+    summary blobs so a legacy activity (no roles persisted) returns
+    ``[]`` rather than raising.
+    """
+    summary_raw = activity_row["summary"]
+    if not summary_raw:
+        return []
+    try:
+        payload = json.loads(summary_raw)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(payload, dict):
+        return []
+    meta = payload.get("metadata")
+    if not isinstance(meta, dict):
+        return []
+    raw_records = meta.get("role_assignments")
+    if not isinstance(raw_records, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for entry in raw_records:
+        if isinstance(entry, dict):
+            out.append(entry)
+    return out
+
+
+def _resolve_spontaneity(
+    conn: sqlite3.Connection,
+    *,
+    activity_id: str,
+    activity_row: sqlite3.Row,
+    new_seq: int,
+) -> _SpontaneityPick | None:
+    """Phase K K15 Surface S: roll the per-content spontaneity dice.
+
+    Computes the effective per-content-type rate as
+    ``max(persona.spontaneity_rates.<kind>,
+    max(role.spontaneity_rates.<kind>_rate for role in cast))``,
+    rolls a deterministic float in ``[0, 1)`` derived from
+    ``sha256(activity_id:new_seq:"spontaneity")``, and dispatches:
+
+    * ``r < effective_jokes`` AND ``jokes_enabled`` → joke interjection.
+    * ``r < effective_jokes + effective_songs`` AND ``songs_enabled``
+      → song interjection.
+    * else → no interjection (returns ``None``).
+
+    The cap-at-sum semantics prevents the same advance from firing both
+    a joke and a song; plan §6 K15 documents that explicitly.
+
+    Attribution per plan §3 S: the participant whose rate matched the
+    chosen content type wins narration. Ties broken by **sorted toy_id,
+    then persona last** — so a cast with a Trickster + a Sidekick whose
+    songs_rate equals the persona's loses the tie to whichever toy
+    sorts first lexicographically (and the persona only narrates when
+    no role had a strictly-higher rate). Returns:
+
+    * ``speaker_kind`` = ``"role"`` | ``"persona"``.
+    * ``display_name`` — the toy's display_name OR the persona's
+      display_name (best-effort read from the personas table).
+    * ``role_name`` — set only when ``speaker_kind == "role"`` (the
+      role slot the toy was filling, e.g. ``"trickster"``).
+
+    Returns ``None`` when:
+
+    * ``play_spontaneity_enabled`` is off (cheap early-exit).
+    * Both effective rates are 0.0 (nothing to roll).
+    * The dice land in the no-fire zone.
+    * The selected content kind's master flag is off (cap-at-sum still
+      considers the rate, but disabled-master suppresses the actual
+      fire — matches plan §3 S "(content_master AND surface_flag)").
+    * The corpus pick returns ``None`` (empty/unrendered corpus). Log +
+      degrade so a half-rendered song corpus doesn't 500 advance.
+    """
+    if not play_spontaneity_enabled.get(conn):
+        return None
+
+    persona_id = activity_row["persona_id"]
+    persona_rates = _load_persona_spontaneity_rates(conn, persona_id)
+    role_records = _parse_persisted_role_records(activity_row)
+
+    # Per-content-type effective rate. We compute alongside the
+    # attribution-candidate-list so a tie-break later can pick a single
+    # winner deterministically without re-scanning.
+    #
+    # Each entry: (rate, sort_key_for_tiebreak, speaker_kind, display_name, role_name)
+    # sort_key_for_tiebreak: toys → toy_id; persona → "~" (sorts after
+    # all toy_ids since "~" > any alnum/underscore role id). Plan §3 S:
+    # "ties broken by sorted toy_id then persona last".
+    jokes_candidates: list[tuple[float, str, str, str, str | None]] = []
+    songs_candidates: list[tuple[float, str, str, str, str | None]] = []
+
+    for record in role_records:
+        role_name_raw = record.get("role_name")
+        display_name_raw = record.get("display_name")
+        toy_id_raw = record.get("toy_id")
+        if not isinstance(role_name_raw, str) or not role_name_raw:
+            continue
+        if not isinstance(display_name_raw, str) or not display_name_raw:
+            continue
+        try:
+            role_enum = Role(role_name_raw)
+        except ValueError:
+            # Unknown role string — skip; the K1 taxonomy validator
+            # gates this at template load, so this branch is defense-
+            # in-depth only.
+            continue
+        role_rates = DEFAULT_ROLE_SPONTANEITY_RATES.get(role_enum)
+        if role_rates is None:
+            continue
+        # Toys sort by toy_id; generic descriptors (no toy_id) sort by
+        # display_name so the tiebreak still has a deterministic key.
+        if isinstance(toy_id_raw, str) and toy_id_raw:
+            sort_key = toy_id_raw
+        else:
+            sort_key = display_name_raw
+        jokes_candidates.append(
+            (
+                float(role_rates["jokes_rate"]),
+                sort_key,
+                "role",
+                display_name_raw,
+                role_name_raw,
+            )
+        )
+        songs_candidates.append(
+            (
+                float(role_rates["songs_rate"]),
+                sort_key,
+                "role",
+                display_name_raw,
+                role_name_raw,
+            )
+        )
+
+    # Persona display_name — best-effort read so a missing/legacy row
+    # falls through to the persona_id string. Used only for attribution
+    # narration (the voice profile is still the persona's regardless).
+    persona_display_name: str = str(persona_id) if persona_id is not None else "Narrator"
+    if persona_id is not None:
+        try:
+            persona_row = conn.execute(
+                "SELECT display_name FROM personas WHERE id = ?",
+                (persona_id,),
+            ).fetchone()
+        except sqlite3.Error:
+            persona_row = None
+        if persona_row is not None and persona_row["display_name"]:
+            persona_display_name = str(persona_row["display_name"])
+    # Persona enters both candidate lists with sort_key "~" so the
+    # plan's "persona last" tie-break holds across all role-name
+    # spellings (all 10 Role.value strings start with letters).
+    jokes_candidates.append(
+        (
+            float(persona_rates.get("jokes", 0.0)),
+            "~",
+            "persona",
+            persona_display_name,
+            None,
+        )
+    )
+    songs_candidates.append(
+        (
+            float(persona_rates.get("songs", 0.0)),
+            "~",
+            "persona",
+            persona_display_name,
+            None,
+        )
+    )
+
+    effective_jokes = max((c[0] for c in jokes_candidates), default=0.0)
+    effective_songs = max((c[0] for c in songs_candidates), default=0.0)
+    if effective_jokes <= 0.0 and effective_songs <= 0.0:
+        return None
+
+    # Roll: derive deterministic [0,1) float from sha256. Same shape as
+    # the K14 embedded picker's seed, but with a distinct salt so the
+    # spontaneity roll never coincides with the embedded pick's seed
+    # (which would produce inverted-deterministic correlations).
+    seed_input = f"{activity_id}:{new_seq}:spontaneity".encode()
+    digest = hashlib.sha256(seed_input).digest()
+    seed_int = int.from_bytes(digest[:8], byteorder="big", signed=False)
+    # 2**64 = 18446744073709551616. Dividing by this maps to [0, 1).
+    roll = seed_int / float(1 << 64)
+
+    jokes_master_on = jokes_enabled.get(conn)
+    songs_master_on = songs_enabled.get(conn)
+
+    pick_kind: str | None = None
+    pick_candidates: list[tuple[float, str, str, str, str | None]] | None = None
+    if roll < effective_jokes and jokes_master_on:
+        pick_kind = "joke"
+        pick_candidates = jokes_candidates
+    elif roll < effective_jokes + effective_songs and songs_master_on:
+        pick_kind = "song"
+        pick_candidates = songs_candidates
+    if pick_kind is None or pick_candidates is None:
+        return None
+
+    # Winner: highest rate, ties broken by sort_key (toys before
+    # persona via the "~" trick). Python's tuple sort is stable + the
+    # ``-rate`` key flips to max-first.
+    winner = min(pick_candidates, key=lambda c: (-c[0], c[1]))
+    _winner_rate, _winner_sort_key, speaker_kind, display_name, role_name = winner
+
+    # Corpus pick — themed if a role drove the rate (we don't have a
+    # role→theme map yet, so theme=None for v1; spontaneity is "any
+    # joke/song" by design per plan §3 S). Fresh seed per roll so
+    # successive spontaneity hits don't deliver the same content. Same
+    # persona-compat filter as embedded so a wizard persona still gets
+    # wizard-compatible content.
+    pick_seed = int.from_bytes(digest[8:16], byteorder="big", signed=False)
+    persona_id_str = str(persona_id) if persona_id is not None else None
+    corpus_entry: Joke | Song | None
+    if pick_kind == "song":
+        corpus_entry = pick_song(
+            seed=pick_seed,
+            persona_id=persona_id_str,
+            theme=None,
+            require_audio=True,
+        )
+    else:  # joke
+        corpus_entry = pick_joke(
+            seed=pick_seed,
+            persona_id=persona_id_str,
+            theme=None,
+        )
+    if corpus_entry is None:
+        _logger.info(
+            "spontaneity roll fired (activity=%s kind=%s roll=%.4f) but corpus is empty; skipping",
+            activity_id,
+            pick_kind,
+            roll,
+        )
+        return None
+
+    attribution: dict[str, Any] = {
+        "speaker_kind": speaker_kind,
+        "display_name": display_name,
+    }
+    if role_name is not None:
+        attribution["role_name"] = role_name
+    return _SpontaneityPick(
+        corpus_entry=corpus_entry,
+        content_kind=pick_kind,
+        attribution=attribution,
+    )
+
+
+def _persist_spontaneity_then_template_step(
+    conn: sqlite3.Connection,
+    *,
+    activity_id: str,
+    spontaneity_corpus: Joke | Song,
+    attribution: dict[str, Any],
+    slot_fills: dict[str, str],
+    new_seq: int,
+    previous_step_id: str,
+    chosen_label: str | None,
+    template_step: Any,
+    embedded_interjection_row: dict[str, Any] | None,
+) -> None:
+    """Phase K K15 Surface S: persist BOTH the spontaneity interjection
+    (at ``new_seq``, ``current=1``) AND the originally-planned next
+    step (at ``new_seq+1``, ``current=0``) in one transaction.
+
+    Plan §6 K15: "Template position pointer NOT advanced through
+    interjection". The kid's next /advance hits the legacy ``current_index
+    + 1 < len(steps)`` branch and flips current to the template step;
+    the spontaneity step doesn't burn a template position.
+
+    Two persisted rows means TWO inserts inside the version-bumped
+    transaction. Order matters only for the SQLite atomicity guarantee
+    (both rows present after commit); seq is the ordering key on
+    read-back.
+
+    Toy display name for the spontaneity joke's ``{toy}`` substitution
+    comes from the attribution when speaker_kind == "role" (the toy
+    whose rate drove the roll); falls back to the catalog resolver for
+    persona-driven rolls. Defense-in-depth: a failure to resolve
+    degrades to no-toy form.
+    """
+    toy_display_name: str | None = None
+    if isinstance(spontaneity_corpus, Joke):
+        if attribution.get("speaker_kind") == "role":
+            display = attribution.get("display_name")
+            if isinstance(display, str) and display:
+                toy_display_name = display
+        else:
+            try:
+                toys = resolve_toys(conn)
+            except sqlite3.Error:
+                toys = []
+            if toys:
+                toy_display_name = toys[0].display_name
+
+    spontaneity_row = build_interjection_step(
+        interjection=InterjectionKind.spontaneity,
+        corpus_entry=spontaneity_corpus,
+        slot_fills=slot_fills,
+        seq=new_seq,
+        toy_display_name=toy_display_name,
+    )
+    # Attach attribution to the metadata blob. The build_interjection_step
+    # helper produces metadata.{interjection, source_id, ...kind-specific};
+    # we extend with spontaneity_attribution so the kiosk can render the
+    # speaker line ("Captain Bear giggles:" vs "Marvelous chants:").
+    metadata = dict(spontaneity_row.get("metadata") or {})
+    metadata["spontaneity_attribution"] = attribution
+    spontaneity_row["metadata"] = metadata
+
+    _insert_interjection_step_row(
+        conn,
+        activity_id=activity_id,
+        interjection_row=spontaneity_row,
+        new_seq=new_seq,
+        previous_step_id=previous_step_id,
+        chosen_label=chosen_label,
+    )
+
+    # Insert the originally-planned next step at new_seq+1 with
+    # current=0. The kid's next /advance flips current to it via the
+    # legacy linear branch. We support BOTH paths the post_advance
+    # handler considers: a regular template step (most common) AND an
+    # embedded interjection step (if the template's next position is
+    # an auto song/joke). The embedded row is pre-built by the caller
+    # so we don't duplicate the picker logic here.
+    if embedded_interjection_row is not None:
+        embedded_for_persist = dict(embedded_interjection_row)
+        embedded_for_persist["seq"] = new_seq + 1
+        _insert_followup_interjection_step_row_current_zero(
+            conn,
+            activity_id=activity_id,
+            interjection_row=embedded_for_persist,
+        )
+    else:
+        _insert_followup_template_step_row_current_zero(
+            conn,
+            activity_id=activity_id,
+            template_step=template_step,
+            slot_fills=slot_fills,
+            new_seq=new_seq + 1,
+        )
+
+
+def _insert_followup_template_step_row_current_zero(
+    conn: sqlite3.Connection,
+    *,
+    activity_id: str,
+    template_step: Any,
+    slot_fills: dict[str, str],
+    new_seq: int,
+) -> None:
+    """Phase K K15 Surface S: persist the originally-planned template
+    step at ``new_seq`` with ``current=0``. Sibling of
+    :func:`_insert_next_step` but skips the ``previous_step_id`` flip
+    (the spontaneity row already grabbed ``current=1``).
+    """
+    body_text = render_with_slot_fills(template_step.text, slot_fills)
+    choices_blob: str | None = None
+    if template_step.choices is not None:
+        rendered_labels = [
+            render_with_slot_fills(label, slot_fills) for label, _next in template_step.choices
+        ]
+        choices_blob = json.dumps(rendered_labels)
+    conn.execute(
+        "INSERT INTO activity_steps "
+        "(id, activity_id, seq, body, sfx, expected_action, current, action_slot, "
+        " choices_json, step_template_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)",
+        (
+            str(uuid.uuid4()),
+            activity_id,
+            new_seq,
+            body_text,
+            template_step.sfx,
+            template_step.expected_action,
+            template_step.action_slot,
+            choices_blob,
+            template_step.id,
+        ),
+    )
+
+
+def _insert_followup_interjection_step_row_current_zero(
+    conn: sqlite3.Connection,
+    *,
+    activity_id: str,
+    interjection_row: dict[str, Any],
+) -> None:
+    """Phase K K15 Surface S: persist a pre-built embedded interjection
+    row at its ``seq`` with ``current=0``. Sibling of
+    :func:`_insert_interjection_step_row` but skips the prev-row flip.
+    """
+    metadata = interjection_row.get("metadata") or {}
+    metadata_blob: str | None
+    if isinstance(metadata, dict) and metadata:
+        metadata_blob = json.dumps(metadata, sort_keys=True)
+    else:
+        metadata_blob = None
+    conn.execute(
+        "INSERT INTO activity_steps "
+        "(id, activity_id, seq, body, sfx, expected_action, current, action_slot, "
+        " choices_json, step_template_id, kind, metadata_json) "
+        "VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)",
+        (
+            str(uuid.uuid4()),
+            activity_id,
+            int(interjection_row["seq"]),
+            interjection_row["body"],
+            interjection_row.get("sfx"),
+            interjection_row.get("expected_action"),
+            interjection_row.get("action_slot"),
+            None,
+            None,
+            interjection_row.get("kind"),
+            metadata_blob,
         ),
     )
 
@@ -3547,6 +4425,26 @@ def post_advance(
         if interjection_row is None:
             return _terminal_advance(conn, pubsub, activity_id, expected_version)
 
+    # Phase K K15 Surface S: roll the spontaneity dice BEFORE the
+    # version-bumped transaction so a fired roll can be persisted
+    # atomically with the regular template-step write. The hook reads
+    # ``play_spontaneity_enabled`` + persona/role spontaneity rates,
+    # rolls a deterministic float from ``(activity_id, new_seq)``, and
+    # returns a ``_SpontaneityPick`` on hit / ``None`` on miss. Placement
+    # AFTER the embedded picker is intentional: when the template step
+    # already IS a (themed) embedded interjection, the spontaneity roll
+    # still fires alongside it — the kid first sees the spontaneity
+    # interjection at new_seq, then the embedded auto-step at new_seq+1
+    # on the next /advance (both surfaces stack rather than racing for
+    # the slot).
+    new_seq = int(current_row["seq"]) + 1
+    spontaneity_pick = _resolve_spontaneity(
+        conn,
+        activity_id=activity_id,
+        activity_row=row,
+        new_seq=new_seq,
+    )
+
     # Atomically: bump version + state, INSERT next step, mark current
     # ``not current`` (and write ``chosen_label`` if branching). All
     # under one transaction so a stale retry post-bump can't double-
@@ -3560,9 +4458,24 @@ def post_advance(
     )
     if not ok:
         raise VersionConflictError(int(row["version"]), str(row["state"]))
-    new_seq = int(current_row["seq"]) + 1
     with conn:
-        if interjection_row is not None:
+        if spontaneity_pick is not None:
+            # K15 S fire: INSERT (spontaneity at new_seq, current=1)
+            # + (template step / embedded at new_seq+1, current=0).
+            # Plan §6 K15: template-position pointer not advanced.
+            _persist_spontaneity_then_template_step(
+                conn,
+                activity_id=activity_id,
+                spontaneity_corpus=spontaneity_pick.corpus_entry,
+                attribution=spontaneity_pick.attribution,
+                slot_fills=slot_fills,
+                new_seq=new_seq,
+                previous_step_id=str(current_row["id"]),
+                chosen_label=chosen_label,
+                template_step=target_template_step,
+                embedded_interjection_row=interjection_row,
+            )
+        elif interjection_row is not None:
             _insert_interjection_step_row(
                 conn,
                 activity_id=activity_id,
@@ -3581,6 +4494,29 @@ def post_advance(
                 previous_step_id=str(current_row["id"]),
                 chosen_label=chosen_label,
             )
+
+    # Phase K K15 Surface S telemetry: append a labeled_events
+    # tool_calls entry with source="spontaneity" + attribution shape so
+    # downstream learning loops can reconstruct which participant fired
+    # which roll. Best-effort (matches parent_insert pattern).
+    if spontaneity_pick is not None:
+        try:
+            append_interjection_event(
+                conn,
+                activity_id=activity_id,
+                source=INTERJECTION_SOURCE_SPONTANEITY,
+                interjection_kind=InterjectionKind.spontaneity.value,
+                corpus_entry_id=spontaneity_pick.corpus_entry.id,
+                step_seq=new_seq,
+                attribution=spontaneity_pick.attribution,
+            )
+        except Exception:  # noqa: BLE001 -- telemetry must never break advance
+            _logger.warning(
+                "spontaneity: append_interjection_event failed for activity %s",
+                activity_id,
+                exc_info=True,
+            )
+
     response = _row_to_response(conn, row)
     _emit_state(pubsub, response)
     return response
