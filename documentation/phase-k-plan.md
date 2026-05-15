@@ -382,6 +382,8 @@ Per [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md), each
 
 **Flags:** `--reviewers code`
 
+**Status:** DONE (2026-05-15)
+
 ### Step K5: Integration test through `_do_propose`
 
 **Problem:** End-to-end test asserting a role-aware template flows through the production propose path: `POST /api/activities/propose` → `_do_propose` → resolved roles persisted in `activities.slot_fills_json` → step bodies rendered via `render_with_slot_fills` → `activity.state` envelope carries the cast. **Required by [`code-quality.md`](../../.claude/rules/code-quality.md) §4** — covers the silent-wiring failure mode (engine builds, never called). Uses pytest-asyncio with `tests/fixtures/personas/role_weighted.json` fixture so the test is byte-deterministic.
