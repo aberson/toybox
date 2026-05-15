@@ -84,9 +84,10 @@ from .content_resolver import (
     apply_banned_themes_filter,
 )
 from .feedback import Candidate, compute_signature, consult_and_select
-from .models import Activity, ActivityStep, Step, Template
+from .models import Activity, ActivityStep, EndingStep, Step, Template
 from .roles import Role
 from .slots import SIGNATURE_CONTRIBUTING_SLOTS, SlotRegistry
+from .themes import Theme
 from .time_of_day import ALWAYS_BUCKET, hour_bucket, is_eligible
 
 _logger = logging.getLogger(__name__)
@@ -129,6 +130,15 @@ class _StepTemplate:
     id: str | None = None
     next: str | None = None
     choices: tuple[tuple[str, str], ...] | None = None
+    # Phase K K14: per-step ``kind`` discriminator + ``auto`` flag for
+    # the embedded picker. ``kind`` defaults to ``"text"`` so the 200
+    # existing branching templates parse unchanged; ``auto`` defaults
+    # to ``None`` (only meaningful on ``"song"``/``"joke"`` kinds —
+    # gated by :class:`toybox.activities.models.Step`'s validator at
+    # parse time). The K14 advance-time embedded picker dispatches on
+    # ``(kind in ("song","joke")) AND auto is True``.
+    kind: str = "text"
+    auto: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,6 +157,15 @@ class _Template:
     # directly (not strings) so the picker doesn't have to re-coerce.
     required_roles: tuple[Role, ...] = ()
     optional_roles: tuple[Role, ...] = ()
+    # Phase K K14: surface the K3 theme tags + optional ending_step on
+    # the cached dataclass so the K14 propose-time endings appender and
+    # the K14 advance-time embedded picker can drive corpus filtering
+    # off the template's declared themes without re-parsing the JSON.
+    # ``recommended_themes`` drives both the endings pick (first theme)
+    # and the embedded pick (also first theme, per phase-k-plan §6).
+    # ``ending_step`` is the optional EndingStep model (or None).
+    recommended_themes: tuple[Theme, ...] = ()
+    ending_step: EndingStep | None = None
 
 
 # Cache: (templates_dir, intent) -> list of loaded templates.
@@ -229,6 +248,12 @@ def _parse_template(raw: dict[str, Any], *, source: str = "<inline>") -> _Templa
                 id=step_model.id,
                 next=step_model.next,
                 choices=choices_tuple,
+                # Phase K K14: thread kind + auto through to the cached
+                # dataclass so the advance-time embedded picker can
+                # detect ``kind in ("song","joke") AND auto is True``
+                # without re-parsing template JSON.
+                kind=step_model.kind,
+                auto=step_model.auto,
             )
         )
     # Phase G graph validation. Raises TemplateGraphError on any
@@ -252,6 +277,11 @@ def _parse_template(raw: dict[str, Any], *, source: str = "<inline>") -> _Templa
         # stores enum values directly.
         required_roles=tuple(template_model.required_roles),
         optional_roles=tuple(template_model.optional_roles),
+        # Phase K K14: surface theme tags + ending_step on the cached
+        # dataclass so the propose-time endings appender and the
+        # advance-time embedded picker can read them without re-loading.
+        recommended_themes=tuple(template_model.recommended_themes),
+        ending_step=template_model.ending_step,
     )
 
 

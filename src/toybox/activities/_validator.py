@@ -433,6 +433,7 @@ def validate_template(template: Template) -> None:
     # at model construction; re-checked here so callers using
     # ``validate_template`` directly get a uniform
     # :class:`TemplateGraphError` shape.
+    has_auto_song_joke = False
     for idx, step in enumerate(template.steps):
         label = step.id if step.id is not None else f"index {idx}"
         if step.kind in ("song", "joke"):
@@ -447,6 +448,23 @@ def validate_template(template: Template) -> None:
                     f"kind={step.kind!r} sets both `corpus_id` and "
                     f"`auto=true`; pick one"
                 )
+            if step.auto is True:
+                has_auto_song_joke = True
+
+    # ----- (K14.1) auto song/joke steps require recommended_themes -------
+    # The K14 embedded picker (post_advance lazy-render) filters the
+    # corpus on the template's first ``recommended_themes`` entry. A
+    # template with an ``auto: true`` step but no themes leaves the
+    # picker with no filter, which silently degrades to "no corpus
+    # entry" → the engine terminates the activity instead of inserting
+    # the embedded step. Fail at template-load time so the author sees
+    # the gap before runtime.
+    if has_auto_song_joke and not template.recommended_themes:
+        raise TemplateGraphError(
+            f"template {template_id!r}: has `auto: true` song/joke step "
+            f"but `recommended_themes` is empty; K14 embedded picker "
+            f"requires at least one theme to filter on"
+        )
 
 
 __all__ = [

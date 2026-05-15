@@ -511,14 +511,41 @@ def test_validate_template_accepts_song_step_with_corpus_id() -> None:
 
 
 def test_validate_template_accepts_joke_step_with_auto() -> None:
+    # K14: ``auto: true`` song/joke steps require a non-empty
+    # ``recommended_themes`` so the embedded picker has a theme to
+    # filter on. Tests that exercise the auto-step path must declare
+    # one theme.
     template = _build_template(
         steps=[
             Step(text="a"),
             Step(text="joke", kind="joke", auto=True),
             Step(text="c"),
         ],
+        recommended_themes=[Theme.silly],
     )
     validate_template(template)
+
+
+def test_validate_template_rejects_auto_song_step_without_recommended_themes() -> None:
+    """K14: ``auto: true`` song/joke steps without
+    ``recommended_themes`` are misconfigured — the K14 embedded picker
+    has nothing to filter on. The K3 validator's K14.1 gate catches
+    this at template-load time so the author sees the gap before
+    runtime.
+    """
+    template = _build_template(
+        steps=[
+            Step(text="a"),
+            Step(text="sing", kind="song", auto=True),
+            Step(text="c"),
+        ],
+        recommended_themes=[],
+    )
+    with pytest.raises(TemplateGraphError) as excinfo:
+        validate_template(template)
+    msg = str(excinfo.value)
+    assert "recommended_themes" in msg
+    assert "auto" in msg
 
 
 def test_validate_template_accepts_ending_step_song() -> None:
