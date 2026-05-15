@@ -1,0 +1,31 @@
+{
+  "intent": "boredom",
+  "templates": [
+    {
+      "id": "fixture_valid_role",
+      "title": "{quest_giver} sends a quest in {room}",
+      "buckets": ["always"],
+      "required_roles": ["quest_giver", "needs_saving"],
+      "optional_roles": ["sidekick"],
+      "recommended_themes": ["adventure", "knights"],
+      "ending_step": { "kind": "song", "auto": true },
+      "steps": [
+        {
+          "id": "open",
+          "text": "{quest_giver} hands {needs_saving} a glowing map of {room}.",
+          "action_slot": "thinking"
+        },
+        {
+          "id": "journey",
+          "text": "{needs_saving} and {sidekick} march together past the {prop}.",
+          "action_slot": "looking"
+        },
+        {
+          "id": "finale",
+          "text": "{needs_saving} reaches the goal and {quest_giver} cheers.",
+          "action_slot": "cheering"
+        }
+      ]
+    }
+  ]
+}

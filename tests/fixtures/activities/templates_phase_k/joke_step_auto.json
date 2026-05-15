@@ -1,0 +1,21 @@
+{
+  "intent": "boredom",
+  "templates": [
+    {
+      "id": "fixture_joke_auto",
+      "title": "Joke-bearing template",
+      "buckets": ["always"],
+      "recommended_themes": ["silly"],
+      "steps": [
+        { "text": "First text step." },
+        {
+          "id": "joke_step",
+          "text": "Now a joke!",
+          "kind": "joke",
+          "auto": true
+        },
+        { "text": "Final step." }
+      ]
+    }
+  ]
+}

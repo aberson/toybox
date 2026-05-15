@@ -74,7 +74,7 @@ from jsonschema.exceptions import ValidationError
 from pydantic import ValidationError as PydanticValidationError
 
 from ..image_gen.models import ACTION_SLOTS
-from ._validator import TemplateGraphError, validate_template_graph
+from ._validator import TemplateGraphError, validate_template, validate_template_graph
 from .content_resolver import (
     SAFE_DEFAULT_TEMPLATE,
     ResolvedChildren,
@@ -84,7 +84,7 @@ from .content_resolver import (
     apply_banned_themes_filter,
 )
 from .feedback import Candidate, compute_signature, consult_and_select
-from .models import Activity, ActivityStep, Step
+from .models import Activity, ActivityStep, Step, Template
 from .slots import SIGNATURE_CONTRIBUTING_SLOTS, SlotRegistry
 from .time_of_day import ALWAYS_BUCKET, hour_bucket, is_eligible
 
@@ -184,7 +184,15 @@ def _parse_template(raw: dict[str, Any], *, source: str = "<inline>") -> _Templa
     template_id = str(raw["id"])
     steps_raw = raw["steps"]
     parsed_steps: list[_StepTemplate] = []
-    pydantic_steps: list[Step] = []
+    # Phase K K3: parse the whole template through Pydantic so the
+    # K3 cross-field shape (role / theme / ending_step) is gated
+    # alongside per-step shape. The legacy per-step ``Step.model_validate``
+    # loop below stays so the ``action_slot`` ValueError branch (which
+    # isn't a Pydantic gate) still fires with its tailored error
+    # message before the more general Template validation. Both layers
+    # raise pydantic.ValidationError / ValueError that the loader
+    # catches as a logged warn + skip.
+    template_model = Template.model_validate(raw)
     for s in steps_raw:
         slot = s.get("action_slot")
         if slot is not None and slot not in ACTION_SLOTS:
@@ -192,11 +200,12 @@ def _parse_template(raw: dict[str, Any], *, source: str = "<inline>") -> _Templa
                 f"template {template_id!r} in {source}: step action_slot={slot!r} "
                 f"is not in ACTION_SLOTS={ACTION_SLOTS!r}"
             )
-        # Pydantic validation: catches bad ``id`` pattern, max-length
-        # violations, choice-count range, and the next/choices XOR.
-        # Errors bubble up — the caller logs + skips the file.
+        # Pydantic validation per step: ``Template.model_validate``
+        # above already ran this for every step, but we keep the
+        # per-step loop so the ``_StepTemplate`` dataclass can be
+        # built incrementally with the source-level ``s`` dict in
+        # scope (action_slot ValueError above relies on that).
         step_model = Step.model_validate(s)
-        pydantic_steps.append(step_model)
         choices_tuple: tuple[tuple[str, str], ...] | None = None
         if step_model.choices is not None:
             choices_tuple = tuple((c.label, c.next) for c in step_model.choices)
@@ -216,7 +225,11 @@ def _parse_template(raw: dict[str, Any], *, source: str = "<inline>") -> _Templa
     # is a hard load-time error per the Phase G plan; the caller
     # in ``_load_intent_templates`` is responsible for whether to
     # surface that as a fatal startup error or a logged skip.
-    validate_template_graph(template_id, pydantic_steps)
+    validate_template_graph(template_id, template_model.steps)
+    # Phase K K3 template-shape validation (placeholder gate, distinct-
+    # toy ceiling, ending_step / song-joke shape defense-in-depth).
+    # Same hard-fail semantics as ``validate_template_graph``.
+    validate_template(template_model)
     return _Template(
         id=template_id,
         title=str(raw["title"]),

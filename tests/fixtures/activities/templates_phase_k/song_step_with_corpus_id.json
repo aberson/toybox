@@ -1,0 +1,20 @@
+{
+  "intent": "boredom",
+  "templates": [
+    {
+      "id": "fixture_song_corpus",
+      "title": "Song-bearing template",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "First text step." },
+        {
+          "id": "song_step",
+          "text": "Now we sing!",
+          "kind": "song",
+          "corpus_id": "space-rhyme-01"
+        },
+        { "text": "Final step." }
+      ]
+    }
+  ]
+}

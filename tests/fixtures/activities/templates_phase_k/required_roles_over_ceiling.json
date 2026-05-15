@@ -1,0 +1,21 @@
+{
+  "intent": "boredom",
+  "templates": [
+    {
+      "id": "fixture_over_ceiling",
+      "title": "Just one role used: {quest_giver}",
+      "buckets": ["always"],
+      "required_roles": ["quest_giver", "sidekick", "frenemy"],
+      "optional_roles": [],
+      "steps": [
+        {
+          "id": "open",
+          "text": "{quest_giver} stands alone.",
+          "action_slot": "thinking"
+        },
+        { "text": "A step." },
+        { "text": "Another step." }
+      ]
+    }
+  ]
+}

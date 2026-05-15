@@ -51,6 +51,80 @@
           "minItems": 3,
           "maxItems": 20,
           "items": { "$ref": "#/$defs/step" }
+        },
+        "required_roles": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/role" },
+          "uniqueItems": true,
+          "default": [],
+          "description": "Phase K K3: roles a template cannot function without. The eligibility filter rejects templates whose required_roles count exceeds the available toy pool. Each {role_name} placeholder in step text MUST be in required_roles ∪ optional_roles (validated by toybox.activities._validator)."
+        },
+        "optional_roles": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/role" },
+          "uniqueItems": true,
+          "default": [],
+          "description": "Phase K K3: roles the template uses opportunistically. Unfilled slots fall back to generic descriptors at slot-fill time."
+        },
+        "recommended_themes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/theme" },
+          "uniqueItems": true,
+          "default": [],
+          "description": "Phase K K3: theme tags driving the K14 embedded-interjection picker. Each entry must be a valid Theme (toybox.activities.themes.Theme)."
+        },
+        "ending_step": {
+          "$ref": "#/$defs/ending_step",
+          "description": "Phase K K3: optional auto-appended interjection step. When present AND the play_endings_enabled surface flag is on, the engine appends a themed song/joke step after the template's last step at activity-creation time."
+        }
+      }
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "friend",
+        "quest_giver",
+        "guide_mentor",
+        "needs_saving",
+        "boss_mini_boss",
+        "big_bad_boss",
+        "frenemy",
+        "sidekick",
+        "trickster",
+        "helper_townsperson"
+      ],
+      "description": "Phase K K1 role taxonomy. Source of truth: toybox.activities.roles.Role. Enum values mirrored here so the jsonschema layer can reject typos before they reach the Pydantic layer."
+    },
+    "theme": {
+      "type": "string",
+      "enum": [
+        "adventure",
+        "magic",
+        "space",
+        "animals",
+        "vehicles",
+        "food",
+        "friendship",
+        "pirates",
+        "knights",
+        "weather",
+        "music",
+        "silly"
+      ],
+      "description": "Phase K K1 theme taxonomy. Source of truth: toybox.activities.themes.Theme. Enum values mirrored here so the jsonschema layer can reject typos before they reach the Pydantic layer."
+    },
+    "ending_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "auto"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["song", "joke"]
+        },
+        "auto": {
+          "type": "boolean",
+          "const": true
         }
       }
     },
@@ -71,7 +145,23 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 600,
-          "description": "Step text. Supports {slot} and {toy} placeholders plus the parametric slots filled by toybox.activities.slots.SlotRegistry: {room}, {action_verb}, {adjective}, {prop}, {body_part}, {count}. Unknown {placeholder} names are echoed back verbatim at substitution time so the typo surfaces visibly. The lint script (planned at tools/lint_templates) will enforce the whitelist."
+          "description": "Step text. Supports {slot} and {toy} placeholders plus the parametric slots filled by toybox.activities.slots.SlotRegistry: {room}, {action_verb}, {adjective}, {prop}, {body_part}, {count}. Phase K K3 also permits {role_name} placeholders (one per role declared in the template's required_roles ∪ optional_roles arrays). Unknown {placeholder} names are echoed back verbatim at substitution time so the typo surfaces visibly. The lint script (planned at tools/lint_templates) will enforce the whitelist."
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["text", "fork", "song", "joke"],
+          "default": "text",
+          "description": "Phase K K3: step kind. Defaults to 'text' for legacy steps that omit the field. 'fork' is the K3 explicit spelling of the existing choices-bearing shape; 'song' and 'joke' deliver interjections (validator gates that they reference a corpus entry via corpus_id OR carry auto=true)."
+        },
+        "corpus_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "Phase K K3: corpus entry id for 'song' / 'joke' kinds. Mutually exclusive with auto=true. Corpus loading lives in K10 (jokes) and K11 (songs); K3 only gates the SHAPE."
+        },
+        "auto": {
+          "type": "boolean",
+          "description": "Phase K K3: when true on a 'song' / 'joke' step, the engine picks a corpus entry at activity-creation time using the template's recommended_themes. Mutually exclusive with corpus_id."
         },
         "sfx": {
           "type": ["string", "null"],

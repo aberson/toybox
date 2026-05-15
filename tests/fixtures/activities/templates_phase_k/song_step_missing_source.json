@@ -1,0 +1,19 @@
+{
+  "intent": "boredom",
+  "templates": [
+    {
+      "id": "fixture_song_missing",
+      "title": "Song-bearing template with no source",
+      "buckets": ["always"],
+      "steps": [
+        { "text": "First text step." },
+        {
+          "id": "song_step",
+          "text": "Now we sing!",
+          "kind": "song"
+        },
+        { "text": "Final step." }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "intent": "boredom",
+  "templates": [
+    {
+      "id": "fixture_undeclared_role",
+      "title": "{quest_giver} sends a quest",
+      "buckets": ["always"],
+      "required_roles": ["quest_giver"],
+      "optional_roles": [],
+      "steps": [
+        {
+          "id": "open",
+          "text": "{quest_giver} and the {frenemy} argue.",
+          "action_slot": "thinking"
+        },
+        { "text": "A step." },
+        { "text": "Another step." }
+      ]
+    }
+  ]
+}

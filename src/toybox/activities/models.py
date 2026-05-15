@@ -10,11 +10,13 @@ step can serialize without translation gymnastics. Both models are
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
 from ..image_gen.models import ACTION_SLOTS
+from .roles import Role
+from .themes import Theme
 
 # Phase G: pattern + max length for step ids used as branch targets.
 # Tighter than template ids (which allow up to 64 chars) because step ids
@@ -75,6 +77,9 @@ def _validate_choice_count(v: list[Choice] | None) -> list[Choice] | None:
     return v
 
 
+StepKind = Literal["text", "fork", "song", "joke"]
+
+
 class Step(BaseModel):
     """Template-time step definition (Phase G).
 
@@ -89,6 +94,16 @@ class Step(BaseModel):
     backward-compatible: existing templates that have none of these
     fields rely on the implicit fall-through edge rule (advance to
     the next array position).
+
+    Phase K K3 additions: ``kind`` (one of ``"text" | "fork" | "song"
+    | "joke"``, default ``"text"`` for backward-compat with the 200
+    existing branching templates), ``corpus_id`` (corpus entry id for
+    ``song`` / ``joke`` kinds — corpus loading lives in K10/K11; K3
+    only gates the SHAPE), and ``auto`` (when true on a ``song`` /
+    ``joke`` step, the engine picks a corpus entry at activity-creation
+    time using the template's ``recommended_themes``). ``corpus_id``
+    and ``auto`` are mutually exclusive and at least one must be set
+    on ``song`` / ``joke`` steps.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -110,6 +125,22 @@ class Step(BaseModel):
     next: str | None = Field(default=None, min_length=1)
     # Phase G: branching choice point. ``len(choices) in (2,3,4)``.
     choices: Annotated[list[Choice] | None, AfterValidator(_validate_choice_count)] = None
+    # Phase K K3: step kind. ``"text"`` is the default for the 200
+    # existing branching templates that omit the field. ``"song"`` and
+    # ``"joke"`` deliver interjections — validator gates the shape
+    # (corpus_id XOR auto=true). ``"fork"`` is the explicit spelling of
+    # the existing choices-bearing shape (not auto-derived; templates
+    # that set choices but leave kind at the default ``"text"`` still
+    # validate, preserving backward-compat).
+    kind: StepKind = "text"
+    # Phase K K3: corpus entry id for ``song`` / ``joke`` step kinds.
+    # Pattern + length echoed from corpus-entry-id format in
+    # documentation/phase-k-plan.md §2 "Identifier formats".
+    corpus_id: str | None = Field(default=None, min_length=1, max_length=64)
+    # Phase K K3: when true on a ``song`` / ``joke`` step, the engine
+    # picks a corpus entry from ``recommended_themes`` at creation
+    # time. Mutually exclusive with ``corpus_id``.
+    auto: bool | None = None
 
     @model_validator(mode="after")
     def _check_next_xor_choices(self) -> Step:
@@ -122,6 +153,47 @@ class Step(BaseModel):
         """
         if self.next is not None and self.choices is not None:
             raise ValueError(f"step id={self.id!r} sets both `next` and `choices`; pick one")
+        return self
+
+    @model_validator(mode="after")
+    def _check_song_joke_shape(self) -> Step:
+        """Phase K K3: ``song`` / ``joke`` steps must reference a
+        corpus entry via ``corpus_id`` OR carry ``auto=True``.
+
+        K10 (jokes) and K11 (songs) own corpus loading; K3 only gates
+        the SHAPE so a hand-edited template with a typo'd ``kind``
+        or missing source-of-content fails LOUDLY at load time.
+
+        ``corpus_id`` and ``auto=True`` are mutually exclusive — a
+        template that pins a specific entry has no use for the auto-
+        pick path, and an auto-pick step has no use for a specific
+        entry. Same defense-in-depth motivation as ``_check_next_xor_choices``.
+        """
+        if self.kind in ("song", "joke"):
+            if self.corpus_id is None and self.auto is not True:
+                raise ValueError(
+                    f"step id={self.id!r} kind={self.kind!r} must set either "
+                    f"`corpus_id` or `auto=true`"
+                )
+            if self.corpus_id is not None and self.auto is True:
+                raise ValueError(
+                    f"step id={self.id!r} kind={self.kind!r} sets both "
+                    f"`corpus_id` and `auto=true`; pick one"
+                )
+        else:
+            # ``corpus_id`` / ``auto`` are only meaningful on song / joke
+            # steps. Reject them on other kinds so a stray field doesn't
+            # silently mask a typo in ``kind``.
+            if self.corpus_id is not None:
+                raise ValueError(
+                    f"step id={self.id!r} kind={self.kind!r} sets `corpus_id`; "
+                    f"only valid on kind='song' or kind='joke'"
+                )
+            if self.auto is not None:
+                raise ValueError(
+                    f"step id={self.id!r} kind={self.kind!r} sets `auto`; "
+                    f"only valid on kind='song' or kind='joke'"
+                )
         return self
 
 
@@ -220,4 +292,97 @@ class Activity(BaseModel):
     toy_ids: tuple[str, ...] = Field(default_factory=tuple)
 
 
-__all__ = ["Activity", "ActivityStep", "Choice", "Step"]
+class EndingStep(BaseModel):
+    """Phase K K3: template-level optional ending interjection.
+
+    When a template declares :attr:`Template.ending_step` AND the
+    parent ``play_endings_enabled`` surface flag is on, the engine
+    appends a themed song/joke step after the template's last step
+    at activity-creation time. ``auto`` is always ``True`` in v1 —
+    the corpus pick is driven by :attr:`Template.recommended_themes`.
+
+    Author-pinned endings (``ending_step.corpus_id``) are an explicit
+    non-feature for v1; the field shape is reserved for future use
+    behind a feature flag, not exposed here.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    kind: Literal["song", "joke"]
+    auto: Literal[True] = True
+
+
+class Template(BaseModel):
+    """Phase K K3: template-time Pydantic shape.
+
+    Mirrors ``$defs/template`` in
+    ``src/toybox/activities/templates/_schema.json``. The
+    ``_parse_template`` path in :mod:`toybox.activities.generator`
+    keeps using its lightweight ``_Template`` dataclass for the
+    runtime hot path; this Pydantic model exists so the new K3
+    template-level invariants (``required_roles`` / ``optional_roles``
+    / ``recommended_themes`` / ``ending_step`` shape) get the same
+    defense-in-depth treatment the per-step shape gets via
+    :class:`Step`. Callers building templates from in-memory dicts
+    (tests, fixtures, generator scripts) can construct this and
+    receive the full validation including the K3 placeholder /
+    ceiling / kind-shape gates wrapped by
+    :func:`toybox.activities._validator.validate_template`.
+
+    Backward-compat: every K3 field is optional with a default of the
+    empty list / ``None``, so a JSON template authored under the
+    pre-K3 schema parses unchanged.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    id: str = Field(min_length=1, max_length=64, pattern=r"^[a-z0-9][a-z0-9_]*$")
+    title: str = Field(min_length=1, max_length=200)
+    buckets: list[str] = Field(default_factory=list)
+    steps: list[Step] = Field(min_length=3, max_length=20)
+    # Phase K K3: top-level role declarations. Both lists default to
+    # empty for backward-compat with the 200 existing branching
+    # templates that omit the fields entirely. Pydantic gates that
+    # every entry is a valid :class:`Role`; uniqueness is enforced by
+    # the validator (see ``_check_role_uniqueness``).
+    required_roles: list[Role] = Field(default_factory=list)
+    optional_roles: list[Role] = Field(default_factory=list)
+    # Phase K K3: theme tags consumed by the K14 embedded picker.
+    # Pydantic gates that every entry is a valid :class:`Theme`.
+    recommended_themes: list[Theme] = Field(default_factory=list)
+    # Phase K K3: optional auto-appended interjection at activity-creation
+    # time. Pydantic gates the shape (kind ∈ {song, joke}, auto=True);
+    # the parent ``play_endings_enabled`` surface flag gates delivery.
+    ending_step: EndingStep | None = None
+
+    @model_validator(mode="after")
+    def _check_role_uniqueness(self) -> Template:
+        """Reject duplicate role entries within ``required_roles`` or
+        ``optional_roles``, and reject overlap between the two lists.
+
+        Authoring intent for a role appearing in both lists is
+        ambiguous (required AND optional?) — fail loudly rather than
+        pick a winner.
+        """
+        if len(set(self.required_roles)) != len(self.required_roles):
+            raise ValueError(f"template id={self.id!r}: `required_roles` contains duplicates")
+        if len(set(self.optional_roles)) != len(self.optional_roles):
+            raise ValueError(f"template id={self.id!r}: `optional_roles` contains duplicates")
+        overlap = set(self.required_roles) & set(self.optional_roles)
+        if overlap:
+            raise ValueError(
+                f"template id={self.id!r}: role(s) {sorted(r.value for r in overlap)!r} "
+                f"appear in both `required_roles` and `optional_roles`; pick one"
+            )
+        return self
+
+
+__all__ = [
+    "Activity",
+    "ActivityStep",
+    "Choice",
+    "EndingStep",
+    "Step",
+    "StepKind",
+    "Template",
+]
