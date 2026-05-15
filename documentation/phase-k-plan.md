@@ -346,6 +346,8 @@ Per [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md), each
 
 **Flags:** `--reviewers code`
 
+**Status:** DONE (2026-05-14)
+
 ### Step K2: Phase-K feature flags (8 settings)
 
 **Problem:** Migration `0015_phase_k_feature_flags.sql` seeds 8 boolean settings (`jokes_enabled`, `songs_enabled`, `play_standalone_enabled`, `play_embedded_enabled`, `play_endings_enabled`, `play_spontaneity_enabled`, `clickable_words_enabled`, `read_me_button_enabled`), defaults per §5. Eight backend modules under `src/toybox/core/` follow the per-setting convention from Phase H/I/J. Eight API endpoints under `src/toybox/api/`. New `PlayFeaturesControls.tsx` parent component (mirrors `PlayQueueSettingsControls.tsx`) with 8 toggle switches. Frontend `api.ts` adds getters/setters. Kiosk `App.tsx` bootstrap fetches all 8 flags and threads via props (no React context).
