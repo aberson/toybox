@@ -119,6 +119,40 @@ describe("ApiClient", () => {
     expect(headers.get("If-Match-Version")).toBeNull();
   });
 
+  it("recastActivity POSTs to /api/activities/<id>/recast with empty body and If-Match-Version", async () => {
+    // Phase K K6: recast re-rolls role cast on a proposed activity.
+    // Wire shape: POST, empty JSON body (server picks a fresh seed),
+    // If-Match-Version header set from the version argument.
+    const fetchImpl = vi
+      .fn<Parameters<FetchLike>, ReturnType<FetchLike>>()
+      .mockResolvedValue(jsonResponse(200, fakeActivity({ version: 4 })));
+    const client = new ApiClient({ fetchImpl, getToken: () => "t" });
+    await client.recastActivity("act-1", 3);
+    const [url, init] = fetchImpl.mock.calls[0]!;
+    expect(url).toBe("/api/activities/act-1/recast");
+    expect(init?.method).toBe("POST");
+    expect(JSON.parse(init?.body as string)).toEqual({});
+    const headers = new Headers(init?.headers);
+    expect(headers.get("If-Match-Version")).toBe("3");
+  });
+
+  it("recastActivity turns 409 version_conflict body into VersionConflictError", async () => {
+    // Phase K K6: matches the K7 call-site pattern (withConflictHandler
+    // unwraps VersionConflictError into the refetch + onConflict path).
+    const conflict: VersionConflictBody = {
+      code: "version_conflict",
+      current_version: 4,
+      current_state: "proposed",
+    };
+    const fetchImpl = vi
+      .fn<Parameters<FetchLike>, ReturnType<FetchLike>>()
+      .mockResolvedValue(jsonResponse(409, { detail: conflict }));
+    const client = new ApiClient({ fetchImpl, getToken: () => "t" });
+    await expect(client.recastActivity("act-1", 1)).rejects.toBeInstanceOf(
+      VersionConflictError,
+    );
+  });
+
   it("turns 409 with version_conflict body into VersionConflictError", async () => {
     const conflict: VersionConflictBody = {
       code: "version_conflict",

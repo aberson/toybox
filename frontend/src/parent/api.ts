@@ -833,6 +833,28 @@ export class ApiClient {
     });
   }
 
+  // Phase K K6: re-roll the role cast on a proposed activity. The
+  // server picks a fresh seed, re-runs the role-slot engine, rewrites
+  // ``activities.slot_fills_json`` + persisted step bodies, and bumps
+  // the version. Returns the updated activity with new ``roles`` +
+  // ``cast_summary`` + re-rendered ``steps[].body``. State guard: 409
+  // ``recast_only_when_proposed`` when the activity isn't proposed;
+  // version mismatch → standard 409 ``version_conflict`` raised as
+  // ``VersionConflictError`` by ``request``. Callers wrap in
+  // ``withConflictHandler`` to refetch on 409 (see K7 suggestion card).
+  async recastActivity(
+    id: string,
+    version: number,
+    opts: RequestOptions = {},
+  ): Promise<Activity> {
+    return this.request<Activity>(`/api/activities/${encodeURIComponent(id)}/recast`, {
+      method: "POST",
+      body: JSON.stringify({}),
+      ifMatchVersion: version,
+      signal: opts.signal,
+    });
+  }
+
   async end(
     id: string,
     version: number,

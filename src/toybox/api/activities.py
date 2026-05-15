@@ -2024,6 +2024,268 @@ def post_regenerate(
     )
 
 
+@router.post("/{activity_id}/recast", response_model=ActivityResponse)
+def post_recast(
+    activity_id: str,
+    conn: Annotated[sqlite3.Connection, Depends(get_activities_db)],
+    pubsub: Annotated[PubSub, Depends(get_pubsub)],
+    expected_version: Annotated[int, Depends(if_match_version_dependency)],
+    _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
+) -> ActivityResponse:
+    """Phase K K6: re-roll the role cast on a proposed activity.
+
+    Re-runs :func:`resolve_role_slots` with a fresh server-side seed,
+    rewrites ``activities.slot_fills_json`` (role-name keys overwritten,
+    legacy slot keys preserved), re-renders every persisted
+    ``activity_steps.body`` (and ``choices_json``) via
+    :func:`render_with_slot_fills`, increments ``activities.version``,
+    and emits an ``activity.state`` envelope with the updated response.
+
+    State guard: this is a *proposed-only* operation (kids haven't seen
+    the cast yet — recast while running/paused would re-render text on
+    a screen the kid is currently looking at). State ≠ ``proposed``
+    returns 409 ``{"code": "recast_only_when_proposed", ...}``. Plan §11
+    flags a v2 idea to lift this gate once mid-activity re-render UX is
+    designed.
+
+    Best-effort role resolution: a template that no longer exists, or
+    declares no roles, leaves ``slot_fills_json`` + step bodies as-is
+    and still bumps the version — the call always succeeds for any
+    proposed row so the parent UI's "New cast" button never wedges.
+    """
+    row = _fetch_activity_row(conn, activity_id)
+    current_state = str(row["state"])
+    current_version = int(row["version"])
+    # State guard fires FIRST so a caller that re-tries after approval
+    # gets the precise "recast_only_when_proposed" code, not a generic
+    # version_conflict that masks the real reason the click was rejected.
+    if current_state != STATE_PROPOSED:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "recast_only_when_proposed",
+                "current_version": current_version,
+                "current_state": current_state,
+            },
+        )
+    if current_version != expected_version:
+        raise VersionConflictError(current_version, current_state)
+
+    # Parse the persisted summary envelope: ``title``, ``metadata``,
+    # ``template_id``. Defensive against legacy plaintext summaries
+    # (no envelope) — the recast still proceeds, just without role
+    # resolution.
+    summary_raw = row["summary"]
+    title: str | None = None
+    metadata: dict[str, Any] = {}
+    template_id: str | None = None
+    if summary_raw:
+        try:
+            payload = json.loads(summary_raw)
+        except json.JSONDecodeError:
+            payload = None
+        if isinstance(payload, dict):
+            title_raw = payload.get("title")
+            if isinstance(title_raw, str):
+                title = title_raw
+            meta_raw = payload.get("metadata")
+            if isinstance(meta_raw, dict):
+                metadata = dict(meta_raw)
+            tid_raw = payload.get("template_id")
+            if isinstance(tid_raw, str) and tid_raw:
+                template_id = tid_raw
+
+    # Parse the persisted slot fills so we can preserve non-role keys
+    # (``toy``, ``room``, ``adjective``, etc.). Recast only overwrites
+    # the role-name keys — the legacy substitution surface stays
+    # byte-identical for templates without declared roles.
+    slot_fills_raw = row["slot_fills_json"]
+    slot_fills: dict[str, str] = {}
+    if slot_fills_raw:
+        try:
+            decoded_fills = json.loads(slot_fills_raw)
+        except json.JSONDecodeError:
+            decoded_fills = None
+        if isinstance(decoded_fills, dict):
+            slot_fills = {str(k): str(v) for k, v in decoded_fills.items()}
+
+    # Resolve the new cast. The template may have been removed/renamed
+    # between propose and recast (best-effort propose contract); we
+    # treat that as "no roles to re-roll" rather than 500-ing.
+    persona_id = row["persona_id"]
+    template = find_template_by_id(template_id) if template_id is not None else None
+    role_overlay: dict[str, str] = {}
+    role_records: list[dict[str, Any]] = []
+    new_cast_summary = ""
+    if template is not None and (template.required_roles or template.optional_roles):
+        try:
+            resolved_toys = resolve_toys(conn)
+        except sqlite3.Error:
+            _logger.warning(
+                "resolve_toys failed on recast for activity %s; leaving slot_fills unchanged",
+                activity_id,
+                exc_info=True,
+            )
+            resolved_toys = []
+        role_weights = _load_persona_role_weights(conn, persona_id)
+        persona_for_picker = _PersonaForRoleSlots(
+            id=str(persona_id) if persona_id is not None else "",
+            role_weights=role_weights,
+        )
+        # ``secrets.randbits(31)`` mirrors ``post_regenerate``'s
+        # fresh-seed convention. The role-slot picker hashes
+        # (template_id, sorted toy ids, persona id, seed) so a new
+        # seed reliably reshuffles even when role_weights tilt one
+        # toy hard into one slot.
+        new_seed = secrets.randbits(31)
+        try:
+            role_slot_result = resolve_role_slots(
+                template,
+                resolved_toys,
+                persona_for_picker,
+                new_seed,
+            )
+        except Exception:  # noqa: BLE001 -- defense: role-slot bug must not wedge recast
+            _logger.warning(
+                "resolve_role_slots failed on recast for activity %s",
+                activity_id,
+                exc_info=True,
+            )
+            role_slot_result = None
+        if role_slot_result is None:
+            # Eligibility gate (required_roles > toy pool) or a caught
+            # exception above. We keep the version bump + emit so the
+            # caller sees "I clicked the button and something happened"
+            # but role text stays whatever it was at propose time.
+            _logger.warning(
+                "recast: resolve_role_slots returned no cast for activity %s "
+                "(template %r); slot_fills unchanged",
+                activity_id,
+                template_id,
+            )
+        else:
+            role_overlay, role_records, new_cast_summary = _build_role_assignments(role_slot_result)
+
+    # Merge the new role overlay onto the persisted slot_fills. Role
+    # name keys overwrite; non-role keys (toy / room / adjective / ...)
+    # are preserved verbatim — the legacy ``{toy}`` substitution path
+    # MUST survive recast even on role-bearing templates.
+    if role_overlay:
+        slot_fills.update(role_overlay)
+
+    # Re-render every persisted activity_steps row using the new fills.
+    # In ``proposed`` state lazy-insert has only written ``steps[0]`` so
+    # this is typically one row, but the loop covers any future change
+    # to the persistence strategy. We re-render even when role_overlay
+    # is empty so the merge above doesn't have to special-case "did
+    # anything change?" — render is idempotent when the fills are.
+    step_rows = conn.execute(
+        "SELECT id, body, choices_json, step_template_id, seq "
+        "FROM activity_steps WHERE activity_id = ?",
+        (activity_id,),
+    ).fetchall()
+
+    # Resolve template steps for re-rendering. We need the ORIGINAL
+    # template step text — the persisted ``body`` has already been
+    # substituted at propose time, so re-rendering it would silently
+    # become a no-op (placeholders are gone). Same logic for
+    # ``choices_json``: we need the template's choice labels, not the
+    # rendered ones we persisted.
+    rendered_updates: list[tuple[str, str | None, str]] = []
+    if template is not None:
+        template_steps = template.steps
+        for step_row in step_rows:
+            step_template_id = step_row["step_template_id"]
+            template_idx = _resolve_template_step_index(
+                template_steps,
+                step_template_id=step_template_id,
+                fallback_array_index=int(step_row["seq"]) - 1,
+            )
+            if template_idx < 0:
+                # Step doesn't map to any template step (corrupt row or
+                # post-template-rename activity). Leave the persisted
+                # body untouched — re-rendering with no template text
+                # to draw from is a no-op anyway.
+                continue
+            tstep = template_steps[template_idx]
+            new_body = render_with_slot_fills(tstep.text, slot_fills)
+            new_choices_blob: str | None
+            if tstep.choices is not None:
+                rendered_labels = [
+                    render_with_slot_fills(label, slot_fills) for label, _next in tstep.choices
+                ]
+                new_choices_blob = json.dumps(rendered_labels)
+            else:
+                # Preserve the existing choices_json — including NULL —
+                # so re-render never strips choice metadata from a row
+                # that legitimately had it (defense against a future
+                # template-step shape change).
+                new_choices_blob = step_row["choices_json"]
+            rendered_updates.append((new_body, new_choices_blob, str(step_row["id"])))
+
+    # Rebuild the summary envelope with the new role metadata. The
+    # ``role_assignments`` + ``cast_summary`` keys are read back by
+    # :func:`_row_to_response` to populate the wire-level ``roles`` +
+    # ``cast_summary`` fields. When no roles resolved we strip both
+    # keys so the wire response cleanly reflects "no cast" rather than
+    # carrying stale pre-recast records.
+    if role_records:
+        metadata["role_assignments"] = role_records
+        metadata["cast_summary"] = new_cast_summary
+    else:
+        metadata.pop("role_assignments", None)
+        metadata.pop("cast_summary", None)
+    new_summary_payload: dict[str, Any] = {
+        "title": title,
+        "metadata": metadata,
+    }
+    if template_id is not None:
+        new_summary_payload["template_id"] = template_id
+    new_summary_blob = json.dumps(new_summary_payload, sort_keys=True)
+    new_slot_fills_blob = json.dumps(slot_fills, sort_keys=True)
+
+    # Two transactions, ordered: (1) bump version + rewrite summary +
+    # slot_fills via ``_attempt_transition`` (reuses the optimistic-
+    # concurrency WHERE clause so a concurrent mutation between fetch
+    # + UPDATE surfaces as a clean 409 rather than a silent double-bump);
+    # (2) re-render the persisted ``activity_steps`` rows. A crash
+    # between the two leaves slot_fills_json ahead of the persisted
+    # step bodies, but ``_row_to_response`` renders steps in the
+    # ``proposed`` state from the template plan + current slot_fills
+    # rather than reading ``activity_steps.body``, so the wire client
+    # never sees the partial-write window.
+    ok, row = _attempt_transition(
+        conn,
+        activity_id=activity_id,
+        expected_version=expected_version,
+        new_state=current_state,
+        additional_sets=(
+            ("summary", new_summary_blob),
+            ("slot_fills_json", new_slot_fills_blob),
+        ),
+    )
+    if not ok:
+        raise VersionConflictError(int(row["version"]), str(row["state"]))
+    if rendered_updates:
+        with conn:
+            for new_body, new_choices_blob, step_id in rendered_updates:
+                conn.execute(
+                    "UPDATE activity_steps SET body = ?, choices_json = ? WHERE id = ?",
+                    (new_body, new_choices_blob, step_id),
+                )
+
+    _logger.info(
+        "recast activity %s from version %d -> %d (%d role(s) re-rolled)",
+        activity_id,
+        current_version,
+        int(row["version"]),
+        len(role_records),
+    )
+    response = _row_to_response(conn, row)
+    _emit_state(pubsub, response)
+    return response
+
+
 def _bad_advance(code: str, **extra: Any) -> HTTPException:
     """Phase G G3: build a 400 with the canonical ``{code, ...}`` body
     used by the advance handler's three branching-input error cases.
