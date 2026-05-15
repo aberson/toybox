@@ -3,50 +3,106 @@
   "templates": [
     {
       "id": "request_activity_soak_fortbuild_01",
-      "title": "Build a {adjective} fort with {toy}",
-      "buckets": ["afternoon"],
+      "title": "Build a {adjective} fort with {friend}",
+      "buckets": [
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Clear a square of floor in {room} big enough for you and {toy}.", "action_slot": "pointing" },
-        { "text": "Gather four pillows and two blankets and stack them in your spot.", "action_slot": "looking" },
-        { "text": "Stand the pillows on edge to make four fort walls.", "action_slot": "thinking" },
-        { "text": "Drape one blanket across the top for the roof.", "action_slot": "pointing" },
+        {
+          "text": "Clear a square of floor in {room} big enough for you and {friend}.",
+          "action_slot": "pointing"
+        },
+        {
+          "text": "Gather four pillows and two blankets and stack them in your spot.",
+          "action_slot": "looking"
+        },
+        {
+          "text": "Stand the pillows on edge to make four fort walls.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Drape one blanket across the top for the roof.",
+          "action_slot": "pointing"
+        },
         {
           "id": "fork",
-          "text": "What kind of fort is this for {toy}?",
+          "text": "What kind of fort is this for {friend}?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "A secret reading nook", "next": "nook_end" },
-            { "label": "A brave lookout tower", "next": "lookout_end" }
+            {
+              "label": "A secret reading nook",
+              "next": "nook_end"
+            },
+            {
+              "label": "A brave lookout tower",
+              "next": "lookout_end"
+            }
           ]
         },
         {
           "id": "nook_end",
-          "text": "Tuck a book and a flashlight inside. Crawl in with {toy} and read one page out loud.",
+          "text": "Tuck a book and a flashlight inside. Crawl in with {friend} and read one page out loud.",
           "action_slot": "sleeping"
         },
         {
           "id": "lookout_end",
-          "text": "Cut a peephole between two pillows. Take turns spying out with {toy} and call out three things you see.",
+          "text": "Cut a peephole between two pillows. Take turns spying out with {friend} and call out three things you see.",
           "action_slot": "looking"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "helper_townsperson",
+        "sidekick"
+      ],
+      "recommended_themes": [
+        "adventure",
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_paperplane_02",
       "title": "Paper plane workshop",
-      "buckets": ["afternoon", "morning"],
+      "buckets": [
+        "afternoon",
+        "morning"
+      ],
       "steps": [
-        { "text": "Gather two sheets of paper and one crayon. Sit at a flat surface with {toy}.", "action_slot": "idle" },
-        { "text": "Fold the first sheet in half the long way, then unfold it.", "action_slot": "thinking" },
-        { "text": "Fold both top corners down to meet the center crease.", "action_slot": "thinking" },
-        { "text": "Fold the slanted edges down again to make a sharp nose.", "action_slot": "thinking" },
+        {
+          "text": "Gather two sheets of paper and one crayon. Sit at a flat surface with {friend}.",
+          "action_slot": "idle"
+        },
+        {
+          "text": "Fold the first sheet in half the long way, then unfold it.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Fold both top corners down to meet the center crease.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Fold the slanted edges down again to make a sharp nose.",
+          "action_slot": "thinking"
+        },
         {
           "id": "shape_fork",
           "text": "What kind of plane is this?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "A long-glide arrow", "next": "arrow_path" },
-            { "label": "A loopy stunt plane", "next": "stunt_path" }
+            {
+              "label": "A long-glide arrow",
+              "next": "arrow_path"
+            },
+            {
+              "label": "A loopy stunt plane",
+              "next": "stunt_path"
+            }
           ]
         },
         {
@@ -69,24 +125,49 @@
         },
         {
           "id": "launch",
-          "text": "Hold the plane behind your ear, point at {toy}, and let it fly. Cheer when it lands!",
+          "text": "Hold the plane behind your ear, point at {friend}, and let it fly. Cheer when it lands!",
           "action_slot": "cheering"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "sidekick"
+      ],
+      "recommended_themes": [
+        "vehicles",
+        "adventure"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_colorhunt_03",
       "title": "{adjective} color hunt in {room}",
-      "buckets": ["always"],
+      "buckets": [
+        "always"
+      ],
       "steps": [
         {
           "id": "pick_color",
-          "text": "{toy} wants to play a color hunt. Pick a color to chase first.",
+          "text": "{friend} wants to play a color hunt. Pick a color to chase first.",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Hunt for red things", "next": "red_path" },
-            { "label": "Hunt for blue things", "next": "blue_path" },
-            { "label": "Hunt for yellow things", "next": "yellow_path" }
+            {
+              "label": "Hunt for red things",
+              "next": "red_path"
+            },
+            {
+              "label": "Hunt for blue things",
+              "next": "blue_path"
+            },
+            {
+              "label": "Hunt for yellow things",
+              "next": "yellow_path"
+            }
           ]
         },
         {
@@ -109,56 +190,122 @@
         },
         {
           "id": "gather",
-          "text": "Bring {count} of your favorites back and lay them in a line in front of {toy}.",
+          "text": "Bring {count} of your favorites back and lay them in a line in front of {friend}.",
           "action_slot": "pointing"
         },
-        { "text": "Tell {toy} which one was the easiest to find and which was the trickiest.", "action_slot": "thinking" }
-      ]
+        {
+          "text": "Tell {friend} which one was the easiest to find and which was the trickiest.",
+          "action_slot": "thinking"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "helper_townsperson"
+      ],
+      "recommended_themes": [
+        "silly",
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_pebblegarden_04",
       "title": "Build a tiny pebble garden",
-      "buckets": ["afternoon"],
+      "buckets": [
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Find a tray, plate, or shoebox lid to be your garden frame.", "action_slot": "looking" },
-        { "text": "Collect six small pebbles, beads, or buttons and pour them in.", "action_slot": "pointing" },
-        { "text": "Add one leaf, one twig, or one folded paper triangle as a tree.", "action_slot": "thinking" },
-        { "text": "Push the pebbles around to make a path winding through the middle.", "action_slot": "thinking" },
+        {
+          "text": "Find a tray, plate, or shoebox lid to be your garden frame.",
+          "action_slot": "looking"
+        },
+        {
+          "text": "Collect six small pebbles, beads, or buttons and pour them in.",
+          "action_slot": "pointing"
+        },
+        {
+          "text": "Add one leaf, one twig, or one folded paper triangle as a tree.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Push the pebbles around to make a path winding through the middle.",
+          "action_slot": "thinking"
+        },
         {
           "id": "garden_fork",
-          "text": "What lives in this garden with {toy}?",
+          "text": "What lives in this garden with {friend}?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "A tiny dragon", "next": "dragon_end" },
-            { "label": "A family of mice", "next": "mice_end" }
+            {
+              "label": "A tiny dragon",
+              "next": "dragon_end"
+            },
+            {
+              "label": "A family of mice",
+              "next": "mice_end"
+            }
           ]
         },
         {
           "id": "dragon_end",
-          "text": "Pile three pebbles into a dragon hill at the path's end. Place {toy} as the dragon's friend.",
+          "text": "Pile three pebbles into a dragon hill at the path's end. Place {friend} as the dragon's friend.",
           "action_slot": "cheering"
         },
         {
           "id": "mice_end",
-          "text": "Make four small pebble nests off the path. Tuck {toy} in as the kindly grandmouse.",
+          "text": "Make four small pebble nests off the path. Tuck {friend} in as the kindly grandmouse.",
           "action_slot": "cheering"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "helper_townsperson",
+        "sidekick"
+      ],
+      "recommended_themes": [
+        "magic",
+        "animals"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_sortbysize_05",
       "title": "Sort the {prop} pile",
-      "buckets": ["always"],
+      "buckets": [
+        "always"
+      ],
       "steps": [
-        { "text": "Gather {count} small objects from {room} into a messy pile near {toy}.", "action_slot": "pointing" },
+        {
+          "text": "Gather {count} small objects from {room} into a messy pile near {friend}.",
+          "action_slot": "pointing"
+        },
         {
           "id": "sort_method",
           "text": "How should we sort the pile?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "By size — smallest to biggest", "next": "size_sort" },
-            { "label": "By color — light to dark", "next": "color_sort" },
-            { "label": "By texture — soft to hard", "next": "texture_sort" }
+            {
+              "label": "By size — smallest to biggest",
+              "next": "size_sort"
+            },
+            {
+              "label": "By color — light to dark",
+              "next": "color_sort"
+            },
+            {
+              "label": "By texture — soft to hard",
+              "next": "texture_sort"
+            }
           ]
         },
         {
@@ -181,27 +328,58 @@
         },
         {
           "id": "show",
-          "text": "Walk {toy} along the line and announce each thing in order.",
+          "text": "Walk {friend} along the line and announce each thing in order.",
           "action_slot": "pointing"
         }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "helper_townsperson"
+      ],
+      "recommended_themes": [
+        "silly",
+        "friendship"
       ]
     },
     {
       "id": "request_activity_soak_drawmonster_06",
       "title": "Design a {adjective} monster",
-      "buckets": ["afternoon", "evening"],
+      "buckets": [
+        "afternoon",
+        "evening"
+      ],
       "steps": [
-        { "text": "Lay paper and three crayons in front of you. {toy} is the art director.", "action_slot": "idle" },
-        { "text": "Draw a big round body in the middle of the page.", "action_slot": "thinking" },
-        { "text": "Add {count} eyes anywhere on the body.", "action_slot": "thinking" },
-        { "text": "Give the monster four legs — straight, wiggly, or zig-zag, your call.", "action_slot": "thinking" },
+        {
+          "text": "Lay paper and three crayons in front of you. {friend} is the art director.",
+          "action_slot": "idle"
+        },
+        {
+          "text": "Draw a big round body in the middle of the page.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Add {count} eyes anywhere on the body.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Give the monster four legs — straight, wiggly, or zig-zag, your call.",
+          "action_slot": "thinking"
+        },
         {
           "id": "monster_fork",
           "text": "What does your monster eat?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Only purple snacks", "next": "purple_eat" },
-            { "label": "Only round things", "next": "round_eat" }
+            {
+              "label": "Only purple snacks",
+              "next": "purple_eat"
+            },
+            {
+              "label": "Only round things",
+              "next": "round_eat"
+            }
           ]
         },
         {
@@ -218,24 +396,50 @@
         },
         {
           "id": "name_it",
-          "text": "Whisper the monster's name to {toy}, then say it loud and proud.",
+          "text": "Whisper the monster's name to {friend}, then say it loud and proud.",
           "action_slot": "cheering"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "trickster"
+      ],
+      "recommended_themes": [
+        "silly",
+        "magic"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_obstacle_07",
       "title": "Living-room obstacle course",
-      "buckets": ["morning", "afternoon"],
+      "buckets": [
+        "morning",
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Stand in {room} with {toy} and look at the open floor.", "action_slot": "looking" },
+        {
+          "text": "Stand in {room} with {friend} and look at the open floor.",
+          "action_slot": "looking"
+        },
         {
           "id": "course_style",
           "text": "What kind of course should we build?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Crawl-and-jump course", "next": "crawl_course" },
-            { "label": "Tip-toe-and-balance course", "next": "balance_course" }
+            {
+              "label": "Crawl-and-jump course",
+              "next": "crawl_course"
+            },
+            {
+              "label": "Tip-toe-and-balance course",
+              "next": "balance_course"
+            }
           ]
         },
         {
@@ -258,28 +462,66 @@
         },
         {
           "id": "speed_run",
-          "text": "Run the course as fast as you can while {toy} cheers from the sidelines.",
+          "text": "Run the course as fast as you can while {friend} cheers from the sidelines.",
           "action_slot": "running"
         },
-        { "text": "Take a bow. Tell {toy} the hardest part and the easiest part.", "action_slot": "cheering" }
-      ]
+        {
+          "text": "Take a bow. Tell {friend} the hardest part and the easiest part.",
+          "action_slot": "cheering"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "helper_townsperson",
+        "sidekick"
+      ],
+      "recommended_themes": [
+        "adventure",
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_potion_08",
       "title": "Mix a pretend potion",
-      "buckets": ["always"],
+      "buckets": [
+        "always"
+      ],
       "steps": [
-        { "text": "Find a cup, a bowl, or a jar to be your cauldron.", "action_slot": "looking" },
-        { "text": "Add three pretend ingredients from {room} — a sock, a paper scrap, a crayon stub.", "action_slot": "pointing" },
-        { "text": "Stir slowly with a spoon or stick while you whisper the recipe to {toy}.", "action_slot": "thinking" },
+        {
+          "text": "Find a cup, a bowl, or a jar to be your cauldron.",
+          "action_slot": "looking"
+        },
+        {
+          "text": "Add three pretend ingredients from {room} — a sock, a paper scrap, a crayon stub.",
+          "action_slot": "pointing"
+        },
+        {
+          "text": "Stir slowly with a spoon or stick while you whisper the recipe to {guide_mentor}.",
+          "action_slot": "thinking"
+        },
         {
           "id": "potion_kind",
           "text": "What does this potion do?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Makes you super fast", "next": "fast_potion" },
-            { "label": "Makes you invisible", "next": "invisible_potion" },
-            { "label": "Makes plants grow giant", "next": "plant_potion" }
+            {
+              "label": "Makes you super fast",
+              "next": "fast_potion"
+            },
+            {
+              "label": "Makes you invisible",
+              "next": "invisible_potion"
+            },
+            {
+              "label": "Makes plants grow giant",
+              "next": "plant_potion"
+            }
           ]
         },
         {
@@ -289,7 +531,7 @@
         },
         {
           "id": "invisible_potion",
-          "text": "Pretend to drink it, then crouch behind a {prop} and giggle while {toy} 'looks' for you.",
+          "text": "Pretend to drink it, then crouch behind a {prop} and giggle while {guide_mentor} 'looks' for you.",
           "action_slot": "thinking"
         },
         {
@@ -297,25 +539,63 @@
           "text": "Pretend to pour it on a houseplant, then slowly stand tall with arms out like branches.",
           "action_slot": "cheering"
         }
-      ]
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "sidekick",
+        "trickster"
+      ],
+      "recommended_themes": [
+        "magic",
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_treasuremap_09",
       "title": "Make a treasure map of {room}",
-      "buckets": ["afternoon"],
+      "buckets": [
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Sit on the floor with paper, a crayon, and {toy} the cartographer.", "action_slot": "idle" },
-        { "text": "Draw the outline of {room} as a big rectangle on the page.", "action_slot": "thinking" },
-        { "text": "Add the door, the window, and one piece of furniture as boxes inside.", "action_slot": "thinking" },
-        { "text": "Pick a hiding spot in {room} and hide a small {prop} there.", "action_slot": "pointing" },
-        { "text": "Draw a big X on the map at the hiding spot.", "action_slot": "thinking" },
+        {
+          "text": "Sit on the floor with paper, a crayon, and {friend} the cartographer.",
+          "action_slot": "idle"
+        },
+        {
+          "text": "Draw the outline of {room} as a big rectangle on the page.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Add the door, the window, and one piece of furniture as boxes inside.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Pick a hiding spot in {room} and hide a small {prop} there.",
+          "action_slot": "pointing"
+        },
+        {
+          "text": "Draw a big X on the map at the hiding spot.",
+          "action_slot": "thinking"
+        },
         {
           "id": "map_fork",
           "text": "How does the treasure hunter find the X?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Follow numbered footsteps", "next": "footsteps_end" },
-            { "label": "Solve a one-word riddle", "next": "riddle_end" }
+            {
+              "label": "Follow numbered footsteps",
+              "next": "footsteps_end"
+            },
+            {
+              "label": "Solve a one-word riddle",
+              "next": "riddle_end"
+            }
           ]
         },
         {
@@ -328,22 +608,51 @@
           "text": "Write one clue word at the top of the map. Hand the map to a grown-up and watch them puzzle it out.",
           "action_slot": "thinking"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "quest_giver"
+      ],
+      "recommended_themes": [
+        "adventure",
+        "pirates"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_kitchenchef_10",
-      "title": "Pretend kitchen with {toy}",
-      "buckets": ["morning", "afternoon"],
+      "title": "Pretend kitchen with {friend}",
+      "buckets": [
+        "morning",
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Set up a pretend stovetop on a low table or chair seat with {toy} as the customer.", "action_slot": "pointing" },
-        { "text": "Gather four pretend ingredients — pebbles, paper balls, leaves, anything.", "action_slot": "looking" },
+        {
+          "text": "Set up a pretend stovetop on a low table or chair seat with {friend} as the customer.",
+          "action_slot": "pointing"
+        },
+        {
+          "text": "Gather four pretend ingredients — pebbles, paper balls, leaves, anything.",
+          "action_slot": "looking"
+        },
         {
           "id": "menu_choice",
           "text": "What is on the menu today?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Soup of the day", "next": "soup_path" },
-            { "label": "Stack of pancakes", "next": "pancake_path" }
+            {
+              "label": "Soup of the day",
+              "next": "soup_path"
+            },
+            {
+              "label": "Stack of pancakes",
+              "next": "pancake_path"
+            }
           ]
         },
         {
@@ -360,34 +669,71 @@
         },
         {
           "id": "plate_up",
-          "text": "Slide your dish onto a small plate or paper square in front of {toy}.",
+          "text": "Slide your dish onto a small plate or paper square in front of {friend}.",
           "action_slot": "pointing",
           "next": "review"
         },
         {
           "id": "review",
-          "text": "Take {toy}'s order review — five stars or four? Bow to the chef!",
+          "text": "Take {friend}'s order review — five stars or four? Bow to the chef!",
           "action_slot": "cheering"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "helper_townsperson"
+      ],
+      "recommended_themes": [
+        "food",
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_rocketship_11",
       "title": "Build a {adjective} rocket ship",
-      "buckets": ["afternoon"],
+      "buckets": [
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Find a tall cardboard box, paper-towel tube, or stacked cushions to be your rocket body.", "action_slot": "looking" },
-        { "text": "Tape or balance a paper triangle on top as the nose cone.", "action_slot": "thinking" },
-        { "text": "Add three paper rectangles around the base as fins.", "action_slot": "thinking" },
-        { "text": "Strap {toy} into the rocket as the brave astronaut.", "action_slot": "pointing" },
-        { "text": "Count down from ten with one finger raised per number.", "action_slot": "cheering" },
+        {
+          "text": "Find a tall cardboard box, paper-towel tube, or stacked cushions to be your rocket body.",
+          "action_slot": "looking"
+        },
+        {
+          "text": "Tape or balance a paper triangle on top as the nose cone.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Add three paper rectangles around the base as fins.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Strap {sidekick} into the rocket as the brave astronaut.",
+          "action_slot": "pointing"
+        },
+        {
+          "text": "Count down from ten with one finger raised per number.",
+          "action_slot": "cheering"
+        },
         {
           "id": "destination",
           "text": "Where does the rocket fly today?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Moon with bouncy craters", "next": "moon_end" },
-            { "label": "Planet of giant flowers", "next": "flower_end" }
+            {
+              "label": "Moon with bouncy craters",
+              "next": "moon_end"
+            },
+            {
+              "label": "Planet of giant flowers",
+              "next": "flower_end"
+            }
           ]
         },
         {
@@ -397,26 +743,58 @@
         },
         {
           "id": "flower_end",
-          "text": "Crouch low, then stretch up tall like blooming. Tell {toy} which giant flower is friendliest.",
+          "text": "Crouch low, then stretch up tall like blooming. Tell {sidekick} which giant flower is friendliest.",
           "action_slot": "cheering"
         }
-      ]
+      ],
+      "required_roles": [
+        "sidekick"
+      ],
+      "optional_roles": [
+        "friend",
+        "helper_townsperson"
+      ],
+      "recommended_themes": [
+        "space",
+        "adventure"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_marblerun_12",
       "title": "Marble run with paper tubes",
-      "buckets": ["afternoon"],
+      "buckets": [
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Collect paper-towel tubes, books, and a small ball or marble.", "action_slot": "looking" },
-        { "text": "Lean two books to make a ramp from a chair down to the floor.", "action_slot": "thinking" },
-        { "text": "Lay one tube along the ramp so the marble can roll through it.", "action_slot": "thinking" },
+        {
+          "text": "Collect paper-towel tubes, books, and a small ball or marble.",
+          "action_slot": "looking"
+        },
+        {
+          "text": "Lean two books to make a ramp from a chair down to the floor.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Lay one tube along the ramp so the marble can roll through it.",
+          "action_slot": "thinking"
+        },
         {
           "id": "ending_zone",
           "text": "Where should the marble land at the bottom?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Into a paper-cup goal", "next": "cup_path" },
-            { "label": "Onto a soft pillow target", "next": "pillow_path" }
+            {
+              "label": "Into a paper-cup goal",
+              "next": "cup_path"
+            },
+            {
+              "label": "Onto a soft pillow target",
+              "next": "pillow_path"
+            }
           ]
         },
         {
@@ -436,25 +814,63 @@
           "text": "Drop the marble three times in a row and count how many times it lands cleanly.",
           "action_slot": "looking"
         },
-        { "text": "Tell {toy} the number out loud and high-five for the best run.", "action_slot": "cheering" }
-      ]
+        {
+          "text": "Tell {friend} the number out loud and high-five for the best run.",
+          "action_slot": "cheering"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "sidekick"
+      ],
+      "recommended_themes": [
+        "adventure",
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_naturetable_13",
       "title": "Set up a nature display",
-      "buckets": ["morning", "afternoon"],
+      "buckets": [
+        "morning",
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Find a small flat surface — a tray, a windowsill, a low shelf — for the display.", "action_slot": "looking" },
-        { "text": "Walk through {room} (or near a window) and gather {count} natural-feeling things: leaves, pebbles, pinecones, feathers.", "action_slot": "looking" },
-        { "text": "Lay everything out on the surface in any order.", "action_slot": "pointing" },
-        { "text": "Pick your favorite find and place it in the very center.", "action_slot": "thinking" },
+        {
+          "text": "Find a small flat surface — a tray, a windowsill, a low shelf — for the display.",
+          "action_slot": "looking"
+        },
+        {
+          "text": "Walk through {room} (or near a window) and gather {count} natural-feeling things: leaves, pebbles, pinecones, feathers.",
+          "action_slot": "looking"
+        },
+        {
+          "text": "Lay everything out on the surface in any order.",
+          "action_slot": "pointing"
+        },
+        {
+          "text": "Pick your favorite find and place it in the very center.",
+          "action_slot": "thinking"
+        },
         {
           "id": "label_or_story",
-          "text": "How should we share the display with {toy}?",
+          "text": "How should we share the display with {friend}?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Make a tiny label for each", "next": "label_end" },
-            { "label": "Tell a story for each", "next": "story_end" }
+            {
+              "label": "Make a tiny label for each",
+              "next": "label_end"
+            },
+            {
+              "label": "Tell a story for each",
+              "next": "story_end"
+            }
           ]
         },
         {
@@ -464,26 +880,54 @@
         },
         {
           "id": "story_end",
-          "text": "Pick up each item one at a time and tell {toy} a one-sentence story about where it came from.",
+          "text": "Pick up each item one at a time and tell {friend} a one-sentence story about where it came from.",
           "action_slot": "pointing"
         }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "helper_townsperson"
+      ],
+      "recommended_themes": [
+        "animals",
+        "adventure"
       ]
     },
     {
       "id": "request_activity_soak_dancecard_14",
       "title": "Make a dance-move card deck",
-      "buckets": ["morning", "afternoon"],
+      "buckets": [
+        "morning",
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Tear paper into four small cards. Sit on the floor with {toy} and a crayon.", "action_slot": "idle" },
-        { "text": "Draw a different dance move on each card — a spin, a hop, a wiggle, a freeze.", "action_slot": "thinking" },
+        {
+          "text": "Tear paper into four small cards. Sit on the floor with {friend} and a crayon.",
+          "action_slot": "idle"
+        },
+        {
+          "text": "Draw a different dance move on each card — a spin, a hop, a wiggle, a freeze.",
+          "action_slot": "thinking"
+        },
         {
           "id": "music_pick",
           "text": "What kind of music plays while you dance?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Fast jumpy music", "next": "fast_path" },
-            { "label": "Slow floaty music", "next": "slow_path" },
-            { "label": "Silent — clap your beat", "next": "clap_path" }
+            {
+              "label": "Fast jumpy music",
+              "next": "fast_path"
+            },
+            {
+              "label": "Slow floaty music",
+              "next": "slow_path"
+            },
+            {
+              "label": "Silent — clap your beat",
+              "next": "clap_path"
+            }
           ]
         },
         {
@@ -509,54 +953,122 @@
           "text": "Flip the rest of the cards one by one until you have danced every move.",
           "action_slot": "jumping"
         },
-        { "text": "Bow to {toy} and stack the cards into a tidy deck for next time.", "action_slot": "waving" }
-      ]
+        {
+          "text": "Bow to {friend} and stack the cards into a tidy deck for next time.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "sidekick"
+      ],
+      "recommended_themes": [
+        "music",
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_bookzoo_15",
       "title": "Build a book-stack zoo",
-      "buckets": ["afternoon"],
+      "buckets": [
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Bring four picture books and place them open in a half-circle in {room}.", "action_slot": "pointing" },
-        { "text": "Set one stuffed animal or {toy} inside each open book — those are the habitats.", "action_slot": "thinking" },
-        { "text": "Walk in a slow loop around the zoo and announce each habitat by name.", "action_slot": "pointing" },
-        { "text": "Pick the animal that looks hungriest and pretend to feed them three pretend snacks.", "action_slot": "thinking" },
+        {
+          "text": "Bring four picture books and place them open in a half-circle in {room}.",
+          "action_slot": "pointing"
+        },
+        {
+          "text": "Set one stuffed animal or {friend} inside each open book — those are the habitats.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Walk in a slow loop around the zoo and announce each habitat by name.",
+          "action_slot": "pointing"
+        },
+        {
+          "text": "Pick the animal that looks hungriest and pretend to feed them three pretend snacks.",
+          "action_slot": "thinking"
+        },
         {
           "id": "zoo_event",
           "text": "What special zoo event happens next?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "A parade through the zoo", "next": "parade_end" },
-            { "label": "A nap-time hush", "next": "nap_end" }
+            {
+              "label": "A parade through the zoo",
+              "next": "parade_end"
+            },
+            {
+              "label": "A nap-time hush",
+              "next": "nap_end"
+            }
           ]
         },
         {
           "id": "parade_end",
-          "text": "Carry {toy} on your shoulder and march past every habitat clapping and cheering.",
+          "text": "Carry {friend} on your shoulder and march past every habitat clapping and cheering.",
           "action_slot": "cheering"
         },
         {
           "id": "nap_end",
-          "text": "Tip-toe past every habitat whispering goodnight. Tuck {toy} on top of the last book.",
+          "text": "Tip-toe past every habitat whispering goodnight. Tuck {friend} on top of the last book.",
           "action_slot": "sleeping"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "helper_townsperson"
+      ],
+      "recommended_themes": [
+        "animals",
+        "adventure"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_papercitybuild_16",
       "title": "Build a paper-cup city",
-      "buckets": ["afternoon"],
+      "buckets": [
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Collect six paper cups, plastic cups, or yogurt pots and rinse-clean them if needed.", "action_slot": "looking" },
-        { "text": "Set the cups upside-down in a {room} corner. Those are the buildings.", "action_slot": "pointing" },
+        {
+          "text": "Collect six paper cups, plastic cups, or yogurt pots and rinse-clean them if needed.",
+          "action_slot": "looking"
+        },
+        {
+          "text": "Set the cups upside-down in a {room} corner. Those are the buildings.",
+          "action_slot": "pointing"
+        },
         {
           "id": "city_kind",
           "text": "What kind of city is this?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "A busy downtown", "next": "downtown_path" },
-            { "label": "A sleepy seaside town", "next": "seaside_path" },
-            { "label": "A space-station city", "next": "space_path" }
+            {
+              "label": "A busy downtown",
+              "next": "downtown_path"
+            },
+            {
+              "label": "A sleepy seaside town",
+              "next": "seaside_path"
+            },
+            {
+              "label": "A space-station city",
+              "next": "space_path"
+            }
           ]
         },
         {
@@ -585,32 +1097,67 @@
         },
         {
           "id": "tour",
-          "text": "Walk {toy} along the streets like a tour guide and name three buildings out loud.",
+          "text": "Walk {friend} along the streets like a tour guide and name three buildings out loud.",
           "action_slot": "pointing"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "helper_townsperson"
+      ],
+      "recommended_themes": [
+        "adventure",
+        "vehicles"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_shadowtrace_17",
       "title": "Trace a {adjective} shadow",
-      "buckets": ["morning", "afternoon"],
+      "buckets": [
+        "morning",
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Find a sunny spot near a window in {room} with paper and a crayon.", "action_slot": "looking" },
-        { "text": "Stand a small object — a cup, a {prop}, a toy — on the paper so its shadow falls on the page.", "action_slot": "pointing" },
-        { "text": "Hold the object steady and trace its shadow with the crayon.", "action_slot": "thinking" },
-        { "text": "Move the object and try a different angle, then trace again.", "action_slot": "thinking" },
+        {
+          "text": "Find a sunny spot near a window in {room} with paper and a crayon.",
+          "action_slot": "looking"
+        },
+        {
+          "text": "Stand a small object — a cup, a {prop}, a toy — on the paper so its shadow falls on the page.",
+          "action_slot": "pointing"
+        },
+        {
+          "text": "Hold the object steady and trace its shadow with the crayon.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Move the object and try a different angle, then trace again.",
+          "action_slot": "thinking"
+        },
         {
           "id": "shadow_use",
           "text": "What should the shadow drawing become?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "A monster face", "next": "monster_finish" },
-            { "label": "A secret coded letter", "next": "code_finish" }
+            {
+              "label": "A monster face",
+              "next": "monster_finish"
+            },
+            {
+              "label": "A secret coded letter",
+              "next": "code_finish"
+            }
           ]
         },
         {
           "id": "monster_finish",
-          "text": "Add eyes, fangs, and ears inside the shadow outline. Show {toy} the new monster.",
+          "text": "Add eyes, fangs, and ears inside the shadow outline. Show {friend} the new monster.",
           "action_slot": "cheering"
         },
         {
@@ -618,20 +1165,38 @@
           "text": "Write one tiny letter inside each shadow outline. Hand the page to a grown-up to decode.",
           "action_slot": "thinking"
         }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "trickster"
+      ],
+      "recommended_themes": [
+        "magic",
+        "silly"
       ]
     },
     {
       "id": "request_activity_soak_recipecard_18",
       "title": "Invent a pretend snack recipe",
-      "buckets": ["always"],
+      "buckets": [
+        "always"
+      ],
       "steps": [
         {
           "id": "snack_type",
-          "text": "What kind of pretend snack are we making with {toy}?",
+          "text": "What kind of pretend snack are we making with {friend}?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Smoothie of the day", "next": "smoothie_path" },
-            { "label": "Sandwich tower", "next": "sandwich_path" }
+            {
+              "label": "Smoothie of the day",
+              "next": "smoothie_path"
+            },
+            {
+              "label": "Sandwich tower",
+              "next": "sandwich_path"
+            }
           ]
         },
         {
@@ -648,7 +1213,7 @@
         },
         {
           "id": "name_recipe",
-          "text": "Give the snack a silly name. Say it three times so {toy} can remember.",
+          "text": "Give the snack a silly name. Say it three times so {friend} can remember.",
           "action_slot": "cheering",
           "next": "draw_card"
         },
@@ -657,24 +1222,58 @@
           "text": "Draw the snack on a paper card and write the silly name underneath.",
           "action_slot": "thinking"
         },
-        { "text": "Hand the recipe card to {toy} for the cookbook.", "action_slot": "waving" }
-      ]
+        {
+          "text": "Hand the recipe card to {friend} for the cookbook.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "helper_townsperson"
+      ],
+      "recommended_themes": [
+        "food",
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_animalstack_19",
       "title": "Stack the {adjective} animal pile",
-      "buckets": ["always"],
+      "buckets": [
+        "always"
+      ],
       "steps": [
-        { "text": "Gather all the stuffed animals you can carry into one pile in {room}.", "action_slot": "pointing" },
-        { "text": "Sit cross-legged with {toy} on top of the pile as the leader.", "action_slot": "thinking" },
+        {
+          "text": "Gather all the stuffed animals you can carry into one pile in {room}.",
+          "action_slot": "pointing"
+        },
+        {
+          "text": "Sit cross-legged with {friend} on top of the pile as the leader.",
+          "action_slot": "thinking"
+        },
         {
           "id": "stack_method",
           "text": "How should the animals be stacked?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Tallest tower we can build", "next": "tower_path" },
-            { "label": "A tidy pyramid", "next": "pyramid_path" },
-            { "label": "A cozy puppy pile", "next": "pile_path" }
+            {
+              "label": "Tallest tower we can build",
+              "next": "tower_path"
+            },
+            {
+              "label": "A tidy pyramid",
+              "next": "pyramid_path"
+            },
+            {
+              "label": "A cozy puppy pile",
+              "next": "pile_path"
+            }
           ]
         },
         {
@@ -700,24 +1299,60 @@
           "text": "Touch each animal and say its name out loud — invent one for any stranger.",
           "action_slot": "pointing"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "sidekick",
+        "helper_townsperson"
+      ],
+      "recommended_themes": [
+        "animals",
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_balloonball_20",
       "title": "Indoor balloon-ball game",
-      "buckets": ["morning", "afternoon"],
+      "buckets": [
+        "morning",
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Find a balloon (or a rolled-up sock) for the indoor ball.", "action_slot": "looking" },
-        { "text": "Mark two goals — one on each side of {room} — using shoes or pillows.", "action_slot": "pointing" },
-        { "text": "{toy} drops the ball at center floor. Crouch ready on opposite sides.", "action_slot": "thinking" },
+        {
+          "text": "Find a balloon (or a rolled-up sock) for the indoor ball.",
+          "action_slot": "looking"
+        },
+        {
+          "text": "Mark two goals — one on each side of {room} — using shoes or pillows.",
+          "action_slot": "pointing"
+        },
+        {
+          "text": "{friend} drops the ball at center floor. Crouch ready on opposite sides.",
+          "action_slot": "thinking"
+        },
         {
           "id": "rule_choice",
           "text": "What is the rule for moving the ball?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Only with your feet", "next": "feet_play" },
-            { "label": "Only with your hands", "next": "hands_play" },
-            { "label": "Only by blowing on it", "next": "blow_play" }
+            {
+              "label": "Only with your feet",
+              "next": "feet_play"
+            },
+            {
+              "label": "Only with your hands",
+              "next": "hands_play"
+            },
+            {
+              "label": "Only by blowing on it",
+              "next": "blow_play"
+            }
           ]
         },
         {
@@ -735,24 +1370,59 @@
           "text": "Crawl and blow — the first goal scored ends the round.",
           "action_slot": "thinking"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "sidekick"
+      ],
+      "recommended_themes": [
+        "adventure",
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_paperdoll_21",
       "title": "Make a paper-doll friend",
-      "buckets": ["afternoon", "evening"],
+      "buckets": [
+        "afternoon",
+        "evening"
+      ],
       "steps": [
-        { "text": "Fold a piece of paper in half. Sit beside {toy} the design assistant.", "action_slot": "idle" },
-        { "text": "Draw half a person along the fold — head, body, one arm, one leg.", "action_slot": "thinking" },
-        { "text": "Cut along the outline (with help if scissors are tricky), then unfold.", "action_slot": "thinking" },
-        { "text": "Color the doll's face with eyes, nose, and a smile.", "action_slot": "thinking" },
+        {
+          "text": "Fold a piece of paper in half. Sit beside {friend} the design assistant.",
+          "action_slot": "idle"
+        },
+        {
+          "text": "Draw half a person along the fold — head, body, one arm, one leg.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Cut along the outline (with help if scissors are tricky), then unfold.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Color the doll's face with eyes, nose, and a smile.",
+          "action_slot": "thinking"
+        },
         {
           "id": "outfit_pick",
           "text": "What is this paper friend wearing today?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "A superhero cape", "next": "cape_end" },
-            { "label": "A garden-party dress", "next": "dress_end" }
+            {
+              "label": "A superhero cape",
+              "next": "cape_end"
+            },
+            {
+              "label": "A garden-party dress",
+              "next": "dress_end"
+            }
           ]
         },
         {
@@ -762,27 +1432,57 @@
         },
         {
           "id": "dress_end",
-          "text": "Draw flowers and ruffles down the doll's body. Pick a name and tell {toy}.",
+          "text": "Draw flowers and ruffles down the doll's body. Pick a name and tell {friend}.",
           "action_slot": "cheering"
         }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "sidekick"
+      ],
+      "recommended_themes": [
+        "friendship",
+        "magic"
       ]
     },
     {
       "id": "request_activity_soak_secrethandshake_22",
       "title": "Invent a secret handshake",
-      "buckets": ["always"],
+      "buckets": [
+        "always"
+      ],
       "steps": [
-        { "text": "Stand face to face with {toy} (or a grown-up) in the middle of {room}.", "action_slot": "pointing" },
-        { "text": "Pick a starting move — a regular high-five works great.", "action_slot": "thinking" },
-        { "text": "Add a second move: maybe a low-five or a fist bump.", "action_slot": "thinking" },
-        { "text": "Add a third move: a spin, a jump, a wiggle — anything!", "action_slot": "jumping" },
+        {
+          "text": "Stand face to face with {friend} (or a grown-up) in the middle of {room}.",
+          "action_slot": "pointing"
+        },
+        {
+          "text": "Pick a starting move — a regular high-five works great.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Add a second move: maybe a low-five or a fist bump.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Add a third move: a spin, a jump, a wiggle — anything!",
+          "action_slot": "jumping"
+        },
         {
           "id": "finisher",
           "text": "Pick a big finishing move for the handshake.",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Double clap and shout", "next": "clap_finish" },
-            { "label": "Slow-motion bow", "next": "bow_finish" }
+            {
+              "label": "Double clap and shout",
+              "next": "clap_finish"
+            },
+            {
+              "label": "Slow-motion bow",
+              "next": "bow_finish"
+            }
           ]
         },
         {
@@ -795,94 +1495,192 @@
           "text": "Run the whole handshake start to end three times. End each time with the slow bow.",
           "action_slot": "cheering"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "sidekick"
+      ],
+      "recommended_themes": [
+        "friendship",
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_pillowmountain_23",
       "title": "Map a pillow mountain expedition",
-      "buckets": ["morning", "afternoon"],
+      "buckets": [
+        "morning",
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Pile every pillow you can find into one big mountain in {room}.", "action_slot": "pointing" },
-        { "text": "Plant a paper flag (a folded sheet on a pencil) at the very top.", "action_slot": "thinking" },
-        { "text": "Walk slowly around the mountain three times to scout the climb.", "action_slot": "looking" },
-        { "text": "Pick a 'base camp' on one side and place {toy} there.", "action_slot": "pointing" },
-        { "text": "Climb (or scoot) carefully from base camp toward the flag.", "action_slot": "thinking" },
+        {
+          "text": "Pile every pillow you can find into one big mountain in {room}.",
+          "action_slot": "pointing"
+        },
+        {
+          "text": "Plant a paper flag (a folded sheet on a pencil) at the very top.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Walk slowly around the mountain three times to scout the climb.",
+          "action_slot": "looking"
+        },
+        {
+          "text": "Pick a 'base camp' on one side and place {friend} there.",
+          "action_slot": "pointing"
+        },
+        {
+          "text": "Climb (or scoot) carefully from base camp toward the flag.",
+          "action_slot": "thinking"
+        },
         {
           "id": "summit_act",
           "text": "What do you do when you reach the summit?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Plant a victory roar", "next": "roar_end" },
-            { "label": "Slide back down on your bottom", "next": "slide_end" }
+            {
+              "label": "Plant a victory roar",
+              "next": "roar_end"
+            },
+            {
+              "label": "Slide back down on your bottom",
+              "next": "slide_end"
+            }
           ]
         },
         {
           "id": "roar_end",
-          "text": "Stand tall, beat your chest, and let out one giant ROAR. {toy} cheers from base camp.",
+          "text": "Stand tall, beat your chest, and let out one giant ROAR. {friend} cheers from base camp.",
           "action_slot": "cheering"
         },
         {
           "id": "slide_end",
-          "text": "Sit down on the top pillow and slide-tumble back to {toy}, giggling the whole way.",
+          "text": "Sit down on the top pillow and slide-tumble back to {friend}, giggling the whole way.",
           "action_slot": "running"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "sidekick",
+        "helper_townsperson"
+      ],
+      "recommended_themes": [
+        "adventure",
+        "knights"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_botanyjar_24",
       "title": "Build a pretend bug jar",
-      "buckets": ["afternoon"],
+      "buckets": [
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Find an empty cup, jar, or bowl to be your collecting jar.", "action_slot": "looking" },
-        { "text": "Tear paper into ten small pieces and crumple them into pretend leaves.", "action_slot": "thinking" },
-        { "text": "Drop the pretend leaves into the jar with {toy} as the field assistant.", "action_slot": "pointing" },
-        { "text": "Cut three tiny paper bugs — a beetle, a worm, a ladybug — and tuck them in.", "action_slot": "thinking" },
+        {
+          "text": "Find an empty cup, jar, or bowl to be your collecting jar.",
+          "action_slot": "looking"
+        },
+        {
+          "text": "Tear paper into ten small pieces and crumple them into pretend leaves.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Drop the pretend leaves into the jar with {friend} as the field assistant.",
+          "action_slot": "pointing"
+        },
+        {
+          "text": "Cut three tiny paper bugs — a beetle, a worm, a ladybug — and tuck them in.",
+          "action_slot": "thinking"
+        },
         {
           "id": "lid_pick",
           "text": "How will you cover the bug jar?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "A breathable paper-towel lid", "next": "paper_lid" },
-            { "label": "A plastic-wrap window lid", "next": "wrap_lid" }
+            {
+              "label": "A breathable paper-towel lid",
+              "next": "paper_lid"
+            },
+            {
+              "label": "A plastic-wrap window lid",
+              "next": "wrap_lid"
+            }
           ]
         },
         {
           "id": "paper_lid",
-          "text": "Tear a square of paper towel and rest it gently on top. Show {toy} how the bugs can breathe.",
+          "text": "Tear a square of paper towel and rest it gently on top. Show {friend} how the bugs can breathe.",
           "action_slot": "pointing"
         },
         {
           "id": "wrap_lid",
-          "text": "Lay a square of plastic wrap (or tissue paper) on top. Watch the bugs through the window with {toy}.",
+          "text": "Lay a square of plastic wrap (or tissue paper) on top. Watch the bugs through the window with {friend}.",
           "action_slot": "looking"
         }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "helper_townsperson"
+      ],
+      "recommended_themes": [
+        "animals",
+        "adventure"
       ]
     },
     {
       "id": "request_activity_soak_sockrace_25",
       "title": "Sock-ball relay race",
-      "buckets": ["morning", "afternoon"],
+      "buckets": [
+        "morning",
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Roll three pairs of clean socks into three soft balls in {room}.", "action_slot": "pointing" },
+        {
+          "text": "Roll three pairs of clean socks into three soft balls in {room}.",
+          "action_slot": "pointing"
+        },
         {
           "id": "course_choice",
           "text": "How should the relay course look?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Straight sprint to {toy}", "next": "sprint_path" },
-            { "label": "Zig-zag around pillow cones", "next": "zigzag_path" },
-            { "label": "Crawl-tunnel under a chair", "next": "crawl_path" }
+            {
+              "label": "Straight sprint to {friend}",
+              "next": "sprint_path"
+            },
+            {
+              "label": "Zig-zag around pillow cones",
+              "next": "zigzag_path"
+            },
+            {
+              "label": "Crawl-tunnel under a chair",
+              "next": "crawl_path"
+            }
           ]
         },
         {
           "id": "sprint_path",
-          "text": "Line the sock-balls up at the start. Carry one at a time to {toy} as fast as you can.",
+          "text": "Line the sock-balls up at the start. Carry one at a time to {friend} as fast as you can.",
           "action_slot": "running",
           "next": "count_results"
         },
         {
           "id": "zigzag_path",
-          "text": "Set three pillows in a zig-zag. Weave each sock-ball through to {toy}.",
+          "text": "Set three pillows in a zig-zag. Weave each sock-ball through to {friend}.",
           "action_slot": "running",
           "next": "count_results"
         },
@@ -894,25 +1692,53 @@
         },
         {
           "id": "count_results",
-          "text": "Count the sock-balls now sitting with {toy}. Cheer your finishing time.",
+          "text": "Count the sock-balls now sitting with {friend}. Cheer your finishing time.",
           "action_slot": "cheering"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "sidekick"
+      ],
+      "recommended_themes": [
+        "adventure",
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_dollhouse_26",
       "title": "Set up a one-room dollhouse",
-      "buckets": ["afternoon"],
+      "buckets": [
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Pick a shoebox, a drawer, or an open book as the dollhouse frame.", "action_slot": "looking" },
+        {
+          "text": "Pick a shoebox, a drawer, or an open book as the dollhouse frame.",
+          "action_slot": "looking"
+        },
         {
           "id": "room_pick",
           "text": "What kind of room is this?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "A cozy bedroom", "next": "bedroom_path" },
-            { "label": "A busy kitchen", "next": "kitchen_path" },
-            { "label": "A tiny art studio", "next": "studio_path" }
+            {
+              "label": "A cozy bedroom",
+              "next": "bedroom_path"
+            },
+            {
+              "label": "A busy kitchen",
+              "next": "kitchen_path"
+            },
+            {
+              "label": "A tiny art studio",
+              "next": "studio_path"
+            }
           ]
         },
         {
@@ -935,90 +1761,184 @@
         },
         {
           "id": "add_resident",
-          "text": "Move {toy} (or a small toy) into the room as the resident.",
+          "text": "Move {friend} (or a small toy) into the room as the resident.",
           "action_slot": "pointing",
           "next": "tour"
         },
         {
           "id": "tour",
-          "text": "Give a tour out loud — three things {toy} can see from inside.",
+          "text": "Give a tour out loud — three things {friend} can see from inside.",
           "action_slot": "pointing"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "helper_townsperson"
+      ],
+      "recommended_themes": [
+        "friendship",
+        "food"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_weatherjar_27",
       "title": "Make a {adjective} weather jar",
-      "buckets": ["afternoon"],
+      "buckets": [
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Find a clear cup or jar and a piece of cotton (or torn tissue) for clouds.", "action_slot": "looking" },
-        { "text": "Tear blue paper into tiny rain-drop scraps and a yellow paper sun.", "action_slot": "thinking" },
-        { "text": "Layer the cotton 'cloud' near the top, sun on one side, rain scraps below.", "action_slot": "thinking" },
+        {
+          "text": "Find a clear cup or jar and a piece of cotton (or torn tissue) for clouds.",
+          "action_slot": "looking"
+        },
+        {
+          "text": "Tear blue paper into tiny rain-drop scraps and a yellow paper sun.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Layer the cotton 'cloud' near the top, sun on one side, rain scraps below.",
+          "action_slot": "thinking"
+        },
         {
           "id": "weather_kind",
           "text": "What kind of weather is brewing in this jar?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "A bright sunny day", "next": "sunny_end" },
-            { "label": "A big thunderstorm", "next": "storm_end" }
+            {
+              "label": "A bright sunny day",
+              "next": "sunny_end"
+            },
+            {
+              "label": "A big thunderstorm",
+              "next": "storm_end"
+            }
           ]
         },
         {
           "id": "sunny_end",
-          "text": "Push the sun to the front and the cloud to the side. Tell {toy} the picnic plan.",
+          "text": "Push the sun to the front and the cloud to the side. Tell {friend} the picnic plan.",
           "action_slot": "cheering"
         },
         {
           "id": "storm_end",
-          "text": "Push the cloud to the front. Tap the jar like raindrops while {toy} hides under a pillow umbrella.",
+          "text": "Push the cloud to the front. Tap the jar like raindrops while {friend} hides under a pillow umbrella.",
           "action_slot": "thinking"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "helper_townsperson"
+      ],
+      "recommended_themes": [
+        "weather",
+        "magic"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_libraryday_28",
       "title": "Set up a tiny lending library",
-      "buckets": ["afternoon"],
+      "buckets": [
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Stack five small books on a low shelf or floor patch with {toy}.", "action_slot": "pointing" },
-        { "text": "Make a paper sign that says LIBRARY and tape it above the stack.", "action_slot": "thinking" },
-        { "text": "Tear five paper squares as borrower cards — one per book.", "action_slot": "thinking" },
+        {
+          "text": "Stack five small books on a low shelf or floor patch with {helper_townsperson}.",
+          "action_slot": "pointing"
+        },
+        {
+          "text": "Make a paper sign that says LIBRARY and tape it above the stack.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Tear five paper squares as borrower cards — one per book.",
+          "action_slot": "thinking"
+        },
         {
           "id": "library_event",
           "text": "What special library event happens today?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "A read-aloud story hour", "next": "story_hour" },
-            { "label": "A best-cover-art contest", "next": "art_contest" }
+            {
+              "label": "A read-aloud story hour",
+              "next": "story_hour"
+            },
+            {
+              "label": "A best-cover-art contest",
+              "next": "art_contest"
+            }
           ]
         },
         {
           "id": "story_hour",
-          "text": "Pick one book, sit {toy} beside you, and read or tell the first page out loud.",
+          "text": "Pick one book, sit {helper_townsperson} beside you, and read or tell the first page out loud.",
           "action_slot": "pointing"
         },
         {
           "id": "art_contest",
-          "text": "Line the books up cover-out. Have {toy} pick the best cover and award it a paper ribbon.",
+          "text": "Line the books up cover-out. Have {helper_townsperson} pick the best cover and award it a paper ribbon.",
           "action_slot": "cheering"
         }
-      ]
+      ],
+      "required_roles": [
+        "helper_townsperson"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "friendship",
+        "magic"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_freezeframe_29",
       "title": "Freeze-frame photo studio",
-      "buckets": ["morning", "afternoon"],
+      "buckets": [
+        "morning",
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Stand in a clear corner of {room} with {toy} as the photographer.", "action_slot": "idle" },
-        { "text": "Pretend to hold up a camera and say 'CLICK' to start a pose.", "action_slot": "pointing" },
+        {
+          "text": "Stand in a clear corner of {room} with {friend} as the photographer.",
+          "action_slot": "idle"
+        },
+        {
+          "text": "Pretend to hold up a camera and say 'CLICK' to start a pose.",
+          "action_slot": "pointing"
+        },
         {
           "id": "pose_theme",
           "text": "What is the photo theme today?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Superhero poses", "next": "hero_path" },
-            { "label": "Animal poses", "next": "animal_path" },
-            { "label": "Funny-face poses", "next": "face_path" }
+            {
+              "label": "Superhero poses",
+              "next": "hero_path"
+            },
+            {
+              "label": "Animal poses",
+              "next": "animal_path"
+            },
+            {
+              "label": "Funny-face poses",
+              "next": "face_path"
+            }
           ]
         },
         {
@@ -1035,33 +1955,67 @@
         },
         {
           "id": "face_path",
-          "text": "Make three of the silliest faces you can. Freeze long enough for {toy} to 'click'.",
+          "text": "Make three of the silliest faces you can. Freeze long enough for {friend} to 'click'.",
           "action_slot": "confused",
           "next": "review"
         },
         {
           "id": "review",
-          "text": "Pretend to scroll through the photos with {toy} and pick the best one.",
+          "text": "Pretend to scroll through the photos with {friend} and pick the best one.",
           "action_slot": "thinking"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "trickster"
+      ],
+      "recommended_themes": [
+        "silly",
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_origamisearch_30",
       "title": "Origami treasure quest",
-      "buckets": ["afternoon"],
+      "buckets": [
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Sit at a flat surface with paper, {toy}, and a calm minute.", "action_slot": "idle" },
-        { "text": "Fold a paper square diagonally to make a triangle.", "action_slot": "thinking" },
-        { "text": "Fold the two side corners up to meet at the top — that's a paper boat-ish shape.", "action_slot": "thinking" },
-        { "text": "Open the bottom flap and pinch into a small cup.", "action_slot": "thinking" },
+        {
+          "text": "Sit at a flat surface with paper, {friend}, and a calm minute.",
+          "action_slot": "idle"
+        },
+        {
+          "text": "Fold a paper square diagonally to make a triangle.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Fold the two side corners up to meet at the top — that's a paper boat-ish shape.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Open the bottom flap and pinch into a small cup.",
+          "action_slot": "thinking"
+        },
         {
           "id": "treasure_kind",
           "text": "What goes in your origami cup?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Three small treasures from {room}", "next": "treasure_path" },
-            { "label": "A folded paper note for {toy}", "next": "note_path" }
+            {
+              "label": "Three small treasures from {room}",
+              "next": "treasure_path"
+            },
+            {
+              "label": "A folded paper note for {friend}",
+              "next": "note_path"
+            }
           ]
         },
         {
@@ -1078,54 +2032,115 @@
         },
         {
           "id": "present",
-          "text": "Hold the cup with two hands and present it to {toy} like a royal gift.",
+          "text": "Hold the cup with two hands and present it to {friend} like a royal gift.",
           "action_slot": "cheering"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "quest_giver"
+      ],
+      "recommended_themes": [
+        "adventure",
+        "magic"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_bodypartbalance_31",
       "title": "Balance {count} {prop} on your {body_part}",
-      "buckets": ["morning", "afternoon"],
+      "buckets": [
+        "morning",
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Find {count} small flat-ish things — books, coasters, paper plates — and a stretch of clear floor.", "action_slot": "looking" },
-        { "text": "Stand still in {room} with {toy} watching from a safe spot.", "action_slot": "idle" },
-        { "text": "Practice balancing the first item on your {body_part} for a count of three.", "action_slot": "thinking" },
+        {
+          "text": "Find {count} small flat-ish things — books, coasters, paper plates — and a stretch of clear floor.",
+          "action_slot": "looking"
+        },
+        {
+          "text": "Stand still in {room} with {friend} watching from a safe spot.",
+          "action_slot": "idle"
+        },
+        {
+          "text": "Practice balancing the first item on your {body_part} for a count of three.",
+          "action_slot": "thinking"
+        },
         {
           "id": "stack_or_walk",
           "text": "Now what? Stack more, or take a walk?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Stack all {count} in place", "next": "stack_path" },
-            { "label": "Walk one step at a time", "next": "walk_path" }
+            {
+              "label": "Stack all {count} in place",
+              "next": "stack_path"
+            },
+            {
+              "label": "Walk one step at a time",
+              "next": "walk_path"
+            }
           ]
         },
         {
           "id": "stack_path",
-          "text": "Add the items one by one to your {body_part}. Hold steady until {toy} counts to {count}.",
+          "text": "Add the items one by one to your {body_part}. Hold steady until {friend} counts to {count}.",
           "action_slot": "cheering"
         },
         {
           "id": "walk_path",
-          "text": "Take {count} slow steps with one item on your {body_part}. {toy} cheers each step.",
+          "text": "Take {count} slow steps with one item on your {body_part}. {friend} cheers each step.",
           "action_slot": "running"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "sidekick"
+      ],
+      "recommended_themes": [
+        "silly",
+        "adventure"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_actionverbchain_32",
       "title": "{count}-step {action_verb} chain",
-      "buckets": ["morning", "afternoon"],
+      "buckets": [
+        "morning",
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Stand in {room} with {toy} as the chain leader.", "action_slot": "pointing" },
-        { "text": "Pick a starting spot and {action_verb} once in place.", "action_slot": "jumping" },
+        {
+          "text": "Stand in {room} with {friend} as the chain leader.",
+          "action_slot": "pointing"
+        },
+        {
+          "text": "Pick a starting spot and {action_verb} once in place.",
+          "action_slot": "jumping"
+        },
         {
           "id": "chain_pattern",
           "text": "What pattern does the chain follow?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Straight line, {count} times", "next": "line_chain" },
-            { "label": "Big circle around {toy}", "next": "circle_chain" }
+            {
+              "label": "Straight line, {count} times",
+              "next": "line_chain"
+            },
+            {
+              "label": "Big circle around {friend}",
+              "next": "circle_chain"
+            }
           ]
         },
         {
@@ -1136,38 +2151,72 @@
         },
         {
           "id": "circle_chain",
-          "text": "{action_verb} {count} times in a circle around {toy}. Each one in a new spot on the loop.",
+          "text": "{action_verb} {count} times in a circle around {friend}. Each one in a new spot on the loop.",
           "action_slot": "running",
           "next": "finish"
         },
         {
           "id": "finish",
-          "text": "Bow to {toy} and shout the number out loud — {count}!",
+          "text": "Bow to {friend} and shout the number out loud — {count}!",
           "action_slot": "cheering"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "sidekick"
+      ],
+      "recommended_themes": [
+        "adventure",
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_propchaintale_33",
       "title": "{prop} chain through {room}",
-      "buckets": ["afternoon"],
+      "buckets": [
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Pick a starting {prop} and place it on the floor in one corner of {room}.", "action_slot": "pointing" },
-        { "text": "Find a second prop-like object and lay it beside the first, just touching.", "action_slot": "looking" },
-        { "text": "Keep adding objects in a long line — anything small and safe — for {count} pieces.", "action_slot": "thinking" },
-        { "text": "Walk slowly along the line beside {toy} and name each object out loud.", "action_slot": "pointing" },
+        {
+          "text": "Pick a starting {prop} and place it on the floor in one corner of {room}.",
+          "action_slot": "pointing"
+        },
+        {
+          "text": "Find a second prop-like object and lay it beside the first, just touching.",
+          "action_slot": "looking"
+        },
+        {
+          "text": "Keep adding objects in a long line — anything small and safe — for {count} pieces.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Walk slowly along the line beside {friend} and name each object out loud.",
+          "action_slot": "pointing"
+        },
         {
           "id": "chain_use",
           "text": "What is the chain for?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "A path for {toy} to walk", "next": "walk_end" },
-            { "label": "A long story-line", "next": "story_end" }
+            {
+              "label": "A path for {friend} to walk",
+              "next": "walk_end"
+            },
+            {
+              "label": "A long story-line",
+              "next": "story_end"
+            }
           ]
         },
         {
           "id": "walk_end",
-          "text": "Carry {toy} along the chain in tiny hops, stopping once at every object.",
+          "text": "Carry {friend} along the chain in tiny hops, stopping once at every object.",
           "action_slot": "jumping"
         },
         {
@@ -1175,34 +2224,64 @@
           "text": "Make up a one-sentence chapter for each object as you walk past. End with the last object as the big twist.",
           "action_slot": "thinking"
         }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "helper_townsperson"
+      ],
+      "recommended_themes": [
+        "adventure",
+        "magic"
       ]
     },
     {
       "id": "request_activity_soak_countingsetup_34",
       "title": "{count} stations of {adjective} stuff",
-      "buckets": ["afternoon"],
+      "buckets": [
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Pick {count} flat spots in {room} — corners, chairs, books on the floor.", "action_slot": "looking" },
-        { "text": "At each spot, place one object that feels {adjective}.", "action_slot": "pointing" },
-        { "text": "Walk {toy} from station to station and touch each object once.", "action_slot": "thinking" },
+        {
+          "text": "Pick {count} flat spots in {room} — corners, chairs, books on the floor.",
+          "action_slot": "looking"
+        },
+        {
+          "text": "At each spot, place one object that feels {adjective}.",
+          "action_slot": "pointing"
+        },
+        {
+          "text": "Walk {friend} from station to station and touch each object once.",
+          "action_slot": "thinking"
+        },
         {
           "id": "station_game",
           "text": "What do we do at the stations?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Spin once at each", "next": "spin_path" },
-            { "label": "Whisper a secret at each", "next": "whisper_path" },
-            { "label": "Strike a pose at each", "next": "pose_path" }
+            {
+              "label": "Spin once at each",
+              "next": "spin_path"
+            },
+            {
+              "label": "Whisper a secret at each",
+              "next": "whisper_path"
+            },
+            {
+              "label": "Strike a pose at each",
+              "next": "pose_path"
+            }
           ]
         },
         {
           "id": "spin_path",
-          "text": "Spin one full turn at each station with {toy} held high.",
+          "text": "Spin one full turn at each station with {friend} held high.",
           "action_slot": "jumping"
         },
         {
           "id": "whisper_path",
-          "text": "Lean in and whisper one secret to {toy} at each station.",
+          "text": "Lean in and whisper one secret to {friend} at each station.",
           "action_slot": "thinking"
         },
         {
@@ -1210,21 +2289,46 @@
           "text": "Strike a different pose at each station and freeze for two seconds.",
           "action_slot": "cheering"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "sidekick"
+      ],
+      "recommended_themes": [
+        "silly",
+        "adventure"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_actionverbcraft_35",
       "title": "Craft something to {action_verb} with",
-      "buckets": ["afternoon"],
+      "buckets": [
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Pick a paper, a tube, or a sock — your craft needs to help you {action_verb}.", "action_slot": "thinking" },
+        {
+          "text": "Pick a paper, a tube, or a sock — your craft needs to help you {action_verb}.",
+          "action_slot": "thinking"
+        },
         {
           "id": "design_pick",
           "text": "How will the craft work?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "A {prop}-style tool", "next": "prop_tool" },
-            { "label": "A wearable on your {body_part}", "next": "wearable_tool" }
+            {
+              "label": "A {prop}-style tool",
+              "next": "prop_tool"
+            },
+            {
+              "label": "A wearable on your {body_part}",
+              "next": "wearable_tool"
+            }
           ]
         },
         {
@@ -1241,161 +2345,322 @@
         },
         {
           "id": "test",
-          "text": "Use your new craft to {action_verb} three times in front of {toy}.",
+          "text": "Use your new craft to {action_verb} three times in front of {friend}.",
           "action_slot": "running"
         },
-        { "text": "Bow. Tell {toy} what to call this invention.", "action_slot": "cheering" }
-      ]
+        {
+          "text": "Bow. Tell {friend} what to call this invention.",
+          "action_slot": "cheering"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "sidekick"
+      ],
+      "recommended_themes": [
+        "adventure",
+        "knights"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_bodypartmuseum_36",
       "title": "Museum of {body_part} prints",
-      "buckets": ["afternoon"],
+      "buckets": [
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Lay paper down in {room}. {toy} is the curator.", "action_slot": "idle" },
-        { "text": "Press your {body_part} gently on a damp paper towel, then onto the dry paper to leave a print.", "action_slot": "thinking" },
-        { "text": "Make {count} prints in a row across the page.", "action_slot": "thinking" },
+        {
+          "text": "Lay paper down in {room}. {guide_mentor} is the curator.",
+          "action_slot": "idle"
+        },
+        {
+          "text": "Press your {body_part} gently on a damp paper towel, then onto the dry paper to leave a print.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Make {count} prints in a row across the page.",
+          "action_slot": "thinking"
+        },
         {
           "id": "label_style",
           "text": "How do we label the museum prints?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "With numbers 1 to {count}", "next": "numbers_end" },
-            { "label": "With invented monster names", "next": "monsters_end" }
+            {
+              "label": "With numbers 1 to {count}",
+              "next": "numbers_end"
+            },
+            {
+              "label": "With invented monster names",
+              "next": "monsters_end"
+            }
           ]
         },
         {
           "id": "numbers_end",
-          "text": "Write a number under each print. Walk {toy} along the gallery and read each number aloud.",
+          "text": "Write a number under each print. Walk {guide_mentor} along the gallery and read each number aloud.",
           "action_slot": "pointing"
         },
         {
           "id": "monsters_end",
-          "text": "Invent a silly monster name for each print and write or whisper it to {toy}.",
+          "text": "Invent a silly monster name for each print and write or whisper it to {guide_mentor}.",
           "action_slot": "cheering"
         }
-      ]
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "helper_townsperson"
+      ],
+      "recommended_themes": [
+        "silly",
+        "animals"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_propparade_37",
-      "title": "Parade of {count} {prop} for {toy}",
-      "buckets": ["morning", "afternoon"],
+      "title": "Parade of {count} {prop} for {quest_giver}",
+      "buckets": [
+        "morning",
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Gather {count} prop-style objects in a pile in {room}.", "action_slot": "pointing" },
-        { "text": "Sit {toy} on a chair as the royal audience.", "action_slot": "thinking" },
+        {
+          "text": "Gather {count} prop-style objects in a pile in {room}.",
+          "action_slot": "pointing"
+        },
+        {
+          "text": "Sit {quest_giver} on a chair as the royal audience.",
+          "action_slot": "thinking"
+        },
         {
           "id": "parade_kind",
           "text": "What kind of parade is this?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Loud and marchy", "next": "march_path" },
-            { "label": "Slow and graceful", "next": "graceful_path" }
+            {
+              "label": "Loud and marchy",
+              "next": "march_path"
+            },
+            {
+              "label": "Slow and graceful",
+              "next": "graceful_path"
+            }
           ]
         },
         {
           "id": "march_path",
-          "text": "Hold each prop high and march past {toy} stamping your feet. Cycle through all {count}.",
+          "text": "Hold each prop high and march past {quest_giver} stamping your feet. Cycle through all {count}.",
           "action_slot": "running",
           "next": "salute"
         },
         {
           "id": "graceful_path",
-          "text": "Hold each prop with two hands and glide past {toy} on tip-toe. Cycle through all {count}.",
+          "text": "Hold each prop with two hands and glide past {quest_giver} on tip-toe. Cycle through all {count}.",
           "action_slot": "thinking",
           "next": "salute"
         },
         {
           "id": "salute",
-          "text": "Stack the props in front of {toy} and give a royal salute.",
+          "text": "Stack the props in front of {quest_giver} and give a royal salute.",
           "action_slot": "cheering"
         }
-      ]
+      ],
+      "required_roles": [
+        "quest_giver"
+      ],
+      "optional_roles": [
+        "friend",
+        "helper_townsperson"
+      ],
+      "recommended_themes": [
+        "knights",
+        "music"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_adjectivedrawing_38",
       "title": "Draw {count} {adjective} pictures",
-      "buckets": ["afternoon", "evening"],
+      "buckets": [
+        "afternoon",
+        "evening"
+      ],
       "steps": [
-        { "text": "Tear a sheet of paper into {count} smaller squares. Sit beside {toy}.", "action_slot": "idle" },
-        { "text": "On the first square, draw something that looks {adjective}.", "action_slot": "thinking" },
-        { "text": "On the second, draw something else that looks {adjective} — but in a different way.", "action_slot": "thinking" },
-        { "text": "Keep going until all {count} squares are full of {adjective} pictures.", "action_slot": "thinking" },
+        {
+          "text": "Tear a sheet of paper into {count} smaller squares. Sit beside {friend}.",
+          "action_slot": "idle"
+        },
+        {
+          "text": "On the first square, draw something that looks {adjective}.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "On the second, draw something else that looks {adjective} — but in a different way.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Keep going until all {count} squares are full of {adjective} pictures.",
+          "action_slot": "thinking"
+        },
         {
           "id": "display_choice",
           "text": "How do we display the pictures?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Tape them in a long row", "next": "row_end" },
-            { "label": "Fan them out around {toy}", "next": "fan_end" }
+            {
+              "label": "Tape them in a long row",
+              "next": "row_end"
+            },
+            {
+              "label": "Fan them out around {friend}",
+              "next": "fan_end"
+            }
           ]
         },
         {
           "id": "row_end",
-          "text": "Tape the squares in a long row on a wall or floor. Walk {toy} along like a gallery tour.",
+          "text": "Tape the squares in a long row on a wall or floor. Walk {friend} along like a gallery tour.",
           "action_slot": "pointing"
         },
         {
           "id": "fan_end",
-          "text": "Fan the squares around {toy} in a half-circle. Spin slowly and call out which one is the {adjective}-est.",
+          "text": "Fan the squares around {friend} in a half-circle. Spin slowly and call out which one is the {adjective}-est.",
           "action_slot": "cheering"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "helper_townsperson"
+      ],
+      "recommended_themes": [
+        "silly",
+        "magic"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_roomsoundmap_39",
       "title": "Sound map of {room}",
-      "buckets": ["always"],
+      "buckets": [
+        "always"
+      ],
       "steps": [
-        { "text": "Sit very still in the middle of {room} with {toy} and a pencil.", "action_slot": "idle" },
-        { "text": "Close your eyes for ten quiet seconds and listen.", "action_slot": "sleeping" },
-        { "text": "Open your eyes. Tell {toy} {count} sounds you heard.", "action_slot": "thinking" },
-        { "text": "Draw a quick map of {room} with a tiny picture for each sound's source.", "action_slot": "thinking" },
+        {
+          "text": "Sit very still in the middle of {room} with {friend} and a pencil.",
+          "action_slot": "idle"
+        },
+        {
+          "text": "Close your eyes for ten quiet seconds and listen.",
+          "action_slot": "sleeping"
+        },
+        {
+          "text": "Open your eyes. Tell {friend} {count} sounds you heard.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Draw a quick map of {room} with a tiny picture for each sound's source.",
+          "action_slot": "thinking"
+        },
         {
           "id": "next_step",
           "text": "What should the sound map become?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "A bedtime quiet-list", "next": "quiet_end" },
-            { "label": "A scavenger checklist", "next": "scavenger_end" }
+            {
+              "label": "A bedtime quiet-list",
+              "next": "quiet_end"
+            },
+            {
+              "label": "A scavenger checklist",
+              "next": "scavenger_end"
+            }
           ]
         },
         {
           "id": "quiet_end",
-          "text": "Cross out the loudest sound. Whisper a goodnight to each remaining one with {toy}.",
+          "text": "Cross out the loudest sound. Whisper a goodnight to each remaining one with {friend}.",
           "action_slot": "sleeping"
         },
         {
           "id": "scavenger_end",
-          "text": "Tip-toe to each sound's source and tap it once. {toy} keeps score on the map.",
+          "text": "Tip-toe to each sound's source and tap it once. {friend} keeps score on the map.",
           "action_slot": "looking"
         }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "guide_mentor"
+      ],
+      "recommended_themes": [
+        "weather",
+        "animals"
       ]
     },
     {
       "id": "request_activity_soak_propandbody_40",
       "title": "Move a {prop} using only your {body_part}",
-      "buckets": ["morning", "afternoon"],
+      "buckets": [
+        "morning",
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Pick a small soft prop — a sock, a paper ball, a small pillow.", "action_slot": "looking" },
-        { "text": "Set the prop on the floor in {room}. {toy} watches from the side.", "action_slot": "pointing" },
+        {
+          "text": "Pick a small soft prop — a sock, a paper ball, a small pillow.",
+          "action_slot": "looking"
+        },
+        {
+          "text": "Set the prop on the floor in {room}. {friend} watches from the side.",
+          "action_slot": "pointing"
+        },
         {
           "id": "challenge",
           "text": "How tricky should this be?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Roll it across the floor", "next": "roll_path" },
-            { "label": "Lift it onto a chair", "next": "lift_path" },
-            { "label": "Balance it then move", "next": "balance_path" }
+            {
+              "label": "Roll it across the floor",
+              "next": "roll_path"
+            },
+            {
+              "label": "Lift it onto a chair",
+              "next": "lift_path"
+            },
+            {
+              "label": "Balance it then move",
+              "next": "balance_path"
+            }
           ]
         },
         {
           "id": "roll_path",
-          "text": "Use only your {body_part} to roll the prop across {room} to {toy}.",
+          "text": "Use only your {body_part} to roll the prop across {room} to {friend}.",
           "action_slot": "thinking"
         },
         {
           "id": "lift_path",
-          "text": "Use only your {body_part} to lift the prop onto a chair near {toy}. No hands cheating!",
+          "text": "Use only your {body_part} to lift the prop onto a chair near {friend}. No hands cheating!",
           "action_slot": "thinking"
         },
         {
@@ -1403,80 +2668,155 @@
           "text": "Balance the prop on your {body_part}, then move three steps without dropping it.",
           "action_slot": "thinking"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "sidekick"
+      ],
+      "recommended_themes": [
+        "silly",
+        "adventure"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_quicktidy_41",
-      "title": "Three-thing tidy with {toy}",
-      "buckets": ["always"],
+      "title": "Three-thing tidy with {helper_townsperson}",
+      "buckets": [
+        "always"
+      ],
       "steps": [
         {
           "id": "pick_zone",
           "text": "Pick one tidy mission for {room}.",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Three soft things to a basket", "next": "soft_end" },
-            { "label": "Three books to a shelf", "next": "books_end" }
+            {
+              "label": "Three soft things to a basket",
+              "next": "soft_end"
+            },
+            {
+              "label": "Three books to a shelf",
+              "next": "books_end"
+            }
           ]
         },
         {
           "id": "soft_end",
-          "text": "Find {count} soft things and carry them to a basket. {toy} cheers each one home.",
+          "text": "Find {count} soft things and carry them to a basket. {helper_townsperson} cheers each one home.",
           "action_slot": "running"
         },
         {
           "id": "books_end",
-          "text": "Find {count} stray books and slot them onto a shelf. {toy} reads the title aloud each time.",
+          "text": "Find {count} stray books and slot them onto a shelf. {helper_townsperson} reads the title aloud each time.",
           "action_slot": "pointing"
         }
-      ]
+      ],
+      "required_roles": [
+        "helper_townsperson"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "friendship",
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_minismile_42",
-      "title": "Make {toy} smile in three steps",
-      "buckets": ["always"],
+      "title": "Make {friend} smile in three steps",
+      "buckets": [
+        "always"
+      ],
       "steps": [
-        { "text": "Sit knee-to-knee with {toy} in {room}.", "action_slot": "idle" },
+        {
+          "text": "Sit knee-to-knee with {friend} in {room}.",
+          "action_slot": "idle"
+        },
         {
           "id": "smile_pick",
           "text": "How do we earn a smile?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Tell a one-line joke", "next": "joke_end" },
-            { "label": "Do a wiggle dance", "next": "dance_end" }
+            {
+              "label": "Tell a one-line joke",
+              "next": "joke_end"
+            },
+            {
+              "label": "Do a wiggle dance",
+              "next": "dance_end"
+            }
           ]
         },
         {
           "id": "joke_end",
-          "text": "Tell {toy} the silliest one-line joke you know. Wait for the giggle.",
+          "text": "Tell {friend} the silliest one-line joke you know. Wait for the giggle.",
           "action_slot": "cheering"
         },
         {
           "id": "dance_end",
-          "text": "Wiggle your whole body for ten counts. {toy}'s smile is your prize.",
+          "text": "Wiggle your whole body for ten counts. {friend}'s smile is your prize.",
           "action_slot": "jumping"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "trickster"
+      ],
+      "recommended_themes": [
+        "silly",
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_quickfind_43",
       "title": "Find {count} round things",
-      "buckets": ["always"],
+      "buckets": [
+        "always"
+      ],
       "steps": [
-        { "text": "Stand in the doorway of {room} with {toy} on alert.", "action_slot": "looking" },
-        { "text": "Look around and call out the first round thing you spot.", "action_slot": "pointing" },
+        {
+          "text": "Stand in the doorway of {room} with {friend} on alert.",
+          "action_slot": "looking"
+        },
+        {
+          "text": "Look around and call out the first round thing you spot.",
+          "action_slot": "pointing"
+        },
         {
           "id": "carry_or_count",
           "text": "What now?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Bring all {count} to {toy}", "next": "carry_end" },
-            { "label": "Just count them aloud", "next": "count_end" }
+            {
+              "label": "Bring all {count} to {friend}",
+              "next": "carry_end"
+            },
+            {
+              "label": "Just count them aloud",
+              "next": "count_end"
+            }
           ]
         },
         {
           "id": "carry_end",
-          "text": "Pick up {count} round things and pile them in front of {toy}. Take a bow.",
+          "text": "Pick up {count} round things and pile them in front of {friend}. Take a bow.",
           "action_slot": "cheering"
         },
         {
@@ -1484,82 +2824,178 @@
           "text": "Point at each round thing and count out loud until you reach {count}.",
           "action_slot": "pointing"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "sidekick"
+      ],
+      "recommended_themes": [
+        "adventure",
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_minisort_44",
       "title": "Sort the sock drawer",
-      "buckets": ["morning"],
+      "buckets": [
+        "morning"
+      ],
       "steps": [
-        { "text": "Empty a sock drawer (or a sock pile) onto the floor of {room}.", "action_slot": "pointing" },
+        {
+          "text": "Empty a sock drawer (or a sock pile) onto the floor of {room}.",
+          "action_slot": "pointing"
+        },
         {
           "id": "sort_rule",
           "text": "How do we sort the socks?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "By matching pairs", "next": "pairs_end" },
-            { "label": "By rainbow color order", "next": "rainbow_end" }
+            {
+              "label": "By matching pairs",
+              "next": "pairs_end"
+            },
+            {
+              "label": "By rainbow color order",
+              "next": "rainbow_end"
+            }
           ]
         },
         {
           "id": "pairs_end",
-          "text": "Match each sock to its twin. Roll each pair into a ball and stack them up. {toy} keeps the count.",
+          "text": "Match each sock to its twin. Roll each pair into a ball and stack them up. {helper_townsperson} keeps the count.",
           "action_slot": "thinking"
         },
         {
           "id": "rainbow_end",
-          "text": "Line the socks up in rainbow order — red, orange, yellow, green, blue, purple. Show {toy} the streak.",
+          "text": "Line the socks up in rainbow order — red, orange, yellow, green, blue, purple. Show {helper_townsperson} the streak.",
           "action_slot": "cheering"
         }
-      ]
+      ],
+      "required_roles": [
+        "helper_townsperson"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "friendship",
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_minicraft_45",
       "title": "Three-fold paper hat",
-      "buckets": ["always"],
+      "buckets": [
+        "always"
+      ],
       "steps": [
-        { "text": "Take one sheet of paper. Sit beside {toy}.", "action_slot": "idle" },
-        { "text": "Fold the paper in half across the long way, then fold the top corners down to the center.", "action_slot": "thinking" },
+        {
+          "text": "Take one sheet of paper. Sit beside {friend}.",
+          "action_slot": "idle"
+        },
+        {
+          "text": "Fold the paper in half across the long way, then fold the top corners down to the center.",
+          "action_slot": "thinking"
+        },
         {
           "id": "hat_finish",
           "text": "How does the hat finish?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Wear it as a sailor hat", "next": "sailor_end" },
-            { "label": "Flip it for a wizard hat", "next": "wizard_end" }
+            {
+              "label": "Wear it as a sailor hat",
+              "next": "sailor_end"
+            },
+            {
+              "label": "Flip it for a wizard hat",
+              "next": "wizard_end"
+            }
           ]
         },
         {
           "id": "sailor_end",
-          "text": "Fold the bottom flaps up. Pop the hat open and put it on. Salute {toy}.",
+          "text": "Fold the bottom flaps up. Pop the hat open and put it on. Salute {friend}.",
           "action_slot": "cheering"
         },
         {
           "id": "wizard_end",
-          "text": "Stand the hat tall like a cone and balance it on your head. Wave a pretend wand at {toy}.",
+          "text": "Stand the hat tall like a cone and balance it on your head. Wave a pretend wand at {friend}.",
           "action_slot": "waving"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "sidekick"
+      ],
+      "recommended_themes": [
+        "pirates",
+        "magic"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_grandcastle_46",
-      "title": "Grand castle build with {toy}",
-      "buckets": ["afternoon"],
+      "title": "Grand castle build with {quest_giver}",
+      "buckets": [
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Clear a big rectangle of floor in {room}. {toy} is the royal architect.", "action_slot": "pointing" },
-        { "text": "Carry over four cushions for the foundation walls.", "action_slot": "looking" },
-        { "text": "Place the cushions in a hollow square. Step inside to test the size.", "action_slot": "thinking" },
-        { "text": "Add a row of books along the top of two cushions to make taller walls.", "action_slot": "thinking" },
-        { "text": "Drape a blanket across two walls as the throne-room roof.", "action_slot": "thinking" },
-        { "text": "Place a small stool or pile of pillows inside as the throne for {toy}.", "action_slot": "pointing" },
+        {
+          "text": "Clear a big rectangle of floor in {room}. {quest_giver} is the royal architect.",
+          "action_slot": "pointing"
+        },
+        {
+          "text": "Carry over four cushions for the foundation walls.",
+          "action_slot": "looking"
+        },
+        {
+          "text": "Place the cushions in a hollow square. Step inside to test the size.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Add a row of books along the top of two cushions to make taller walls.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Drape a blanket across two walls as the throne-room roof.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Place a small stool or pile of pillows inside as the throne for {quest_giver}.",
+          "action_slot": "pointing"
+        },
         {
           "id": "tower_pick",
           "text": "What kind of tower does the castle need?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "A tall watchtower", "next": "tall_tower" },
-            { "label": "A wide gatehouse", "next": "wide_gate" },
-            { "label": "A secret hidden tower", "next": "secret_tower" }
+            {
+              "label": "A tall watchtower",
+              "next": "tall_tower"
+            },
+            {
+              "label": "A wide gatehouse",
+              "next": "wide_gate"
+            },
+            {
+              "label": "A secret hidden tower",
+              "next": "secret_tower"
+            }
           ]
         },
         {
@@ -1588,29 +3024,70 @@
         },
         {
           "id": "ceremony",
-          "text": "Crown {toy} on the throne with a paper-strip crown and bow three times.",
+          "text": "Crown {quest_giver} on the throne with a paper-strip crown and bow three times.",
           "action_slot": "cheering"
         }
-      ]
+      ],
+      "required_roles": [
+        "quest_giver"
+      ],
+      "optional_roles": [
+        "friend",
+        "helper_townsperson"
+      ],
+      "recommended_themes": [
+        "knights",
+        "adventure"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_marketstall_47",
       "title": "Set up a make-believe market stall",
-      "buckets": ["afternoon"],
+      "buckets": [
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Pick a small table or low chair-back as your market counter.", "action_slot": "looking" },
-        { "text": "Tear paper into ten small price tags and set them in a stack.", "action_slot": "thinking" },
-        { "text": "Gather six pretend goods — fruit toys, blocks, paper-ball muffins, anything.", "action_slot": "pointing" },
-        { "text": "Arrange the goods in a tidy row across the counter.", "action_slot": "thinking" },
-        { "text": "Write or draw a price on each tag and place it in front of its goods.", "action_slot": "thinking" },
-        { "text": "Tape a paper sign above the counter with the stall's name.", "action_slot": "thinking" },
+        {
+          "text": "Pick a small table or low chair-back as your market counter.",
+          "action_slot": "looking"
+        },
+        {
+          "text": "Tear paper into ten small price tags and set them in a stack.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Gather six pretend goods — fruit toys, blocks, paper-ball muffins, anything.",
+          "action_slot": "pointing"
+        },
+        {
+          "text": "Arrange the goods in a tidy row across the counter.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Write or draw a price on each tag and place it in front of its goods.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Tape a paper sign above the counter with the stall's name.",
+          "action_slot": "thinking"
+        },
         {
           "id": "stall_special",
           "text": "What is the stall's specialty today?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Fresh-baked pretend bread", "next": "bread_path" },
-            { "label": "Hand-crafted paper jewels", "next": "jewel_path" }
+            {
+              "label": "Fresh-baked pretend bread",
+              "next": "bread_path"
+            },
+            {
+              "label": "Hand-crafted paper jewels",
+              "next": "jewel_path"
+            }
           ]
         },
         {
@@ -1627,36 +3104,79 @@
         },
         {
           "id": "first_sale",
-          "text": "{toy} comes to shop. Greet them, show three options, and wrap their pick in paper.",
+          "text": "{helper_townsperson} comes to shop. Greet them, show three options, and wrap their pick in paper.",
           "action_slot": "pointing",
           "next": "wave_off"
         },
         {
           "id": "wave_off",
-          "text": "Hand {toy} the package and wave goodbye. Count the pretend coins they 'paid'.",
+          "text": "Hand {helper_townsperson} the package and wave goodbye. Count the pretend coins they 'paid'.",
           "action_slot": "waving"
         }
-      ]
+      ],
+      "required_roles": [
+        "helper_townsperson"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "food",
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_paperboatregatta_48",
       "title": "Paper-boat regatta",
-      "buckets": ["afternoon"],
+      "buckets": [
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Find a sink, a bathtub, or a wide bowl of water. Bring two sheets of paper and {toy}.", "action_slot": "pointing" },
-        { "text": "Fold the first sheet in half the long way, then unfold.", "action_slot": "thinking" },
-        { "text": "Fold the top corners down to the center crease — that's the boat's nose.", "action_slot": "thinking" },
-        { "text": "Fold the bottom strips up on each side to make the boat's rim.", "action_slot": "thinking" },
-        { "text": "Pull the rim apart and pinch the bottom flat — your first boat is ready.", "action_slot": "cheering" },
-        { "text": "Repeat the folds with the second sheet to make boat number two.", "action_slot": "thinking" },
-        { "text": "Color the sails or hulls so the boats look different.", "action_slot": "thinking" },
+        {
+          "text": "Find a sink, a bathtub, or a wide bowl of water. Bring two sheets of paper and {friend}.",
+          "action_slot": "pointing"
+        },
+        {
+          "text": "Fold the first sheet in half the long way, then unfold.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Fold the top corners down to the center crease — that's the boat's nose.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Fold the bottom strips up on each side to make the boat's rim.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Pull the rim apart and pinch the bottom flat — your first boat is ready.",
+          "action_slot": "cheering"
+        },
+        {
+          "text": "Repeat the folds with the second sheet to make boat number two.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Color the sails or hulls so the boats look different.",
+          "action_slot": "thinking"
+        },
         {
           "id": "race_kind",
           "text": "What kind of race is this?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "First-to-the-other-side race", "next": "speed_race" },
-            { "label": "Most-loops-around race", "next": "loop_race" }
+            {
+              "label": "First-to-the-other-side race",
+              "next": "speed_race"
+            },
+            {
+              "label": "Most-loops-around race",
+              "next": "loop_race"
+            }
           ]
         },
         {
@@ -1673,29 +3193,69 @@
         },
         {
           "id": "winner",
-          "text": "Lift the winning boat out and present it to {toy}. Drip-dry it on a paper towel.",
+          "text": "Lift the winning boat out and present it to {friend}. Drip-dry it on a paper towel.",
           "action_slot": "cheering"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "sidekick"
+      ],
+      "recommended_themes": [
+        "pirates",
+        "weather"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_petsalon_49",
       "title": "Open a stuffed-pet salon",
-      "buckets": ["afternoon"],
+      "buckets": [
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Set out a brush, a small towel, and a paper-bow ribbon in {room}. {toy} is first in line.", "action_slot": "pointing" },
-        { "text": "Greet {toy} at the salon door and lead them to the towel mat.", "action_slot": "waving" },
-        { "text": "Brush {toy}'s fur (or fabric) gently in long strokes. Hum a salon song.", "action_slot": "thinking" },
-        { "text": "Pretend to wash {toy}'s ears with a small dab of pretend shampoo.", "action_slot": "thinking" },
-        { "text": "Pat {toy} dry with the towel. Spin them gently to check the look.", "action_slot": "thinking" },
+        {
+          "text": "Set out a brush, a small towel, and a paper-bow ribbon in {room}. {friend} is first in line.",
+          "action_slot": "pointing"
+        },
+        {
+          "text": "Greet {friend} at the salon door and lead them to the towel mat.",
+          "action_slot": "waving"
+        },
+        {
+          "text": "Brush {friend}'s fur (or fabric) gently in long strokes. Hum a salon song.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Pretend to wash {friend}'s ears with a small dab of pretend shampoo.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Pat {friend} dry with the towel. Spin them gently to check the look.",
+          "action_slot": "thinking"
+        },
         {
           "id": "style_pick",
-          "text": "What style does {toy} want today?",
+          "text": "What style does {friend} want today?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Fancy and floofy", "next": "floofy_path" },
-            { "label": "Sleek and shiny", "next": "sleek_path" },
-            { "label": "Wild and zigzaggy", "next": "wild_path" }
+            {
+              "label": "Fancy and floofy",
+              "next": "floofy_path"
+            },
+            {
+              "label": "Sleek and shiny",
+              "next": "sleek_path"
+            },
+            {
+              "label": "Wild and zigzaggy",
+              "next": "wild_path"
+            }
           ]
         },
         {
@@ -1718,37 +3278,83 @@
         },
         {
           "id": "mirror",
-          "text": "Hold {toy} up to a mirror (or pretend mirror) for the big reveal.",
+          "text": "Hold {friend} up to a mirror (or pretend mirror) for the big reveal.",
           "action_slot": "cheering",
           "next": "next_client"
         },
         {
           "id": "next_client",
-          "text": "Wave {toy} out the door and call the next pretend pet for an appointment.",
+          "text": "Wave {friend} out the door and call the next pretend pet for an appointment.",
           "action_slot": "waving"
         }
-      ]
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "helper_townsperson"
+      ],
+      "recommended_themes": [
+        "animals",
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     },
     {
       "id": "request_activity_soak_townmural_50",
       "title": "Paint a paper-town mural",
-      "buckets": ["afternoon"],
+      "buckets": [
+        "afternoon"
+      ],
       "steps": [
-        { "text": "Tape three sheets of paper edge-to-edge along a wall or floor strip in {room}.", "action_slot": "pointing" },
-        { "text": "Sit at one end with {toy} and a stack of crayons or markers.", "action_slot": "idle" },
-        { "text": "Draw a long horizontal line across all three sheets — that is the ground.", "action_slot": "thinking" },
-        { "text": "On the first sheet, draw two small houses with square windows.", "action_slot": "thinking" },
-        { "text": "On the second sheet, draw a park with three trees and a bench.", "action_slot": "thinking" },
-        { "text": "On the third sheet, draw a tall building or two — the downtown skyline.", "action_slot": "thinking" },
-        { "text": "Add roads connecting the buildings along the ground line.", "action_slot": "thinking" },
+        {
+          "text": "Tape three sheets of paper edge-to-edge along a wall or floor strip in {room}.",
+          "action_slot": "pointing"
+        },
+        {
+          "text": "Sit at one end with {friend} and a stack of crayons or markers.",
+          "action_slot": "idle"
+        },
+        {
+          "text": "Draw a long horizontal line across all three sheets — that is the ground.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "On the first sheet, draw two small houses with square windows.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "On the second sheet, draw a park with three trees and a bench.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "On the third sheet, draw a tall building or two — the downtown skyline.",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "Add roads connecting the buildings along the ground line.",
+          "action_slot": "thinking"
+        },
         {
           "id": "weather_in_town",
           "text": "What's the weather in your paper town?",
           "action_slot": "thinking",
           "choices": [
-            { "label": "Sunny day with clouds", "next": "sunny_town" },
-            { "label": "Rainy with puddles", "next": "rainy_town" },
-            { "label": "Snowy and quiet", "next": "snow_town" }
+            {
+              "label": "Sunny day with clouds",
+              "next": "sunny_town"
+            },
+            {
+              "label": "Rainy with puddles",
+              "next": "rainy_town"
+            },
+            {
+              "label": "Snowy and quiet",
+              "next": "snow_town"
+            }
           ]
         },
         {
@@ -1777,9 +3383,19 @@
         },
         {
           "id": "tour",
-          "text": "Walk {toy} from one end of the mural to the other. Tell the story of each piece.",
+          "text": "Walk {friend} from one end of the mural to the other. Tell the story of each piece.",
           "action_slot": "pointing"
         }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "helper_townsperson"
+      ],
+      "recommended_themes": [
+        "vehicles",
+        "weather"
       ]
     }
   ]
