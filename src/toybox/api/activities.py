@@ -1731,6 +1731,31 @@ def _resolve_template_step_index(
     return -1
 
 
+def _is_branch_destination_leaf(template_steps: Sequence[Any], step: Any) -> bool:
+    """A step is a "branch-destination leaf" iff some step in the same
+    template references its ``id`` via ``choices[*].next`` AND the step
+    itself has neither ``choices`` nor ``next``. Such steps terminate
+    on advance — implicit fall-through to ``steps[i+1]`` is wrong for
+    branch endings (would bleed one branch's outcome into another, e.g.
+    "save the cat" silently chaining into the "save the baby" outcome).
+    Templates that intentionally chain post-branch content do it via
+    explicit ``next`` (see the ``train_13`` mountain/beach/cookie merge
+    into ``tunnel``).
+    """
+    if step.id is None:
+        return False
+    if step.choices is not None or step.next is not None:
+        return False
+    target_id = step.id
+    for s in template_steps:
+        if s.choices is None:
+            continue
+        for _label, dest in s.choices:
+            if dest == target_id:
+                return True
+    return False
+
+
 def _insert_next_step(
     conn: sqlite3.Connection,
     *,
@@ -2049,6 +2074,15 @@ def post_advance(
             if t_step.id == target_step_id:
                 target_template_step = t_step
                 break
+    elif _is_branch_destination_leaf(template.steps, current_template_step):
+        # Rule 2.5: branch-destination leaves terminate. They have no
+        # outgoing edge of their own and are reached as the explicit
+        # target of some step's ``choices[*].next``; implicit fall-through
+        # to the next array entry is the wrong semantics here because
+        # the next entry is typically a SIBLING branch's ending.
+        if advance_body.choice_index is not None:
+            raise _bad_advance("choice_not_allowed", reason="current_step_is_terminal")
+        return _terminal_advance(conn, pubsub, activity_id, expected_version)
     elif current_template_index + 1 < len(template.steps):
         # Rule 3: fall through to next array position.
         if advance_body.choice_index is not None:

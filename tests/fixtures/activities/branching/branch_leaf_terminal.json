@@ -1,0 +1,31 @@
+{
+  "intent": "boredom",
+  "templates": [
+    {
+      "id": "fixture_branch_leaf_terminal",
+      "title": "Hero in {room}",
+      "buckets": ["always"],
+      "steps": [
+        {
+          "id": "fork",
+          "text": "{toy} sees two emergencies. Who do you save first?",
+          "action_slot": "thinking",
+          "choices": [
+            { "label": "The cat", "next": "cat_end" },
+            { "label": "The baby", "next": "baby_end" }
+          ]
+        },
+        {
+          "id": "cat_end",
+          "text": "You lift the cat down. Crowd cheers!",
+          "action_slot": "cheering"
+        },
+        {
+          "id": "baby_end",
+          "text": "You catch the stroller. Hero!",
+          "action_slot": "running"
+        }
+      ]
+    }
+  ]
+}

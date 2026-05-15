@@ -41,7 +41,10 @@ def valid_branching_dir(tmp_path: Path) -> Path:
     * open (choices: sneak | announce)
     * sneak (next: snack_ending)
     * announce (next: victory_ending)
-    * snack_ending (terminal in fall-through chain)
+    * snack_ending (reached via ``sneak.next`` — falls through to
+      victory_ending under Rule 3 because it's NOT a ``choices[*].next``
+      target. Branch-destination-leaf termination only applies to steps
+      reached via a ``choices[*].next`` edge, not via ``step.next``.)
     * victory_ending (last array entry — true terminal)
 
     Path A: open → sneak → snack_ending → (fall-through) → victory_ending → completed
@@ -302,6 +305,89 @@ def test_branching_signature_path_agnostic(
     assert sig_a == sig_b, (
         f"path-agnostic invariant broken: path A signature {sig_a!r} != "
         f"path B signature {sig_b!r}"
+    )
+    generator.clear_template_cache()
+
+
+@pytest.fixture
+def branch_leaf_terminal_dir(tmp_path: Path) -> Path:
+    """Stage the ``branch_leaf_terminal.json`` fixture, which mirrors
+    the ``request_play_soak_superhero_12`` shape: a choice step whose
+    targets (``cat_end``, ``baby_end``) are leaves with no ``next``,
+    and where ``cat_end`` is NOT the last array entry. Without the
+    Rule 2.5 fix, advancing past ``cat_end`` would fall through to
+    ``baby_end`` (the bug the user reported as "save the cat AND see
+    the baby ending"). With the fix, ``cat_end`` terminates the
+    activity right after the kid sees it.
+    """
+    fixture = (
+        Path(__file__).resolve().parents[1]
+        / "fixtures"
+        / "activities"
+        / "branching"
+        / "branch_leaf_terminal.json"
+    )
+    payload = fixture.read_text(encoding="utf-8")
+    staged = tmp_path / "templates"
+    staged.mkdir()
+    (staged / "boredom.json").write_text(payload, encoding="utf-8")
+    src_schema = (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "toybox"
+        / "activities"
+        / "templates"
+        / "_schema.json"
+    )
+    shutil.copy(src_schema, staged / "_schema.json")
+    return staged
+
+
+def test_branch_destination_leaf_terminates_no_fall_through(
+    client: TestClient,
+    parent_headers: dict[str, str],
+    db_path: Path,
+    branch_leaf_terminal_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression for the "save the cat → see the baby ending too" bug.
+
+    Picking choice 0 (``cat_end``) at the fork must terminate the
+    activity after ``cat_end`` is shown. The persisted rows must be
+    exactly ``["fork", "cat_end"]`` — NOT ``["fork", "cat_end",
+    "baby_end"]``. The activity state must be ``completed`` after the
+    advance past ``cat_end``.
+    """
+    from toybox.activities import generator
+
+    monkeypatch.setattr(generator, "TEMPLATES_DIR", branch_leaf_terminal_dir)
+    generator.clear_template_cache()
+
+    body = _propose(client, parent_headers, seed=11)
+    state = _approve(client, parent_headers, body["id"], body["version"])
+    # approved → running (renders fork at seq=1)
+    state = _advance(client, parent_headers, body["id"], state["version"])
+    # Pick "the cat" → inserts cat_end at seq=2
+    state = _advance(client, parent_headers, body["id"], state["version"], choice_index=0)
+    assert state["state"] == "running"
+    # Advance past cat_end → must terminate, NOT insert baby_end.
+    state = _advance(client, parent_headers, body["id"], state["version"])
+    assert state["state"] == "completed"
+
+    conn = connect(db_path, check_same_thread=False)
+    try:
+        rows = conn.execute(
+            "SELECT seq, step_template_id FROM activity_steps "
+            "WHERE activity_id = ? ORDER BY seq",
+            (body["id"],),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    template_path = [str(r["step_template_id"]) for r in rows]
+    assert template_path == ["fork", "cat_end"], (
+        f"branch destination leaf must terminate, got {template_path!r}; "
+        "fall-through into the sibling branch's ending is the bug."
     )
     generator.clear_template_cache()
 

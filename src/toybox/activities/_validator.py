@@ -43,13 +43,19 @@ def _step_outgoing(
     array_index: int,
     array_length: int,
     id_to_index: dict[str, int],
+    branch_destination_ids: frozenset[str],
 ) -> list[int]:
     """Return the array indices of every step ``step`` has an edge to.
 
-    Implements the four edge rules from the Phase G plan:
+    Implements the edge rules from the Phase G plan:
     1. ``choices`` → all ``choices[i].next`` targets.
     2. ``next`` → the single ``next`` target.
-    3. neither + not last in array → fall through to ``array_index + 1``.
+    2.5. branch-destination leaf (referenced by some ``choices[*].next``,
+         no ``next``/``choices`` of its own) → terminal. Without this
+         the implicit fall-through in rule 3 would bleed one branch's
+         ending into the next array entry (the sibling branch's ending).
+    3. neither + not last in array + not a branch destination → fall
+       through to ``array_index + 1``.
     4. neither + last in array → terminal (no outgoing edges).
 
     Targets that fail to resolve return an empty list — the
@@ -68,15 +74,38 @@ def _step_outgoing(
         if target_idx is None:
             return []
         return [target_idx]
+    if step.id is not None and step.id in branch_destination_ids:
+        return []
     if array_index + 1 < array_length:
         return [array_index + 1]
     return []
 
 
-def _is_terminal(step: Step, array_index: int, array_length: int) -> bool:
-    """A step is terminal iff it has neither outgoing-edge field set
-    AND is the last entry in the template's steps array."""
-    return step.choices is None and step.next is None and array_index + 1 == array_length
+def _is_terminal(
+    step: Step,
+    array_index: int,
+    array_length: int,
+    branch_destination_ids: frozenset[str],
+) -> bool:
+    """A step is terminal iff it has no outgoing edges under the
+    rules in :func:`_step_outgoing` — either it's the last array entry
+    with no ``next``/``choices``, or it's a branch-destination leaf."""
+    if step.choices is not None or step.next is not None:
+        return False
+    if array_index + 1 == array_length:
+        return True
+    return step.id is not None and step.id in branch_destination_ids
+
+
+def _collect_branch_destination_ids(steps: list[Step]) -> frozenset[str]:
+    """Step ids referenced by some step's ``choices[*].next``."""
+    out: set[str] = set()
+    for s in steps:
+        if s.choices is None:
+            continue
+        for choice in s.choices:
+            out.add(choice.next)
+    return frozenset(out)
 
 
 def validate_template_graph(template_id: str, steps: list[Step]) -> None:
@@ -147,6 +176,7 @@ def validate_template_graph(template_id: str, steps: list[Step]) -> None:
     # cannot create a cycle on its own, but combining it with `next`
     # back-edges can.
     array_length = len(steps)
+    branch_destination_ids = _collect_branch_destination_ids(steps)
     visited: set[int] = set()
     parents: dict[int, int | None] = {0: None}
     queue: deque[int] = deque([0])
@@ -161,7 +191,9 @@ def validate_template_graph(template_id: str, steps: list[Step]) -> None:
                 f"template {template_id!r}: cycle detected through {cycle_path}"
             )
         visited.add(idx)
-        for next_idx in _step_outgoing(steps[idx], idx, array_length, id_to_index):
+        for next_idx in _step_outgoing(
+            steps[idx], idx, array_length, id_to_index, branch_destination_ids
+        ):
             if next_idx not in visited and next_idx not in queue:
                 parents[next_idx] = idx
                 queue.append(next_idx)
@@ -183,7 +215,10 @@ def validate_template_graph(template_id: str, steps: list[Step]) -> None:
             )
 
     # ----- (e) at least one terminal reachable ------------------------------
-    if not any(_is_terminal(steps[idx], idx, array_length) for idx in visited):
+    if not any(
+        _is_terminal(steps[idx], idx, array_length, branch_destination_ids)
+        for idx in visited
+    ):
         # With the implicit-fall-through rule the last array entry
         # always satisfies (e), so this branch only fires if every
         # reached node has an outgoing edge — e.g. all steps use
