@@ -481,6 +481,8 @@ Per [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md), each
 
 **Flags:** `--reviewers full --start-cmd "uv run python -m toybox.main --host 127.0.0.1 --port 8000" --url "http://127.0.0.1:4000/child"`
 
+**Status:** DONE (2026-05-15) — code reviewers + frontend gates; visual evidence deferred to K17 + K18
+
 ### Step K13: Standalone intents (Surface A) wired into trigger registry
 
 **Problem:** Add `request_song` + `request_joke` patterns to `src/toybox/triggers/defaults.json` (bump pattern versions monotonically so version-merge picks them up on existing installs). Generators produce single-step activities from corpus. Parent suggestion card surfaces them like any other suggestion. Gated on `(<content_master> AND play_standalone_enabled)`. When surface or content disabled, `POST /api/activities/propose` returns `HTTP 200 {state: "dismissed", reason: "surface_disabled"}` and emits no `activity.state` envelope. Integration test asserts trigger phrase → propose → kiosk flow end-to-end with the surface flag both enabled and disabled.
