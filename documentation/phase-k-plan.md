@@ -517,6 +517,8 @@ Per [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md), each
 
 **Flags:** `--reviewers full --start-cmd "uv run python -m toybox.main --host 127.0.0.1 --port 8000" --url "http://127.0.0.1:4000/parent"`
 
+**Status:** DONE (2026-05-15) — code reviewers + frontend gates; visual evidence deferred to K17 + K18. Notable: all 4 interjection surfaces (endings, embedded, parent-insert, spontaneity) share K14's `build_interjection_step` single source of truth; spontaneity uses deterministic id-pinning test pattern to mitigate §8 risk #12 flakiness.
+
 ### Step K16: Catalog backfill — 200 templates to role-aware + themed + ending steps (soak)
 
 **Problem:** Overnight 4-agent soak (one agent per intent file: `boredom.json`, `request_play.json`, `request_story.json`, `request_activity.json` — 50 templates each). Each agent rewrites templates to declare `required_roles` + `recommended_themes` + use role placeholders + (where the agent decides appropriate) add `ending_step: {kind: "song"|"joke", auto: true}`. Each agent validates each template through `_validator.py`, reports a per-template pass/fail row. **Engine must be stable before this step** — any post-K5 schema change invalidates the soak output. Acceptance: 100% of templates pass `_validator.py`; manual spot-check on 5 per intent for narrative coherence; at least 60% of templates have an `ending_step` (engaging templates — rocket launch, pirate adventure, etc.; quiet story templates may not need one).
