@@ -469,6 +469,8 @@ Per [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md), each
 
 **Flags:** `--reviewers code`
 
+**Status:** DONE (2026-05-15) — manifest + loader + script shipped; audio render is one-shot operator action (run `python scripts/generate_song_corpus.py` once after `pip install TTS`); 50MB total-audio assertion deferred to K17 smoke gate per §8 risk #6
+
 ### Step K12: New step kinds in kiosk — SongPlayer + joke step delivery
 
 **Problem:** `StepCard.tsx` switches on `step.kind`. `kind: "song"` renders new `SongPlayer.tsx` (`<audio>` element with `playing/paused/done` state; next button enables on `onended`) — no Read Me button. `kind: "joke"` renders setup line, auto-plays via Web Speech, reveals punchline after a 1.5s pause + Web Speech delivery; Read Me button re-plays both lines on tap. Backward-compat: `kind: "text"` (default) renders as today plus K9 affordances. Existing `kind: "fork"` unchanged behavior plus K9 affordances. **When `songs_enabled` is false AND a song step is encountered, kiosk auto-advances silently to the next step** (no meta-message — interjection metadata makes the step transparent). Same for jokes.
