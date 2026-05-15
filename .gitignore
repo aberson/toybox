@@ -41,6 +41,12 @@ data/models/*
 # rule matches only directories.
 !data/models/lora/
 data/models/lora/*/
+# Phase K K10: ship the bundled joke corpus in git. The directory + JSON
+# file are operator-authored content (no binaries), so they belong in the
+# repo so a fresh clone + ``uv run python -m toybox.main`` works without
+# a separate "download corpus" step.
+!data/jokes/
+!data/jokes/jokes.json
 
 # Secrets / OAuth
 secrets.json

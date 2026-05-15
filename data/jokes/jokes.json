@@ -1,0 +1,479 @@
+[
+  {
+    "id": "why-chicken-crossed",
+    "setup": "Why did the chicken cross the road?",
+    "punchline": "To get to the other side!",
+    "theme": "silly",
+    "optional_toy_slot": false,
+    "age_band": "3-5",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "why-toy-crossed-road",
+    "setup": "Why did {toy} cross the playground?",
+    "punchline": "To get to the slide on the other side!",
+    "theme": "silly",
+    "optional_toy_slot": true,
+    "age_band": "3-5",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "knock-knock-boo",
+    "setup": "Knock knock! Who's there? Boo. Boo who?",
+    "punchline": "Don't cry, it's just a joke!",
+    "theme": "silly",
+    "optional_toy_slot": false,
+    "age_band": "3-5",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "knock-knock-lettuce",
+    "setup": "Knock knock! Who's there? Lettuce. Lettuce who?",
+    "punchline": "Lettuce in, it's freezing out here!",
+    "theme": "food",
+    "optional_toy_slot": false,
+    "age_band": "6-8",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "why-banana-doctor",
+    "setup": "Why did the banana go to the doctor?",
+    "punchline": "Because it wasn't peeling well!",
+    "theme": "food",
+    "optional_toy_slot": false,
+    "age_band": "3-5",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "what-cheese-not-yours",
+    "setup": "What do you call cheese that isn't yours?",
+    "punchline": "Nacho cheese!",
+    "theme": "food",
+    "optional_toy_slot": false,
+    "age_band": "6-8",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "pizza-bad-joke",
+    "setup": "I was going to tell a pizza joke, but...",
+    "punchline": "It was too cheesy.",
+    "theme": "food",
+    "optional_toy_slot": false,
+    "age_band": "9-12",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "toy-favorite-food",
+    "setup": "What is {toy}'s favorite snack?",
+    "punchline": "Anything you share!",
+    "theme": "food",
+    "optional_toy_slot": true,
+    "age_band": "3-5",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "space-rhyme-01",
+    "setup": "Why did the cow go to outer space?",
+    "punchline": "To see the moooon up close!",
+    "theme": "space",
+    "optional_toy_slot": false,
+    "age_band": "3-5",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "why-astronaut-party",
+    "setup": "Why didn't the astronaut come to the party?",
+    "punchline": "They needed a little space.",
+    "theme": "space",
+    "optional_toy_slot": false,
+    "age_band": "9-12",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "toy-on-the-moon",
+    "setup": "What does {toy} do on the moon?",
+    "punchline": "Bounce really, really high!",
+    "theme": "space",
+    "optional_toy_slot": true,
+    "age_band": "3-5",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "saturn-rings",
+    "setup": "Why does Saturn have so many rings?",
+    "punchline": "Because it really likes jewelry!",
+    "theme": "space",
+    "optional_toy_slot": false,
+    "age_band": "6-8",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "wizard-spell-toy",
+    "setup": "What spell did the wizard cast on {toy}?",
+    "punchline": "A giggle spell — and it worked!",
+    "theme": "magic",
+    "optional_toy_slot": true,
+    "age_band": "3-5",
+    "persona_compat": ["wizard", "princess"]
+  },
+  {
+    "id": "magic-wand-broken",
+    "setup": "Why was the magic wand sad?",
+    "punchline": "It lost its spark!",
+    "theme": "magic",
+    "optional_toy_slot": false,
+    "age_band": "3-5",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "wizard-laundry",
+    "setup": "How does a wizard do laundry?",
+    "punchline": "With a spin spell!",
+    "theme": "magic",
+    "optional_toy_slot": false,
+    "age_band": "6-8",
+    "persona_compat": ["wizard", "all"]
+  },
+  {
+    "id": "magic-mirror-truth",
+    "setup": "What did the magic mirror say to the wall?",
+    "punchline": "I reflect your good taste!",
+    "theme": "magic",
+    "optional_toy_slot": false,
+    "age_band": "9-12",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "pirate-letter",
+    "setup": "What's a pirate's favorite letter?",
+    "punchline": "You'd think it's R, but their first love is the C!",
+    "theme": "pirates",
+    "optional_toy_slot": false,
+    "age_band": "6-8",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "pirate-toy-treasure",
+    "setup": "Where does {toy} hide treasure?",
+    "punchline": "X marks the toy box!",
+    "theme": "pirates",
+    "optional_toy_slot": true,
+    "age_band": "3-5",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "pirate-shower",
+    "setup": "Why don't pirates take showers before they go to sea?",
+    "punchline": "They just wash up on shore!",
+    "theme": "pirates",
+    "optional_toy_slot": false,
+    "age_band": "9-12",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "pirate-math-pi",
+    "setup": "What's a pirate's favorite type of math?",
+    "punchline": "Pi-rate-ical!",
+    "theme": "pirates",
+    "optional_toy_slot": false,
+    "age_band": "9-12",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "knight-stomachache",
+    "setup": "Why did the knight have a stomach ache?",
+    "punchline": "Too much knight food!",
+    "theme": "knights",
+    "optional_toy_slot": false,
+    "age_band": "6-8",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "knight-toy-shining",
+    "setup": "Why does {toy} shine the armor every day?",
+    "punchline": "Because dull adventures are no fun!",
+    "theme": "knights",
+    "optional_toy_slot": true,
+    "age_band": "6-8",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "dragon-toothbrush",
+    "setup": "Why do dragons brush their teeth?",
+    "punchline": "To stop fire breath in the morning!",
+    "theme": "knights",
+    "optional_toy_slot": false,
+    "age_band": "3-5",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "castle-dance",
+    "setup": "How does a castle say hello?",
+    "punchline": "It gives you a stone-cold wave!",
+    "theme": "knights",
+    "optional_toy_slot": false,
+    "age_band": "9-12",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "elephant-fridge",
+    "setup": "How do you put an elephant in a fridge?",
+    "punchline": "Open the door, put it in, close the door!",
+    "theme": "animals",
+    "optional_toy_slot": false,
+    "age_band": "6-8",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "cat-piano",
+    "setup": "Why don't cats play piano?",
+    "punchline": "They prefer to play with the strings!",
+    "theme": "animals",
+    "optional_toy_slot": false,
+    "age_band": "6-8",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "toy-pet-dog",
+    "setup": "What kind of pet does {toy} want?",
+    "punchline": "A very tiny dinosaur!",
+    "theme": "animals",
+    "optional_toy_slot": true,
+    "age_band": "3-5",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "duck-bill",
+    "setup": "Why did the duck get in trouble at the restaurant?",
+    "punchline": "It tried to skip the bill!",
+    "theme": "animals",
+    "optional_toy_slot": false,
+    "age_band": "9-12",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "owl-late",
+    "setup": "What does an owl say when it's late?",
+    "punchline": "Whooo-rry up!",
+    "theme": "animals",
+    "optional_toy_slot": false,
+    "age_band": "6-8",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "car-tired",
+    "setup": "Why was the little car so tired?",
+    "punchline": "It was out of gas!",
+    "theme": "vehicles",
+    "optional_toy_slot": false,
+    "age_band": "3-5",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "bicycle-fall",
+    "setup": "Why couldn't the bicycle stand up?",
+    "punchline": "Because it was two-tired!",
+    "theme": "vehicles",
+    "optional_toy_slot": false,
+    "age_band": "6-8",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "toy-driving-school",
+    "setup": "What did {toy} learn in driving school?",
+    "punchline": "How to honk politely!",
+    "theme": "vehicles",
+    "optional_toy_slot": true,
+    "age_band": "3-5",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "rocket-meeting",
+    "setup": "Why was the rocket late to the meeting?",
+    "punchline": "It had to blast off some steam first!",
+    "theme": "vehicles",
+    "optional_toy_slot": false,
+    "age_band": "9-12",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "submarine-secret",
+    "setup": "How do submarines keep secrets?",
+    "punchline": "They keep everything down low!",
+    "theme": "vehicles",
+    "optional_toy_slot": false,
+    "age_band": "9-12",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "best-friend-toy",
+    "setup": "Why is {toy} the best friend?",
+    "punchline": "Because they always listen and never interrupt!",
+    "theme": "friendship",
+    "optional_toy_slot": true,
+    "age_band": "3-5",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "two-balloons",
+    "setup": "What did one balloon say to the other?",
+    "punchline": "You complete me, friend!",
+    "theme": "friendship",
+    "optional_toy_slot": false,
+    "age_band": "6-8",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "high-five-tree",
+    "setup": "What's the best way to high-five a tree?",
+    "punchline": "Give it a great big leaf-five!",
+    "theme": "friendship",
+    "optional_toy_slot": false,
+    "age_band": "3-5",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "toy-best-friend-quest",
+    "setup": "What did {toy} say when they found a new friend?",
+    "punchline": "Welcome to the adventure crew!",
+    "theme": "friendship",
+    "optional_toy_slot": true,
+    "age_band": "6-8",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "thunder-shy",
+    "setup": "Why was the thunder so shy?",
+    "punchline": "It didn't like being the loudest in the room!",
+    "theme": "weather",
+    "optional_toy_slot": false,
+    "age_band": "6-8",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "cloud-underwear",
+    "setup": "What does a cloud wear under its raincoat?",
+    "punchline": "Thunderwear!",
+    "theme": "weather",
+    "optional_toy_slot": false,
+    "age_band": "6-8",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "rainbow-pot",
+    "setup": "Why did the rainbow visit the bank?",
+    "punchline": "To check on its pot of gold!",
+    "theme": "weather",
+    "optional_toy_slot": false,
+    "age_band": "9-12",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "toy-rain-dance",
+    "setup": "What does {toy} do when it rains?",
+    "punchline": "Splash in every single puddle!",
+    "theme": "weather",
+    "optional_toy_slot": true,
+    "age_band": "3-5",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "drum-promotion",
+    "setup": "Why did the drum get a promotion?",
+    "punchline": "It really knows how to beat the competition!",
+    "theme": "music",
+    "optional_toy_slot": false,
+    "age_band": "9-12",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "piano-locked-out",
+    "setup": "Why did the piano get locked out of the house?",
+    "punchline": "It forgot its keys!",
+    "theme": "music",
+    "optional_toy_slot": false,
+    "age_band": "6-8",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "toy-favorite-song",
+    "setup": "What is {toy}'s favorite kind of music?",
+    "punchline": "Anything with a really good chorus!",
+    "theme": "music",
+    "optional_toy_slot": true,
+    "age_band": "3-5",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "guitar-quiet",
+    "setup": "Why was the guitar so quiet?",
+    "punchline": "It was just waiting for its solo!",
+    "theme": "music",
+    "optional_toy_slot": false,
+    "age_band": "6-8",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "mountain-laugh",
+    "setup": "How do mountains stay warm?",
+    "punchline": "They wear snow caps!",
+    "theme": "adventure",
+    "optional_toy_slot": false,
+    "age_band": "6-8",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "explorer-toy-quest",
+    "setup": "Where is {toy} exploring today?",
+    "punchline": "Behind the very curious couch cushions!",
+    "theme": "adventure",
+    "optional_toy_slot": true,
+    "age_band": "3-5",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "map-upside-down",
+    "setup": "Why was the map upside down?",
+    "punchline": "Because the adventurer was looking for down-under!",
+    "theme": "adventure",
+    "optional_toy_slot": false,
+    "age_band": "9-12",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "compass-friends",
+    "setup": "Why does the compass have so many friends?",
+    "punchline": "It always points them in the right direction!",
+    "theme": "adventure",
+    "optional_toy_slot": false,
+    "age_band": "6-8",
+    "persona_compat": ["all"]
+  },
+  {
+    "id": "detective-clue",
+    "setup": "Why did the detective bring a ladder to the case?",
+    "punchline": "They were looking for high clues!",
+    "theme": "silly",
+    "optional_toy_slot": false,
+    "age_band": "9-12",
+    "persona_compat": ["detective", "all"]
+  },
+  {
+    "id": "periodic-table-joke",
+    "setup": "Why are chemists great storytellers?",
+    "punchline": "Because they have all the right elements!",
+    "theme": "silly",
+    "optional_toy_slot": false,
+    "age_band": "9-12",
+    "persona_compat": ["periodic_table", "all"]
+  },
+  {
+    "id": "princess-tiara",
+    "setup": "Why did the princess wear two crowns?",
+    "punchline": "Because one is never enough for a royal day!",
+    "theme": "silly",
+    "optional_toy_slot": false,
+    "age_band": "6-8",
+    "persona_compat": ["princess", "all"]
+  }
+]
