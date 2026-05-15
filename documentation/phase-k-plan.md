@@ -406,6 +406,8 @@ Per [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md), each
 
 **Flags:** `--reviewers code`
 
+**Status:** DONE (2026-05-15)
+
 ### Step K7: Suggestion card — role labels + two re-roll buttons
 
 **Problem:** Parent suggestion card renders role assignments under the title ("Quest Giver: Wise Owl", "Hero: Captain Bear"). Two buttons: "New cast" calls `recastActivity`; "New activity" dismisses + calls `propose` with a fresh seed. Both wrap in `withConflictHandler`. Buttons greyed out when activity state ≠ `proposed`. Touch test via vitest; runtime smoke verifies the card renders + recast round-trips.
