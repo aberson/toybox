@@ -135,16 +135,24 @@ export function SuggestionCard(props: SuggestionCardProps): JSX.Element {
               match); we show a soft "no trigger" line in that case so
               parents don't see an empty section. ``persona_reasoning``
               is always populated by the backend (synthesised default
-              when the propose call didn't supply one). */}
+              when the propose call didn't supply one).
+
+              ``typeof === "string"`` (not ``!== null``) because activities
+              that arrive via the ``activity.state`` WS envelope have these
+              fields stripped as PII (api/activities.py:_emit_state), so
+              they reach the frontend as ``undefined`` rather than
+              ``null``. A plain ``!== null`` check would let undefined
+              through and the template literal would render the literal
+              string "undefined". (#111) */}
           <div data-testid="why-trigger" style={{ marginBottom: 4 }}>
             <strong>trigger:</strong>{" "}
-            {triggerPhrase !== null && triggerPhrase !== ""
+            {typeof triggerPhrase === "string" && triggerPhrase !== ""
               ? `"${triggerPhrase}"`
               : "(no trigger — proposed manually)"}
           </div>
           <div data-testid="why-persona" style={{ marginBottom: 4 }}>
             <strong>persona:</strong>{" "}
-            {personaReasoning !== null && personaReasoning !== ""
+            {typeof personaReasoning === "string" && personaReasoning !== ""
               ? personaReasoning
               : "matched on intent"}
           </div>

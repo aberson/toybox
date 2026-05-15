@@ -148,4 +148,43 @@ describe("SuggestionCard why-toggle", () => {
     expect(persona.textContent?.toLowerCase()).toContain("matched on intent");
   });
 
+  it("renders fallback for undefined trigger_phrase (WS-stripped envelope)", () => {
+    // Activities delivered through the ``activity.state`` WS envelope
+    // have ``trigger_phrase`` stripped as PII (api/activities.py:
+    // _emit_state). The field arrives as ``undefined`` rather than
+    // ``null``, so the guard must catch both forms. Regression cover
+    // for #111 — without this the panel renders the literal string
+    // "undefined" for every live (WS-delivered) suggestion.
+    render(
+      <SuggestionCard
+        activity={fakeActivity({ trigger_phrase: undefined })}
+        onApprove={async () => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("why-toggle"));
+    const trigger = screen.getByTestId("why-trigger");
+    expect(trigger.textContent?.toLowerCase()).toContain("no trigger");
+    expect(trigger.textContent?.toLowerCase()).not.toContain("undefined");
+  });
+
+  it("renders fallback for undefined persona_reasoning (WS-stripped envelope)", () => {
+    // Same shape as the trigger_phrase case — the WS envelope strips
+    // ``persona_reasoning`` alongside ``trigger_phrase``. Regression
+    // cover for #111.
+    render(
+      <SuggestionCard
+        activity={fakeActivity({ persona_reasoning: undefined })}
+        onApprove={async () => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("why-toggle"));
+    const persona = screen.getByTestId("why-persona");
+    expect(persona.textContent?.toLowerCase()).toContain("matched on intent");
+    expect(persona.textContent?.toLowerCase()).not.toContain("undefined");
+  });
+
 });
