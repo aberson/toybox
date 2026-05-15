@@ -24,6 +24,7 @@ import secrets
 import sqlite3
 import uuid
 from collections.abc import Iterator, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
@@ -31,9 +32,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ..activities.content_resolver import (
+    GenericDescriptor,
     ResolvedRoom,
     ResolvedToy,
     resolve_child_profiles,
+    resolve_role_slots,
     resolve_rooms,
     resolve_toys,
 )
@@ -52,6 +55,7 @@ from ..activities.generator import (
     render_with_slot_fills,
     resolve_dispatch,
 )
+from ..activities.roles import ROLE_DISPLAY_NAMES, Role
 from ..ai.judge import judge_and_persist
 from ..ai.labeled_events import (
     GENERATOR_PATH_CLAUDE,
@@ -235,6 +239,35 @@ class ActivityStepResponse(BaseModel):
     chosen_label: str | None = None
 
 
+class RoleAssignment(BaseModel):
+    """Phase K K5: one role slot's resolved filler.
+
+    Surfaced on :class:`ActivityResponse.roles` so the parent UI (K7)
+    can render the "cast list" panel without re-running the slot-fill
+    engine. Exactly ONE of ``toy_id`` / ``generic_descriptor`` is set:
+
+    * ``toy_id`` populated when the slot-fill engine assigned a real
+      catalog toy (``ResolvedToy``) — the kiosk can dereference the id
+      for the sprite, and ``display_name`` carries the toy's friendly
+      label.
+    * ``generic_descriptor`` populated when the toy pool was exhausted
+      before every ``optional_role`` slot could be filled by a real toy
+      — :data:`toybox.activities.generic_descriptors.GENERIC_DESCRIPTORS`
+      provides a fallback flavor string and ``display_name`` mirrors it
+      so renderers can use a single field for both branches.
+
+    The discriminator is the presence of one or the other; the kiosk's
+    sprite resolver short-circuits when ``toy_id is None``.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    role_name: str = Field(min_length=1)
+    toy_id: str | None = None
+    generic_descriptor: str | None = None
+    display_name: str = Field(min_length=1)
+
+
 class ActivityResponse(BaseModel):
     """Wire shape for an activity returned by the REST API."""
 
@@ -263,6 +296,18 @@ class ActivityResponse(BaseModel):
     # propose call didn't supply a trigger / persona rationale.
     trigger_phrase: str | None = None
     persona_reasoning: str | None = None
+    # Phase K K5: resolved role-slot assignments. Keyed by the lowercase
+    # snake_case :class:`Role` value (``"quest_giver"``). Always present;
+    # ``{}`` for templates with no ``required_roles`` / ``optional_roles``.
+    # The slot-fill engine (K4) populates this on propose; the recast
+    # endpoint (K6) and insert-joke/song endpoints (K15) may rewrite it.
+    roles: dict[str, RoleAssignment] = Field(default_factory=dict)
+    # Phase K K5: pre-rendered cast summary string for the parent UI's
+    # "What this looks like" panel (K7). Format:
+    # ``"Quest Giver: Wise Owl, Hero: Captain Bear"`` — sorted by role
+    # name for determinism, comma-separated. Empty string when ``roles``
+    # is empty.
+    cast_summary: str = ""
 
 
 class ProposeRequest(BaseModel):
@@ -704,6 +749,35 @@ def _row_to_response(
     raw_reasoning = metadata.get("persona_reasoning")
     if isinstance(raw_reasoning, str) and raw_reasoning:
         persona_reasoning = raw_reasoning
+    # Phase K K5: reconstruct the typed role-assignment list + cast
+    # summary from the persisted metadata envelope BEFORE we strip the
+    # K5 keys below. Defensive parsing so a malformed envelope (or a
+    # pre-K5 activity row) cleanly falls through to empty values — the
+    # wire schema's defaults handle both.
+    roles_map: dict[str, RoleAssignment] = {}
+    raw_role_records = metadata.get("role_assignments")
+    if isinstance(raw_role_records, list):
+        for entry in raw_role_records:
+            if not isinstance(entry, dict):
+                continue
+            role_name_raw = entry.get("role_name")
+            display_name_raw = entry.get("display_name")
+            if not isinstance(role_name_raw, str) or not role_name_raw:
+                continue
+            if not isinstance(display_name_raw, str) or not display_name_raw:
+                continue
+            toy_id_raw = entry.get("toy_id")
+            generic_raw = entry.get("generic_descriptor")
+            roles_map[role_name_raw] = RoleAssignment(
+                role_name=role_name_raw,
+                toy_id=str(toy_id_raw) if isinstance(toy_id_raw, str) and toy_id_raw else None,
+                generic_descriptor=(
+                    str(generic_raw) if isinstance(generic_raw, str) and generic_raw else None
+                ),
+                display_name=display_name_raw,
+            )
+    cast_summary_raw = metadata.get("cast_summary")
+    cast_summary = cast_summary_raw if isinstance(cast_summary_raw, str) else ""
     # Phase G G2 (iter-2): ``slot_fills`` is persistence-only telemetry
     # (the lazy advance handler in G3 reads it from
     # ``activities.slot_fills_json``, NOT from the wire) — no UI consumes
@@ -715,7 +789,19 @@ def _row_to_response(
     # one chokepoint covers both surfaces — the model_dump in
     # ``_emit_state`` sees the already-cleaned metadata, and there's no
     # second read path that bypasses ``_row_to_response``.
-    metadata = {k: v for k, v in metadata.items() if k != "slot_fills"}
+    # Phase K K5: ``role_assignments`` + ``cast_summary`` are persisted
+    # under ``metadata`` so a single envelope round-trips both the
+    # legacy fields and the new role state. Surfaced at the top level
+    # on the response via the dedicated ``roles`` / ``cast_summary``
+    # fields; stripped from ``metadata`` here so we don't duplicate the
+    # data on the wire (and so the WS envelope doesn't carry two copies
+    # of the role display names — one structured, one as the
+    # comma-separated string).
+    metadata = {
+        k: v
+        for k, v in metadata.items()
+        if k not in ("slot_fills", "role_assignments", "cast_summary")
+    }
 
     # Phase G G2.5: for proposed / approved activities, render the full
     # template step plan so the parent dashboard's suggestion card can
@@ -760,6 +846,8 @@ def _row_to_response(
         metadata=metadata,
         trigger_phrase=trigger_phrase,
         persona_reasoning=persona_reasoning,
+        roles=roles_map,
+        cast_summary=cast_summary,
     )
 
 
@@ -969,6 +1057,153 @@ def _build_persona_reasoning(
         if isinstance(display_name, str) and display_name:
             return f"{display_name} picked for {intent}"
     return "matched on intent"
+
+
+def _load_persona_role_weights(
+    conn: sqlite3.Connection, persona_id: str | None
+) -> dict[str, float]:
+    """Phase K K5: fetch ``personas.role_weights`` JSON for the propose path.
+
+    Returns an empty mapping when:
+
+    * ``persona_id`` is ``None`` (no persona pinned and the library is empty).
+    * The persona row is absent (caller pinned an id that doesn't exist —
+      treated as "no preference" rather than raising; matches the broader
+      "propose never 500s on missing data" contract).
+    * The persisted JSON is NULL, empty, or malformed.
+
+    Mapping keys are role-name strings (lowercase snake_case
+    :class:`~toybox.activities.roles.Role` values); unknown keys are NOT
+    filtered here — the K4 picker silently ignores them, and a defensive
+    filter would mask a stale schema-validation regression.
+    """
+    if persona_id is None:
+        return {}
+    try:
+        row = conn.execute(
+            "SELECT role_weights FROM personas WHERE id = ?",
+            (persona_id,),
+        ).fetchone()
+    except sqlite3.Error:
+        _logger.warning(
+            "role_weights read failed for persona %r; treating as uniform",
+            persona_id,
+            exc_info=True,
+        )
+        return {}
+    if row is None:
+        return {}
+    raw = row["role_weights"]
+    if not raw:
+        return {}
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        _logger.warning(
+            "role_weights JSON malformed for persona %r; treating as uniform",
+            persona_id,
+        )
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    out: dict[str, float] = {}
+    for key, value in payload.items():
+        if not isinstance(key, str):
+            continue
+        if isinstance(value, bool):
+            # ``bool`` is a subtype of ``int``; reject explicitly so a
+            # ``True``/``False`` weight doesn't masquerade as 1.0/0.0.
+            continue
+        if isinstance(value, int | float):
+            out[key] = float(value)
+    return out
+
+
+@dataclass(frozen=True, slots=True)
+class _PersonaForRoleSlots:
+    """Minimal :class:`~toybox.activities.content_resolver._PersonaLike`
+    implementation used by :func:`_do_propose` to call
+    :func:`toybox.activities.content_resolver.resolve_role_slots`.
+
+    The picker reads only ``id`` + ``role_weights``; using a frozen
+    dataclass here (instead of constructing a Pydantic
+    :class:`~toybox.personas.models.RoleWeights`) keeps the K5 wire-up
+    isolated from the loader's strict validation path. K4's picker is
+    already defensive against unknown keys / non-numeric values.
+    """
+
+    id: str
+    role_weights: dict[str, float]
+
+
+def _build_role_assignments(
+    role_slot_result: dict[str, Any] | None,
+) -> tuple[dict[str, str], list[dict[str, Any]], str]:
+    """Phase K K5: translate :func:`resolve_role_slots` output for persistence.
+
+    Returns ``(slot_fills_overlay, role_records, cast_summary)`` where:
+
+    * ``slot_fills_overlay`` — dict keyed by lowercase role-name, value
+      is the resolved ``display_name``. Merged into the existing
+      ``slot_fills`` map so :func:`render_with_slot_fills` substitutes
+      ``{role_name}`` placeholders with the right string.
+    * ``role_records`` — list of plain-dict ``RoleAssignment`` rows the
+      caller stashes onto the activity's metadata envelope. Each carries
+      ``role_name`` (str), ``toy_id`` (str | None), ``generic_descriptor``
+      (str | None), and ``display_name`` (str). Exactly one of ``toy_id``
+      and ``generic_descriptor`` is set — the discriminator the wire
+      :class:`RoleAssignment` model enforces.
+    * ``cast_summary`` — comma-separated
+      ``"<RoleDisplay>: <DisplayName>"`` string sorted by role-name
+      (``role.value``) for determinism. Empty when no roles resolved.
+
+    Returns three empty values when ``role_slot_result`` is ``None`` or
+    empty (template has no roles, or eligibility gate rejected it).
+    """
+    slot_fills_overlay: dict[str, str] = {}
+    role_records: list[dict[str, Any]] = []
+    if not role_slot_result:
+        return slot_fills_overlay, role_records, ""
+
+    # Sort by role-name for deterministic ordering on the wire.
+    for role_name in sorted(role_slot_result.keys()):
+        value = role_slot_result[role_name]
+        if isinstance(value, GenericDescriptor):
+            display_name = value.display_name
+            record = {
+                "role_name": role_name,
+                "toy_id": None,
+                "generic_descriptor": display_name,
+                "display_name": display_name,
+            }
+        else:
+            # ``ResolvedToy`` — duck-typed read so a future shape change
+            # doesn't require an import cycle here.
+            display_name = str(value.display_name)
+            toy_id = str(value.id)
+            record = {
+                "role_name": role_name,
+                "toy_id": toy_id,
+                "generic_descriptor": None,
+                "display_name": display_name,
+            }
+        slot_fills_overlay[role_name] = display_name
+        role_records.append(record)
+
+    summary_pieces: list[str] = []
+    for record in role_records:
+        role_name = str(record["role_name"])
+        try:
+            role_enum = Role(role_name)
+            display_label = ROLE_DISPLAY_NAMES[role_enum]
+        except (ValueError, KeyError):
+            # An unknown role-name string would mean K4 returned a key
+            # outside the taxonomy — taxonomy-completeness tests gate
+            # that, but defend the rendering anyway with the raw key.
+            display_label = role_name
+        summary_pieces.append(f"{display_label}: {record['display_name']}")
+    cast_summary = ", ".join(summary_pieces)
+    return slot_fills_overlay, role_records, cast_summary
 
 
 def _pick_random_library_persona(conn: sqlite3.Connection) -> dict[str, Any] | None:
@@ -1335,6 +1570,63 @@ def _do_propose(
             available_rooms=resolved_rooms,
             resolved_children=resolved_children,
         )
+    # Phase K K5: role-slot resolution. When the picked template
+    # declared ``required_roles`` or ``optional_roles`` at K3 schema
+    # extension time, resolve them now via K4's slot-fill engine and
+    # merge the per-role display names into the activity's slot_fills
+    # so :func:`render_with_slot_fills` substitutes ``{role_name}``
+    # placeholders in step text. The resolved cast (structured form,
+    # role-name → resolved toy id OR generic descriptor) lands on the
+    # activity's metadata envelope so :func:`_row_to_response` can
+    # surface ``ActivityResponse.roles`` + ``cast_summary``.
+    #
+    # Best-effort: a missing template (renamed between propose runs)
+    # or a no-roles template short-circuits silently — the legacy
+    # ``{toy}`` substitution path stays the load-bearing fill for the
+    # 200 pre-K templates.
+    role_slot_overlay: dict[str, str] = {}
+    role_records: list[dict[str, Any]] = []
+    cast_summary = ""
+    template_for_roles = find_template_by_id(activity.template_id)
+    if template_for_roles is not None and (
+        template_for_roles.required_roles or template_for_roles.optional_roles
+    ):
+        role_weights = _load_persona_role_weights(conn, effective_persona_id)
+        persona_for_picker = _PersonaForRoleSlots(
+            id=effective_persona_id or "",
+            role_weights=role_weights,
+        )
+        try:
+            role_slot_result = resolve_role_slots(
+                template_for_roles,
+                resolved_toys,
+                persona_for_picker,
+                body.seed,
+            )
+        except Exception:  # noqa: BLE001 -- defense: role-slot bug must not break propose
+            _logger.warning(
+                "resolve_role_slots failed for template %r; skipping role wire-up",
+                activity.template_id,
+                exc_info=True,
+            )
+            role_slot_result = None
+        else:
+            # ``None`` from a clean return means the eligibility gate
+            # rejected the template (required_roles > toy pool). The
+            # legacy ``{toy}`` substitution stays in place, but role
+            # placeholders will echo literally — that's the design
+            # fallback for an undersized household; future iterations
+            # (K6 recast) re-pick. Log so operators can grep occurrences
+            # and re-tune the toy pool.
+            if role_slot_result is None:
+                _logger.warning(
+                    "resolve_role_slots eligibility-gate rejected template %r "
+                    "(required_roles count exceeds available toy pool); "
+                    "step text will retain role placeholders literally",
+                    activity.template_id,
+                )
+        role_slot_overlay, role_records, cast_summary = _build_role_assignments(role_slot_result)
+
     session_id = _ensure_session(conn, body.session_id)
 
     # Evict oldest first so the configured cap holds for the new row.
@@ -1417,6 +1709,38 @@ def _do_propose(
         slot_fills_arg: dict[str, str] = {str(k): str(v) for k, v in raw_slot_fills.items()}
     else:
         slot_fills_arg = {}
+    # Phase K K5: merge the role-name → display-name overlay so
+    # ``render_with_slot_fills`` resolves ``{quest_giver}`` etc. The
+    # overlay never collides with legacy slot names (role values are
+    # snake_case role taxonomy entries, never ``toy``/``slot``/the
+    # SlotRegistry word-list names). Also re-render step bodies +
+    # choice labels NOW so the persisted ``activity_steps`` row carries
+    # the substituted text — the generator ran without role context so
+    # its initial render left the placeholders intact.
+    if role_slot_overlay:
+        slot_fills_arg.update(role_slot_overlay)
+        # Re-render every step's body + choice labels with the merged
+        # slot fills. The generator already substituted legacy slots;
+        # this pass picks up the newly-merged role names.
+        for step_record, original_step in zip(steps, activity.steps, strict=True):
+            step_record["body"] = render_with_slot_fills(original_step.text, slot_fills_arg)
+            if original_step.choices_rendered is not None:
+                step_record["choices_rendered"] = tuple(
+                    render_with_slot_fills(label, slot_fills_arg)
+                    for label in original_step.choices_rendered
+                )
+    if role_records:
+        # Stash on the persisted metadata envelope so ``_row_to_response``
+        # can reconstruct ``ActivityResponse.roles`` + ``cast_summary``
+        # on every read (REST GET, WS ``activity.state`` envelope).
+        metadata["role_assignments"] = role_records
+        metadata["cast_summary"] = cast_summary
+        # Re-encode summary_payload now that metadata changed.
+        summary_payload = {
+            "title": activity.title,
+            "metadata": metadata,
+            "template_id": activity.template_id,
+        }
     _persist_activity(
         conn,
         activity_id=activity.id,
@@ -2600,6 +2924,7 @@ __all__ = [
     "ProposeRequest",
     "ProposedListResponse",
     "RegenerateRequest",
+    "RoleAssignment",
     "STATE_APPROVED",
     "STATE_COMPLETED",
     "STATE_DIDNT_WORK",

@@ -21,6 +21,20 @@ export interface ActivityStep {
   current: boolean;
 }
 
+/**
+ * Phase K K5: one resolved cast member on an activity. Surfaced on
+ * ``Activity.roles`` keyed by the lowercase snake_case role name
+ * ("quest_giver", "friend", ...). Exactly one of ``toy_id`` /
+ * ``generic_descriptor`` is set; ``display_name`` is the rendered
+ * label both the kiosk and parent UI use as a single field.
+ */
+export interface RoleAssignment {
+  role_name: string;
+  toy_id: string | null;
+  generic_descriptor: string | null;
+  display_name: string;
+}
+
 export interface Activity {
   id: string;
   state: ActivityState;
@@ -43,6 +57,14 @@ export interface Activity {
   // the field is null only on pre-step-23 activities.
   trigger_phrase: string | null;
   persona_reasoning: string | null;
+  // Phase K K5: resolved role-slot cast (keyed by lowercase role name).
+  // Optional + may be {} for pre-K5 activities or templates with no
+  // declared roles. The parent UI's K7 "cast list" panel reads this.
+  roles?: Record<string, RoleAssignment>;
+  // Phase K K5: comma-separated cast summary
+  // ("Quest Giver: Wise Owl, Friend: Captain Bear"). Optional + may be
+  // "" when ``roles`` is empty.
+  cast_summary?: string;
 }
 
 export interface VersionConflictBody {

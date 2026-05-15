@@ -85,6 +85,7 @@ from .content_resolver import (
 )
 from .feedback import Candidate, compute_signature, consult_and_select
 from .models import Activity, ActivityStep, Step, Template
+from .roles import Role
 from .slots import SIGNATURE_CONTRIBUTING_SLOTS, SlotRegistry
 from .time_of_day import ALWAYS_BUCKET, hour_bucket, is_eligible
 
@@ -136,6 +137,16 @@ class _Template:
     title: str
     buckets: frozenset[str]
     steps: tuple[_StepTemplate, ...]
+    # Phase K K5: surface the K3 role declarations on the cached
+    # dataclass so the propose path (api/activities.py) can call
+    # :func:`toybox.activities.content_resolver.resolve_role_slots`
+    # after :func:`generate` picks a template. Default to empty tuples
+    # so the 200 existing branching templates (which omit the fields)
+    # parse unchanged. Source of truth for the role taxonomy is
+    # :class:`toybox.activities.roles.Role`; we store the enum members
+    # directly (not strings) so the picker doesn't have to re-coerce.
+    required_roles: tuple[Role, ...] = ()
+    optional_roles: tuple[Role, ...] = ()
 
 
 # Cache: (templates_dir, intent) -> list of loaded templates.
@@ -235,6 +246,12 @@ def _parse_template(raw: dict[str, Any], *, source: str = "<inline>") -> _Templa
         title=str(raw["title"]),
         buckets=frozenset(raw.get("buckets", []) or []),
         steps=tuple(parsed_steps),
+        # Phase K K5: copy the K3 role declarations off the Pydantic
+        # template model (already validated above). ``Template.model_validate``
+        # coerces JSON strings to :class:`Role` members so the dataclass
+        # stores enum values directly.
+        required_roles=tuple(template_model.required_roles),
+        optional_roles=tuple(template_model.optional_roles),
     )
 
 

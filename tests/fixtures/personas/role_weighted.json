@@ -1,0 +1,22 @@
+{
+  "id": "role_weighted_fixture",
+  "display_name": "Role Weighted Fixture Persona",
+  "archetype": "custom",
+  "system_prompt": "Test-only persona for the Phase K K5 propose-path integration test. Pins role_weights so the slot-fill picker is byte-deterministic.",
+  "avatar_image_path": "library/avatars/role_weighted_fixture.png",
+  "behavior_tags": ["test", "k5"],
+  "age_range_min": 3,
+  "age_range_max": 10,
+  "language": "en",
+  "source": "library",
+  "default_voice_tone": "neutral",
+  "role_weights": {
+    "quest_giver": 2.0,
+    "friend": 2.0
+  },
+  "voice_profile": null,
+  "spontaneity_rates": {
+    "jokes": 0.0,
+    "songs": 0.0
+  }
+}

@@ -64,6 +64,21 @@ export interface ActivityStep {
   choices?: ChoiceOption[] | null;
 }
 
+/**
+ * Phase K K5: one resolved cast member on an activity. The kiosk's
+ * persona-avatar / sprite resolvers do NOT yet consume this shape
+ * (K7 wires the parent UI cast panel; the kiosk currently keeps
+ * rendering the activity-level toy_ids sprite). Declared on the
+ * Activity interface for completeness so a future kiosk cast-aware
+ * sprite swap can compile.
+ */
+export interface RoleAssignment {
+  role_name: string;
+  toy_id: string | null;
+  generic_descriptor: string | null;
+  display_name: string;
+}
+
 export interface Activity {
   id: string;
   state: ActivityState;
@@ -85,6 +100,13 @@ export interface Activity {
   // shape may not expose this yet for pre-F7 callers; missing/empty
   // → no sprite, same as today.
   toy_ids?: string[];
+  // Phase K K5: resolved role-slot cast (keyed by lowercase role name).
+  // Optional + may be {} for pre-K5 activities or templates with no
+  // declared roles.
+  roles?: Record<string, RoleAssignment>;
+  // Phase K K5: comma-separated cast summary string. Optional + may be
+  // "" when ``roles`` is empty.
+  cast_summary?: string;
 }
 
 export interface VersionConflictBody {

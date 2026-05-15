@@ -1,0 +1,23 @@
+{
+  "intent": "boredom",
+  "templates": [
+    {
+      "id": "fixture_role_required_quest",
+      "title": "A quest for {quest_giver} and {friend}",
+      "buckets": ["always"],
+      "required_roles": ["quest_giver", "friend"],
+      "optional_roles": [],
+      "steps": [
+        {
+          "text": "{quest_giver} hands {friend} a tiny scroll with a clue inside."
+        },
+        {
+          "text": "{friend} reads the clue out loud — it points to a hidden treat."
+        },
+        {
+          "text": "{quest_giver} cheers as {friend} finds the spot and celebrates."
+        }
+      ]
+    }
+  ]
+}
