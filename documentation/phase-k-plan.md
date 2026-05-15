@@ -430,6 +430,8 @@ Per [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md), each
 
 **Flags:** `--reviewers full --start-cmd "uv run python -m toybox.main --host 127.0.0.1 --port 8000" --url "http://127.0.0.1:4000/child"`
 
+**Status:** DONE (2026-05-15) — code reviewers + frontend gates; visual evidence deferred to K17 + K18
+
 ### Step K9: Click-to-read — word-level taps + Read Me button
 
 **Problem:** Two new components, two distinct affordances, no gesture-disambiguation needed:
