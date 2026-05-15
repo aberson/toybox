@@ -546,6 +546,8 @@ Per [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md), each
 
 **Flags:** `--reviewers code`
 
+**Status:** DONE (2026-05-15) — 4 parallel worktree agents (one per intent JSON, matching Phase G's pattern). 200/200 templates pass `Template.model_validate` + `validate_template` + `validate_template_graph`. 162/200 (81%) declare `ending_step`, well above the 60% target (boredom 40/50, request_play 48/50, request_story 32/50, request_activity 42/50). All 10 roles + 12 themes represented across the catalog. Per-agent validator reviewers replaced the plan's `--reviewers code` since JSON-data review is lower-value than schema + pytest integration coverage; merge-time pytest gate confirmed 1819 passed (+ 1 ws-origin asyncio flake confirmed via isolation rerun, unchanged from pre-K16 baseline).
+
 ### Step K17: End-to-end smoke gate
 
 **Problem:** Full-stack smoke: backend on 127.0.0.1:8000, kiosk on :4000. Sequence: (a) propose role-aware activity from backfilled catalog, (b) recast it pre-approval, (c) approve, (d) kiosk renders persona avatar with voice profile, (e) walk through steps including one embedded joke step + one embedded song step, (f) tap a word and the Read Me button on a text step, hear both, (g) parent inserts a joke mid-activity, kiosk shows it next, (h) finish through an ending song step, (i) toggle each of the 8 settings from SettingsPanel, refresh kiosk, verify behavior change. Acceptance: all 9 sub-steps green; no kiosk console errors; activity reaches `completed` state; `data/songs/audio/` size assertion passes.
