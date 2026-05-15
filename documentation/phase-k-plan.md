@@ -548,6 +548,32 @@ Per [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md), each
 
 **Status:** DONE (2026-05-15) — 4 parallel worktree agents (one per intent JSON, matching Phase G's pattern). 200/200 templates pass `Template.model_validate` + `validate_template` + `validate_template_graph`. 162/200 (81%) declare `ending_step`, well above the 60% target (boredom 40/50, request_play 48/50, request_story 32/50, request_activity 42/50). All 10 roles + 12 themes represented across the catalog. Per-agent validator reviewers replaced the plan's `--reviewers code` since JSON-data review is lower-value than schema + pytest integration coverage; merge-time pytest gate confirmed 1819 passed (+ 1 ws-origin asyncio flake confirmed via isolation rerun, unchanged from pre-K16 baseline).
 
+### Step K16b: Catalog expansion — 800 new role-aware + themed templates (16-agent soak)
+
+**Problem:** Net new branching catalog content. 16 parallel agents (4 per intent file × 50 templates each) author new templates with the K3 role/theme/ending_step shape from day one (no retrofit). Per-intent agent slots use disjoint numeric suffix ranges (`_051..100`, `_101..150`, `_151..200`, `_201..250`) to guarantee zero id collisions; topic words can overlap across agents since the numeric suffix breaks ties. Each agent writes its 50 new templates to a provisional file `_k16b_<intent>_<letter>.json` (bare JSON array) in its worktree; orchestrator reads each provisional file, concats into the production intent JSON, and commits one merged update per intent. Final state: 200 → 1000 branching templates (5× scale-up). Acceptance: 100% pass `Template.model_validate` + `validate_template` + `validate_template_graph`; 0 id collisions; per-intent ending_step rate ≥60% on the new 200; aggregate pytest stays green post-merge.
+
+**Why now (not Phase L):** Engine substrate K1-K15 is stable; no schema change pending in K17/K18. K17 is operator-blocked on Coqui audio render — orchestrator has free capacity. Running 800-template soak in the K17 window adds 0 days to the phase ship date. Per Phase G's pattern (200 templates @ 0% validation failures) and K16's pattern (50/agent painless), 16 agents @ 50 templates each is the same per-agent scope as both predecessors.
+
+**Soak agent prompt seed** (one agent per intent slot `{A,B,C,D}` × 4 intents = 16 dispatch):
+
+> You are one of 16 parallel agents authoring NEW branching templates for toybox. Your scope is `<intent>.json`, agent slot `<letter>`, numeric suffix range `NNN..MMM` (50 templates). For each new template:
+> 1. Read all existing templates in `<intent>.json` to calibrate tone, length, narrative shape. Do NOT repeat their topic/setting motifs.
+> 2. Invent fresh topic/setting words. Template ids use the pattern `<intent>_soak_<topic>_NNN` where NNN is in your assigned range (3-digit zero-padded).
+> 3. 3-12 steps per template matching the existing K3 shape: text + optional fork choices + action_slot + optional sfx.
+> 4. Declare `required_roles` (1-3) + `optional_roles` (0-4) from the 10-role taxonomy in `src/toybox/activities/roles.py` (no overlap).
+> 5. Use role placeholders `{quest_giver}`, `{friend}`, etc. — every used placeholder must be declared in `required_roles ∪ optional_roles`.
+> 6. Add `recommended_themes` (1-3) from the 12-theme taxonomy in `src/toybox/activities/themes.py`.
+> 7. Add `ending_step` for engaging templates; omit for quiet/contemplative ones. Target ≥30/50 with `ending_step`.
+> 8. Write your 50 new templates as a bare JSON array to `_k16b_<intent>_<letter>.json` in the worktree root.
+> 9. Validate each via `Template.model_validate` + `validate_template` + `validate_template_graph` until 50/50 pass.
+> 10. Commit in worktree: `K16b draft: <intent>.json — agent <letter> — 50 new (range NNN..MMM)`.
+
+**Type:** code
+
+**Issue:** #133
+
+**Flags:** `--reviewers code` (per-agent validator + orchestrator pytest gate post-merge, same as K16)
+
 ### Step K17: End-to-end smoke gate
 
 **Problem:** Full-stack smoke: backend on 127.0.0.1:8000, kiosk on :4000. Sequence: (a) propose role-aware activity from backfilled catalog, (b) recast it pre-approval, (c) approve, (d) kiosk renders persona avatar with voice profile, (e) walk through steps including one embedded joke step + one embedded song step, (f) tap a word and the Read Me button on a text step, hear both, (g) parent inserts a joke mid-activity, kiosk shows it next, (h) finish through an ending song step, (i) toggle each of the 8 settings from SettingsPanel, refresh kiosk, verify behavior change. Acceptance: all 9 sub-steps green; no kiosk console errors; activity reaches `completed` state; `data/songs/audio/` size assertion passes.
