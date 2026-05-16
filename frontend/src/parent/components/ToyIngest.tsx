@@ -1,5 +1,5 @@
 import type { JSX } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ROLE_DISPLAY_NAMES,
@@ -195,6 +195,24 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
   const [togglingActiveId, setTogglingActiveId] = useState<string | null>(
     null,
   );
+
+  // Sort mode for the toy list. "active" puts active toys first
+  // (alpha within each group); "name" is pure alpha A→Z. Default is
+  // "active" so the list the parent operates on most is at the top.
+  // Auto-resort on toggle is free — toggleToyActive calls refetchToys
+  // which replaces `toys`, and the useMemo below recomputes.
+  const [sortMode, setSortMode] = useState<"active" | "name">("active");
+
+  const sortedToys = useMemo<Toy[]>(() => {
+    const copy = [...toys];
+    copy.sort((a, b) => {
+      if (sortMode === "active" && a.active !== b.active) {
+        return a.active ? -1 : 1;
+      }
+      return a.display_name.localeCompare(b.display_name);
+    });
+    return copy;
+  }, [toys, sortMode]);
 
   // Per-toy allowed-roles popover. Closed by default; toggled by the
   // "Allowed roles" button on the edit form. The popover renders the
@@ -932,11 +950,35 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
         </p>
       )}
       {toys.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            margin: "4px 0 8px",
+          }}
+        >
+          <span style={{ fontSize: 12, color: "#666" }}>Sort:</span>
+          <button
+            type="button"
+            data-testid="toys-sort-toggle"
+            data-sort-mode={sortMode}
+            onClick={() =>
+              setSortMode((prev) => (prev === "active" ? "name" : "active"))
+            }
+            title="Click to switch sort"
+            style={{ fontSize: 12, padding: "2px 8px" }}
+          >
+            {sortMode === "active" ? "Active first" : "Name (A→Z)"}
+          </button>
+        </div>
+      )}
+      {toys.length > 0 && (
         <ul
           data-testid="toys-list"
           style={{ listStyle: "none", padding: 0, margin: 0 }}
         >
-          {toys.map((t) => {
+          {sortedToys.map((t) => {
             const isEditing = editingToyId === t.id;
             const thumb = imageUrl(t.image_path, t.image_hash);
             return (
