@@ -526,6 +526,22 @@ export function App(): JSX.Element {
     }
   }, [activity, api, busyAdvance, refetchActivity]);
 
+  // When the kiosk first sees an activity in ``approved`` state, auto-fire
+  // one /advance so the kid's first "Next" tap advances seq=1 → seq=2.
+  // Without this, the first /advance only flips approved → running while
+  // keeping current=seq=1 (see post_advance's approved branch in
+  // src/toybox/api/activities.py), so "Next" appears to do nothing on
+  // the first click. Tracked by activity-id; on failure we don't retry —
+  // the kid can fall back to manually tapping Next.
+  const autoAdvancedForRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (activity === null) return;
+    if (activity.state !== "approved") return;
+    if (autoAdvancedForRef.current === activity.id) return;
+    autoAdvancedForRef.current = activity.id;
+    void handleAdvance();
+  }, [activity, handleAdvance]);
+
   // Phase G G4: choice-driven advance. Mirrors handleAdvance but
   // posts ``{choice_index}`` so the backend can resolve the right
   // successor on a branching step. Returns "ok"/"conflict" so the
