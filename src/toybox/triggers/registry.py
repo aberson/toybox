@@ -57,6 +57,14 @@ class Intent(BaseModel):
 
     ``confidence`` is reserved for future weighting; v1 curated and
     dynamic patterns are always ``1.0``.
+
+    ``phrase`` carries the originating transcript text so downstream
+    consumers (e.g. the parent UI's "Why this?" panel) can show what
+    was actually said. Distinct from ``slot``, which is the
+    regex-captured slot VALUE (e.g. a song name); ``slot`` is ``None``
+    for boredom-style intents whose pattern has no capture group.
+    Optional + defaults to ``None`` so callers that construct
+    Intents directly (tests, fixtures) aren't forced to supply it.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -65,6 +73,7 @@ class Intent(BaseModel):
     slot: str | None
     pattern_id: str
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    phrase: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -246,6 +255,7 @@ def _curated_intents(text: str, patterns: list[_Pattern]) -> list[Intent]:
                     slot=slot,
                     pattern_id=pat.id,
                     confidence=1.0,
+                    phrase=text,
                 )
             )
     return out
@@ -262,6 +272,7 @@ def _toy_intents(text: str, triggers: list[ToyTrigger]) -> list[Intent]:
                 slot=trig.display_name,
                 pattern_id=trig.pattern_id,
                 confidence=1.0,
+                phrase=text,
             )
         )
     return out

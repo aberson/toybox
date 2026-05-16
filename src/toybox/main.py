@@ -909,7 +909,15 @@ def _persist_dispatcher_activity(
     # for the child-scope WS envelope). Build a fresh dict — the
     # dispatcher's Activity is frozen with a frozen metadata view.
     metadata = dict(activity.metadata)
-    trigger_phrase = intent.slot if intent.slot else None
+    # ``intent.phrase`` carries the originating transcript text (populated
+    # by the trigger matcher). ``intent.slot`` is the regex-captured slot
+    # VALUE (e.g. a song name) and is ``None`` for most intents — leaving
+    # this code reading ``slot`` made "Why this?" show "no trigger" for
+    # every mic-detected boredom / request_play / request_song intent.
+    # Prefer ``phrase`` for the user-facing rationale; fall back to
+    # ``slot`` for back-compat with tests that construct Intent without
+    # a phrase.
+    trigger_phrase = intent.phrase if intent.phrase else intent.slot
     if trigger_phrase is not None and trigger_phrase.strip():
         metadata["trigger_phrase"] = trigger_phrase.strip()
     if "persona_reasoning" not in metadata:
