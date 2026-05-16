@@ -326,7 +326,7 @@ def resolve_toys(
     limit: int | None = None,
     child_ids: Sequence[str] | None = None,
 ) -> list[ResolvedToy]:
-    """Fetch non-archived toys, recency-sorted, capped at ``limit``.
+    """Fetch non-archived, active toys, recency-sorted, capped at ``limit``.
 
     Args:
         conn: SQLite connection.
@@ -341,6 +341,10 @@ def resolve_toys(
         A list of :class:`ResolvedToy`, sorted by ``last_used_at DESC``
         (null = oldest) with ``id`` ASC tiebreak. Empty when the toys
         table is empty.
+
+    ``active = 0`` rows are excluded so the parent's "deactivate this
+    toy" toggle (migration 0018) keeps the toy out of role-casting for
+    propose/recast — that's the whole point of the toggle.
     """
     del child_ids  # Reserved; see docstring.
     cap = limit if limit is not None else _toys_limit()
@@ -355,7 +359,7 @@ def resolve_toys(
     rows = conn.execute(
         "SELECT id, display_name, tags, persona_id, last_used_at, allowed_roles "
         "FROM toys "
-        "WHERE archived = 0 "
+        "WHERE archived = 0 AND active = 1 "
         "ORDER BY last_used_at IS NULL ASC, last_used_at DESC, id COLLATE BINARY ASC "
         "LIMIT ?",
         (cap,),

@@ -203,6 +203,12 @@ export interface Toy {
   created_at: string;
   last_used_at: string | null;
   allowed_roles: string[];
+  // Migration 0018: parent-controlled active/inactive toggle. ``false``
+  // means "exclude this toy from passive mention triggers and from
+  // role-casting." Distinct from ``archived`` (which removes the toy
+  // from the library entirely). Backend default is ``true``; the field
+  // is required on every wire response after the migration.
+  active: boolean;
 }
 
 export interface ToyVisionSuggestion {
@@ -258,6 +264,10 @@ export interface ToyUpdateRequest {
   persona_id?: string | null;
   archived?: boolean;
   allowed_roles?: string[];
+  // Migration 0018: flip parent-facing active/inactive. Omitting the
+  // field leaves the existing value untouched; setting it to ``false``
+  // pulls the toy out of mention triggers + role-casting.
+  active?: boolean;
 }
 
 export interface ToyListResponse {

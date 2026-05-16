@@ -72,6 +72,7 @@ def _insert_toy(
     archived: int = 0,
     last_used_at: str | None = None,
     image_hash: str | None = None,
+    active: int = 1,
 ) -> None:
     """Insert a toy with sensible defaults; image_hash is unique-or-null."""
     h = image_hash if image_hash is not None else f"hash-{toy_id}"
@@ -79,8 +80,8 @@ def _insert_toy(
         conn.execute(
             "INSERT INTO toys "
             "(id, display_name, image_path, image_hash, type, tags, persona_id, "
-            " archived, created_at, last_used_at) "
-            "VALUES (?, ?, ?, ?, NULL, ?, ?, ?, '2026-01-01T00:00:00Z', ?)",
+            " archived, created_at, last_used_at, active) "
+            "VALUES (?, ?, ?, ?, NULL, ?, ?, ?, '2026-01-01T00:00:00Z', ?, ?)",
             (
                 toy_id,
                 display_name,
@@ -90,6 +91,7 @@ def _insert_toy(
                 persona_id,
                 archived,
                 last_used_at,
+                active,
             ),
         )
 
@@ -165,6 +167,19 @@ def test_resolve_toys_skips_archived(conn: sqlite3.Connection) -> None:
     _insert_toy(conn, toy_id="t2", display_name="Bravo", archived=1)
     out = resolve_toys(conn)
     assert [t.id for t in out] == ["t1"]
+
+
+def test_resolve_toys_skips_inactive(conn: sqlite3.Connection) -> None:
+    """Migration 0018: ``active = 0`` rows must be excluded from the
+    role-casting pool. Active toys remain; archived rows continue to be
+    excluded independently of the active flag."""
+    _insert_toy(conn, toy_id="t-on", display_name="On", active=1)
+    _insert_toy(conn, toy_id="t-off", display_name="Off", active=0)
+    _insert_toy(
+        conn, toy_id="t-archived-and-off", display_name="Gone", archived=1, active=0
+    )
+    out = [t.id for t in resolve_toys(conn)]
+    assert out == ["t-on"]
 
 
 def test_resolve_toys_recency_sorted_with_id_tiebreak(conn: sqlite3.Connection) -> None:

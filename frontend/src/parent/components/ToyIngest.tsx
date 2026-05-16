@@ -188,6 +188,13 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
     Record<string, string>
   >({});
   const [archivingId, setArchivingId] = useState<string | null>(null);
+  // Migration 0018: per-toy active/inactive toggle. Tracks the id of
+  // the toy whose PATCH is in flight so we can disable the control +
+  // surface a brief "..." label without locking out the rest of the
+  // list. Null = no toggle currently in flight.
+  const [togglingActiveId, setTogglingActiveId] = useState<string | null>(
+    null,
+  );
 
   // Per-toy allowed-roles popover. Closed by default; toggled by the
   // "Allowed roles" button on the edit form. The popover renders the
@@ -596,6 +603,29 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
     [api, archivingId, cancelToyEdit, editingToyId, refetchToys],
   );
 
+  const toggleToyActive = useCallback(
+    async (toy: Toy): Promise<void> => {
+      if (togglingActiveId !== null) return;
+      setTogglingActiveId(toy.id);
+      try {
+        await api.updateToy(
+          toy.id,
+          { active: !toy.active },
+          { signal: aborterRef.current?.signal },
+        );
+        await refetchToys();
+      } catch (err) {
+        if (isAbortError(err)) return;
+        const message =
+          err instanceof Error ? err.message : "toggle failed";
+        setListError(message);
+      } finally {
+        setTogglingActiveId(null);
+      }
+    },
+    [api, refetchToys, togglingActiveId],
+  );
+
   const updateEditField = useCallback(
     <K extends keyof FormState>(key: K, value: FormState[K]): void => {
       setEditForm((prev) => ({ ...prev, [key]: value }));
@@ -914,10 +944,12 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
                 key={t.id}
                 data-testid="toy-row"
                 data-toy-id={t.id}
+                data-toy-active={t.active ? "true" : "false"}
                 style={{
                   padding: "8px 0",
                   borderBottom: "1px solid #eee",
                   fontSize: 14,
+                  opacity: t.active ? 1 : 0.5,
                 }}
               >
                 {!isEditing && (
@@ -959,6 +991,26 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
                       )}
                     </div>
                     <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        type="button"
+                        data-testid="toggle-toy-active-button"
+                        aria-pressed={t.active}
+                        disabled={togglingActiveId === t.id}
+                        onClick={() => {
+                          void toggleToyActive(t);
+                        }}
+                        title={
+                          t.active
+                            ? "Deactivate this toy (exclude from suggestions and play)"
+                            : "Activate this toy"
+                        }
+                      >
+                        {togglingActiveId === t.id
+                          ? "..."
+                          : t.active
+                            ? "active"
+                            : "inactive"}
+                      </button>
                       <button
                         type="button"
                         data-testid="edit-toy-button"

@@ -153,6 +153,7 @@ class ToyResponse(BaseModel):
     created_at: str
     last_used_at: str | None
     allowed_roles: list[str] = Field(default_factory=list)
+    active: bool = True
 
 
 class ToyListResponse(BaseModel):
@@ -276,6 +277,7 @@ class ToyUpdateRequest(BaseModel):
     tags: list[str] | None = None
     persona_id: str | None = None
     archived: bool | None = None
+    active: bool | None = None
     allowed_roles: list[str] | None = Field(default=None, max_length=len(Role))
 
     @field_validator("display_name")
@@ -504,6 +506,12 @@ def _row_to_response(row: sqlite3.Row | dict[str, Any]) -> ToyResponse:
         raw_allowed = getter("allowed_roles")
     except (KeyError, IndexError):
         raw_allowed = None
+    # ``active`` was added in migration 0018; default to True if the
+    # Row-like input is missing the column.
+    try:
+        raw_active = getter("active")
+    except (KeyError, IndexError):
+        raw_active = 1
     return ToyResponse(
         id=str(getter("id")),
         display_name=str(getter("display_name")),
@@ -515,6 +523,7 @@ def _row_to_response(row: sqlite3.Row | dict[str, Any]) -> ToyResponse:
         created_at=str(getter("created_at")),
         last_used_at=getter("last_used_at"),
         allowed_roles=_decode_allowed_roles(raw_allowed),
+        active=bool(raw_active),
     )
 
 
@@ -972,6 +981,9 @@ def patch_toy(
         elif col == "archived":
             columns.append("archived = ?")
             params.append(1 if value else 0)
+        elif col == "active":
+            columns.append("active = ?")
+            params.append(1 if value else 0)
         elif col == "allowed_roles":
             # Canonical "unrestricted" sentinel is NULL (see migration
             # 0017). PATCH ``allowed_roles=[]`` clears any previous
@@ -989,10 +1001,11 @@ def patch_toy(
     set_clause = ", ".join(columns)
     with conn:
         conn.execute(f"UPDATE toys SET {set_clause} WHERE id = ?", params)
-    # If display_name or archived changed, the trigger registry needs a
-    # refresh so the new mention pattern (or the absence of an archived
-    # toy's pattern) takes effect on the next transcript scan.
-    if "display_name" in data or "archived" in data:
+    # If display_name, archived, or active changed, the trigger registry
+    # needs a refresh so the new mention pattern (or the absence of an
+    # archived/inactive toy's pattern) takes effect on the next transcript
+    # scan.
+    if "display_name" in data or "archived" in data or "active" in data:
         try:
             refresh_mention_toys(conn)
         except Exception:  # noqa: BLE001

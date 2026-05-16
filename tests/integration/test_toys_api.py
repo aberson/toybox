@@ -848,3 +848,126 @@ def test_patch_allowed_roles_empty_clears_previous_restriction(
     get_resp = vc_client.get(f"/api/toys/{toy_id}", headers=parent_headers)
     assert get_resp.status_code == 200
     assert get_resp.json()["allowed_roles"] == []
+
+
+# ---------------------------------------------------------------------
+# Migration 0018: per-toy ``active`` toggle
+# ---------------------------------------------------------------------
+
+
+def test_new_toy_defaults_to_active_true(
+    vc_client: TestClient,
+    parent_headers: dict[str, str],
+    stub_vision_client: StubClient,
+) -> None:
+    """A freshly created toy is active by default and the wire field
+    is always present."""
+    stub_vision_client._image_responses = [
+        '{"display_name": "X", "tags": [], "persona_match_id": null}'
+    ]
+    toy_id = _create_toy(vc_client, parent_headers, "Default Cat")
+    resp = vc_client.get(f"/api/toys/{toy_id}", headers=parent_headers)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "active" in body, "active must always be present on the wire"
+    assert body["active"] is True
+
+
+def test_patch_active_toggles_and_persists(
+    vc_client: TestClient,
+    parent_headers: dict[str, str],
+    stub_vision_client: StubClient,
+) -> None:
+    """PATCH ``active=false`` flips the flag; PATCH ``active=true`` flips
+    back. GET round-trips the literal value."""
+    stub_vision_client._image_responses = [
+        '{"display_name": "X", "tags": [], "persona_match_id": null}'
+    ]
+    toy_id = _create_toy(vc_client, parent_headers, "Toggleable")
+
+    off = vc_client.patch(
+        f"/api/toys/{toy_id}",
+        json={"active": False},
+        headers=parent_headers,
+    )
+    assert off.status_code == 200, off.text
+    assert off.json()["active"] is False
+
+    fetched = vc_client.get(f"/api/toys/{toy_id}", headers=parent_headers)
+    assert fetched.status_code == 200
+    assert fetched.json()["active"] is False
+
+    on = vc_client.patch(
+        f"/api/toys/{toy_id}",
+        json={"active": True},
+        headers=parent_headers,
+    )
+    assert on.status_code == 200
+    assert on.json()["active"] is True
+
+
+def test_list_includes_inactive_toys(
+    vc_client: TestClient,
+    parent_headers: dict[str, str],
+    stub_vision_client: StubClient,
+) -> None:
+    """The parent toy list must show inactive toys (they are not
+    archived — the parent needs to see them to re-enable them).
+    """
+    stub_vision_client._image_responses = [
+        '{"display_name": "X", "tags": [], "persona_match_id": null}'
+    ] * 3
+    a = _create_toy(vc_client, parent_headers, "Active One")
+    b = _create_toy(vc_client, parent_headers, "Muted One")
+
+    patch = vc_client.patch(
+        f"/api/toys/{b}", json={"active": False}, headers=parent_headers
+    )
+    assert patch.status_code == 200
+
+    resp = vc_client.get("/api/toys", headers=parent_headers)
+    assert resp.status_code == 200
+    ids_to_active = {t["id"]: t["active"] for t in resp.json()["toys"]}
+    assert a in ids_to_active
+    assert b in ids_to_active
+    assert ids_to_active[a] is True
+    assert ids_to_active[b] is False
+
+
+def test_mention_trigger_excludes_inactive_toy(
+    vc_client: TestClient,
+    parent_headers: dict[str, str],
+    db_path: Path,
+    stub_vision_client: StubClient,
+) -> None:
+    """Migration 0018: an inactive toy must not produce mention_toy
+    intents on transcript scan. This is the whole point of the toggle —
+    the parent muting a toy stops it from showing up in suggestions.
+    """
+    stub_vision_client._image_responses = [
+        '{"display_name": "X", "tags": [], "persona_match_id": null}'
+    ]
+    toy_id = _create_toy(vc_client, parent_headers, "Hidden Bear")
+
+    from toybox.triggers.registry import match
+
+    pre = match("can we play with hidden bear", db_path=db_path)
+    pre_matches = [
+        i for i in pre if i.name == "mention_toy" and i.slot == "Hidden Bear"
+    ]
+    assert len(pre_matches) == 1, "sanity: trigger fires while the toy is active"
+
+    deactivate = vc_client.patch(
+        f"/api/toys/{toy_id}",
+        json={"active": False},
+        headers=parent_headers,
+    )
+    assert deactivate.status_code == 200
+
+    post = match("can we play with hidden bear", db_path=db_path)
+    post_matches = [
+        i for i in post if i.name == "mention_toy" and i.slot == "Hidden Bear"
+    ]
+    assert post_matches == [], (
+        "inactive toy must not produce mention_toy intents after the toggle"
+    )

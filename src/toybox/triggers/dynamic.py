@@ -51,17 +51,22 @@ def _compile_for(display_name: str) -> re.Pattern[str] | None:
 
 
 def load_toy_triggers(conn: sqlite3.Connection) -> list[ToyTrigger]:
-    """Return one :class:`ToyTrigger` per non-archived toy.
+    """Return one :class:`ToyTrigger` per non-archived, active toy.
 
     Rebuilds on every call (v1 stub). Empty table → empty list. Rows
     whose ``display_name`` is empty after stripping are skipped with a
     debug log.
+
+    ``active = 0`` rows are excluded so the parent's "deactivate this
+    toy" toggle (migration 0018) keeps mentions from suggesting
+    activities for the muted toy.
     """
     triggers: list[ToyTrigger] = []
     try:
         rows = list(
             conn.execute(
-                "SELECT id, display_name FROM toys WHERE archived = 0 ORDER BY id"
+                "SELECT id, display_name FROM toys "
+                "WHERE archived = 0 AND active = 1 ORDER BY id"
             ).fetchall()
         )
     except sqlite3.DatabaseError as exc:

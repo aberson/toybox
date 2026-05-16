@@ -54,6 +54,7 @@ function fakeToy(overrides: Partial<Toy> = {}): Toy {
     created_at: "2026-05-03T00:00:00Z",
     last_used_at: null,
     allowed_roles: [],
+    active: true,
     ...overrides,
   };
 }
@@ -116,6 +117,8 @@ function buildStubApi(initial: Toy[]): StubApi {
           tags: body.tags ?? existing?.tags ?? [],
           allowed_roles:
             body.allowed_roles ?? existing?.allowed_roles ?? [],
+          active:
+            body.active ?? existing?.active ?? true,
         });
         currentList = currentList.map((t) => (t.id === id ? updated : t));
         return updated;
@@ -543,5 +546,65 @@ describe("ToyIngest", () => {
     // Empty list MUST be present in the body (PATCH = clear restriction).
     expect(Array.isArray(args[1].allowed_roles)).toBe(true);
     expect(args[1].allowed_roles).toEqual([]);
+  });
+
+  it("clicking the active toggle PATCHes active: false and dims the row", async () => {
+    const toy = fakeToy({ id: "t-cat", display_name: "Whiskers", active: true });
+    const stub = buildStubApi([toy]);
+    render(<ToyIngest api={stub as unknown as ApiClient} />);
+
+    const button = (await screen.findByTestId(
+      "toggle-toy-active-button",
+    )) as HTMLButtonElement;
+    expect(button.textContent).toBe("active");
+
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(stub.updateToy).toHaveBeenCalledTimes(1);
+    });
+    const args = stub.updateToy.mock.calls[0] as [
+      string,
+      ToyUpdateRequest,
+      unknown,
+    ];
+    expect(args[0]).toBe("t-cat");
+    expect(args[1]).toEqual({ active: false });
+
+    // After the refetch the row reflects the new state.
+    await waitFor(() => {
+      const updatedButton = screen.getByTestId(
+        "toggle-toy-active-button",
+      ) as HTMLButtonElement;
+      expect(updatedButton.textContent).toBe("inactive");
+      expect(updatedButton.getAttribute("aria-pressed")).toBe("false");
+    });
+
+    const row = screen.getByTestId("toy-row");
+    expect(row.getAttribute("data-toy-active")).toBe("false");
+    expect(row.getAttribute("style") ?? "").toContain("opacity: 0.5");
+  });
+
+  it("clicking an inactive toy's toggle PATCHes active: true", async () => {
+    const toy = fakeToy({ id: "t-cat", display_name: "Whiskers", active: false });
+    const stub = buildStubApi([toy]);
+    render(<ToyIngest api={stub as unknown as ApiClient} />);
+
+    const button = (await screen.findByTestId(
+      "toggle-toy-active-button",
+    )) as HTMLButtonElement;
+    expect(button.textContent).toBe("inactive");
+
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(stub.updateToy).toHaveBeenCalledTimes(1);
+    });
+    const args = stub.updateToy.mock.calls[0] as [
+      string,
+      ToyUpdateRequest,
+      unknown,
+    ];
+    expect(args[1]).toEqual({ active: true });
   });
 });
