@@ -742,3 +742,109 @@ def test_staging_registry_evicts_abandoned_entries(
     assert second.status_code == 200
     # The abandoned entry has been swept; only the fresh one remains.
     assert abandoned not in toys_router_mod._staging_extensions
+
+
+# ---------------------------------------------------------------------
+# Migration 0017: per-toy role restrictions (``allowed_roles``)
+# ---------------------------------------------------------------------
+
+
+def test_get_returns_empty_allowed_roles_for_existing_toy(
+    vc_client: TestClient,
+    parent_headers: dict[str, str],
+    stub_vision_client: StubClient,
+) -> None:
+    """A toy created without ``allowed_roles`` round-trips to ``[]``
+    on GET — NEVER ``None`` and NEVER missing from the response.
+    Canonical wire repr for "unrestricted" is the empty list.
+    """
+    stub_vision_client._image_responses = [
+        '{"display_name": "X", "tags": [], "persona_match_id": null}'
+    ]
+    toy_id = _create_toy(vc_client, parent_headers, "Unrestricted")
+    resp = vc_client.get(f"/api/toys/{toy_id}", headers=parent_headers)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "allowed_roles" in body, (
+        "allowed_roles must always be present on the wire even when the DB column is NULL"
+    )
+    assert body["allowed_roles"] == []
+
+
+def test_patch_allowed_roles_round_trip(
+    vc_client: TestClient,
+    parent_headers: dict[str, str],
+    stub_vision_client: StubClient,
+) -> None:
+    """PATCH ``allowed_roles=["big_bad_boss"]`` persists; GET returns it."""
+    stub_vision_client._image_responses = [
+        '{"display_name": "X", "tags": [], "persona_match_id": null}'
+    ]
+    toy_id = _create_toy(vc_client, parent_headers, "Bowser")
+    patch = vc_client.patch(
+        f"/api/toys/{toy_id}",
+        json={"allowed_roles": ["big_bad_boss"]},
+        headers=parent_headers,
+    )
+    assert patch.status_code == 200, patch.text
+    assert patch.json()["allowed_roles"] == ["big_bad_boss"]
+
+    get_resp = vc_client.get(f"/api/toys/{toy_id}", headers=parent_headers)
+    assert get_resp.status_code == 200
+    assert get_resp.json()["allowed_roles"] == ["big_bad_boss"]
+
+
+def test_patch_allowed_roles_unknown_role_returns_422(
+    vc_client: TestClient,
+    parent_headers: dict[str, str],
+    stub_vision_client: StubClient,
+) -> None:
+    """An unknown role-name entry must 422 — the Pydantic validator
+    rejects values outside the ``Role`` StrEnum vocabulary."""
+    stub_vision_client._image_responses = [
+        '{"display_name": "X", "tags": [], "persona_match_id": null}'
+    ]
+    toy_id = _create_toy(vc_client, parent_headers, "BadRole")
+    resp = vc_client.patch(
+        f"/api/toys/{toy_id}",
+        json={"allowed_roles": ["not_a_real_role"]},
+        headers=parent_headers,
+    )
+    assert resp.status_code == 422, resp.text
+
+
+def test_patch_allowed_roles_empty_clears_previous_restriction(
+    vc_client: TestClient,
+    parent_headers: dict[str, str],
+    stub_vision_client: StubClient,
+) -> None:
+    """PATCH ``allowed_roles=[]`` clears a previously-set restriction.
+
+    The DB stores NULL for the unrestricted sentinel (per migration
+    0017), but the wire-side round-trip is symmetric — empty list in,
+    empty list out.
+    """
+    stub_vision_client._image_responses = [
+        '{"display_name": "X", "tags": [], "persona_match_id": null}'
+    ]
+    toy_id = _create_toy(vc_client, parent_headers, "Switcher")
+    # First set a restriction.
+    first = vc_client.patch(
+        f"/api/toys/{toy_id}",
+        json={"allowed_roles": ["friend", "sidekick"]},
+        headers=parent_headers,
+    )
+    assert first.status_code == 200
+    assert sorted(first.json()["allowed_roles"]) == ["friend", "sidekick"]
+    # Then clear it.
+    clear = vc_client.patch(
+        f"/api/toys/{toy_id}",
+        json={"allowed_roles": []},
+        headers=parent_headers,
+    )
+    assert clear.status_code == 200
+    assert clear.json()["allowed_roles"] == []
+    # And re-read to confirm the DB really stored the cleared value.
+    get_resp = vc_client.get(f"/api/toys/{toy_id}", headers=parent_headers)
+    assert get_resp.status_code == 200
+    assert get_resp.json()["allowed_roles"] == []

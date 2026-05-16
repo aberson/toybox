@@ -18,6 +18,7 @@ import type {
   Toy,
   ToyConfirmRequest,
   ToyListResponse,
+  ToyUpdateRequest,
   ToyUploadResponse,
   ToyVisionSuggestion,
 } from "../api";
@@ -52,6 +53,7 @@ function fakeToy(overrides: Partial<Toy> = {}): Toy {
     archived: false,
     created_at: "2026-05-03T00:00:00Z",
     last_used_at: null,
+    allowed_roles: [],
     ...overrides,
   };
 }
@@ -80,12 +82,17 @@ interface StubApi {
   listToys: Mock;
   uploadToyPhoto: Mock;
   confirmToy: Mock;
+  updateToy: Mock;
 }
 
 function buildStubApi(initial: Toy[]): StubApi {
+  // Per-test state so updateToy can echo a refreshed Toy with the
+  // patched ``allowed_roles`` and the list refetch surfaces the new
+  // value without recomputing the response shape in every test.
+  let currentList = initial;
   return {
     listToys: vi.fn(
-      async (): Promise<ToyListResponse> => ({ toys: initial }),
+      async (): Promise<ToyListResponse> => ({ toys: currentList }),
     ) as Mock,
     uploadToyPhoto: vi.fn(
       async (_file: File): Promise<ToyUploadResponse> => fakeUpload(),
@@ -96,7 +103,23 @@ function buildStubApi(initial: Toy[]): StubApi {
           id: "new-toy",
           display_name: body.display_name,
           tags: body.tags,
+          allowed_roles: body.allowed_roles ?? [],
         }),
+    ) as Mock,
+    updateToy: vi.fn(
+      async (id: string, body: ToyUpdateRequest): Promise<Toy> => {
+        const existing = currentList.find((t) => t.id === id);
+        const updated = fakeToy({
+          ...(existing ?? {}),
+          id,
+          display_name: body.display_name ?? existing?.display_name ?? "Bear",
+          tags: body.tags ?? existing?.tags ?? [],
+          allowed_roles:
+            body.allowed_roles ?? existing?.allowed_roles ?? [],
+        });
+        currentList = currentList.map((t) => (t.id === id ? updated : t));
+        return updated;
+      },
     ) as Mock,
   };
 }
@@ -403,5 +426,122 @@ describe("ToyIngest", () => {
     });
     expect(screen.getByText("Bear")).toBeTruthy();
     expect(screen.getByText("Robot")).toBeTruthy();
+  });
+
+  // -------------------------------------------------------------------
+  // Per-toy role restrictions (migration 0017): edit-form behaviour
+  // -------------------------------------------------------------------
+
+  async function openEditForm(toy: Toy): Promise<void> {
+    const stub = buildStubApi([toy]);
+    render(<ToyIngest api={stub as unknown as ApiClient} />);
+    await waitFor(() => {
+      expect(screen.getAllByTestId("toy-row")).toHaveLength(1);
+    });
+    fireEvent.click(screen.getByTestId("edit-toy-button"));
+    await screen.findByTestId("toy-edit-form");
+    // Stash the stub on globalThis so the assertions below can read
+    // mock-call history without a separate render helper.
+    (
+      globalThis as unknown as { __stub__: StubApi }
+    ).__stub__ = stub;
+  }
+
+  it("edit form seeds allowed_roles from the current toy", async () => {
+    const toy = fakeToy({
+      id: "bowser",
+      display_name: "Bowser",
+      allowed_roles: ["big_bad_boss"],
+    });
+    await openEditForm(toy);
+    // Open the popover so we can inspect the checkbox state.
+    fireEvent.click(screen.getByTestId("edit-field-allowed-roles"));
+    const checkbox = screen.getByTestId(
+      "allowed-role-checkbox-big_bad_boss",
+    ) as HTMLInputElement;
+    expect(checkbox.checked).toBe(true);
+    // The chip should also render (the popover doesn't need to be
+    // open for chips to be visible).
+    expect(screen.getByTestId("allowed-role-chip-big_bad_boss")).toBeTruthy();
+  });
+
+  it("toggling a checkbox in the popover adds the role to state + chips", async () => {
+    const toy = fakeToy({ id: "miss-maple", display_name: "Miss Maple" });
+    await openEditForm(toy);
+    fireEvent.click(screen.getByTestId("edit-field-allowed-roles"));
+    expect(
+      screen.queryByTestId("allowed-role-chip-friend"),
+    ).toBeNull();
+    fireEvent.click(screen.getByTestId("allowed-role-checkbox-friend"));
+    await waitFor(() => {
+      expect(screen.getByTestId("allowed-role-chip-friend")).toBeTruthy();
+    });
+    const checkbox = screen.getByTestId(
+      "allowed-role-checkbox-friend",
+    ) as HTMLInputElement;
+    expect(checkbox.checked).toBe(true);
+  });
+
+  it("clicking a chip's × button removes the role from state", async () => {
+    const toy = fakeToy({
+      id: "bowser",
+      display_name: "Bowser",
+      allowed_roles: ["big_bad_boss", "frenemy"],
+    });
+    await openEditForm(toy);
+    expect(screen.getByTestId("allowed-role-chip-big_bad_boss")).toBeTruthy();
+    fireEvent.click(
+      screen.getByTestId("allowed-role-chip-remove-big_bad_boss"),
+    );
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId("allowed-role-chip-big_bad_boss"),
+      ).toBeNull();
+    });
+    // The other chip survives.
+    expect(screen.getByTestId("allowed-role-chip-frenemy")).toBeTruthy();
+  });
+
+  it("save submits the populated allowed_roles in the PATCH body", async () => {
+    const toy = fakeToy({
+      id: "bowser",
+      display_name: "Bowser",
+      allowed_roles: ["big_bad_boss"],
+    });
+    await openEditForm(toy);
+    const stub = (globalThis as unknown as { __stub__: StubApi }).__stub__;
+    fireEvent.click(screen.getByTestId("save-toy-edit-button"));
+    await waitFor(() => {
+      expect(stub.updateToy).toHaveBeenCalledTimes(1);
+    });
+    const args = stub.updateToy.mock.calls[0] as [
+      string,
+      ToyUpdateRequest,
+      unknown,
+    ];
+    expect(args[0]).toBe("bowser");
+    expect(args[1].allowed_roles).toEqual(["big_bad_boss"]);
+  });
+
+  it("save submits allowed_roles: [] (not omitted) when empty", async () => {
+    const toy = fakeToy({
+      id: "noodle",
+      display_name: "Noodle",
+      allowed_roles: [],
+    });
+    await openEditForm(toy);
+    const stub = (globalThis as unknown as { __stub__: StubApi }).__stub__;
+    fireEvent.click(screen.getByTestId("save-toy-edit-button"));
+    await waitFor(() => {
+      expect(stub.updateToy).toHaveBeenCalledTimes(1);
+    });
+    const args = stub.updateToy.mock.calls[0] as [
+      string,
+      ToyUpdateRequest,
+      unknown,
+    ];
+    // Empty list MUST be present in the body (PATCH = clear restriction).
+    expect(Array.isArray(args[1].allowed_roles)).toBe(true);
+    expect(args[1].allowed_roles).toEqual([]);
   });
 });

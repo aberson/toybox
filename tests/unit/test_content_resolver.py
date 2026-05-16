@@ -975,3 +975,124 @@ def test_resolve_role_slots_generic_descriptor_has_no_toy_id() -> None:
     # ``display_name`` is the substitution-time field, mirroring the
     # ResolvedToy.display_name shape.
     assert descriptor.display_name == "a friendly stranger"
+
+
+# ---------------------------------------------------------------------------
+# Per-toy role restrictions (migration 0017)
+# ---------------------------------------------------------------------------
+
+
+def _restricted_toy(toy_id: str, allowed: tuple[str, ...]) -> ResolvedToy:
+    """Build a :class:`ResolvedToy` with a specific ``allowed_roles``."""
+    return ResolvedToy(
+        id=toy_id,
+        display_name=toy_id.upper(),
+        allowed_roles=allowed,
+    )
+
+
+def test_role_filter_excludes_restricted_toy_from_non_allowed_role() -> None:
+    """A toy restricted to ``big_bad_boss`` only must NOT be cast into
+    a ``friend`` slot when another (unrestricted) toy is available.
+
+    Setup: 2 toys — Bowser (restricted to big_bad_boss) + Owl (unrestricted).
+    Template: required role = ``friend``. Picker MUST pick Owl.
+    """
+    tpl = _StubTemplateWithRoles(
+        id="t_friend",
+        required_roles=(Role.friend,),
+    )
+    persona = _StubPersona(id="p1", role_weights={})
+    bowser = _restricted_toy("a_bowser", ("big_bad_boss",))
+    owl = _toy("b_owl")
+    out = resolve_role_slots(tpl, [bowser, owl], persona, seed=42)
+    assert out is not None
+    friend_pick = out[Role.friend.value]
+    assert isinstance(friend_pick, ResolvedToy)
+    assert friend_pick.id == "b_owl", (
+        f"role restriction should have excluded Bowser; got {friend_pick.id!r}"
+    )
+
+
+def test_role_filter_picks_restricted_toy_for_allowed_role() -> None:
+    """A toy restricted to a specific role IS picked for that role
+    when it's in the filtered pool.
+
+    Setup: 2 toys — Bowser (restricted to big_bad_boss) + Owl
+    (unrestricted). Template: required ``big_bad_boss``. Both are
+    eligible; persona weights bias toward Bowser via the id-sorted
+    primary-mass branch (Bowser sorts first).
+    """
+    tpl = _StubTemplateWithRoles(
+        id="t_boss",
+        required_roles=(Role.big_bad_boss,),
+    )
+    # Heavy weight on big_bad_boss biases the first-sorted candidate;
+    # both Bowser ("a_bowser") and Owl ("b_owl") are eligible so the
+    # filter doesn't shrink the pool, but the persona weight pushes
+    # toward "a_bowser" because it sorts first.
+    persona = _StubPersona(id="p1", role_weights={"big_bad_boss": 100.0})
+    bowser = _restricted_toy("a_bowser", ("big_bad_boss",))
+    owl = _toy("b_owl")
+    out = resolve_role_slots(tpl, [bowser, owl], persona, seed=42)
+    assert out is not None
+    pick = out[Role.big_bad_boss.value]
+    assert isinstance(pick, ResolvedToy)
+    assert pick.id == "a_bowser", (
+        f"restricted-but-eligible Bowser should be biased into the slot; got {pick.id!r}"
+    )
+
+
+def test_role_filter_soft_fallback_when_filtered_pool_empty(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """When every toy's ``allowed_roles`` excludes the target role,
+    the picker MUST fall back to the unfiltered pool and log it.
+
+    The filter expresses a preference; it must never starve a slot.
+    """
+    tpl = _StubTemplateWithRoles(
+        id="t_friend",
+        required_roles=(Role.friend,),
+    )
+    persona = _StubPersona(id="p1", role_weights={})
+    # Both toys restricted away from ``friend``; required_roles = (friend,)
+    # so the picker has no way to honour the restriction. Soft fallback:
+    # pick anyway, log the info-level reason.
+    only_a = _restricted_toy("a", ("big_bad_boss",))
+    only_b = _restricted_toy("b", ("quest_giver",))
+    with caplog.at_level("INFO", logger="toybox.activities.content_resolver"):
+        out = resolve_role_slots(tpl, [only_a, only_b], persona, seed=42)
+    assert out is not None, "soft fallback must NOT return None when pool is non-empty"
+    pick = out[Role.friend.value]
+    assert isinstance(pick, ResolvedToy)
+    assert pick.id in {"a", "b"}, (
+        "soft fallback must pick from the unfiltered pool when filtered is empty"
+    )
+    # Assert the info-level log message fires once.
+    fallback_msgs = [
+        rec for rec in caplog.records if "had no candidates for role" in rec.getMessage()
+    ]
+    assert len(fallback_msgs) >= 1, (
+        f"expected at least one info-level fallback log; got "
+        f"{[rec.getMessage() for rec in caplog.records]!r}"
+    )
+    assert "friend" in fallback_msgs[0].getMessage()
+
+
+def test_role_filter_unrestricted_toy_eligible_everywhere() -> None:
+    """A toy with empty ``allowed_roles`` (default) is eligible for
+    every role — backwards compatible with every existing catalog row.
+    """
+    tpl = _StubTemplateWithRoles(
+        id="t_multi",
+        required_roles=(Role.friend, Role.quest_giver),
+    )
+    persona = _StubPersona(id="p1", role_weights={})
+    # Both toys unrestricted (empty tuple) — the filter is a no-op and
+    # both required roles MUST be filled by a real toy.
+    toys = [_toy("alpha"), _toy("bravo")]
+    out = resolve_role_slots(tpl, toys, persona, seed=42)
+    assert out is not None
+    assert isinstance(out[Role.friend.value], ResolvedToy)
+    assert isinstance(out[Role.quest_giver.value], ResolvedToy)

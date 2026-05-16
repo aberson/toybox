@@ -1,0 +1,30 @@
+-- Phase K post-ship — per-toy role restrictions.
+--
+-- Adds ``allowed_roles`` to ``toys``: a JSON-encoded array of
+-- :class:`toybox.activities.roles.Role` string values that limits
+-- which Phase K roles the toy is eligible to be cast as by
+-- :func:`toybox.activities.content_resolver.resolve_role_slots`.
+--
+-- Wire / DB representation choice:
+--
+--   * Canonical wire representation is the empty list ``[]`` for
+--     "unrestricted" (default).
+--   * In the DB this column uses ``NULL`` to mean "unrestricted" so
+--     existing rows automatically default to backwards-compatible
+--     behaviour without an explicit backfill UPDATE. The Python
+--     layer in :mod:`toybox.api.toys` and
+--     :mod:`toybox.activities.content_resolver` normalises
+--     ``NULL`` and the empty JSON array ``'[]'`` to ``[]`` on read
+--     so both DB shapes round-trip to the same wire value.
+--   * The writer (PATCH ``allowed_roles=[]``) stores ``NULL`` in
+--     the DB to keep the "unrestricted" sentinel canonical at the
+--     storage layer. A populated list is stored as JSON text
+--     (``'["big_bad_boss"]'``); per-entry validation lives in the
+--     Pydantic layer against :class:`toybox.activities.roles.Role`.
+--
+-- Forward-only (invariant 10); existing rows default NULL on this
+-- column. No CHECK constraint here — the Pydantic validator owns
+-- the role-name vocabulary so a future Role taxonomy expansion does
+-- not need a follow-up migration.
+
+ALTER TABLE toys ADD COLUMN allowed_roles TEXT;

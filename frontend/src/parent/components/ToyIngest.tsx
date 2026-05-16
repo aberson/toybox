@@ -2,6 +2,10 @@ import type { JSX } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
+  ROLE_DISPLAY_NAMES,
+  type RoleName,
+} from "../../shared/types";
+import {
   ApiError,
   extractToyImageExistsDetail,
   extractValidationErrors,
@@ -17,6 +21,14 @@ import type {
 } from "../api";
 import { useParentStore } from "../store";
 import { ToyActionGrid } from "./ToyActionGrid";
+
+// Sorted RoleName list driven by ROLE_DISPLAY_NAMES — the single
+// source of truth for the role taxonomy lives in
+// ``src/toybox/activities/roles.py`` (per code-quality.md §2).
+// Sorting at module load keeps the popover order stable.
+const ROLE_NAMES_SORTED: RoleName[] = (
+  Object.keys(ROLE_DISPLAY_NAMES) as RoleName[]
+).sort();
 
 // Step 16: parent-facing toy ingest UI. The component runs in two
 // phases.
@@ -49,15 +61,26 @@ interface FormState {
   tags: string;
   // Comma-separated raw text — the only TextField shape that
   // round-trips cleanly. Submission splits on commas + trims.
+  allowed_roles: string[];
+  // Per-toy role restriction (post-K). Empty array = "unrestricted"
+  // (default). Items must be ``RoleName`` values — typed as
+  // ``string[]`` here so the popover can write/read freely without
+  // re-narrowing in every handler; the validator on the backend
+  // rejects unknown role names with HTTP 422.
 }
 
-const EMPTY_FORM: FormState = { display_name: "", tags: "" };
+const EMPTY_FORM: FormState = {
+  display_name: "",
+  tags: "",
+  allowed_roles: [],
+};
 
 function suggestionToForm(suggestion: ToyUploadResponse["suggested"]): FormState {
   if (suggestion === null) return EMPTY_FORM;
   return {
     display_name: suggestion.display_name,
     tags: suggestion.tags.join(", "),
+    allowed_roles: [],
   };
 }
 
@@ -165,6 +188,14 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
     Record<string, string>
   >({});
   const [archivingId, setArchivingId] = useState<string | null>(null);
+
+  // Per-toy allowed-roles popover. Closed by default; toggled by the
+  // "Allowed roles" button on the edit form. The popover renders the
+  // 10 ``RoleName`` checkboxes (sorted) — selected items also render
+  // as removable chips below the button so the parent always sees
+  // their selection without re-opening the popover.
+  const [editRolePopoverOpen, setEditRolePopoverOpen] =
+    useState<boolean>(false);
 
   // Phase F Step F8: track the id of the toy whose action grid should
   // render below the form. Set to the freshly-committed toy id after
@@ -456,9 +487,11 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
       setEditForm({
         display_name: toy.display_name,
         tags: toy.tags.join(", "),
+        allowed_roles: toy.allowed_roles ?? [],
       });
       setEditError(null);
       setEditFieldErrors({});
+      setEditRolePopoverOpen(false);
       // Phase F Step F8: seed the action grid for the toy under edit.
       // Archived toys (toy.archived === true) hide the grid entirely
       // per plan §F8 — the existing toy list already filters
@@ -477,6 +510,24 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
     setEditForm(EMPTY_FORM);
     setEditError(null);
     setEditFieldErrors({});
+    setEditRolePopoverOpen(false);
+  }, []);
+
+  const toggleAllowedRole = useCallback((role: RoleName): void => {
+    setEditForm((prev) => {
+      const present = prev.allowed_roles.includes(role);
+      const next = present
+        ? prev.allowed_roles.filter((r) => r !== role)
+        : [...prev.allowed_roles, role];
+      return { ...prev, allowed_roles: next };
+    });
+  }, []);
+
+  const removeAllowedRole = useCallback((role: string): void => {
+    setEditForm((prev) => ({
+      ...prev,
+      allowed_roles: prev.allowed_roles.filter((r) => r !== role),
+    }));
   }, []);
 
   const submitToyEdit = useCallback(async (): Promise<void> => {
@@ -490,6 +541,11 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
         {
           display_name: editForm.display_name,
           tags: parseTags(editForm.tags),
+          // Always submit allowed_roles (empty array clears any
+          // previous restriction). Omitting it would leave the
+          // existing value untouched — that's NOT what "save the
+          // form" should mean here.
+          allowed_roles: editForm.allowed_roles,
         },
         { signal: aborterRef.current?.signal },
       );
@@ -1039,6 +1095,123 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
                           {editFieldErrors["tags"]}
                         </p>
                       )}
+                    </div>
+                    <div>
+                      <button
+                        type="button"
+                        data-testid="edit-field-allowed-roles"
+                        onClick={() =>
+                          setEditRolePopoverOpen((prev) => !prev)
+                        }
+                        aria-expanded={editRolePopoverOpen}
+                        style={{
+                          display: "block",
+                          fontSize: 12,
+                          padding: "4px 8px",
+                        }}
+                      >
+                        Allowed roles
+                        {editForm.allowed_roles.length > 0 && (
+                          <span style={{ marginLeft: 6, color: "#666" }}>
+                            ({editForm.allowed_roles.length})
+                          </span>
+                        )}
+                      </button>
+                      {editRolePopoverOpen && (
+                        <div
+                          data-testid="allowed-roles-popover"
+                          role="group"
+                          aria-label="Allowed roles"
+                          style={{
+                            border: "1px solid #ccc",
+                            borderRadius: 4,
+                            padding: 8,
+                            marginTop: 4,
+                            background: "#fafafa",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 4,
+                          }}
+                        >
+                          {ROLE_NAMES_SORTED.map((role) => {
+                            const checked =
+                              editForm.allowed_roles.includes(role);
+                            return (
+                              <label
+                                key={role}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 6,
+                                  fontSize: 12,
+                                }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  data-testid={`allowed-role-checkbox-${role}`}
+                                  checked={checked}
+                                  onChange={() => toggleAllowedRole(role)}
+                                />
+                                {ROLE_DISPLAY_NAMES[role]}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {editForm.allowed_roles.length > 0 && (
+                        <div
+                          data-testid="allowed-roles-chips"
+                          style={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: 4,
+                            marginTop: 6,
+                          }}
+                        >
+                          {editForm.allowed_roles.map((role) => (
+                            <span
+                              key={role}
+                              data-testid={`allowed-role-chip-${role}`}
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 4,
+                                padding: "2px 6px",
+                                fontSize: 12,
+                                background: "#e3f2fd",
+                                border: "1px solid #90caf9",
+                                borderRadius: 12,
+                              }}
+                            >
+                              {ROLE_DISPLAY_NAMES[role as RoleName] ?? role}
+                              <button
+                                type="button"
+                                data-testid={`allowed-role-chip-remove-${role}`}
+                                aria-label={`Remove ${role}`}
+                                onClick={() => removeAllowedRole(role)}
+                                style={{
+                                  border: "none",
+                                  background: "transparent",
+                                  cursor: "pointer",
+                                  fontSize: 12,
+                                  padding: 0,
+                                }}
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <p
+                        style={{
+                          color: "#666",
+                          fontSize: 11,
+                          margin: "4px 0 0",
+                        }}
+                      >
+                        Leave empty to allow any role.
+                      </p>
                     </div>
                     {editError !== null && (
                       <p

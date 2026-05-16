@@ -63,6 +63,7 @@ When an activity has more than one ``child_id``:
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
 import random
@@ -114,6 +115,13 @@ class ResolvedToy:
     ``last_used_at`` is included so the call site can also record toy
     recency on the labeled_events row if it wants — the resolver itself
     doesn't update the column.
+
+    ``allowed_roles`` carries the per-toy role restriction added in
+    migration 0017. The canonical "unrestricted" representation is the
+    empty tuple ``()``; :func:`resolve_role_slots` reads it to filter
+    each role-slot's candidate pool. Empty tuple means the toy is
+    eligible for every Phase K role (backwards compatible for existing
+    rows whose DB column is NULL).
     """
 
     id: str
@@ -121,6 +129,7 @@ class ResolvedToy:
     tags: tuple[str, ...] = ()
     persona_id: str | None = None
     last_used_at: str | None = None
+    allowed_roles: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -344,7 +353,8 @@ def resolve_toys(
     # tiebreak deterministic across SQLite builds (BINARY is the default
     # for TEXT but pinning it makes the contract explicit).
     rows = conn.execute(
-        "SELECT id, display_name, tags, persona_id, last_used_at FROM toys "
+        "SELECT id, display_name, tags, persona_id, last_used_at, allowed_roles "
+        "FROM toys "
         "WHERE archived = 0 "
         "ORDER BY last_used_at IS NULL ASC, last_used_at DESC, id COLLATE BINARY ASC "
         "LIMIT ?",
@@ -353,13 +363,55 @@ def resolve_toys(
     return [_row_to_resolved_toy(r) for r in rows]
 
 
+def _decode_toy_allowed_roles(raw: object) -> tuple[str, ...]:
+    """Decode the ``toys.allowed_roles`` JSON column to a normalized tuple.
+
+    NULL / empty string / malformed JSON / non-array all normalise to
+    the empty tuple (unrestricted). Unknown role names are dropped
+    silently — the picker side won't match an entry that isn't a real
+    role, but we don't want a stale DB row to crash propose either.
+    Mirror of the wire-side decoder in :mod:`toybox.api.toys`.
+    """
+    if raw is None:
+        return ()
+    if not isinstance(raw, str):
+        return ()
+    stripped = raw.strip()
+    if not stripped:
+        return ()
+    try:
+        decoded = json.loads(stripped)
+    except json.JSONDecodeError:
+        _logger.warning(
+            "toys.allowed_roles: malformed JSON %r; treating as unrestricted",
+            raw,
+        )
+        return ()
+    if not isinstance(decoded, list):
+        return ()
+    out: list[str] = []
+    for entry in decoded:
+        if isinstance(entry, str) and entry:
+            out.append(entry)
+    return tuple(out)
+
+
 def _row_to_resolved_toy(row: sqlite3.Row) -> ResolvedToy:
+    # ``allowed_roles`` was added by migration 0017; rows from older
+    # schemas (or hand-built dicts in tests) may not carry the column.
+    # Defensively probe via ``row.keys()`` so the resolver doesn't
+    # crash if a caller hands us a partial row.
+    try:
+        raw_allowed = row["allowed_roles"]
+    except (IndexError, KeyError):
+        raw_allowed = None
     return ResolvedToy(
         id=str(row["id"]),
         display_name=str(row["display_name"]),
         tags=_split_csv(row["tags"]),
         persona_id=row["persona_id"],
         last_used_at=row["last_used_at"],
+        allowed_roles=_decode_toy_allowed_roles(raw_allowed),
     )
 
 
@@ -853,8 +905,9 @@ def resolve_role_slots(
     # gated ``len(required_roles) > len(available_toys)`` above, so the
     # pool size is guaranteed adequate.
     for role in _ordered_roles(required_roles):
+        candidate_pool = _filter_pool_for_role(remaining_toys, role, template_id)
         weight = _coerce_weight(role_weights.get(role.value))
-        picked = _pick_weighted(remaining_toys, weight, rng)
+        picked = _pick_weighted(candidate_pool, weight, rng)
         assignments[role.value] = picked
         remaining_toys = [t for t in remaining_toys if t.id != picked.id]
 
@@ -864,8 +917,9 @@ def resolve_role_slots(
     # single value, but the lookup is deterministic regardless.
     for role in _ordered_roles(optional_roles):
         if remaining_toys:
+            candidate_pool = _filter_pool_for_role(remaining_toys, role, template_id)
             weight = _coerce_weight(role_weights.get(role.value))
-            picked = _pick_weighted(remaining_toys, weight, rng)
+            picked = _pick_weighted(candidate_pool, weight, rng)
             assignments[role.value] = picked
             remaining_toys = [t for t in remaining_toys if t.id != picked.id]
         else:
@@ -887,6 +941,45 @@ def resolve_role_slots(
             assignments[role.value] = GenericDescriptor(display_name=descriptor_text)
 
     return assignments
+
+
+def _filter_pool_for_role(
+    pool: Sequence[ResolvedToy],
+    role: Role,
+    template_id: str,
+) -> list[ResolvedToy]:
+    """Filter ``pool`` to toys eligible for ``role`` per ``allowed_roles``.
+
+    A toy is eligible when:
+
+    * Its :attr:`ResolvedToy.allowed_roles` tuple is empty (unrestricted),
+      OR
+    * The target ``role.value`` is in :attr:`ResolvedToy.allowed_roles`.
+
+    Soft fallback (NOT hard skip): if the filtered pool is empty,
+    returns ``pool`` unchanged and logs one info-level message per
+    fallback. The filter never causes a role slot to fail when the
+    unfiltered pool has candidates — the worst case is "we wanted to
+    honour the operator's role restriction but couldn't, so we picked
+    from the full pool instead". This matches the per-toy restriction's
+    advisory nature: it expresses a preference, not a hard constraint
+    that could starve the cast.
+
+    Returns a fresh ``list[ResolvedToy]`` so the caller can drop the
+    picked toy without mutating the input.
+    """
+    if not pool:
+        return list(pool)
+    filtered = [toy for toy in pool if not toy.allowed_roles or role.value in toy.allowed_roles]
+    if not filtered:
+        _logger.info(
+            "toy role restriction had no candidates for role=%s; "
+            "falling back to unrestricted pool (template=%r)",
+            role.value,
+            template_id,
+        )
+        return list(pool)
+    return filtered
 
 
 def _ordered_roles(raw_roles: Sequence[object]) -> list[Role]:

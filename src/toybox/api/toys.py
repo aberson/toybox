@@ -24,6 +24,7 @@ gets ``vision_skipped: true``.
 
 from __future__ import annotations
 
+import json
 import logging
 import sqlite3
 import time
@@ -42,6 +43,7 @@ from fastapi import (
 )
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from ..activities.roles import Role
 from ..ai.breaker import CircuitBreaker
 from ..ai.capability import is_capable
 from ..ai.client import AIClient
@@ -132,7 +134,12 @@ def get_vision_breaker() -> CircuitBreaker:
 
 
 class ToyResponse(BaseModel):
-    """Wire shape for a toy row."""
+    """Wire shape for a toy row.
+
+    ``allowed_roles`` carries the per-toy role restriction (Phase K
+    post-ship). Canonical wire repr is the empty list ``[]`` for
+    "unrestricted" — see migration 0017 for the DB-vs-wire mapping.
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -145,6 +152,7 @@ class ToyResponse(BaseModel):
     archived: bool
     created_at: str
     last_used_at: str | None
+    allowed_roles: list[str] = Field(default_factory=list)
 
 
 class ToyListResponse(BaseModel):
@@ -185,6 +193,33 @@ class UploadResponse(BaseModel):
     height: int
 
 
+def _normalise_allowed_roles(value: list[str]) -> list[str]:
+    """Validate + normalise an ``allowed_roles`` list.
+
+    Each entry must be a member value of :class:`toybox.activities.roles.Role`.
+    Duplicates are silently deduped (first-seen order preserved) so an
+    operator hand-editing the call doesn't see a 422 just because they
+    repeated a role. Unknown values raise :class:`ValueError` which
+    pydantic surfaces as HTTP 422.
+    """
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in value:
+        if not isinstance(raw, str):
+            raise ValueError(f"allowed_roles entry must be a string, got {type(raw).__name__}")
+        try:
+            role = Role(raw)
+        except ValueError as exc:
+            raise ValueError(
+                f"unknown role name {raw!r}; must be one of {sorted(r.value for r in Role)}"
+            ) from exc
+        if role.value in seen:
+            continue
+        seen.add(role.value)
+        out.append(role.value)
+    return out
+
+
 class ToyConfirmRequest(BaseModel):
     """Body for ``POST /api/toys`` (commit a staged upload)."""
 
@@ -194,6 +229,7 @@ class ToyConfirmRequest(BaseModel):
     display_name: str = Field(min_length=1)
     tags: list[str] = Field(default_factory=list, max_length=20)
     persona_id: str | None = None
+    allowed_roles: list[str] | None = Field(default=None, max_length=len(Role))
 
     @field_validator("display_name")
     @classmethod
@@ -223,6 +259,13 @@ class ToyConfirmRequest(BaseModel):
             out.append(stripped)
         return out
 
+    @field_validator("allowed_roles")
+    @classmethod
+    def _validate_allowed_roles(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return None
+        return _normalise_allowed_roles(value)
+
 
 class ToyUpdateRequest(BaseModel):
     """Body for ``PATCH /api/toys/{id}``. All fields optional."""
@@ -233,6 +276,7 @@ class ToyUpdateRequest(BaseModel):
     tags: list[str] | None = None
     persona_id: str | None = None
     archived: bool | None = None
+    allowed_roles: list[str] | None = Field(default=None, max_length=len(Role))
 
     @field_validator("display_name")
     @classmethod
@@ -269,6 +313,13 @@ class ToyUpdateRequest(BaseModel):
             seen.add(key)
             out.append(stripped)
         return out
+
+    @field_validator("allowed_roles")
+    @classmethod
+    def _validate_allowed_roles(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return None
+        return _normalise_allowed_roles(value)
 
 
 class DeleteResponse(BaseModel):
@@ -387,11 +438,72 @@ def _join_tags(tags: list[str]) -> str | None:
     return ",".join(tags)
 
 
+def _decode_allowed_roles(raw: object) -> list[str]:
+    """Decode the ``toys.allowed_roles`` column into the wire list.
+
+    The DB column is JSON-encoded ``list[str]`` (or NULL for the
+    unrestricted default — see migration 0017). Either of ``NULL`` /
+    empty string / ``'[]'`` normalises to the empty list on the wire.
+    Unknown values (a row hand-edited to a bogus JSON shape) are
+    treated as unrestricted with a WARNING log; the picker side enforces
+    the role-name vocabulary independently so a stale DB row can't crash
+    propose.
+    """
+    if raw is None:
+        return []
+    if not isinstance(raw, str):
+        _logger.warning(
+            "toys.allowed_roles: expected TEXT or NULL, got %s; treating as unrestricted",
+            type(raw).__name__,
+        )
+        return []
+    stripped = raw.strip()
+    if not stripped:
+        return []
+    try:
+        decoded = json.loads(stripped)
+    except json.JSONDecodeError:
+        _logger.warning(
+            "toys.allowed_roles: malformed JSON %r; treating as unrestricted",
+            raw,
+        )
+        return []
+    if not isinstance(decoded, list):
+        _logger.warning(
+            "toys.allowed_roles: expected JSON array, got %s; treating as unrestricted",
+            type(decoded).__name__,
+        )
+        return []
+    out: list[str] = []
+    for entry in decoded:
+        if isinstance(entry, str):
+            out.append(entry)
+    return out
+
+
+def _encode_allowed_roles_for_db(value: list[str]) -> str | None:
+    """Encode a validated ``allowed_roles`` list for storage.
+
+    Empty list → ``None`` (canonical "unrestricted" sentinel in the DB).
+    Non-empty list → JSON-encoded string with stable key order.
+    """
+    if not value:
+        return None
+    return json.dumps(value, separators=(",", ":"))
+
+
 def _row_to_response(row: sqlite3.Row | dict[str, Any]) -> ToyResponse:
     # Both ``sqlite3.Row`` and ``dict`` expose a ``__getitem__`` that
     # accepts a string key and returns the column value, so we just
     # bind once and call uniformly.
     getter: Any = row.__getitem__
+    # ``allowed_roles`` was added in migration 0017. Some Row-like inputs
+    # (e.g. a hand-built dict in a test) may omit the column entirely;
+    # treat that as unrestricted rather than crashing.
+    try:
+        raw_allowed = getter("allowed_roles")
+    except (KeyError, IndexError):
+        raw_allowed = None
     return ToyResponse(
         id=str(getter("id")),
         display_name=str(getter("display_name")),
@@ -402,6 +514,7 @@ def _row_to_response(row: sqlite3.Row | dict[str, Any]) -> ToyResponse:
         archived=bool(getter("archived")),
         created_at=str(getter("created_at")),
         last_used_at=getter("last_used_at"),
+        allowed_roles=_decode_allowed_roles(raw_allowed),
     )
 
 
@@ -669,14 +782,15 @@ async def post_confirm(
     # this keeps the invariant local to commit).
     image_hash = compute_hash(committed.read_bytes())
     tags_blob = _join_tags(body.tags)
+    allowed_roles_blob = _encode_allowed_roles_for_db(body.allowed_roles or [])
     created_at = _now_iso()
     try:
         with conn:
             conn.execute(
                 "INSERT INTO toys "
                 "(id, display_name, image_path, image_hash, type, tags, "
-                " persona_id, archived, created_at, last_used_at) "
-                "VALUES (?, ?, ?, ?, NULL, ?, ?, 0, ?, NULL)",
+                " persona_id, archived, created_at, last_used_at, allowed_roles) "
+                "VALUES (?, ?, ?, ?, NULL, ?, ?, 0, ?, NULL, ?)",
                 (
                     new_id,
                     body.display_name,
@@ -685,6 +799,7 @@ async def post_confirm(
                     tags_blob,
                     body.persona_id,
                     created_at,
+                    allowed_roles_blob,
                 ),
             )
     except sqlite3.IntegrityError as exc:
@@ -857,6 +972,16 @@ def patch_toy(
         elif col == "archived":
             columns.append("archived = ?")
             params.append(1 if value else 0)
+        elif col == "allowed_roles":
+            # Canonical "unrestricted" sentinel is NULL (see migration
+            # 0017). PATCH ``allowed_roles=[]`` clears any previous
+            # restriction by writing NULL. An explicit ``null`` body
+            # also reaches this branch with ``value=None`` (since
+            # ``exclude_unset`` only filters fields the client never
+            # sent, not ones explicitly set to ``null``); both are
+            # treated identically — clear the restriction.
+            columns.append("allowed_roles = ?")
+            params.append(_encode_allowed_roles_for_db(value or []))
         else:
             columns.append(f"{col} = ?")
             params.append(value)

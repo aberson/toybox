@@ -188,6 +188,10 @@ export interface ChildInUseDetail {
 
 // Step 16: toy ingest wire shapes. Mirror the Pydantic models in
 // src/toybox/api/toys.py.
+//
+// ``allowed_roles`` was added by migration 0017 (per-toy role
+// restriction). Canonical wire repr: empty array = "unrestricted"
+// (default — backwards-compatible for every existing toy).
 export interface Toy {
   id: string;
   display_name: string;
@@ -198,6 +202,7 @@ export interface Toy {
   archived: boolean;
   created_at: string;
   last_used_at: string | null;
+  allowed_roles: string[];
 }
 
 export interface ToyVisionSuggestion {
@@ -239,15 +244,20 @@ export interface ToyConfirmRequest {
   display_name: string;
   tags: string[];
   persona_id?: string | null;
+  allowed_roles?: string[];
 }
 
 // Body for PATCH /api/toys/{id}. All fields optional; only fields
 // present in the body are written.
+//
+// ``allowed_roles=[]`` clears any previously-set per-toy role
+// restriction; omitting the field leaves the existing value untouched.
 export interface ToyUpdateRequest {
   display_name?: string;
   tags?: string[];
   persona_id?: string | null;
   archived?: boolean;
+  allowed_roles?: string[];
 }
 
 export interface ToyListResponse {

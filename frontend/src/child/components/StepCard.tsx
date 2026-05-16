@@ -164,6 +164,34 @@ function lookupToyDisplayName(
   return undefined;
 }
 
+// Phase K K1+ multi-toy sprite resolution: pick the cast member whose
+// rendered display name appears earliest in the step body. Word-boundary
+// regex avoids substring false-positives (e.g. "Bear" inside "Big Bear").
+// Returns the fallback (activity-level ``toy_ids[0]``) when no role
+// resolves — pre-K activities, role-less templates, or steps whose body
+// names no cast member (transitional / parametric-only steps).
+function resolveStepToyId(
+  body: string | undefined,
+  roles: Activity["roles"],
+  fallback: string | null,
+): string | null {
+  if (!body || !roles) return fallback;
+  let bestIdx = -1;
+  let bestToyId: string | null = null;
+  for (const role of Object.values(roles)) {
+    if (!role.toy_id) continue;
+    const name = role.display_name;
+    if (!name) continue;
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const match = new RegExp(`\\b${escaped}\\b`).exec(body);
+    if (match !== null && (bestIdx === -1 || match.index < bestIdx)) {
+      bestIdx = match.index;
+      bestToyId = role.toy_id;
+    }
+  }
+  return bestToyId ?? fallback;
+}
+
 // The kiosk renders the step flagged `current: true`. While the
 // activity is `approved` (parent has approved but the child hasn't
 // pressed the button yet) no step is current — we render the first
@@ -191,21 +219,27 @@ export function StepCard(props: StepCardProps): JSX.Element {
       ? currentStep.choices
       : null;
 
-  // Phase F Step F7 sprite resolution. Both signals must be present
-  // for the sprite to render: the step itself must opt in via
-  // ``action_slot``, and the activity must carry at least one toy
-  // (``toy_ids[0]`` is the deterministic pick — multi-toy
-  // composition is out of scope for v1, see plan §"Activity → toy
-  // resolution"). When either is missing the kiosk renders the same
-  // body-only layout it shipped with before F7.
+  // Phase F Step F7 sprite resolution. The sprite renders when the
+  // step opts in via ``action_slot`` and we can resolve a toy id.
+  //
+  // Phase K K1+ adds multi-toy role substitution into step bodies
+  // (e.g. ``{quest_giver}`` → "Bowser"). The activity-level
+  // ``toy_ids[0]`` is the persona-matched primary toy and is often
+  // unrelated to the cast — using it for every step shows the wrong
+  // toy whenever the body names a different role's display name.
+  // ``resolveStepToyId`` scans ``activity.roles`` for the role whose
+  // display name appears earliest in the rendered body and returns
+  // that role's toy_id; falls back to ``toy_ids[0]`` for pre-K
+  // activities or steps whose body names no cast member.
   const slot =
     previewStep !== null && typeof previewStep.action_slot === "string"
       ? previewStep.action_slot
       : null;
-  const toyId =
+  const fallbackToyId =
     activity.toy_ids !== undefined && activity.toy_ids.length > 0
       ? (activity.toy_ids[0] ?? null)
       : null;
+  const toyId = resolveStepToyId(previewStep?.body, activity.roles, fallbackToyId);
   const showSprite = slot !== null && toyId !== null;
   const toyDisplayName =
     showSprite && toyId !== null ? lookupToyDisplayName(activity, toyId) : undefined;

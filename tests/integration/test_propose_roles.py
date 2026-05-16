@@ -359,3 +359,196 @@ def test_propose_substitutes_role_placeholder_in_title(
         )
 
     generator.clear_template_cache()
+
+
+# ---------------------------------------------------------------------
+# Per-toy role restrictions (migration 0017): end-to-end through propose
+# ---------------------------------------------------------------------
+
+
+def _seed_role_restricted_toys(db_path: Path) -> list[tuple[str, str, str | None]]:
+    """Insert toys whose ``allowed_roles`` cover both restricted + open.
+
+    Returns ``[(toy_id, display_name, allowed_roles_json | None)]``.
+    The restricted toy is keyed FIRST in id-sort order so the K4 picker
+    sees it as the primary candidate for the role-weight bias path.
+    """
+    toys: list[tuple[str, str, str | None]] = [
+        # Bowser: restricted to a role the fixture template does NOT
+        # require (quest_giver / friend are the requirements). Without
+        # the per-toy restriction wire-up, Bowser would be a viable
+        # candidate for both required roles.
+        ("a_bowser", "Bowser", '["big_bad_boss"]'),
+        # Three unrestricted toys so the picker can fill quest_giver +
+        # friend without falling back.
+        ("b_owl", "Wise Owl", None),
+        ("c_cat", "Clever Cat", None),
+        ("d_duck", "Daring Duck", None),
+    ]
+    conn = connect(db_path)
+    try:
+        with conn:
+            for toy_id, display_name, allowed_json in toys:
+                conn.execute(
+                    "INSERT INTO toys "
+                    "(id, display_name, image_path, image_hash, type, tags, "
+                    " persona_id, archived, created_at, last_used_at, allowed_roles) "
+                    "VALUES (?, ?, ?, ?, NULL, NULL, NULL, 0, "
+                    " '2026-01-01T00:00:00Z', NULL, ?)",
+                    (
+                        toy_id,
+                        display_name,
+                        f"img/{toy_id}.png",
+                        f"hash-{toy_id}",
+                        allowed_json,
+                    ),
+                )
+    finally:
+        conn.close()
+    return toys
+
+
+def test_propose_excludes_role_restricted_toy_from_non_allowed_slot(
+    client: TestClient,
+    parent_headers: dict[str, str],
+    db_path: Path,
+    role_template_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Production-caller integration test for the per-toy role restriction.
+
+    Setup: 4 toys — Bowser restricted to ``big_bad_boss``; the others
+    unrestricted. Template requires ``quest_giver`` + ``friend``.
+    Bowser MUST NOT be cast into either slot — the picker should
+    prefer one of the unrestricted toys for both roles. This catches
+    the silent-wiring failure mode where the filter never reaches the
+    picker from the production propose path (code-quality.md §4).
+    """
+    from toybox.activities import generator
+
+    monkeypatch.setattr(generator, "TEMPLATES_DIR", role_template_dir)
+    generator.clear_template_cache()
+
+    seeded = _seed_role_restricted_toys(db_path)
+    _seed_role_weighted_persona(db_path)
+
+    response = client.post(
+        "/api/activities/propose",
+        json=_PROPOSE_BODY,
+        headers=parent_headers,
+    )
+    assert response.status_code == 201, response.text
+    body = cast("dict[str, Any]", response.json())
+
+    roles = body.get("roles") or {}
+    assert set(roles.keys()) == {"quest_giver", "friend"}, (
+        f"propose must seed both roles; got {sorted(roles.keys())!r}"
+    )
+
+    restricted_id = seeded[0][0]  # Bowser
+    unrestricted_ids = {t[0] for t in seeded[1:]}
+
+    for role_name, assignment in roles.items():
+        toy_id = assignment.get("toy_id")
+        assert toy_id is not None, f"role {role_name!r} must have a toy_id"
+        assert toy_id != restricted_id, (
+            f"per-toy role restriction failed: Bowser (restricted to big_bad_boss) "
+            f"was cast as {role_name!r}; allowed_roles filter never reached the "
+            f"picker from the production propose path"
+        )
+        assert toy_id in unrestricted_ids, (
+            f"role {role_name!r} toy_id {toy_id!r} unexpected — expected one of "
+            f"the three unrestricted toys"
+        )
+
+    generator.clear_template_cache()
+
+
+def test_propose_casts_restricted_toy_for_its_allowed_role(
+    client: TestClient,
+    parent_headers: dict[str, str],
+    tmp_path: Path,
+    db_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Mirror of the above but with a template whose required_role IS
+    the toy's allowed role — the restricted toy SHOULD be cast.
+
+    Builds a one-off boredom template that requires ``big_bad_boss``
+    only, seeds Bowser (restricted to big_bad_boss) as the sole toy,
+    and asserts Bowser fills the slot. The point is to lock that the
+    filter doesn't accidentally exclude eligible toys.
+    """
+    from toybox.activities import generator
+
+    # Build a custom fixture: required role = ``big_bad_boss`` only.
+    custom_template = {
+        "intent": "boredom",
+        "templates": [
+            {
+                "id": "fixture_role_required_big_bad_boss",
+                "title": "{big_bad_boss} stomps in.",
+                "buckets": ["always"],
+                "required_roles": ["big_bad_boss"],
+                "optional_roles": [],
+                "steps": [
+                    {"text": "{big_bad_boss} arrives and grumbles dramatically."},
+                    {"text": "{big_bad_boss} declares a friendly competition."},
+                    {"text": "Everyone cheers as {big_bad_boss} laughs along."},
+                ],
+            }
+        ],
+    }
+    staged = tmp_path / "templates_big_bad_boss"
+    staged.mkdir()
+    (staged / "boredom.json").write_text(json.dumps(custom_template, indent=2), encoding="utf-8")
+    src_schema = (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "toybox"
+        / "activities"
+        / "templates"
+        / "_schema.json"
+    )
+    import shutil  # local import — only this branch needs it.
+
+    shutil.copy(src_schema, staged / "_schema.json")
+
+    monkeypatch.setattr(generator, "TEMPLATES_DIR", staged)
+    generator.clear_template_cache()
+
+    # Seed Bowser only — restricted to big_bad_boss; the template's
+    # required role IS big_bad_boss, so the filter keeps Bowser in.
+    conn = connect(db_path)
+    try:
+        with conn:
+            conn.execute(
+                "INSERT INTO toys "
+                "(id, display_name, image_path, image_hash, type, tags, "
+                " persona_id, archived, created_at, last_used_at, allowed_roles) "
+                "VALUES ('a_bowser', 'Bowser', 'img/bowser.png', 'hash-bowser', "
+                " NULL, NULL, NULL, 0, '2026-01-01T00:00:00Z', NULL, "
+                " '[\"big_bad_boss\"]')"
+            )
+    finally:
+        conn.close()
+    _seed_role_weighted_persona(db_path)
+
+    response = client.post(
+        "/api/activities/propose",
+        json=_PROPOSE_BODY,
+        headers=parent_headers,
+    )
+    assert response.status_code == 201, response.text
+    body = cast("dict[str, Any]", response.json())
+
+    roles = body.get("roles") or {}
+    assert set(roles.keys()) == {"big_bad_boss"}, (
+        f"propose must seed only the big_bad_boss role; got {sorted(roles.keys())!r}"
+    )
+    assignment = roles["big_bad_boss"]
+    assert assignment.get("toy_id") == "a_bowser", (
+        f"the restricted Bowser SHOULD be cast as big_bad_boss; got {assignment!r}"
+    )
+
+    generator.clear_template_cache()
