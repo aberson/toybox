@@ -9,6 +9,10 @@ export default defineConfig({
   server: {
     port: 4000,
     strictPort: true,
+    // Bind all interfaces so the iPad PWA can reach the kiosk over LAN
+    // during operator UATs (K18 onward). Loopback-only default + Windows
+    // IPv6 binding ([::1]) made http://<LAN_IP>:4000/child unreachable.
+    host: true,
     proxy: {
       "/api": {
         target: "http://localhost:8000",

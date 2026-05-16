@@ -91,12 +91,22 @@
           "action_slot": "jumping"
         },
         {
+          "text": "(embedded joke — body rendered from corpus at advance time)",
+          "kind": "joke",
+          "auto": true
+        },
+        {
           "text": "Now turn left and {action_verb} until you bump into something soft.",
           "action_slot": "running"
         },
         {
           "text": "Look down — what is the closest {prop} to your foot?",
           "action_slot": "looking"
+        },
+        {
+          "text": "(embedded song — body rendered from corpus at advance time)",
+          "kind": "song",
+          "auto": true
         },
         {
           "text": "{quest_giver} whispers: the treasure is hidden under or behind it.",
