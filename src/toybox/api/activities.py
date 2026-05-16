@@ -2281,8 +2281,15 @@ def _do_propose(
     # intended loop calls that fell back vs. real Claude outages.
     if loop_fallback_reason is not None:
         metadata["fallback_reason"] = loop_fallback_reason
+    # Phase K (issue #135): title is provisionally the generator's
+    # already-rendered value. When ``role_slot_overlay`` is non-empty
+    # the title is re-rendered below from ``template_for_roles.title``
+    # so role-name placeholders (``{trickster}`` etc.) resolve to the
+    # picked toy display names. Without that re-render the literal
+    # ``{role_name}`` leaks to the parent suggestion card + kiosk header.
+    rendered_title = activity.title
     summary_payload = {
-        "title": activity.title,
+        "title": rendered_title,
         "metadata": metadata,
         "template_id": activity.template_id,
     }
@@ -2320,12 +2327,26 @@ def _do_propose(
     # ``render_with_slot_fills`` resolves ``{quest_giver}`` etc. The
     # overlay never collides with legacy slot names (role values are
     # snake_case role taxonomy entries, never ``toy``/``slot``/the
-    # SlotRegistry word-list names). Also re-render step bodies +
-    # choice labels NOW so the persisted ``activity_steps`` row carries
-    # the substituted text — the generator ran without role context so
-    # its initial render left the placeholders intact.
+    # SlotRegistry word-list names). Also re-render the title + step
+    # bodies + choice labels NOW so the persisted ``activity_steps`` row
+    # carries the substituted text — the generator ran without role
+    # context so its initial render left the placeholders intact.
+    #
+    # Issue #135 fix: the title re-render uses ``template_for_roles.title``
+    # (the raw template text with placeholders intact), NOT
+    # ``activity.title`` (which the generator already partial-rendered).
+    # Re-rendering the partial would be a no-op because role placeholders
+    # are still literal in the partial — we MUST render from the raw
+    # template to pick up the merged role fills.
     if role_slot_overlay:
         slot_fills_arg.update(role_slot_overlay)
+        # Re-render title from raw template (guarded — ``template_for_roles``
+        # is only set when a role-bearing template was found above; an
+        # empty overlay won't reach this branch so the guard is belt-and-
+        # suspenders).
+        if template_for_roles is not None:
+            rendered_title = render_with_slot_fills(template_for_roles.title, slot_fills_arg)
+            summary_payload["title"] = rendered_title
         # Re-render every step's body + choice labels with the merged
         # slot fills. The generator already substituted legacy slots;
         # this pass picks up the newly-merged role names.
@@ -2342,9 +2363,11 @@ def _do_propose(
         # on every read (REST GET, WS ``activity.state`` envelope).
         metadata["role_assignments"] = role_records
         metadata["cast_summary"] = cast_summary
-        # Re-encode summary_payload now that metadata changed.
+        # Re-encode summary_payload now that metadata changed. Reuse
+        # ``rendered_title`` (set above when role_slot_overlay was
+        # non-empty) so the role-substituted title is preserved.
         summary_payload = {
-            "title": activity.title,
+            "title": rendered_title,
             "metadata": metadata,
             "template_id": activity.template_id,
         }
@@ -2788,8 +2811,18 @@ def post_recast(
     # name keys overwrite; non-role keys (toy / room / adjective / ...)
     # are preserved verbatim — the legacy ``{toy}`` substitution path
     # MUST survive recast even on role-bearing templates.
+    #
+    # Issue #135 fix: also re-render the title from the RAW
+    # ``template.title`` text (not from the persisted ``title`` which
+    # has already been substituted at propose time — re-rendering that
+    # would be a no-op since role placeholders are gone). When the
+    # template is no longer findable (renamed between propose + recast)
+    # we leave the persisted title unchanged: best-effort contract
+    # mirrors how step-body re-rendering also short-circuits below.
     if role_overlay:
         slot_fills.update(role_overlay)
+        if template is not None:
+            title = render_with_slot_fills(template.title, slot_fills)
 
     # Re-render every persisted activity_steps row using the new fills.
     # In ``proposed`` state lazy-insert has only written ``steps[0]`` so

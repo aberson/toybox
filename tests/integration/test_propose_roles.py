@@ -24,6 +24,7 @@ id toy fills ``friend``.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 from pathlib import Path
 from typing import Any, cast
@@ -288,5 +289,73 @@ def test_propose_wires_role_slot_engine_end_to_end(
         f"slot_fills_json.quest_giver should equal the resolved quest_giver display name "
         f"{quest_giver_display!r}; got {persisted.get('quest_giver')!r}"
     )
+
+    generator.clear_template_cache()
+
+
+# Issue #135: title leaked literal {role_name} placeholders because the
+# propose path re-rendered step bodies + choice labels with the merged
+# role_slot_overlay but never re-rendered the title. This regression test
+# pins the fix end-to-end through the production endpoint.
+_PLACEHOLDER_RE = re.compile(r"\{[a-z_]+\}")
+
+
+def test_propose_substitutes_role_placeholder_in_title(
+    client: TestClient,
+    parent_headers: dict[str, str],
+    db_path: Path,
+    role_template_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Issue #135 regression: ``response["title"]`` must NOT contain a
+    literal ``{role_name}`` placeholder after propose merges the
+    role-slot overlay. Resolved role display names must appear verbatim
+    in the rendered title.
+
+    Fixture template title: ``"A quest for {quest_giver} and {friend}"``
+    — both role placeholders MUST resolve to picked-toy display names.
+    """
+    from toybox.activities import generator
+
+    monkeypatch.setattr(generator, "TEMPLATES_DIR", role_template_dir)
+    generator.clear_template_cache()
+
+    _seed_toys(db_path)
+    _seed_role_weighted_persona(db_path)
+
+    response = client.post(
+        "/api/activities/propose",
+        json=_PROPOSE_BODY,
+        headers=parent_headers,
+    )
+    assert response.status_code == 201, response.text
+    body = cast("dict[str, Any]", response.json())
+
+    title = body.get("title")
+    assert isinstance(title, str) and title, (
+        f"propose response must have a non-empty title; got {title!r}"
+    )
+
+    # ----- (a) no literal {role_name} placeholders leak -----
+    leftover = _PLACEHOLDER_RE.search(title)
+    assert leftover is None, (
+        f"propose response title still contains a literal placeholder "
+        f"{leftover.group(0) if leftover else None!r} (issue #135 regression): {title!r}"
+    )
+
+    # ----- (b) each resolved role display name appears verbatim in title -
+    roles = body.get("roles") or {}
+    assert set(roles.keys()) == {"quest_giver", "friend"}, (
+        f"propose must seed both roles; got {sorted(roles.keys())!r}"
+    )
+    for role_name, assignment in roles.items():
+        display_name = assignment.get("display_name")
+        assert isinstance(display_name, str) and display_name, (
+            f"role {role_name!r} must have a non-empty display_name; got {display_name!r}"
+        )
+        assert display_name in title, (
+            f"role {role_name!r} display_name {display_name!r} should appear "
+            f"verbatim in title {title!r}"
+        )
 
     generator.clear_template_cache()

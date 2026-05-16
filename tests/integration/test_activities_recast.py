@@ -22,6 +22,7 @@ production caller) requirement is satisfied for the recast endpoint.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 from pathlib import Path
 from typing import Any, cast
@@ -402,3 +403,84 @@ def test_recast_unknown_activity_returns_404(
     detail = resp.json()["detail"]
     assert detail["code"] == "activity_not_found"
     assert detail["id"] == "does-not-exist"
+
+
+# Issue #135: recast re-rendered step bodies + choice labels with the
+# merged role_overlay but read ``title`` back from the persisted
+# summary verbatim and never re-rendered it from ``template.title``.
+# This regression test pins the fix end-to-end through the production
+# endpoint.
+_PLACEHOLDER_RE = re.compile(r"\{[a-z_]+\}")
+
+
+def test_recast_re_renders_title_from_template(
+    client: TestClient,
+    parent_headers: dict[str, str],
+    db_path: Path,
+    role_template_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Issue #135 regression: after recast, the response title MUST
+    NOT contain any literal ``{role_name}`` placeholder, and the
+    resolved-role display names from the recast cast MUST appear
+    verbatim in the rendered title.
+
+    Fixture template title: ``"A quest for {quest_giver} and {friend}"``.
+    The recast picks a fresh seed so the cast may or may not differ
+    from propose; whichever cast lands, the title must reflect THAT
+    cast — not the literal placeholder, not the prior cast.
+    """
+    proposed = _propose_role_activity(
+        client, parent_headers, db_path, role_template_dir, monkeypatch
+    )
+    activity_id = proposed["id"]
+    initial_version = proposed["version"]
+    proposed_title = proposed.get("title")
+    assert isinstance(proposed_title, str), (
+        f"propose response must include a title; got {proposed_title!r}"
+    )
+    # Sanity: propose path is already covered by #135 fix; assert here
+    # so a regression on the propose side surfaces on this test too.
+    assert _PLACEHOLDER_RE.search(proposed_title) is None, (
+        f"propose response title still contains a literal placeholder "
+        f"(issue #135 regression): {proposed_title!r}"
+    )
+
+    recast_resp = client.post(
+        f"/api/activities/{activity_id}/recast",
+        json={},
+        headers={**parent_headers, "If-Match-Version": str(initial_version)},
+    )
+    assert recast_resp.status_code == 200, recast_resp.text
+    body = cast("dict[str, Any]", recast_resp.json())
+
+    title = body.get("title")
+    assert isinstance(title, str) and title, (
+        f"recast response must have a non-empty title; got {title!r}"
+    )
+
+    # ----- (a) no literal {role_name} placeholders leak post-recast ------
+    leftover = _PLACEHOLDER_RE.search(title)
+    assert leftover is None, (
+        f"recast response title still contains a literal placeholder "
+        f"{leftover.group(0) if leftover else None!r} (issue #135 regression): {title!r}"
+    )
+
+    # ----- (b) each resolved role display name appears verbatim in title -
+    # We don't gate on whether the recast picked a different toy from
+    # propose (the seed is fresh + the RNG can land on the same cast);
+    # the contract is "title reflects WHATEVER cast resolved on this
+    # recast", which is what we assert.
+    roles = body.get("roles") or {}
+    assert set(roles.keys()) == {"quest_giver", "friend"}, (
+        f"recast must keep both roles; got {sorted(roles.keys())!r}"
+    )
+    for role_name, assignment in roles.items():
+        display_name = assignment.get("display_name")
+        assert isinstance(display_name, str) and display_name, (
+            f"role {role_name!r} must have a non-empty display_name; got {display_name!r}"
+        )
+        assert display_name in title, (
+            f"role {role_name!r} display_name {display_name!r} should appear "
+            f"verbatim in recast title {title!r}"
+        )
