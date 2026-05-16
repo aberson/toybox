@@ -139,6 +139,12 @@ export interface ProposePayload {
   // Step 23: optional "why this?" telemetry (see Activity).
   trigger_phrase?: string | null;
   persona_reasoning?: string | null;
+  // When true, the backend reads recent transcripts, extracts themes,
+  // and biases the template picker toward them. Manual buttons
+  // ("Trigger now" + "New activity") set this so the next proposal
+  // inherits whatever the kid was just talking about. No-op when no
+  // recent transcript matches the theme taxonomy.
+  use_recent_transcripts?: boolean;
 }
 
 // Step 18: child-profile editor wire shapes. Mirror the Pydantic
@@ -849,11 +855,15 @@ export class ApiClient {
   async regenerate(
     id: string,
     version: number,
-    opts: RequestOptions = {},
+    opts: RequestOptions & { useRecentTranscripts?: boolean } = {},
   ): Promise<Activity> {
+    const body: Record<string, unknown> = {};
+    if (opts.useRecentTranscripts === true) {
+      body["use_recent_transcripts"] = true;
+    }
     return this.request<Activity>(`/api/activities/${encodeURIComponent(id)}/regenerate`, {
       method: "POST",
-      body: JSON.stringify({}),
+      body: JSON.stringify(body),
       ifMatchVersion: version,
       signal: opts.signal,
     });

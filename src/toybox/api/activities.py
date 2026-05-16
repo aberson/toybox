@@ -57,6 +57,7 @@ from ..activities.generator import (
     resolve_dispatch,
 )
 from ..activities.interjection import build_interjection_step
+from ..activities.topic_extract import extract_themes
 from ..activities.interjections import InterjectionKind
 from ..activities.joke_corpus import Joke, apply_toy_substitution, pick_joke
 from ..activities.roles import (
@@ -394,6 +395,16 @@ class ProposeRequest(BaseModel):
     # north of any realistic spoken phrase.
     trigger_phrase: str | None = Field(default=None, max_length=512)
     persona_reasoning: str | None = Field(default=None, max_length=512)
+    # When true, the propose handler reads the most-recent unexpired
+    # transcripts, extracts themes via
+    # :func:`toybox.activities.topic_extract.extract_themes`, and biases
+    # the template picker toward those themes (no-op when no themes
+    # match — see :func:`_apply_preferred_themes`). Default ``False``
+    # for back-compat with existing tests + mic-driven proposals (which
+    # already carry the transcript's literal phrase via
+    # :data:`Intent.phrase`). Frontend "Trigger now" + "New activity"
+    # set this to ``True`` so manual buttons inherit recent context.
+    use_recent_transcripts: bool = False
 
 
 class ApproveRequest(BaseModel):
@@ -417,6 +428,10 @@ class RegenerateRequest(BaseModel):
     # as ``ProposeRequest`` (see comment above).
     trigger_phrase: str | None = Field(default=None, max_length=512)
     persona_reasoning: str | None = Field(default=None, max_length=512)
+    # Same semantics as :attr:`ProposeRequest.use_recent_transcripts`.
+    # Regenerate funnels through :func:`_do_propose` so the flag rides
+    # the same code path.
+    use_recent_transcripts: bool = False
 
 
 class DidntWorkRequest(BaseModel):
@@ -2088,6 +2103,46 @@ def _do_propose(
         dispatch = _resolve_local_dispatch(dispatch)
     loop_tool_calls: list[dict[str, Any]] | None = None
     generator_path_for_recording = GENERATOR_PATH_OFFLINE
+
+    # Manual buttons ("Trigger now" + "New activity") set
+    # ``use_recent_transcripts`` so the next propose biases toward
+    # whatever the kid was just talking about. We extract themes here
+    # and pass them through to the offline picker. Best-effort: a
+    # transcript-read failure or zero matches degrades to no-bias
+    # (current behavior). Capped at 20 recent rows — that's roughly
+    # the last 5–10 minutes of speech, plenty of context without
+    # turning every propose call into a long scan.
+    preferred_themes: tuple[str, ...] = ()
+    # First transcript text + extracted themes are kept around so the
+    # "Why this?" panel can surface the bias provenance ("kid said X →
+    # we biased toward [adventure]"). Set only when bias actually had
+    # input to work with — empty when no transcripts or no theme match.
+    bias_source_phrase: str | None = None
+    if body.use_recent_transcripts:
+        try:
+            transcript_rows = conn.execute(
+                "SELECT text FROM transcripts WHERE text IS NOT NULL "
+                "ORDER BY ended_at DESC LIMIT 20"
+            ).fetchall()
+            transcript_texts = [str(r["text"]) for r in transcript_rows]
+            extracted = extract_themes(transcript_texts)
+            preferred_themes = tuple(str(t) for t in extracted)
+            if preferred_themes:
+                _logger.info(
+                    "propose: biasing toward themes %s from %d recent transcript(s)",
+                    list(preferred_themes),
+                    len(transcript_texts),
+                )
+                # Most-recent transcript becomes the "why this?" trigger
+                # phrase fallback so the parent can see what the kid
+                # said that drove the bias.
+                if transcript_texts:
+                    bias_source_phrase = transcript_texts[0]
+        except sqlite3.Error:
+            _logger.warning(
+                "propose: recent-transcript read failed; falling back to no-bias",
+                exc_info=True,
+            )
     if dispatch.adapter == ADAPTER_LOCAL:
         # is_local_capable returned True -- route through the local
         # adapter. Pre-Step-26 this raises NotImplementedError; the
@@ -2156,6 +2211,7 @@ def _do_propose(
                 available_toys=resolved_toys,
                 available_rooms=resolved_rooms,
                 resolved_children=resolved_children,
+                preferred_themes=preferred_themes,
             )
             loop_tool_calls = None
     else:
@@ -2176,6 +2232,7 @@ def _do_propose(
             available_toys=resolved_toys,
             available_rooms=resolved_rooms,
             resolved_children=resolved_children,
+            preferred_themes=preferred_themes,
         )
     # Phase K K5: role-slot resolution. When the picked template
     # declared ``required_roles`` or ``optional_roles`` at K3 schema
@@ -2269,11 +2326,28 @@ def _do_propose(
     # parent trust more than a generic rationale.
     if body.trigger_phrase is not None and body.trigger_phrase.strip():
         metadata["trigger_phrase"] = body.trigger_phrase.strip()
+    elif bias_source_phrase is not None and bias_source_phrase.strip():
+        # No explicit trigger phrase, but the bias path read recent
+        # transcripts and found themes — surface the most-recent one
+        # so "Why this?" shows the kid's actual speech instead of the
+        # generic "(no trigger — proposed manually)" fallback.
+        metadata["trigger_phrase"] = bias_source_phrase.strip()[:512]
     metadata["persona_reasoning"] = _build_persona_reasoning(
         caller_supplied=body.persona_reasoning,
         intent=body.intent,
         persona_meta=persona_meta,
     )
+    # Append the bias provenance to ``persona_reasoning`` when the
+    # transcript-bias path actually had themes to use. Lets the parent
+    # see that the picker was nudged toward a specific theme set
+    # rather than just hitting the default pool — useful both for
+    # trust ("the system is listening") and debugging ("the bias
+    # picked adventure even though I wanted magic").
+    if preferred_themes:
+        metadata["persona_reasoning"] = (
+            f"{metadata['persona_reasoning']} "
+            f"(biased toward {', '.join(preferred_themes)} from recent speech)"
+        )
     # H3: when the loop-mode dispatch caught a narrow transient failure
     # and fell back to the offline generator, surface the reason on the
     # activity's metadata envelope so an operator running queries
@@ -2658,6 +2732,7 @@ def post_regenerate(
             context=context,
             trigger_phrase=inherited_trigger,
             persona_reasoning=inherited_reasoning,
+            use_recent_transcripts=body.use_recent_transcripts,
         ),
         conn,
         pubsub,

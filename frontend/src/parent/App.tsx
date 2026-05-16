@@ -554,11 +554,17 @@ export function App(): JSX.Element {
     try {
       const now = new Date();
       const seed = Math.floor(Math.random() * 1_000_000);
+      // ``use_recent_transcripts``: the backend reads recent transcripts,
+      // extracts themes via the topic_extract synonym map, and biases the
+      // template picker toward what the kid was just talking about.
+      // No-op when there's no recent transcript matching the taxonomy —
+      // falls back to the current "request_play / freeplay" pool.
       const activity = await api.propose({
         intent: "request_play",
         slot: "freeplay",
         hour: now.getHours(),
         seed,
+        use_recent_transcripts: true,
       });
       // Version-guarded set so a same-id ws envelope can't be regressed
       // by a slow propose response landing late.
@@ -652,8 +658,12 @@ export function App(): JSX.Element {
 
   const handleRegenerate = useCallback(
     async (target: Activity): Promise<void> => {
+      // Manual "skip" / "new activity" / "try a different one" all funnel
+      // through here. Set ``useRecentTranscripts`` so the backend biases
+      // the next pick toward whatever the kid was just talking about —
+      // matches the same opt-in already on ``handleTrigger``.
       const result = await withConflictHandler({
-        mutation: () => api.regenerate(target.id, target.version),
+        mutation: () => api.regenerate(target.id, target.version, { useRecentTranscripts: true }),
         refetch: () => refetchActivity(target.id),
         onConflict: (conflict, fresh) => {
           useParentStore.getState().applyVersionConflict(conflict, fresh);

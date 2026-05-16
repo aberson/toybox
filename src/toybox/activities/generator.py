@@ -538,6 +538,38 @@ def _safe_default_to_template() -> _Template:
     )
 
 
+def _apply_preferred_themes(
+    templates: list[_Template],
+    preferred_themes: Sequence[str],
+) -> list[_Template]:
+    """Bias toward templates whose ``recommended_themes`` overlap ``preferred_themes``.
+
+    When ``preferred_themes`` is empty, return ``templates`` unchanged
+    (no bias — current behavior). When non-empty:
+
+    * If ANY template overlaps the preference set, return only the
+      overlapping subset. The downstream picker then chooses from a
+      tighter pool, raising the chance the kid sees a topical activity.
+    * If NO template overlaps, return ``templates`` unchanged. Preference
+      is a hint, not a hard filter — we never starve the picker just
+      because none of the eligible templates happen to be tagged with
+      what the kid was just talking about.
+
+    Theme equality is on the string value so callers can pass either
+    :class:`Theme` enum members or plain ``str`` (matches the existing
+    ``banned_themes`` convention).
+    """
+    if not preferred_themes:
+        return templates
+    pref_set = {str(t) for t in preferred_themes}
+    matchers = [
+        t
+        for t in templates
+        if any(str(theme) in pref_set for theme in t.recommended_themes)
+    ]
+    return matchers if matchers else templates
+
+
 def _apply_banned_themes(
     templates: list[_Template],
     banned_themes: Sequence[str],
@@ -574,6 +606,7 @@ def _select_template(
     toy: str,
     conn: sqlite3.Connection | None,
     banned_themes: Sequence[str] = (),
+    preferred_themes: Sequence[str] = (),
 ) -> tuple[_Template, str]:
     """Pick one template. Returns ``(template, source_intent)``.
 
@@ -594,7 +627,10 @@ def _select_template(
     activity signature byte-for-byte.
     """
     primary = _load_intent_templates(intent)
-    eligible = _apply_banned_themes(_filter_eligible(primary, hour), banned_themes)
+    eligible = _apply_preferred_themes(
+        _apply_banned_themes(_filter_eligible(primary, hour), banned_themes),
+        preferred_themes,
+    )
     if eligible:
         eligible.sort(key=lambda t: t.id)
         return (
@@ -603,7 +639,10 @@ def _select_template(
         )
 
     # Fallback 1: any "always" template within the requested intent.
-    always_primary = _apply_banned_themes(_filter_always(primary), banned_themes)
+    always_primary = _apply_preferred_themes(
+        _apply_banned_themes(_filter_always(primary), banned_themes),
+        preferred_themes,
+    )
     if always_primary:
         always_primary.sort(key=lambda t: t.id)
         _logger.info(
@@ -619,7 +658,10 @@ def _select_template(
     # Fallback 2: boredom intent's always pool (final safety net).
     if intent != FALLBACK_INTENT:
         boredom = _load_intent_templates(FALLBACK_INTENT)
-        always_boredom = _apply_banned_themes(_filter_always(boredom), banned_themes)
+        always_boredom = _apply_preferred_themes(
+            _apply_banned_themes(_filter_always(boredom), banned_themes),
+            preferred_themes,
+        )
         if always_boredom:
             always_boredom.sort(key=lambda t: t.id)
             _logger.info(
@@ -873,6 +915,7 @@ def generate(
     available_toys: Sequence[ResolvedToy] = (),
     available_rooms: Sequence[ResolvedRoom] = (),
     resolved_children: ResolvedChildren | None = None,
+    preferred_themes: Sequence[str] = (),
 ) -> Activity:
     """Generate a deterministic :class:`Activity`.
 
@@ -970,6 +1013,7 @@ def generate(
         toy=toy_name,
         conn=conn,
         banned_themes=banned_themes,
+        preferred_themes=preferred_themes,
     )
 
     # Resolve every parametric slot (``{room}``, ``{action_verb}``,
