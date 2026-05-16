@@ -594,6 +594,8 @@ Per [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md), each
 
 **Tracking issue:** #131 (manual-section step — `/build-phase` does not dispatch; issue exists for operator tracking + audit trail)
 
+**Status:** DONE (2026-05-16) — bundled with post-K17 #135 toy-role-restriction patches + dispatcher trigger_phrase fix + per-toy active toggle. 12/14 checks PASS; 2 defects filed (cosmetic/UX, not data integrity, not ship-blockers for Phase K substrate): [#137](https://github.com/aberson/toybox/issues/137) (Read Me watermark drifts to mid-screen on fork pages — K9 absolute-positioning anchored to section instead of viewport) + [#138](https://github.com/aberson/toybox/issues/138) (embedded joke/song picker and ending picker can collide on a narrow corpus pool — kid sees the same entry twice in a row). Spontaneity check (#9) skipped per operator note. Full run doc: [`runs/2026-05-16-phase-k-uat.md`](runs/2026-05-16-phase-k-uat.md).
+
 **Problem:** Operator-only step. Verifies on real iPad PWA hardware that:
 
 1. iOS Safari `speechSynthesis` activates after first user gesture (open kiosk, tap a word or the Read Me button, hear it — silent before tap is expected).
