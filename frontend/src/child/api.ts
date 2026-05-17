@@ -68,7 +68,11 @@ export interface ActivityStep {
   // "text" when the field is absent. K12 dispatches on this field to
   // mount SongPlayer / JokeStep instead of the default text+choices
   // path. Optional + nullable so pre-K3 wire payloads typecheck.
-  kind?: "text" | "fork" | "song" | "joke" | null;
+  // Phase L L10: ``"reward"`` is the terminal-step kind appended by
+  // ``_terminal_advance`` when an activity ends — the kiosk's
+  // RewardStep dispatches on ``metadata.reward_kind`` to render the
+  // picture / joke / song reward.
+  kind?: "text" | "fork" | "song" | "joke" | "reward" | null;
   // Phase K K12: arbitrary per-step metadata. Today's known keys:
   //   * ``audio_url`` (string) — absolute or backend-relative URL for
   //     a song step's mp3. Read by SongPlayer when present.

@@ -853,3 +853,41 @@ describe("StepCard K12 — auto-advance on disabled content master", () => {
   });
 });
 
+// Phase L L10: StepCard mounts RewardStep when step.kind === "reward"
+// and skips the body-row + linear NextStepButton (RewardStep owns
+// its own surface, like SongPlayer does on kind="song").
+
+describe("StepCard L10 — reward step dispatch", () => {
+  it("mounts RewardStep for kind=reward and skips the body-row + NextStepButton", () => {
+    const activity = fakeActivity({
+      steps: [
+        {
+          ...fakeStep({ body: "Gold Star" }),
+          kind: "reward",
+          metadata: {
+            reward_kind: "picture",
+            reward_id: "gold-star",
+            image_url: "/api/static/images/rewards/gold-star.png",
+            animation: "shine",
+            audio_url: null,
+            body: "Gold Star",
+            setup: null,
+            punchline: null,
+          },
+        } as ActivityStep,
+      ],
+    });
+    render(<StepCard activity={activity} onAdvance={vi.fn()} />);
+    // RewardStep mounts and surfaces its picture-variant child.
+    const card = screen.getByTestId("reward-step");
+    expect(card.getAttribute("data-reward-kind")).toBe("picture");
+    expect(screen.getByTestId("reward-picture-image")).not.toBeNull();
+    // The default text body-row is NOT rendered — RewardStep owns
+    // the entire kiosk surface for the reward beat.
+    expect(screen.queryByTestId("step-body-row")).toBeNull();
+    // No linear NextStepButton — the picture variant uses its own
+    // 6s timer + tap-to-advance.
+    expect(screen.queryByTestId("next-step-button")).toBeNull();
+  });
+});
+

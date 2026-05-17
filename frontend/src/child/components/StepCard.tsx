@@ -8,6 +8,7 @@ import { ClickableText } from "./ClickableText";
 import { JokeStep, replayJoke } from "./JokeStep";
 import { NextStepButton } from "./NextStepButton";
 import { ReadMeButton } from "./ReadMeButton";
+import { RewardStep } from "./RewardStep";
 import { SongPlayer } from "./SongPlayer";
 import { ToyActionSprite } from "./ToyActionSprite";
 
@@ -383,7 +384,20 @@ export function StepCard(props: StepCardProps): JSX.Element {
         (setup + delayed punchline, both auto-spoken) PLUS the linear
         NextStepButton. ``text`` / ``fork`` (default) renders the
         existing body-row + choices/next path.
+
+        Phase L L10: ``reward`` mounts the RewardStep, which branches
+        internally on ``metadata.reward_kind`` (picture / joke / song).
+        Like ``song``, the reward step owns its entire surface — no
+        body-row, no linear NextStepButton, no ReadMeButton — so the
+        downstream guards exclude both ``song`` and ``reward`` kinds.
       */}
+      {stepKind === "reward" && previewStep !== null && (
+        <RewardStep
+          key={`reward-${previewStep.seq}`}
+          metadata={previewStep.metadata ?? null}
+          onAdvance={props.onAdvance}
+        />
+      )}
       {stepKind === "song" && previewStep !== null && (
         <SongPlayer
           // Key on seq so an advancing kiosk unmounts + remounts the
@@ -406,7 +420,7 @@ export function StepCard(props: StepCardProps): JSX.Element {
           clickableWordsEnabled={clickableWordsEnabled}
         />
       )}
-      {stepKind !== "song" && stepKind !== "joke" && (
+      {stepKind !== "song" && stepKind !== "joke" && stepKind !== "reward" && (
         <div
           data-testid="step-body-row"
           style={{
@@ -471,8 +485,14 @@ export function StepCard(props: StepCardProps): JSX.Element {
         SongPlayer owns its own Next button (enabled on onended). The
         joke path keeps the linear NextStepButton because the punchline
         reveal is timed, not interaction-gated.
+
+        Phase L L10: reward steps also skip the linear NextStepButton.
+        RewardStep owns its own advance affordance (6s auto-advance +
+        tap on picture; SongPlayer's internal Next on song; the linear
+        Next is mounted via the joke-reward's JokeStep delegation, so
+        the kid still gets a tap target).
       */}
-      {stepKind !== "song" && choices !== null && props.onChoose !== undefined && (
+      {stepKind !== "song" && stepKind !== "reward" && choices !== null && props.onChoose !== undefined && (
         <div
           data-testid="choice-button-stack"
           style={{
@@ -511,7 +531,7 @@ export function StepCard(props: StepCardProps): JSX.Element {
           ))}
         </div>
       )}
-      {stepKind !== "song" && choices === null && props.onAdvance !== undefined && (
+      {stepKind !== "song" && stepKind !== "reward" && choices === null && props.onAdvance !== undefined && (
         <NextStepButton
           onClick={props.onAdvance}
           busy={props.advanceBusy === true}

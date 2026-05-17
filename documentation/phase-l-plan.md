@@ -440,6 +440,8 @@ New component [`frontend/src/child/components/RewardStep.tsx`](../frontend/src/c
 
 **Flags:** `--reviewers code`
 
+**Status:** DONE (2026-05-17) — `frontend/src/child/animations/rewardAnimations.css` ships 6 unprefixed `@keyframes` (shine/jump/spin/pulse/wobble/float per plan timings); `rewardAnimations.ts` is the typed `Record<Animation, CSSProperties>` map. `RewardStep.tsx` branches on `metadata.reward_kind`: picture renders 240px pixelated `<img>` + caption + animation style + 6s auto-advance + tap-to-advance; joke delegates to `JokeStep` + adds explicit NextStepButton; song delegates to `SongPlayer` (uses `onEnded` for advance). `StepCard.tsx` dispatches `step.kind === "reward"` to RewardStep. Notable gap fix: `ActivityStep.kind` TS Literal union didn't include `"reward"` (L1 only added it on the Python side via codegen) — dev added it to `child/api.ts`. 17 new vitest tests (16 in RewardStep.test.tsx incl. 6 parametrized animations + 1 in StepCard.test.tsx). 576 vitest pass; typecheck CLEAN, lint CLEAN. Iter 1 PASS.
+
 ### Step L11: End-to-end integration test through production caller
 
 **Problem:** New pytest module [`tests/integration/test_phase_l_reward_e2e.py`](../tests/integration/test_phase_l_reward_e2e.py) covering production paths (code-quality §4):

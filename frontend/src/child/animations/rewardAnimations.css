@@ -1,0 +1,88 @@
+/*
+ * Phase L Step L10: kiosk-side runtime reward animations.
+ *
+ * Six keyframes — one per ``Animation`` enum member. The kiosk-side
+ * RewardStep imports the typed CSSProperties map in
+ * ``rewardAnimations.ts`` which in turn imports this file so the
+ * keyframes are loaded into the kiosk bundle.
+ *
+ * Distinct file from the parent-preview animations
+ * (``frontend/src/parent/animations/rewardAnimationsPreview.css``).
+ * The two stylesheets ship in different bundles (parent vs kiosk
+ * route) so global-scope keyframe collision is not an issue in
+ * practice; we still use unprefixed keyframe names here (and
+ * ``reward-preview-*`` over on the parent side) so a future
+ * single-bundle build can't surface a silent override.
+ */
+
+@keyframes shine {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 215, 0, 0);
+    filter: brightness(1);
+  }
+  50% {
+    box-shadow: 0 0 24px 4px rgba(255, 215, 0, 0.7);
+    filter: brightness(1.4);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 215, 0, 0);
+    filter: brightness(1);
+  }
+}
+
+@keyframes jump {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-40px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes wobble {
+  0% {
+    transform: rotate(-10deg);
+  }
+  50% {
+    transform: rotate(10deg);
+  }
+  100% {
+    transform: rotate(-10deg);
+  }
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
