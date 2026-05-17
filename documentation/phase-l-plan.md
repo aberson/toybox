@@ -407,6 +407,8 @@ Drop the three registrations from the FastAPI router list. Drop the `Interjectio
 
 **Flags:** `--reviewers code`
 
+**Status:** DONE (2026-05-17) — `SuggestionCard.tsx` gets a 4-option `<select>` (Random/Picture/Joke/Song; default Random); selection threads through onApprove → ApiClient.approve → L4's ApproveRequest.reward_type. `App.tsx` bootstrap parallel-fetch added `api.listRewards()` as 10th call; `activeRewardsCount: number | null` seeded from `rewards.filter(active).length` (null = unknown → don't disable, gracefully falls through to L4 resolver fallback). Disable+hint "No rewards configured" only when all three lanes ineligible (0 active rewards AND !jokes_enabled AND !songs_enabled). +8 vitest tests (7 in SuggestionCard.test.tsx, 1 in api.test.ts pinning reward_type wire shape). 559 vitest pass; typecheck CLEAN, lint CLEAN. Iter 1 PASS.
+
 ### Step L10: Kiosk RewardStep + CSS animation primitives
 
 **Problem:** CSS animations require **two artifacts**: (a) `@keyframes` blocks defined at the document level, and (b) per-element `animation:` shorthand strings that reference those keyframes by name. Phase L ships both:

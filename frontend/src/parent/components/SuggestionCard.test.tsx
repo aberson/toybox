@@ -9,7 +9,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { Activity, RoleAssignment } from "../api";
+import type { Activity, RewardType, RoleAssignment } from "../api";
 import { SuggestionCard } from "./SuggestionCard";
 
 function fakeRole(overrides: Partial<RoleAssignment> = {}): RoleAssignment {
@@ -493,5 +493,175 @@ describe("SuggestionCard K7 re-roll buttons", () => {
     expect(
       (screen.getByTestId("new-activity-button") as HTMLButtonElement).disabled,
     ).toBe(true);
+  });
+});
+
+describe("SuggestionCard L9 reward dropdown", () => {
+  it("renders four options with 'Random' selected by default", () => {
+    // Spec: dropdown shows Random / Picture / Joke / Song, with
+    // Random pre-selected on first render. Default matches the L4
+    // wire default so the UI value + omit-default backend resolve
+    // align — see L9 plan §default semantics.
+    render(
+      <SuggestionCard
+        activity={fakeActivity()}
+        onApprove={async () => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+      />,
+    );
+    const select = screen.getByTestId("reward-select") as HTMLSelectElement;
+    expect(select.value).toBe("random");
+    const labels = Array.from(select.options).map((o) => o.textContent);
+    expect(labels).toEqual(["Random", "Picture", "Joke", "Song"]);
+    // values match the wire union literal
+    const values = Array.from(select.options).map((o) => o.value);
+    expect(values).toEqual(["random", "picture", "joke", "song"]);
+  });
+
+  it("approving with the default selection passes 'random' to onApprove", async () => {
+    const onApprove = vi.fn(
+      async (_rewardType: RewardType): Promise<void> => undefined,
+    );
+    render(
+      <SuggestionCard
+        activity={fakeActivity()}
+        onApprove={onApprove}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("approve-button"));
+    expect(onApprove).toHaveBeenCalledTimes(1);
+    expect(onApprove).toHaveBeenCalledWith("random");
+  });
+
+  it("selecting 'Picture' then approving passes 'picture' to onApprove", () => {
+    const onApprove = vi.fn(
+      async (_rewardType: RewardType): Promise<void> => undefined,
+    );
+    render(
+      <SuggestionCard
+        activity={fakeActivity()}
+        onApprove={onApprove}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+      />,
+    );
+    const select = screen.getByTestId("reward-select") as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: "picture" } });
+    expect(select.value).toBe("picture");
+    fireEvent.click(screen.getByTestId("approve-button"));
+    expect(onApprove).toHaveBeenCalledWith("picture");
+  });
+
+  it("disables dropdown + renders hint when ALL three lanes are ineligible", () => {
+    // Picture pool empty (activeRewardsCount=0) AND jokes off AND
+    // songs off → no useful selection available, so the dropdown
+    // disables and a "No rewards configured" hint surfaces below.
+    render(
+      <SuggestionCard
+        activity={fakeActivity()}
+        onApprove={async () => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+        activeRewardsCount={0}
+        jokesEnabled={false}
+        songsEnabled={false}
+      />,
+    );
+    const select = screen.getByTestId("reward-select") as HTMLSelectElement;
+    expect(select.disabled).toBe(true);
+    const hint = screen.getByTestId("reward-disabled-hint");
+    expect(hint.textContent).toContain("No rewards configured");
+  });
+
+  it("enables dropdown + hides hint when ANY single lane is eligible", () => {
+    // One active picture reward is enough to keep the dropdown
+    // alive even when both joke + song masters are off. The L4
+    // fallback chain handles a per-call empty-pool case silently
+    // so the parent's choice isn't blocked.
+    render(
+      <SuggestionCard
+        activity={fakeActivity()}
+        onApprove={async () => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+        activeRewardsCount={1}
+        jokesEnabled={false}
+        songsEnabled={false}
+      />,
+    );
+    const select = screen.getByTestId("reward-select") as HTMLSelectElement;
+    expect(select.disabled).toBe(false);
+    expect(screen.queryByTestId("reward-disabled-hint")).toBeNull();
+  });
+
+  it("Picture option works regardless of joke/song eligibility", () => {
+    // With pictures eligible but jokes/songs disabled, selecting
+    // Picture must still ride through to onApprove. Pins that the
+    // dropdown options are NOT individually disabled when their
+    // lane is off — only the entire select disables when ALL three
+    // lanes are off.
+    const onApprove = vi.fn(
+      async (_rewardType: RewardType): Promise<void> => undefined,
+    );
+    render(
+      <SuggestionCard
+        activity={fakeActivity()}
+        onApprove={onApprove}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+        activeRewardsCount={3}
+        jokesEnabled={false}
+        songsEnabled={false}
+      />,
+    );
+    const select = screen.getByTestId("reward-select") as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: "picture" } });
+    fireEvent.click(screen.getByTestId("approve-button"));
+    expect(onApprove).toHaveBeenCalledWith("picture");
+  });
+
+  it("select carries an accessible label", () => {
+    // Accessibility: the spec requires either a visible <label> or
+    // an aria-label. We ship both — a visible "Reward:" label tied
+    // by htmlFor + a redundant aria-label so screen readers always
+    // get a usable name.
+    render(
+      <SuggestionCard
+        activity={fakeActivity()}
+        onApprove={async () => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+      />,
+    );
+    // getByLabelText walks both <label htmlFor> and aria-label so
+    // hitting either branch counts.
+    const select = screen.getByLabelText(/reward/i) as HTMLSelectElement;
+    expect(select.tagName).toBe("SELECT");
+    expect(select.getAttribute("aria-label")).toBe("Reward type");
+  });
+
+  it("treats null activeRewardsCount as 'unknown → enabled'", () => {
+    // Per L9 spec: when activeRewardsCount is null (e.g. the bootstrap
+    // listRewards fetch failed), the card defaults to "rewards are
+    // available" and relies on the L4 backend fallback chain. This
+    // guards against the failure mode where a slow / errored bootstrap
+    // would otherwise paint a falsely-disabled dropdown.
+    render(
+      <SuggestionCard
+        activity={fakeActivity()}
+        onApprove={async () => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+        activeRewardsCount={null}
+        jokesEnabled={false}
+        songsEnabled={false}
+      />,
+    );
+    const select = screen.getByTestId("reward-select") as HTMLSelectElement;
+    expect(select.disabled).toBe(false);
+    expect(screen.queryByTestId("reward-disabled-hint")).toBeNull();
   });
 });

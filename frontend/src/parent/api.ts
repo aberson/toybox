@@ -3,7 +3,7 @@
 // error. All routes hit /api/* (vite dev proxy forwards to :8000).
 // Shapes mirror src/toybox/api/activities.py and core/version_check.py.
 
-import type { Animation } from "../shared/types";
+import type { Animation, RewardType } from "../shared/types";
 
 export type ActivityState =
   | "proposed"
@@ -652,6 +652,11 @@ export type {
 } from "../shared/feature_flags";
 export { PHASE_K_FEATURE_FLAG_DEFAULTS } from "../shared/feature_flags";
 
+// Phase L L9: re-export so SuggestionCard + PlayQueueList consumers
+// pull the wire-string union from a single "../api" import (matches
+// the Animation pass-through above).
+export type { RewardType } from "../shared/types";
+
 // Phase J step J5: the proposed-activities REST seed. Items are the
 // scrolling-queue rows (newest first, up to backend cap). ``active``
 // is the currently-playing card when ``include_active=true`` was
@@ -903,11 +908,25 @@ export class ApiClient {
     id: string,
     version: number,
     childIds?: string[],
+    // Phase L L9: per-activity reward type chosen by the parent in the
+    // SuggestionCard dropdown. Omitted (or ``null``) lets the backend
+    // default to ``"random"`` — matches the L4 ApproveRequest field
+    // semantics (Optional[Literal[...]] with None → "random" resolved
+    // server-side). When provided, the value is forwarded verbatim;
+    // ``"random"`` from the UI default still rides the wire so the
+    // server log records the parent's explicit choice rather than the
+    // omit-default. Optional so pre-L9 callers (e.g. legacy test
+    // helpers) keep compiling.
+    rewardType?: RewardType,
     opts: RequestOptions = {},
   ): Promise<Activity> {
+    const body: Record<string, unknown> = { child_ids: childIds ?? null };
+    if (rewardType !== undefined) {
+      body["reward_type"] = rewardType;
+    }
     return this.request<Activity>(`/api/activities/${encodeURIComponent(id)}/approve`, {
       method: "POST",
-      body: JSON.stringify({ child_ids: childIds ?? null }),
+      body: JSON.stringify(body),
       ifMatchVersion: version,
       signal: opts.signal,
     });

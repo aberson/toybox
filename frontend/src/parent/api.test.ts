@@ -103,6 +103,24 @@ describe("ApiClient", () => {
     expect(JSON.parse(init?.body as string)).toEqual({ child_ids: null });
   });
 
+  it("approve forwards rewardType into the request body when provided (L9)", async () => {
+    // L9: parent's reward-type selection from the SuggestionCard
+    // dropdown rides on the approve body's ``reward_type`` field.
+    // L4 backend accepts the four-value union; absent (or null
+    // implicitly via omit) resolves to "random" server-side. The
+    // wire shape this test pins matches the L4 ApproveRequest.
+    const fetchImpl = vi
+      .fn<Parameters<FetchLike>, ReturnType<FetchLike>>()
+      .mockResolvedValue(jsonResponse(200, fakeActivity()));
+    const client = new ApiClient({ fetchImpl, getToken: () => "t" });
+    await client.approve("act-1", 3, undefined, "picture");
+    const init = fetchImpl.mock.calls[0]?.[1];
+    expect(JSON.parse(init?.body as string)).toEqual({
+      child_ids: null,
+      reward_type: "picture",
+    });
+  });
+
   it("thumbsUp POSTs to /api/activities/<id>/thumbs-up with no body or version", async () => {
     // Step 15: thumbs-up writes parent_signal=+1 to labeled_events.
     // No If-Match-Version (no state transition); no JSON body required.

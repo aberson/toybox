@@ -22,7 +22,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Mock } from "vitest";
 
-import type { Activity } from "../api";
+import type { Activity, RewardType } from "../api";
 import { PlayQueueList } from "./PlayQueueList";
 
 function fakeActivity(overrides: Partial<Activity> = {}): Activity {
@@ -66,7 +66,10 @@ function fakeActiveActivity(overrides: Partial<Activity> = {}): Activity {
 }
 
 interface Handlers {
-  onApprove: Mock<[Activity], Promise<void>>;
+  // Phase L L9: onApprove now carries the reward-type selection
+  // alongside the activity. Pre-L9 the signature was [Activity];
+  // updated here so the mock matches the PlayQueueList prop.
+  onApprove: Mock<[Activity, RewardType], Promise<void>>;
   onDismiss: Mock<[Activity], Promise<void>>;
   onRegenerate: Mock<[Activity], Promise<void>>;
   onEnd: Mock<[Activity], Promise<void>>;
@@ -79,8 +82,12 @@ interface Handlers {
 
 function buildHandlers(): Handlers {
   const noop = async (_target: Activity): Promise<void> => undefined;
+  const approveNoop = async (
+    _target: Activity,
+    _rewardType: RewardType,
+  ): Promise<void> => undefined;
   return {
-    onApprove: vi.fn(noop),
+    onApprove: vi.fn(approveNoop),
     onDismiss: vi.fn(noop),
     onRegenerate: vi.fn(noop),
     onEnd: vi.fn(noop),

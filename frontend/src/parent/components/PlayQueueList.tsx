@@ -1,7 +1,7 @@
 import type { CSSProperties, JSX } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { Activity } from "../api";
+import type { Activity, RewardType } from "../api";
 import { ActivityPanel } from "./ActivityPanel";
 import { SuggestionCard } from "./SuggestionCard";
 
@@ -40,7 +40,12 @@ export interface PlayQueueListProps {
   active: Activity | null;
   proposedList: Activity[];
   cadenceSeconds: number;
-  onApprove: (activity: Activity) => Promise<void>;
+  // Phase L L9: approve now carries the parent's reward-type choice
+  // (from the SuggestionCard dropdown) so it can be forwarded to the
+  // backend ApproveRequest. Same arrow shape as ``onApprove`` on
+  // ``ApiClient.approve`` so App.tsx's handler can pass it straight
+  // through without unpacking.
+  onApprove: (activity: Activity, rewardType: RewardType) => Promise<void>;
   onDismiss: (activity: Activity) => Promise<void>;
   onRegenerate: (activity: Activity) => Promise<void>;
   onEnd: (activity: Activity) => Promise<void>;
@@ -65,6 +70,13 @@ export interface PlayQueueListProps {
   onInsertSong?: (activity: Activity) => Promise<void>;
   jokesEnabled?: boolean;
   songsEnabled?: boolean;
+  // Phase L L9: count of active picture rewards in the parent's
+  // library (App-lifted from a bootstrap ``listRewards`` GET). Passes
+  // through to each SuggestionCard for its dropdown's eligibility
+  // check. ``null`` (or omitted) means "unknown" — the card treats
+  // that as "rewards are available" and relies on the L4 fallback
+  // chain if the pool actually turns out to be empty.
+  activeRewardsCount?: number | null;
 }
 
 // Keyed busy map: (action, id) → in-flight flag. A nested record keeps
@@ -119,6 +131,7 @@ export function PlayQueueList(props: PlayQueueListProps): JSX.Element {
     onInsertSong,
     jokesEnabled,
     songsEnabled,
+    activeRewardsCount,
   } = props;
 
   const [busy, setBusy] = useState<BusyMap>(() => emptyBusy());
@@ -356,8 +369,10 @@ export function PlayQueueList(props: PlayQueueListProps): JSX.Element {
           >
             <SuggestionCard
               activity={row}
-              onApprove={() =>
-                runGuarded("approve", row.id, () => onApprove(row))
+              onApprove={(rewardType) =>
+                runGuarded("approve", row.id, () =>
+                  onApprove(row, rewardType),
+                )
               }
               onSkip={() =>
                 runGuarded("regenerate", row.id, () => onRegenerate(row))
@@ -378,6 +393,9 @@ export function PlayQueueList(props: PlayQueueListProps): JSX.Element {
                 recast: busy.recast.has(row.id),
                 newActivity: busy.newActivity.has(row.id),
               }}
+              activeRewardsCount={activeRewardsCount}
+              jokesEnabled={jokesEnabled}
+              songsEnabled={songsEnabled}
             />
           </div>
         );

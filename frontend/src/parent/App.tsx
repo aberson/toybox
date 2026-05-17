@@ -16,6 +16,7 @@ import type {
   PhaseKFeatureFlags,
   PlayCadenceSeconds,
   PlayTargetDepth,
+  RewardType,
 } from "./api";
 import { PHASE_K_FEATURE_FLAG_DEFAULTS } from "./api";
 import { CapabilityBanner } from "./components/CapabilityBanner";
@@ -121,6 +122,22 @@ export function App(): JSX.Element {
   // writes update via ``handleFeatureFlagChanged``.
   const [featureFlags, setFeatureFlags] = useState<PhaseKFeatureFlags>(
     PHASE_K_FEATURE_FLAG_DEFAULTS,
+  );
+  // Phase L L9: count of active picture rewards in the library. Seeded
+  // via a bootstrap parallel ``listRewards`` GET below; threaded down
+  // through ``PlayQueueList`` to each ``SuggestionCard`` so the reward
+  // dropdown's eligibility logic can disable when all three lanes
+  // (picture / joke / song) are empty.
+  //
+  // ``null`` (initial state) means "unknown" — the SuggestionCard
+  // treats that as "rewards are available" and relies on the L4
+  // backend's fallback chain if the picture pool turns out to be
+  // empty. This means a failed/slow bootstrap fetch never paints a
+  // mis-disabled dropdown — the worst case is the parent picks
+  // "Picture" against an empty pool and the L4 resolver silently
+  // falls back to another type.
+  const [activeRewardsCount, setActiveRewardsCount] = useState<number | null>(
+    null,
   );
   const [authMode, setAuthMode] = useState<AuthMode>("bootstrap");
   const [authStatus, setAuthStatus] = useState<ParentAuthStatus | null>(null);
@@ -258,6 +275,7 @@ export function App(): JSX.Element {
         playStandaloneResult,
         clickableWordsResult,
         readMeButtonResult,
+        rewardsListResult,
       ] = await Promise.allSettled([
         api.getTranscriptRetention({ signal: aborter.signal }),
         api.getPlayCadenceSeconds({ signal: aborter.signal }),
@@ -278,6 +296,13 @@ export function App(): JSX.Element {
         api.getPlayStandaloneEnabled({ signal: aborter.signal }),
         api.getClickableWordsEnabled({ signal: aborter.signal }),
         api.getReadMeButtonEnabled({ signal: aborter.signal }),
+        // Phase L L9: seed ``activeRewardsCount`` so the suggestion
+        // card's reward dropdown can pre-compute picture eligibility.
+        // Failures fall through to the ``null`` default, which is
+        // treated as "unknown → assume available" by the card; the L4
+        // backend fallback chain silently degrades if the pool is
+        // actually empty.
+        api.listRewards({ signal: aborter.signal }),
       ]);
       // ``Promise.allSettled`` swallows aborts as rejected results, so
       // a mid-bootstrap unmount (e.g. parent navigates away while these
@@ -369,6 +394,29 @@ export function App(): JSX.Element {
         console.warn(
           "proposed activities initial fetch failed, using empty queue",
           proposedResult.reason,
+        );
+      }
+      // Phase L L9: derive the active-reward count from the bootstrap
+      // listRewards snapshot. We count only ``active === true`` rows
+      // (the L4 reward resolver picks from the same active partition);
+      // archived rows are filtered server-side. A failed fetch leaves
+      // the state at ``null`` (assume-available) per the comment on
+      // the useState seed above.
+      if (rewardsListResult.status === "fulfilled") {
+        // Defensive ``Array.isArray`` guard: if a misconfigured proxy
+        // returns the wrong shape (or a test fixture's catch-all hits
+        // the path) we fall back to ``null`` (unknown → assume
+        // available) rather than crashing the whole bootstrap effect.
+        const rewards = rewardsListResult.value.rewards;
+        if (Array.isArray(rewards)) {
+          const count = rewards.filter((r) => r.active).length;
+          setActiveRewardsCount(count);
+        }
+      } else if (!isAbortError(rewardsListResult.reason)) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          "rewards list initial fetch failed, assuming available",
+          rewardsListResult.reason,
         );
       }
       const ws = new ParentWsClient({
@@ -582,7 +630,7 @@ export function App(): JSX.Element {
   // action + id) so two different rows can have concurrent in-flight
   // mutations without one row's spinner blocking the other.
   const handleApprove = useCallback(
-    async (target: Activity): Promise<void> => {
+    async (target: Activity, rewardType: RewardType): Promise<void> => {
       // Phase J step J9: switch-confirm flow. When an active activity
       // exists with a DIFFERENT id, approving a queued suggestion would
       // implicitly displace the current activity. Surface a confirm so
@@ -592,6 +640,12 @@ export function App(): JSX.Element {
       // Same-id (defensive: approve on the active row) falls through to
       // the standard approve path so a no-op approve doesn't trigger a
       // confusing confirm dialog.
+      //
+      // Phase L L9: the ``rewardType`` argument forwards the parent's
+      // dropdown selection to ``api.approve`` so the L4 ApproveRequest
+      // carries it through to the resolver. The default-on-render path
+      // (``"random"``) still rides the wire — match between UI default
+      // and backend default kept by the SuggestionCard's initial state.
       const currentActive = useParentStore.getState().active;
       if (currentActive !== null && currentActive.id !== target.id) {
         const ok = window.confirm(
@@ -611,7 +665,8 @@ export function App(): JSX.Element {
         // ending up with a half-applied switch.
         if (endResult === null) return;
         const approveResult = await withConflictHandler({
-          mutation: () => api.approve(target.id, target.version),
+          mutation: () =>
+            api.approve(target.id, target.version, undefined, rewardType),
           refetch: () => refetchActivity(target.id),
           onConflict: (conflict, fresh) => {
             useParentStore.getState().applyVersionConflict(conflict, fresh);
@@ -622,7 +677,8 @@ export function App(): JSX.Element {
         return;
       }
       const result = await withConflictHandler({
-        mutation: () => api.approve(target.id, target.version),
+        mutation: () =>
+          api.approve(target.id, target.version, undefined, rewardType),
         refetch: () => refetchActivity(target.id),
         onConflict: (conflict, fresh) => {
           useParentStore.getState().applyVersionConflict(conflict, fresh);
@@ -1009,6 +1065,7 @@ export function App(): JSX.Element {
                       onInsertSong={handleInsertSong}
                       jokesEnabled={featureFlags.jokes_enabled}
                       songsEnabled={featureFlags.songs_enabled}
+                      activeRewardsCount={activeRewardsCount}
                     />
                     {/* Phase J step J8: TriggerButton restyled and
                         repositioned below the queue. Pre-J8 it was the

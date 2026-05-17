@@ -1,7 +1,19 @@
-import type { JSX } from "react";
+import type { ChangeEvent, JSX } from "react";
 import { useState } from "react";
 
-import type { Activity, RoleAssignment } from "../api";
+import type { Activity, RewardType, RoleAssignment } from "../api";
+
+// Phase L L9: reward dropdown options surfaced on the SuggestionCard.
+// Wire strings match the L1 ``RewardType`` Literal alias verbatim
+// (``picture | joke | song | random``); the visible label is the
+// title-cased variant. Order is "random first" so the default option
+// is also the first one rendered.
+const REWARD_OPTIONS: ReadonlyArray<{ value: RewardType; label: string }> = [
+  { value: "random", label: "Random" },
+  { value: "picture", label: "Picture" },
+  { value: "joke", label: "Joke" },
+  { value: "song", label: "Song" },
+];
 
 export interface SuggestionCardBusy {
   approve: boolean;
@@ -17,7 +29,14 @@ export interface SuggestionCardBusy {
 
 export interface SuggestionCardProps {
   activity: Activity;
-  onApprove: () => Promise<void>;
+  // Phase L L9: the parent picks a per-activity reward type from a
+  // local dropdown on the card. The selected value rides ``onApprove``
+  // so the L4 backend records it on the approve payload. Pre-L9
+  // callers (e.g. kiosk-side surfaces) that mount the card and pass a
+  // zero-arg lambda would break the type, so we made the parameter
+  // required — every existing caller in this tree (PlayQueueList) is
+  // updated in the same step.
+  onApprove: (rewardType: RewardType) => Promise<void>;
   onSkip: () => Promise<void>;
   onDismiss: () => Promise<void>;
   // Phase K K7: "New cast" calls ``recastActivity`` (re-rolls the
@@ -32,6 +51,24 @@ export interface SuggestionCardProps {
   // Optional in-flight flags so rapid double-clicks can't fire two
   // mutations with the same If-Match-Version. Defaults to all-idle.
   busy?: SuggestionCardBusy;
+  // Phase L L9: eligibility plumbing for the reward dropdown. All
+  // three are optional; when none are supplied (or any of the picture
+  // / jokes / songs lanes is eligible) the dropdown is enabled and no
+  // hint renders.
+  //
+  // ``activeRewardsCount`` is the number of ACTIVE (active=true,
+  // archived=false) picture rewards in the library. ``null`` means
+  // "unknown" — we default to "rewards are available" rather than
+  // disabling the dropdown, leaning on the L4 backend's fallback
+  // chain to gracefully degrade if the picture pool is actually
+  // empty. ``jokesEnabled`` / ``songsEnabled`` are the App-lifted
+  // master toggles (see RewardsSection). When all three lanes are
+  // ineligible (0 active pictures AND jokes off AND songs off), the
+  // ``<select>`` is disabled and a "No rewards configured" hint
+  // renders below.
+  activeRewardsCount?: number | null;
+  jokesEnabled?: boolean;
+  songsEnabled?: boolean;
 }
 
 // Phase K K7: prefer the backend-rendered ``cast_summary`` string when
@@ -69,7 +106,17 @@ function renderCastLabel(activity: Activity): string | null {
 // The intent (``intent_source``) is also surfaced as a third row when
 // available, since the slot/intent drove the template selection.
 export function SuggestionCard(props: SuggestionCardProps): JSX.Element {
-  const { activity, onApprove, onSkip, onDismiss, onRecast, onNewActivity } = props;
+  const {
+    activity,
+    onApprove,
+    onSkip,
+    onDismiss,
+    onRecast,
+    onNewActivity,
+    activeRewardsCount,
+    jokesEnabled,
+    songsEnabled,
+  } = props;
   const busy: SuggestionCardBusy = props.busy ?? {
     approve: false,
     skip: false,
@@ -78,6 +125,29 @@ export function SuggestionCard(props: SuggestionCardProps): JSX.Element {
   const busyRecast = busy.recast ?? false;
   const busyNewActivity = busy.newActivity ?? false;
   const [whyOpen, setWhyOpen] = useState(false);
+  // Phase L L9: per-card reward selection. ``random`` is the L4 wire
+  // default; mirroring it here as the initial state keeps the dropdown
+  // UI default and the backend default aligned.
+  const [rewardType, setRewardType] = useState<RewardType>("random");
+
+  // Eligibility for each reward lane. ``null`` activeRewardsCount is
+  // "unknown" — treat as eligible (don't disable) and let the L4
+  // resolver fall back silently if the picture pool is actually empty.
+  // jokes/songs corpora are bundled with the kiosk binary so a runtime
+  // empty-corpus check isn't needed client-side; only the master
+  // toggle matters here.
+  const pictureEligible =
+    activeRewardsCount === undefined ||
+    activeRewardsCount === null ||
+    activeRewardsCount > 0;
+  const jokeEligible = jokesEnabled !== false;
+  const songEligible = songsEnabled !== false;
+  const anyRewardEligible = pictureEligible || jokeEligible || songEligible;
+  const rewardDisabled = !anyRewardEligible;
+
+  const handleRewardChange = (e: ChangeEvent<HTMLSelectElement>): void => {
+    setRewardType(e.target.value as RewardType);
+  };
   const title = activity.title ?? activity.summary ?? "Untitled activity";
   const castLabel = renderCastLabel(activity);
   // Phase K K7: re-roll buttons disable when the activity isn't in
@@ -142,13 +212,64 @@ export function SuggestionCard(props: SuggestionCardProps): JSX.Element {
           ))}
         </ol>
       )}
+      {/* Phase L L9: per-card reward dropdown. The selected value is
+          local state; on approve it rides the existing ``onApprove``
+          callback through to ``ApiClient.approve``'s new ``rewardType``
+          parameter and lands in the L4 ApproveRequest. The dropdown
+          disables itself + surfaces a hint when all three lanes
+          (picture / joke / song) are ineligible — in that mode the
+          parent gets no useful choice, so we make the absence
+          explicit. A native ``<select>`` (rather than a styled radio
+          group) is intentional: lightweight, keyboard-accessible by
+          default, and matches the operator-tooling vibe of the rest
+          of the parent UI. */}
+      <div
+        data-testid="reward-row"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginTop: 12,
+          fontSize: 13,
+        }}
+      >
+        <label
+          htmlFor={`reward-select-${activity.id}`}
+          style={{ color: "#374151" }}
+        >
+          Reward:
+        </label>
+        <select
+          id={`reward-select-${activity.id}`}
+          data-testid="reward-select"
+          aria-label="Reward type"
+          value={rewardType}
+          disabled={rewardDisabled}
+          onChange={handleRewardChange}
+          style={{ fontSize: 13, padding: "2px 4px" }}
+        >
+          {REWARD_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        {rewardDisabled && (
+          <span
+            data-testid="reward-disabled-hint"
+            style={{ color: "#6b7280", fontSize: 12 }}
+          >
+            No rewards configured
+          </span>
+        )}
+      </div>
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
         <button
           type="button"
           data-testid="approve-button"
           disabled={busy.approve}
           onClick={() => {
-            void onApprove();
+            void onApprove(rewardType);
           }}
         >
           {busy.approve ? "approving..." : "approve"}
