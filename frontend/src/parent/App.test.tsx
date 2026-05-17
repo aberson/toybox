@@ -276,6 +276,17 @@ function stubFullAuthFetch(opts: { pin_set: boolean }): Mock {
         headers: { "Content-Type": "application/json" },
       });
     }
+    // Phase L Step L8: the Rewards sub-tab under Kids & Toyboxes
+    // mounts RewardsSection → RewardIngest, which fires a list probe
+    // on mount and reads ``resp.rewards``. Return a shape-correct empty
+    // list so the post-login render is clean for L8's tab-switch
+    // assertions.
+    if (url.endsWith("/api/rewards")) {
+      return new Response(JSON.stringify({ rewards: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     // Anything else (e.g. TranscriptsManager's pagination probe) gets a
     // benign empty response so the post-login render doesn't surface
     // unrelated network noise as test failures.
@@ -662,6 +673,44 @@ describe("App Kids & Toyboxes tab (H3)", () => {
     });
     expect(screen.queryByTestId("toy-ingest")).toBeNull();
     expect(screen.queryByTestId("child-profile-editor")).toBeNull();
+  });
+
+  // Phase L Step L8: Rewards sub-tab. RewardsSection houses the L7
+  // RewardIngest panel + the joke/song master toggles that moved out
+  // of PlayFeaturesControls. The sub-tab exists alongside toys /
+  // children / rooms; switching here mounts the section and unmounts
+  // the others.
+  it("clicking subtab-rewards mounts RewardsSection (L8)", async () => {
+    stubFullAuthFetch({ pin_set: true });
+    render(<App />);
+    await driveLoginToTabShell();
+    act(() => {
+      fireEvent.click(screen.getByTestId("tab-kids-toyboxes"));
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId("toy-ingest")).toBeTruthy();
+    });
+    // The rewards sub-tab trigger exists.
+    expect(screen.queryByTestId("subtab-rewards")).toBeTruthy();
+    act(() => {
+      fireEvent.click(screen.getByTestId("subtab-rewards"));
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId("rewards-section")).toBeTruthy();
+    });
+    // Both master toggles render in the header.
+    expect(
+      screen.queryByTestId("reward-master-toggle-jokes_enabled"),
+    ).toBeTruthy();
+    expect(
+      screen.queryByTestId("reward-master-toggle-songs_enabled"),
+    ).toBeTruthy();
+    // The RewardIngest panel mounts inside the section.
+    expect(screen.queryByTestId("reward-ingest")).toBeTruthy();
+    // The other Kids & Toyboxes editors are NOT mounted in parallel.
+    expect(screen.queryByTestId("toy-ingest")).toBeNull();
+    expect(screen.queryByTestId("child-profile-editor")).toBeNull();
+    expect(screen.queryByTestId("room-ingest-bulk")).toBeNull();
   });
 });
 

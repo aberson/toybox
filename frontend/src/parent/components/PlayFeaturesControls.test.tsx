@@ -1,7 +1,14 @@
-// Phase K step K2: component tests for PlayFeaturesControls. Mirrors
-// PlayQueueSettingsControls.test.tsx shape: stubs each setter, exercises
-// render + click + reject paths, pins the canonical 8-flag list against
-// silent drift.
+// Phase K step K2 (Phase L step L8): component tests for
+// PlayFeaturesControls. Mirrors PlayQueueSettingsControls.test.tsx
+// shape: stubs each setter, exercises render + click + reject paths,
+// pins the canonical flag list against silent drift.
+//
+// L8 reduced the FEATURE_TOGGLES list from FIVE entries to THREE: the
+// ``jokes_enabled`` + ``songs_enabled`` master toggles moved out of
+// this component and into ``RewardsSection`` (Kids & Toyboxes → Rewards).
+// The error-path test that used to drive ``jokes_enabled`` now drives
+// ``play_standalone_enabled`` — the wiring is identical so any
+// surviving regression still surfaces here.
 
 import {
   cleanup,
@@ -24,8 +31,6 @@ import {
 // ``vi.fn(async (value: boolean) => ({ value }))`` per setter — the
 // signature matches ApiClient's ``Promise<FeatureFlagResponse>``.
 type StubApi = Record<
-  | "setJokesEnabled"
-  | "setSongsEnabled"
   | "setPlayStandaloneEnabled"
   | "setClickableWordsEnabled"
   | "setReadMeButtonEnabled",
@@ -34,8 +39,6 @@ type StubApi = Record<
 
 function buildStubApi(): StubApi {
   return {
-    setJokesEnabled: vi.fn(async (v: boolean) => ({ value: v })) as Mock,
-    setSongsEnabled: vi.fn(async (v: boolean) => ({ value: v })) as Mock,
     setPlayStandaloneEnabled: vi.fn(
       async (v: boolean) => ({ value: v }),
     ) as Mock,
@@ -48,9 +51,10 @@ function buildStubApi(): StubApi {
   };
 }
 
+// The three flags this component still owns after Phase L Step L8.
+// ``jokes_enabled`` + ``songs_enabled`` are validated by
+// RewardsSection.test.tsx.
 const ALL_FLAG_KEYS: readonly PhaseKFeatureFlag[] = [
-  "jokes_enabled",
-  "songs_enabled",
   "play_standalone_enabled",
   "clickable_words_enabled",
   "read_me_button_enabled",
@@ -62,13 +66,28 @@ afterEach(() => {
 });
 
 describe("PlayFeaturesControls — canonical flag list", () => {
-  it("exposes exactly the expected Phase K flags in spec order", () => {
+  it("exposes exactly the expected Phase L L8 flags in spec order", () => {
     expect(FEATURE_TOGGLES.map((t) => t.key)).toEqual(ALL_FLAG_KEYS);
+  });
+
+  it("FEATURE_TOGGLES contains exactly three entries (NOT five — L8 moved jokes/songs to RewardsSection)", () => {
+    // Pin against accidental re-introduction of the master toggles
+    // that L8 moved out. A regression that re-adds ``jokes_enabled``
+    // or ``songs_enabled`` here would silently produce duplicate
+    // toggles (one in PlayFeaturesControls, one in RewardsSection)
+    // racing the same lifted state. Code-quality §2: one source of
+    // truth per data-shape constant.
+    expect(FEATURE_TOGGLES).toHaveLength(3);
+    expect(FEATURE_TOGGLES.map((t) => t.key)).not.toContain("jokes_enabled");
+    expect(FEATURE_TOGGLES.map((t) => t.key)).not.toContain("songs_enabled");
   });
 
   it("PHASE_K_FEATURE_FLAG_DEFAULTS matches the §5 defaults exactly", () => {
     // Lock the surviving Phase K defaults. Phase L Step L5 removed the
-    // three play-surface flags (embedded/endings/spontaneity). Every
+    // three play-surface flags (embedded/endings/spontaneity); Phase L
+    // Step L8 moved the joke/song masters into ``RewardsSection`` but
+    // the shared defaults dict still keys on all five so the bootstrap
+    // can seed every flag from one Promise.allSettled pass. Every
     // remaining flag defaults to On.
     expect(PHASE_K_FEATURE_FLAG_DEFAULTS).toEqual({
       jokes_enabled: true,
@@ -122,7 +141,7 @@ describe("PlayFeaturesControls — render", () => {
 });
 
 describe("PlayFeaturesControls — click-to-toggle", () => {
-  it("clicking Off on jokes_enabled calls setJokesEnabled(false) + onValueChanged", async () => {
+  it("clicking Off on play_standalone_enabled calls setPlayStandaloneEnabled(false) + onValueChanged", async () => {
     const api = buildStubApi();
     const onValueChanged = vi.fn();
     render(
@@ -132,21 +151,26 @@ describe("PlayFeaturesControls — click-to-toggle", () => {
         onValueChanged={onValueChanged}
       />,
     );
-    fireEvent.click(screen.getByTestId("feature-toggle-jokes_enabled-off"));
+    fireEvent.click(
+      screen.getByTestId("feature-toggle-play_standalone_enabled-off"),
+    );
     await waitFor(() => {
-      expect(api.setJokesEnabled).toHaveBeenCalledWith(
+      expect(api.setPlayStandaloneEnabled).toHaveBeenCalledWith(
         false,
         expect.anything(),
       );
-      expect(onValueChanged).toHaveBeenCalledWith("jokes_enabled", false);
+      expect(onValueChanged).toHaveBeenCalledWith(
+        "play_standalone_enabled",
+        false,
+      );
     });
   });
 
-  it("clicking Off on songs_enabled calls setSongsEnabled(false) + onValueChanged", async () => {
-    // Companion to the jokes_enabled click test above — exercises a
-    // second flag's setter wiring so a copy-paste mismatch between two
-    // adjacent rows surfaces here rather than via the more-fan-out
-    // "every flag clicks once" matrix test further down.
+  it("clicking Off on clickable_words_enabled calls setClickableWordsEnabled(false) + onValueChanged", async () => {
+    // Companion to the play_standalone_enabled click test above —
+    // exercises a second flag's setter wiring so a copy-paste mismatch
+    // between two adjacent rows surfaces here rather than via the
+    // more-fan-out "every flag clicks once" matrix test further down.
     const api = buildStubApi();
     const onValueChanged = vi.fn();
     render(
@@ -156,13 +180,18 @@ describe("PlayFeaturesControls — click-to-toggle", () => {
         onValueChanged={onValueChanged}
       />,
     );
-    fireEvent.click(screen.getByTestId("feature-toggle-songs_enabled-off"));
+    fireEvent.click(
+      screen.getByTestId("feature-toggle-clickable_words_enabled-off"),
+    );
     await waitFor(() => {
-      expect(api.setSongsEnabled).toHaveBeenCalledWith(
+      expect(api.setClickableWordsEnabled).toHaveBeenCalledWith(
         false,
         expect.anything(),
       );
-      expect(onValueChanged).toHaveBeenCalledWith("songs_enabled", false);
+      expect(onValueChanged).toHaveBeenCalledWith(
+        "clickable_words_enabled",
+        false,
+      );
     });
   });
 
@@ -176,11 +205,14 @@ describe("PlayFeaturesControls — click-to-toggle", () => {
         onValueChanged={onValueChanged}
       />,
     );
-    // jokes_enabled defaults to on; clicking On again must not PUT.
-    fireEvent.click(screen.getByTestId("feature-toggle-jokes_enabled-on"));
+    // play_standalone_enabled defaults to on; clicking On again must
+    // not PUT.
+    fireEvent.click(
+      screen.getByTestId("feature-toggle-play_standalone_enabled-on"),
+    );
     // Give microtasks a tick.
     await Promise.resolve();
-    expect(api.setJokesEnabled).not.toHaveBeenCalled();
+    expect(api.setPlayStandaloneEnabled).not.toHaveBeenCalled();
     expect(onValueChanged).not.toHaveBeenCalled();
   });
 
@@ -227,7 +259,7 @@ describe("PlayFeaturesControls — click-to-toggle", () => {
 describe("PlayFeaturesControls — error path", () => {
   it("renders an inline error and reverts the optimistic flip on rejection", async () => {
     const api = buildStubApi();
-    api.setJokesEnabled = vi.fn(async () => {
+    api.setPlayStandaloneEnabled = vi.fn(async () => {
       throw new Error("network down");
     }) as Mock;
     const onValueChanged = vi.fn();
@@ -238,10 +270,12 @@ describe("PlayFeaturesControls — error path", () => {
         onValueChanged={onValueChanged}
       />,
     );
-    fireEvent.click(screen.getByTestId("feature-toggle-jokes_enabled-off"));
+    fireEvent.click(
+      screen.getByTestId("feature-toggle-play_standalone_enabled-off"),
+    );
     await waitFor(() => {
       const errorEl = screen.getByTestId(
-        "feature-toggle-jokes_enabled-error",
+        "feature-toggle-play_standalone_enabled-error",
       );
       expect(errorEl.textContent).toBe("network down");
     });
@@ -251,7 +285,7 @@ describe("PlayFeaturesControls — error path", () => {
     // button should be re-pressed against the unchanged currentValue.
     expect(
       screen
-        .getByTestId("feature-toggle-jokes_enabled-on")
+        .getByTestId("feature-toggle-play_standalone_enabled-on")
         .getAttribute("aria-pressed"),
     ).toBe("true");
   });

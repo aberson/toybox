@@ -24,6 +24,7 @@ import { Header } from "./components/Header";
 import { PinLogin } from "./components/PinLogin";
 import { PinSetup } from "./components/PinSetup";
 import { PlayQueueList } from "./components/PlayQueueList";
+import { RewardsSection } from "./components/RewardsSection";
 import { RoomIngestBulk } from "./components/RoomIngestBulk";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { StatsPanel } from "./components/StatsPanel";
@@ -62,12 +63,17 @@ type AuthMode = "bootstrap" | "setup" | "login" | "ready" | "error";
 // enums) so the values themselves double as ``data-testid`` suffixes.
 type TopTab = "play" | "kids-toyboxes" | "settings";
 type PlaySubTab = "play-ideas" | "transcription";
-type KidsSubTab = "toys" | "children" | "rooms";
+type KidsSubTab = "toys" | "children" | "rooms" | "rewards";
 type SettingsSubTab = "settings" | "stats";
 
 const TOP_TAB_VALUES: readonly TopTab[] = ["play", "kids-toyboxes", "settings"];
 const PLAY_SUBTAB_VALUES: readonly PlaySubTab[] = ["play-ideas", "transcription"];
-const KIDS_SUBTAB_VALUES: readonly KidsSubTab[] = ["toys", "children", "rooms"];
+const KIDS_SUBTAB_VALUES: readonly KidsSubTab[] = [
+  "toys",
+  "children",
+  "rooms",
+  "rewards",
+];
 const SETTINGS_SUBTAB_VALUES: readonly SettingsSubTab[] = ["settings", "stats"];
 
 export function App(): JSX.Element {
@@ -1032,6 +1038,7 @@ export function App(): JSX.Element {
                   { key: "toys", label: "Toys" },
                   { key: "children", label: "Children" },
                   { key: "rooms", label: "Rooms" },
+                  { key: "rewards", label: "Rewards" },
                 ]}
                 value={kidsTab.value}
                 onChange={kidsTab.setValue}
@@ -1042,12 +1049,25 @@ export function App(): JSX.Element {
                     components are mounted unchanged from their pre-H2
                     homes — only their parent gate moved. H5 stripped the
                     banned-themes UI from ChildProfileEditor and promoted
-                    it to the global Settings → Settings sub-tab. */}
+                    it to the global Settings → Settings sub-tab.
+                    Phase L Step L8 added the Rewards sub-tab — houses
+                    the L7 RewardIngest panel plus the joke + song
+                    master toggles that moved out of PlayFeaturesControls
+                    (rewards are now the home for per-activity reward
+                    TYPES, so the masters live alongside the picture-
+                    reward library). */}
                 {kidsTab.value === "toys" && <ToyIngest api={api} />}
                 {kidsTab.value === "children" && (
                   <ChildProfileEditor api={api} />
                 )}
                 {kidsTab.value === "rooms" && <RoomIngestBulk api={api} />}
+                {kidsTab.value === "rewards" && (
+                  <RewardsSection
+                    api={api}
+                    values={featureFlags}
+                    onValueChanged={handleFeatureFlagChanged}
+                  />
+                )}
               </div>
             </>
           )}

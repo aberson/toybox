@@ -93,10 +93,13 @@ afterEach(() => {
 });
 
 describe("PlayFeaturesControls — integration with real ApiClient", () => {
-  it("clicking Off on jokes_enabled fires PUT /api/settings/jokes-enabled with {value:false}", async () => {
+  it("clicking Off on play_standalone_enabled fires PUT /api/settings/play-standalone-enabled with {value:false}", async () => {
     // This is the canary for the iter-1 this-binding bug. If the
     // setter is detached, the click raises a TypeError inside the
-    // .then chain and no PUT ever reaches fetchImpl.
+    // .then chain and no PUT ever reaches fetchImpl. Phase L Step L8
+    // moved the original jokes_enabled canary out to
+    // RewardsSection.test.tsx; play_standalone_enabled is the
+    // surviving first-row canary here.
     const { api, observed, fetchImpl } = buildRealApiClient();
     const onValueChanged = vi.fn();
     render(
@@ -106,23 +109,28 @@ describe("PlayFeaturesControls — integration with real ApiClient", () => {
         onValueChanged={onValueChanged}
       />,
     );
-    fireEvent.click(screen.getByTestId("feature-toggle-jokes_enabled-off"));
+    fireEvent.click(
+      screen.getByTestId("feature-toggle-play_standalone_enabled-off"),
+    );
     await waitFor(() => {
       expect(fetchImpl).toHaveBeenCalled();
-      expect(onValueChanged).toHaveBeenCalledWith("jokes_enabled", false);
+      expect(onValueChanged).toHaveBeenCalledWith(
+        "play_standalone_enabled",
+        false,
+      );
     });
     // Exactly one PUT, exactly the right shape.
     const puts = observed.filter((r) => r.method === "PUT");
     expect(puts).toHaveLength(1);
-    expect(puts[0].url).toMatch(/\/api\/settings\/jokes-enabled$/);
+    expect(puts[0].url).toMatch(/\/api\/settings\/play-standalone-enabled$/);
     expect(puts[0].body).toBe(JSON.stringify({ value: false }));
   });
 
-  it("clicking Off on songs_enabled fires PUT /api/settings/songs-enabled with {value:false}", async () => {
+  it("clicking Off on clickable_words_enabled fires PUT /api/settings/clickable-words-enabled with {value:false}", async () => {
     // Companion canary covering a second flag's setter wiring through
     // the real ApiClient. Different snake_case → kebab-case mapping
-    // shape than jokes_enabled so a unitary regex regression in the
-    // URL builder surfaces here.
+    // shape so a unitary regex regression in the URL builder surfaces
+    // here.
     const { api, observed } = buildRealApiClient();
     const onValueChanged = vi.fn();
     render(
@@ -132,13 +140,18 @@ describe("PlayFeaturesControls — integration with real ApiClient", () => {
         onValueChanged={onValueChanged}
       />,
     );
-    fireEvent.click(screen.getByTestId("feature-toggle-songs_enabled-off"));
+    fireEvent.click(
+      screen.getByTestId("feature-toggle-clickable_words_enabled-off"),
+    );
     await waitFor(() => {
-      expect(onValueChanged).toHaveBeenCalledWith("songs_enabled", false);
+      expect(onValueChanged).toHaveBeenCalledWith(
+        "clickable_words_enabled",
+        false,
+      );
     });
     const puts = observed.filter((r) => r.method === "PUT");
     expect(puts).toHaveLength(1);
-    expect(puts[0].url).toMatch(/\/api\/settings\/songs-enabled$/);
+    expect(puts[0].url).toMatch(/\/api\/settings\/clickable-words-enabled$/);
     expect(puts[0].body).toBe(JSON.stringify({ value: false }));
   });
 
@@ -158,9 +171,11 @@ describe("PlayFeaturesControls — integration with real ApiClient", () => {
       />,
     );
     // Map of snake_case flag key → expected kebab-case URL fragment.
-    const expectedUrl: Record<PhaseKFeatureFlag, string> = {
-      jokes_enabled: "/api/settings/jokes-enabled",
-      songs_enabled: "/api/settings/songs-enabled",
+    // L8 removed jokes_enabled + songs_enabled from this section; the
+    // map covers only the three flags PlayFeaturesControls still
+    // renders. Use Partial<...> so the type stays in lockstep with
+    // PhaseKFeatureFlag even though jokes/songs aren't keys here.
+    const expectedUrl: Partial<Record<PhaseKFeatureFlag, string>> = {
       play_standalone_enabled: "/api/settings/play-standalone-enabled",
       clickable_words_enabled: "/api/settings/clickable-words-enabled",
       read_me_button_enabled: "/api/settings/read-me-button-enabled",
@@ -178,7 +193,9 @@ describe("PlayFeaturesControls — integration with real ApiClient", () => {
       await waitFor(() => {
         expect(
           observed.some(
-            (r) => r.method === "PUT" && r.url.endsWith(expectedUrl[spec.key]),
+            (r) =>
+              r.method === "PUT" &&
+              r.url.endsWith(expectedUrl[spec.key] ?? ""),
           ),
         ).toBe(true);
       });
@@ -187,7 +204,9 @@ describe("PlayFeaturesControls — integration with real ApiClient", () => {
     for (const spec of FEATURE_TOGGLES) {
       const target = !PHASE_K_FEATURE_FLAG_DEFAULTS[spec.key];
       const matches = observed.filter(
-        (r) => r.method === "PUT" && r.url.endsWith(expectedUrl[spec.key]),
+        (r) =>
+          r.method === "PUT" &&
+          r.url.endsWith(expectedUrl[spec.key] ?? ""),
       );
       expect(matches).toHaveLength(1);
       expect(matches[0].body).toBe(JSON.stringify({ value: target }));

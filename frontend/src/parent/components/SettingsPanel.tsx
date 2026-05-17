@@ -424,8 +424,6 @@ export interface SettingsPanelProps {
     | "setTranscriptRetention"
     | "setPlayTargetDepth"
     | "setPlayCadenceSeconds"
-    | "setJokesEnabled"
-    | "setSongsEnabled"
     | "setPlayStandaloneEnabled"
     | "setClickableWordsEnabled"
     | "setReadMeButtonEnabled"

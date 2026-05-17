@@ -1,7 +1,11 @@
-// Phase K step K2 (Phase L step L6): five parent-controlled feature-
+// Phase K step K2 (Phase L step L8): three parent-controlled feature-
 // flag toggles. Originally eight; L5 removed play_embedded_enabled +
 // play_endings_enabled + play_spontaneity_enabled when jokes/songs
-// became per-activity reward types.
+// became per-activity reward types. L8 then moved ``jokes_enabled`` +
+// ``songs_enabled`` out of this component and into the new
+// ``RewardsSection`` header — their state still lives in App.tsx's
+// lifted ``featureFlags`` dict so the Phase L bootstrap parallel-fetch
+// still seeds five values, but only THREE flags render here.
 //
 // Pattern mirrors PlayQueueSettingsControls.tsx (Phase J J10) — the
 // parent (App.tsx → SettingsPanel) holds the source-of-truth bool
@@ -12,9 +16,9 @@
 //
 // Visual style: a simple two-state segmented control (On / Off) per
 // flag. Mirrors PlayQueueSettingsControls' segmented-button shape so
-// SettingsPanel renders consistently. The five controls share a
+// SettingsPanel renders consistently. The three controls share a
 // single component definition driven by the canonical flag list
-// imported from ../api — one source of truth so a future sixth flag
+// imported from ../api — one source of truth so a future fourth flag
 // is a single-line edit (code-quality §2).
 //
 // Each toggle's aria-pressed reflects the *displayed* value (the
@@ -59,15 +63,15 @@ const ROW_STYLE: CSSProperties = {
   borderTop: "1px solid #f3f4f6",
 };
 
-// Single source of truth for the five flag setters routed from
+// Single source of truth for the three flag setters routed from
 // ``ApiClient``. The key is the canonical Pydantic name (matches the
 // settings table row); the API client setter method name follows the
 // same convention as Phase J's ``setPlayCadenceSeconds``. Phase L L5
 // removed setPlayEmbeddedEnabled / setPlayEndingsEnabled /
-// setPlaySpontaneityEnabled when those surfaces were deleted.
+// setPlaySpontaneityEnabled when those surfaces were deleted; L8 then
+// removed setJokesEnabled / setSongsEnabled when the joke + song
+// master toggles moved to ``RewardsSection`` (Kids & Toyboxes → Rewards).
 type FlagSetterName =
-  | "setJokesEnabled"
-  | "setSongsEnabled"
   | "setPlayStandaloneEnabled"
   | "setClickableWordsEnabled"
   | "setReadMeButtonEnabled";
@@ -87,18 +91,6 @@ interface FeatureToggleSpec {
 }
 
 export const FEATURE_TOGGLES: readonly FeatureToggleSpec[] = [
-  {
-    key: "jokes_enabled",
-    label: "Jokes enabled",
-    hint: "Master switch for the jokes corpus. When off, no surface delivers a joke.",
-    setter: "setJokesEnabled",
-  },
-  {
-    key: "songs_enabled",
-    label: "Songs enabled",
-    hint: "Master switch for the songs corpus. When off, no surface delivers a song.",
-    setter: "setSongsEnabled",
-  },
   {
     key: "play_standalone_enabled",
     label: "Standalone joke/song activities",
@@ -121,14 +113,18 @@ export const FEATURE_TOGGLES: readonly FeatureToggleSpec[] = [
 
 export interface PlayFeaturesControlsProps {
   api: Pick<ApiClient, FlagSetterName>;
-  // The lifted, source-of-truth values for all five flags. Seeded by
-  // App.tsx's bootstrap parallel-fetch; updated via
+  // The lifted, source-of-truth values for the surviving flags. The
+  // ``values`` dict still keys on ``PhaseKFeatureFlag`` (the full
+  // five-key union) so App.tsx can pass its single ``featureFlags``
+  // state object to BOTH this component and RewardsSection without
+  // slicing — this component only reads the three keys it renders.
+  // Seeded by App.tsx's bootstrap parallel-fetch; updated via
   // ``onValueChanged`` after each successful PUT.
   values: Record<PhaseKFeatureFlag, boolean>;
   // Bubble each successful PUT response back up so App.tsx can update
   // its lifted state. The kiosk also reads these for its own bootstrap
   // path; SettingsPanel uses ``values`` directly. Callback is a single
-  // function (rather than five per-flag callbacks) so adding a sixth
+  // function (rather than three per-flag callbacks) so adding a fourth
   // flag stays a one-line edit.
   onValueChanged: (key: PhaseKFeatureFlag, value: boolean) => void;
 }
@@ -274,10 +270,9 @@ export function PlayFeaturesControls(
     <section data-testid="play-features-controls" style={CARD_STYLE}>
       <h3 style={SECTION_HEADING_STYLE}>Play features</h3>
       <p style={HINT_STYLE}>
-        Master switches for the joke + song surfaces, the four play
-        surfaces, and the kiosk word-level + Read Me affordances. A
-        surface delivers content only when both its master and its
-        surface flag are on.
+        Master switches for the standalone joke / song trigger flow and
+        the kiosk word-level + Read Me affordances. The joke + song
+        master toggles themselves live under Kids & Toyboxes → Rewards.
       </p>
       {FEATURE_TOGGLES.map((spec) => (
         <FeatureToggleRow

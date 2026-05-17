@@ -338,6 +338,23 @@ describe("App bootstrap parallel-fetch happy path (J8)", () => {
         u.endsWith("/api/activities/proposed?include_active=true"),
       ).length,
     ).toBe(1);
+    // Phase L Step L8: the bootstrap parallel-fetch still seeds the
+    // FIVE surviving feature flags exactly once each, even though
+    // ``jokes_enabled`` + ``songs_enabled`` no longer drive
+    // PlayFeaturesControls (they moved to RewardsSection). App.tsx's
+    // lifted ``featureFlags`` dict is the single source of truth for
+    // BOTH consumers; if a future regression dropped the jokes/songs
+    // reads to "save a round-trip" the Rewards section header would
+    // paint optimistic defaults instead of the persisted values.
+    for (const path of [
+      "/api/settings/jokes-enabled",
+      "/api/settings/songs-enabled",
+      "/api/settings/play-standalone-enabled",
+      "/api/settings/clickable-words-enabled",
+      "/api/settings/read-me-button-enabled",
+    ]) {
+      expect(urls.filter((u) => u.endsWith(path)).length).toBe(1);
+    }
     // proposedList + active hydrated from the REST snapshot via
     // applyMutationResult — the version-guarded reducer puts ``proposed``
     // rows into proposedList and ``running`` into active.
