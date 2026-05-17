@@ -72,9 +72,16 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Final, Literal, Protocol, cast
 
+from ..core import jokes_enabled as _jokes_enabled
+from ..core import songs_enabled as _songs_enabled
 from ..core.banned_themes import current_banned_themes_global
 from .generic_descriptors import GENERIC_DESCRIPTORS
+from .joke_corpus import pick_joke
+from .models import Animation
 from .roles import Role
+from .song_corpus import pick_song
+from .themes import Theme
+from .topic_extract import extract_themes
 
 _logger = logging.getLogger(__name__)
 
@@ -1042,6 +1049,692 @@ def _coerce_weight(raw: object) -> float | None:
     return None
 
 
+# ---------------------------------------------------------------------------
+# Phase L Step L3 — reward resolver
+# ---------------------------------------------------------------------------
+#
+# ``resolve_reward`` is the server-side picker the kiosk advance handler
+# (L4) calls when the parent-approved reward step fires. The function is
+# pure: takes a connection + a :class:`RewardActivityContext` snapshot
+# of the activity + a requested type, returns a :class:`ResolvedReward`
+# (or ``None`` when no reward is available across the fallback chain).
+#
+# Algorithm (locked per documentation/phase-l-plan.md §7 L3):
+#
+# 1. Compute the activity's themes as the UNION of (a) the template's
+#    ``recommended_themes`` and (b) themes extracted from the most
+#    recent 50 transcripts in this session. Both sources are lowercased
+#    + NFKC-normalised (the inputs are already in canonical form: Theme
+#    enum values are lowercase ASCII; transcript-extracted themes flow
+#    through :func:`topic_extract.extract_themes` which returns Theme
+#    members).
+#
+# 2. When ``requested_type == "random"``, roll among eligible types
+#    (picture if any active rewards exist, joke if jokes_enabled +
+#    non-empty corpus, song if songs_enabled + non-empty corpus). Roll
+#    uniformly across eligible types. The roll uses the deterministic
+#    seed below.
+#
+# 3. Try the chosen (or rolled) type:
+#    - picture: SELECT active+non-archived rewards, order by
+#      (overlap_count DESC, last_used_at ASC NULLS FIRST, id ASC),
+#      pick the head. Empty intersection -> uniform random (seeded).
+#    - joke / song: corpus pickers seeded on the same hash, theme=first
+#      activity theme (lowest-id Theme member for stability), with a
+#      ``theme=None`` fallback when the themed pick returns None.
+#
+# 4. On empty pool / no result, fall through ``picture -> joke -> song
+#    -> None``. The starting type is determined by the requested type;
+#    fallback walks the remaining types in chain order, skipping the
+#    type we already tried.
+#
+# Determinism: the seed for every random/uniform pick within one call
+# is ``sha256((activity_id, current_step_count))`` so repeated calls
+# within one advance return the same result. Tests assert exact
+# outcomes given fixed inputs.
+
+
+@dataclass(frozen=True, slots=True)
+class RewardActivityContext:
+    """Snapshot of the activity fields :func:`resolve_reward` reads.
+
+    Decouples the resolver from the activity persistence row shape; L4
+    builds this from the joined SQL row and passes it in. Keeping the
+    shape narrow makes the function trivially unit-testable.
+
+    Fields:
+
+    * ``id`` — the ``activities.id`` PK. Mixed into the deterministic
+      seed so two activities pick different rewards at the same step
+      count.
+    * ``session_id`` — the activity's session, used to scope the
+      transcript SQL in :func:`recent_transcript_texts`.
+    * ``persona_id`` — passed through to :func:`pick_joke` /
+      :func:`pick_song`'s persona-compat filter. ``None`` means "no
+      persona constraint" (matches the corpus picker's contract).
+    * ``slot_fills_json`` — the raw ``activities.slot_fills_json`` TEXT
+      column value. The resolver decodes it to look up the reserved
+      ``"__template_id"`` key (L4 writes this on approve). When the key
+      is absent the template-themes source contributes nothing — the
+      resolver falls through to transcript-only theme extraction.
+    * ``current_step_count`` — the step seq the reward fires after.
+      Mixed into the deterministic seed so a hypothetical re-advance
+      at a different step count picks a different reward (a stable
+      contract tests can assert).
+    """
+
+    id: str
+    session_id: str
+    persona_id: str | None
+    slot_fills_json: str | None
+    current_step_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedReward:
+    """The picked reward in a uniform shape for the kiosk wire envelope.
+
+    One dataclass for all three kinds so the L4 handler can return it
+    verbatim. Per documentation/phase-l-plan.md §8 the wire shape is:
+
+    * ``kind`` — the type discriminator (also the L4 step row's
+      ``kind`` column value).
+    * ``reward_id`` — the catalog entry id (``rewards.id`` /
+      ``Joke.id`` / ``Song.id``). The kiosk uses it for logging and
+      the parent UI uses it for cross-reference.
+    * ``image_url`` — set for ``kind="picture"``, ``None`` otherwise.
+    * ``animation`` — set for ``kind="picture"``, ``None`` otherwise.
+    * ``audio_url`` — set for ``kind="song"``, ``None`` otherwise.
+    * ``body`` — display text. For ``picture`` this is the display
+      name; for ``joke`` this duplicates the punchline so the kiosk
+      can render uniformly; for ``song`` this is the title.
+    * ``setup`` / ``punchline`` — set for ``kind="joke"``, ``None``
+      otherwise. Duplicating ``punchline`` into ``body`` keeps the
+      uniform-shape contract while preserving the structured fields.
+    """
+
+    kind: Literal["picture", "joke", "song"]
+    reward_id: str
+    image_url: str | None
+    animation: Animation | None
+    audio_url: str | None
+    body: str
+    setup: str | None
+    punchline: str | None
+
+
+# Public type alias for the requested-type wire string. The resolver
+# accepts the four-member Literal from :data:`toybox.activities.models.RewardType`
+# but exposes it locally so callers don't have to thread the import.
+_RewardTypeRequest = Literal["picture", "joke", "song", "random"]
+
+# Reserved key the L4 approve handler writes into ``slot_fills_json``
+# to carry the template id through to the resolver. Reads tolerate its
+# absence gracefully.
+_TEMPLATE_ID_KEY: Final[str] = "__template_id"
+
+# Default cap on transcripts pulled per resolve call. Mirrors the
+# ``LIMIT 50`` in ``ai/tools.py:404`` (the producer this duplicates by
+# design — see :func:`recent_transcript_texts` docstring).
+_TRANSCRIPT_LIMIT: Final[int] = 50
+
+
+def recent_transcript_texts(
+    conn: sqlite3.Connection,
+    session_id: str,
+    limit: int = _TRANSCRIPT_LIMIT,
+) -> list[str]:
+    """Return up to ``limit`` recent non-null transcript bodies for ``session_id``.
+
+    Duplicates the 5-line SQL from
+    :mod:`toybox.ai.tools` (the ``_resolve_recent_transcripts`` body).
+    Dependency direction is one-way (``api`` / advance handler →
+    ``content_resolver``; ``content_resolver`` does NOT import from
+    ``ai/tools``), so the duplication is deliberate per
+    code-quality.md §1.
+
+    Ordered by ``ended_at DESC`` (most-recent first) which matches both
+    the producer and the consumer side's "show me what was just said"
+    intent. ``ended_at`` is the canonical recency timestamp because the
+    transcript row writes finalize when the utterance ends.
+    """
+    rows = conn.execute(
+        "SELECT text FROM transcripts "
+        "WHERE session_id = ? AND text IS NOT NULL "
+        "ORDER BY ended_at DESC LIMIT ?",
+        (session_id, int(limit)),
+    ).fetchall()
+    return [str(row["text"]) for row in rows]
+
+
+def _decode_template_id(slot_fills_json: str | None) -> str | None:
+    """Extract the reserved ``__template_id`` key from ``slot_fills_json``.
+
+    L4 writes ``slot_fills["__template_id"] = activity.template_id`` at
+    approve time so the resolver can find the template's
+    ``recommended_themes`` at advance time. Pre-L4 rows do not carry
+    the key — return ``None`` and let the caller fall through to the
+    transcript-only theme source.
+
+    Tolerant of malformed JSON / non-dict payloads / non-string values
+    (logs a WARNING and returns ``None``) to mirror the defensive
+    decoding pattern in :mod:`toybox.api.activities`.
+    """
+    if not slot_fills_json:
+        return None
+    try:
+        decoded = json.loads(slot_fills_json)
+    except json.JSONDecodeError:
+        _logger.warning(
+            "reward resolver: slot_fills_json malformed; ignoring template-themes source",
+        )
+        return None
+    if not isinstance(decoded, dict):
+        return None
+    raw = decoded.get(_TEMPLATE_ID_KEY)
+    if isinstance(raw, str) and raw:
+        return raw
+    return None
+
+
+def _template_recommended_themes(template_id: str | None) -> list[str]:
+    """Look up the template and return its ``recommended_themes`` as strings.
+
+    Returns an empty list when:
+
+    * ``template_id`` is ``None`` (pre-L4 activity row).
+    * The template isn't currently loaded (renamed / removed between
+      approve and advance).
+
+    Imported lazily to avoid a module-load-time cycle:
+    ``activities.generator`` already imports indirectly from
+    ``content_resolver`` (via :func:`resolve_toys`); importing at
+    module scope would form a graph cycle. The lazy import is paid
+    once per resolve call.
+    """
+    if not template_id:
+        return []
+    from .generator import find_template_by_id  # noqa: PLC0415
+
+    template = find_template_by_id(template_id)
+    if template is None:
+        return []
+    # ``_Template.recommended_themes`` is ``tuple[Theme, ...]``; Theme
+    # is a StrEnum so the .value is already lowercased ASCII. We expose
+    # plain strings here so the intersection with reward.tags (also
+    # strings) is straightforward.
+    return [theme.value for theme in template.recommended_themes]
+
+
+def _compute_activity_themes(
+    conn: sqlite3.Connection,
+    ctx: RewardActivityContext,
+) -> list[str]:
+    """Union of (template recommended_themes) ∪ (extracted transcript themes).
+
+    Both sources contribute lowercased + NFKC-canonical strings:
+
+    * Template themes: :class:`Theme` enum values are lowercase ASCII
+      (NFKC is a no-op on ASCII), so no extra normalisation needed.
+    * Transcript themes: :func:`topic_extract.extract_themes` returns
+      :class:`Theme` members; same canonical-form guarantee.
+
+    Order: union preserves first-seen across the concatenated source
+    order (template first, then transcripts). The downstream picker
+    sorts deterministically anyway, so order here is informational
+    only — :func:`_first_theme_for_corpus` re-sorts by Theme-enum
+    declaration order before picking, so the union-input order doesn't
+    affect the corpus-picker's theme choice.
+    """
+    template_id = _decode_template_id(ctx.slot_fills_json)
+    template_themes = _template_recommended_themes(template_id)
+    texts = recent_transcript_texts(conn, ctx.session_id)
+    transcript_themes = [theme.value for theme in extract_themes(texts)]
+    seen: set[str] = set()
+    out: list[str] = []
+    for theme in (*template_themes, *transcript_themes):
+        if theme in seen:
+            continue
+        seen.add(theme)
+        out.append(theme)
+    return out
+
+
+def _seed_for_activity(activity_id: str, current_step_count: int) -> int:
+    """Deterministic 64-bit seed derived from ``(activity_id, step_count)``.
+
+    Per phase-l-plan §7 L3: ``sha256((activity_id, current_step_count))``.
+    The 64-bit truncation matches :func:`_seed_role_picks` precedent —
+    plenty of entropy for the small number of picks the resolver makes
+    per call.
+    """
+    canonical = f"{activity_id}|{int(current_step_count)}"
+    digest = hashlib.sha256(canonical.encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], "big", signed=False)
+
+
+def _seeded_rng(seed: int) -> random.Random:
+    """Build a :class:`random.Random` from the canonical seed.
+
+    Used for the ``random`` requested-type uniform roll across eligible
+    types AND for the empty-intersection uniform fallback over the
+    picture pool. Each pick path uses a fresh :class:`random.Random`
+    instance seeded from ``(activity_id, step_count)``, so they're
+    independently deterministic — the type-roll and the picture-pool
+    uniform pick don't share RNG state.
+    """
+    return random.Random(seed)
+
+
+def _theme_overlap_count(reward_tags: list[str], activity_themes: list[str]) -> int:
+    """Set-intersection cardinality of reward tags vs. activity themes.
+
+    Both inputs are already lowercased + NFKC-canonical (rewards via
+    the L2 write-time normaliser; activity themes via the StrEnum
+    guarantee + transcript extractor's Theme output).
+    """
+    if not reward_tags or not activity_themes:
+        return 0
+    return len(set(reward_tags) & set(activity_themes))
+
+
+def _load_active_rewards(conn: sqlite3.Connection) -> list[dict[str, object]]:
+    """Return all eligible reward rows as plain dicts (active + non-archived).
+
+    Dict (not :class:`sqlite3.Row`) because the picker sorts the list in
+    Python with a multi-key tuple — Row's column-by-name access still
+    works but converting once keeps the sort key tuple readable.
+    """
+    rows = conn.execute(
+        "SELECT id, display_name, image_path, animation, tags, last_used_at "
+        "FROM rewards WHERE active = 1 AND archived = 0"
+    ).fetchall()
+    out: list[dict[str, object]] = []
+    for row in rows:
+        # Decode tags inline so the picker doesn't depend on the
+        # rewards API module (one-way dependency: api → resolver).
+        raw_tags = row["tags"]
+        tags: list[str] = []
+        if isinstance(raw_tags, str) and raw_tags.strip():
+            try:
+                decoded = json.loads(raw_tags)
+            except json.JSONDecodeError:
+                _logger.warning(
+                    "reward resolver: rewards.tags malformed for id=%r; treating as empty",
+                    row["id"],
+                )
+                decoded = []
+            if isinstance(decoded, list):
+                tags = [entry for entry in decoded if isinstance(entry, str)]
+        out.append(
+            {
+                "id": str(row["id"]),
+                "display_name": str(row["display_name"]),
+                "image_path": str(row["image_path"]),
+                "animation": str(row["animation"]),
+                "tags": tags,
+                "last_used_at": row["last_used_at"],
+            }
+        )
+    return out
+
+
+def _image_url_from_image_path(image_path: str) -> str:
+    """Derive the static-mount URL from a stored ``rewards.image_path``.
+
+    Stored values follow ``data/images/rewards/<filename>`` (see
+    :func:`toybox.storage.images.relative_committed_path`). The static
+    mount in :mod:`toybox.app` exposes ``data/images/`` at
+    ``/api/static/images/``, so the URL is the stored path with the
+    ``data/images/`` prefix swapped for ``/api/static/images/``.
+
+    Defensive against legacy / hand-edited rows whose ``image_path``
+    does NOT carry the expected prefix: returns the value as-is with a
+    WARNING. The kiosk falls back to a placeholder for missing files,
+    so a malformed URL is still preferred over crashing the advance.
+    """
+    expected_prefix = "data/images/"
+    normalised = image_path.replace("\\", "/")
+    if normalised.startswith(expected_prefix):
+        return "/api/static/images/" + normalised[len(expected_prefix) :]
+    _logger.warning(
+        "reward resolver: image_path %r does not start with %r; returning as-is",
+        image_path,
+        expected_prefix,
+    )
+    return image_path
+
+
+def _pick_picture(
+    rewards: list[dict[str, object]],
+    activity_themes: list[str],
+    rng: random.Random,
+) -> ResolvedReward | None:
+    """Pick one picture reward from ``rewards`` per the L3 sort rules.
+
+    Empty input → ``None`` (caller falls through to the next type).
+
+    Sort keys (per phase-l-plan §7 L3):
+
+    1. overlap_count DESC
+    2. last_used_at ASC NULLS FIRST
+    3. id ASC (deterministic tiebreak)
+
+    Empty-intersection special case (every reward has overlap_count =
+    0): the plan says "Empty intersection falls back to uniform random
+    over the type pool." Implemented as ``rng.choice`` over the
+    overlap=0 cohort. Mixed pools (some rewards overlap, some don't)
+    fall through to the primary sort — the overlap-DESC key surfaces
+    the overlapping rewards above the non-overlapping ones.
+    """
+    if not rewards:
+        return None
+    # Single pass: compute overlap counts and find the max.
+    enriched = [
+        (_theme_overlap_count(cast("list[str]", r["tags"]), activity_themes), r) for r in rewards
+    ]
+    max_overlap = max(count for count, _ in enriched)
+    if max_overlap == 0:
+        # No theme intersects any reward — uniform random over the
+        # whole pool (seeded). Sort by id ASC first so the seeded pick
+        # is byte-stable across DB row-order changes.
+        sorted_pool = sorted(rewards, key=lambda r: str(r["id"]))
+        picked = rng.choice(sorted_pool)
+        return _reward_row_to_resolved(picked)
+    # Primary sort path. ``last_used_at IS NULL`` → 0 (NULLS FIRST) so
+    # the never-used reward wins the recency tiebreak.
+    sorted_rewards = sorted(
+        enriched,
+        key=lambda entry: (
+            -entry[0],  # overlap_count DESC
+            entry[1]["last_used_at"] is not None,  # False (NULL) sorts first
+            str(entry[1]["last_used_at"] or ""),  # last_used_at ASC
+            str(entry[1]["id"]),  # id ASC
+        ),
+    )
+    return _reward_row_to_resolved(sorted_rewards[0][1])
+
+
+def _reward_row_to_resolved(row: dict[str, object]) -> ResolvedReward:
+    """Coerce a reward dict-row into a :class:`ResolvedReward` for ``kind="picture"``."""
+    raw_animation = str(row["animation"])
+    try:
+        animation = Animation(raw_animation)
+    except ValueError:
+        # Defense-in-depth: a hand-edited row with a stale animation
+        # value would otherwise blow up the wire shape. Fall back to
+        # the first enum member (matches the rewards API decoder).
+        _logger.warning(
+            "reward resolver: rewards.animation %r is not a valid Animation; "
+            "falling back to first enum member",
+            raw_animation,
+        )
+        animation = next(iter(Animation))
+    return ResolvedReward(
+        kind="picture",
+        reward_id=str(row["id"]),
+        image_url=_image_url_from_image_path(str(row["image_path"])),
+        animation=animation,
+        audio_url=None,
+        body=str(row["display_name"]),
+        setup=None,
+        punchline=None,
+    )
+
+
+def _first_theme_for_corpus(activity_themes: list[str]) -> Theme | None:
+    """Pick a deterministic activity theme to seed the corpus picker.
+
+    Policy: lowest-by-id Theme member among the activity themes (the
+    StrEnum's declared order is the canonical ordering used elsewhere
+    in :mod:`toybox.activities.topic_extract`). Returns ``None`` when
+    no activity theme maps to a Theme member — the caller then passes
+    ``theme=None`` to the picker, which broadens the candidate pool to
+    every entry.
+
+    "Lowest-by-id" is the deterministic policy documented in the L3
+    plan: tests can assert exact picks given fixed inputs without
+    having to reason about transcript order or template-author intent.
+    """
+    if not activity_themes:
+        return None
+    theme_order = {t.value: i for i, t in enumerate(Theme)}
+    valid = [t for t in activity_themes if t in theme_order]
+    if not valid:
+        return None
+    valid.sort(key=lambda t: theme_order[t])
+    # Coerce back to Theme. ``Theme(value)`` is guaranteed to succeed
+    # because ``valid`` was filtered against ``theme_order`` keys.
+    return Theme(valid[0])
+
+
+def _try_pick_joke(
+    seed: int,
+    persona_id: str | None,
+    activity_themes: list[str],
+) -> ResolvedReward | None:
+    """Pick one joke; theme-first, untheme fallback. Returns ``None`` on miss.
+
+    Per phase-l-plan §7 L3: "Try with one of the activity themes first
+    (lowest-id theme...). If returns None, fall back to ``theme=None``."
+
+    Corpus-load failures during the pick (the picker eagerly loads the
+    corpus on first call) are caught and treated as a missed pick so
+    the resolver's fallback chain proceeds. A malformed bundle is a
+    packaging error, not a crash-the-advance-handler moment.
+    """
+    theme = _first_theme_for_corpus(activity_themes)
+    try:
+        joke = pick_joke(seed, persona_id=persona_id, theme=theme) if theme is not None else None
+        if joke is None:
+            joke = pick_joke(seed, persona_id=persona_id, theme=None)
+    except (ValueError, OSError) as exc:
+        _logger.warning("reward resolver: pick_joke failed: %s", exc)
+        return None
+    if joke is None:
+        return None
+    return ResolvedReward(
+        kind="joke",
+        reward_id=joke.id,
+        image_url=None,
+        animation=None,
+        audio_url=None,
+        body=joke.punchline,
+        setup=joke.setup,
+        punchline=joke.punchline,
+    )
+
+
+def _try_pick_song(
+    seed: int,
+    persona_id: str | None,
+    activity_themes: list[str],
+) -> ResolvedReward | None:
+    """Pick one song with audio present; theme-first, untheme fallback.
+
+    Corpus-load / audio-probe failures during the pick are caught and
+    treated as a missed pick so the resolver's fallback chain proceeds.
+    See :func:`_try_pick_joke` for the same rationale.
+    """
+    theme = _first_theme_for_corpus(activity_themes)
+    try:
+        song = (
+            pick_song(seed, persona_id=persona_id, theme=theme, require_audio=True)
+            if theme is not None
+            else None
+        )
+        if song is None:
+            song = pick_song(seed, persona_id=persona_id, theme=None, require_audio=True)
+    except (ValueError, OSError) as exc:
+        _logger.warning("reward resolver: pick_song failed: %s", exc)
+        return None
+    if song is None:
+        return None
+    return ResolvedReward(
+        kind="song",
+        reward_id=song.id,
+        image_url=None,
+        animation=None,
+        audio_url=f"/api/static/songs/audio/{song.id}.mp3",
+        body=song.title,
+        setup=None,
+        punchline=None,
+    )
+
+
+# Canonical fallback chain (per phase-l-plan §7 L3): picture → joke →
+# song → None. The starting point is set by the requested type and the
+# fallback walks the remaining types in this order, skipping any type
+# already tried in the same call.
+_FALLBACK_ORDER: Final[tuple[Literal["picture", "joke", "song"], ...]] = (
+    "picture",
+    "joke",
+    "song",
+)
+
+
+def _type_is_eligible(
+    conn: sqlite3.Connection,
+    kind: Literal["picture", "joke", "song"],
+    rewards: list[dict[str, object]],
+) -> bool:
+    """Per-type eligibility gate, applied on EVERY type-try.
+
+    Unified entry point for the eligibility logic (per the L3 plan §1.3
+    "If the chosen reward type has nothing eligible to fire ... fall
+    through ``picture → joke → song → no reward``"). Used both when the
+    ``random`` requested type rolls among eligible types and when the
+    fallback chain steps into an explicit/fallback type — the
+    ``jokes_enabled`` / ``songs_enabled`` flags MUST hard-gate the
+    explicit-type and fallback paths, not just random-roll eligibility.
+
+    Decisions per kind:
+
+    * ``picture`` — at least one active+non-archived reward row exists
+      (the caller passes the already-loaded ``rewards`` list so we
+      don't re-query).
+    * ``joke`` — household flag ``jokes_enabled = true`` AND the joke
+      corpus is non-empty. Corpus load failures (malformed bundle)
+      treat the type as ineligible and log a WARNING.
+    * ``song`` — household flag ``songs_enabled = true`` AND the song
+      corpus is non-empty. Corpus load failures treat the type as
+      ineligible.
+
+    Note (random-distribution skew, intentional): when audio MP3s have
+    NOT yet been generated (fresh dev install pre-``generate_song_corpus.py``),
+    the song corpus is non-empty but every per-song ``require_audio``
+    check at pick time returns ``None``. The ``random`` roll still
+    treats ``song`` as eligible — so it gets rolled, the pick returns
+    None, and the fallback chain salvages with a picture/joke. The
+    operator-visible behaviour is correct (salvage works); only the
+    random distribution is skewed (song's share is wasted on the
+    fallback). A v2 nice-to-have: filter ``song`` out of the random
+    pool by audio-availability so the distribution stays uniform.
+    """
+    # Corpus emptiness is a packaging-time concern (the bundled corpora
+    # ship validated). Use the loaders' tuple length to handle the rare
+    # test fixture that points TOYBOX_DATA_DIR at an empty corpus.
+    from .joke_corpus import load_jokes  # noqa: PLC0415
+    from .song_corpus import load_songs  # noqa: PLC0415
+
+    if kind == "picture":
+        return bool(rewards)
+    if kind == "joke":
+        if not _jokes_enabled.get(conn):
+            return False
+        try:
+            return len(load_jokes()) > 0
+        except (ValueError, OSError) as exc:
+            _logger.warning("reward resolver: jokes corpus load failed: %s", exc)
+            return False
+    if kind == "song":
+        if not _songs_enabled.get(conn):
+            return False
+        try:
+            return len(load_songs()) > 0
+        except (ValueError, OSError) as exc:
+            _logger.warning("reward resolver: songs corpus load failed: %s", exc)
+            return False
+    return False
+
+
+def _eligible_types(
+    conn: sqlite3.Connection,
+    rewards: list[dict[str, object]],
+) -> list[Literal["picture", "joke", "song"]]:
+    """Compute the eligible reward types for the ``random`` roll.
+
+    Thin wrapper over :func:`_type_is_eligible` — calls the per-type
+    gate for each of the three kinds and collects the ones that pass.
+    """
+    return [k for k in _FALLBACK_ORDER if _type_is_eligible(conn, k, rewards)]
+
+
+def resolve_reward(
+    conn: sqlite3.Connection,
+    activity: RewardActivityContext,
+    requested_type: _RewardTypeRequest,
+) -> ResolvedReward | None:
+    """Pick the reward for one activity-advance.
+
+    Returns ``None`` when no type yields a result. See module
+    docstring + the L3 plan section for the algorithm.
+
+    ``requested_type`` may be ``"random"`` to roll among eligible types
+    or one of the three concrete types; either way the function walks
+    the fallback chain ``picture → joke → song`` when the starting
+    type yields no result.
+
+    The function is deterministic given a fixed ``(activity.id,
+    activity.current_step_count)`` — repeated calls within one advance
+    return the same :class:`ResolvedReward`. The contract is what L4
+    relies on for idempotency.
+    """
+    activity_themes = _compute_activity_themes(conn, activity)
+    rewards = _load_active_rewards(conn)
+    seed = _seed_for_activity(activity.id, activity.current_step_count)
+
+    # Determine starting type.
+    if requested_type == "random":
+        eligible = _eligible_types(conn, rewards)
+        if not eligible:
+            return None
+        rng_for_type = _seeded_rng(seed)
+        starting_type: Literal["picture", "joke", "song"] = rng_for_type.choice(eligible)
+    else:
+        starting_type = requested_type
+
+    # Build the ordered try-chain starting from ``starting_type``, then
+    # walking the canonical fallback chain skipping the starting type.
+    try_order: list[Literal["picture", "joke", "song"]] = [starting_type]
+    for kind in _FALLBACK_ORDER:
+        if kind != starting_type:
+            try_order.append(kind)
+
+    rng_for_picture = _seeded_rng(seed)
+    for kind in try_order:
+        # Per-type gate: ``jokes_enabled`` / ``songs_enabled`` flags
+        # MUST hard-gate the explicit-type and fallback paths, not just
+        # the ``random`` roll. If the flag for the type is off (or the
+        # corpus failed to load), skip the type entirely and let the
+        # fallback chain proceed to the next eligible type.
+        if not _type_is_eligible(conn, kind, rewards):
+            continue
+        if kind == "picture":
+            picked = _pick_picture(rewards, activity_themes, rng_for_picture)
+            if picked is not None:
+                return picked
+        elif kind == "joke":
+            picked = _try_pick_joke(seed, activity.persona_id, activity_themes)
+            if picked is not None:
+                return picked
+        elif kind == "song":
+            picked = _try_pick_song(seed, activity.persona_id, activity_themes)
+            if picked is not None:
+                return picked
+    return None
+
+
 __all__ = [
     "DEFAULT_ROOMS_LIMIT",
     "DEFAULT_TOYS_LIMIT",
@@ -1052,14 +1745,18 @@ __all__ = [
     "GenericDescriptor",
     "ReadingLevel",
     "ResolvedChildren",
+    "ResolvedReward",
     "ResolvedRoom",
     "ResolvedToy",
+    "RewardActivityContext",
     "RoleSlotValue",
     "SafeDefaultTemplate",
     "aggregate_child_constraints",
     "apply_banned_themes_filter",
     "build_claude_directive",
+    "recent_transcript_texts",
     "resolve_child_profiles",
+    "resolve_reward",
     "resolve_role_slots",
     "resolve_rooms",
     "resolve_toys",
