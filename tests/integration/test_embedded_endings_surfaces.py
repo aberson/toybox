@@ -448,10 +448,16 @@ def test_endings_skipped_when_songs_content_master_off(
         activity = _advance(client, parent_headers, activity_id, version)
         version = int(activity["version"])
 
-    steps = _fetch_steps(db_path, activity_id)
+    # Phase L Step L4: filter out the reward-step row (kind='reward')
+    # that the post-L4 terminal advance may append. This test
+    # specifically pins the K14 ending-surface gating contract; the
+    # L4 reward step is orthogonal and covered by
+    # test_phase_l_reward_step_wiring.py.
+    steps = [r for r in _fetch_steps(db_path, activity_id) if r["kind"] != "reward"]
     kinds = {r["kind"] for r in steps}
     assert "song" not in kinds, f"no song row should exist, got kinds={kinds}"
-    # All 3 template steps materialised; no seq=4.
+    # All 3 template steps materialised; no seq=4 from the deleted
+    # K14 ending surface.
     assert {r["seq"] for r in steps} == {1, 2, 3}, (
         f"expected seqs 1,2,3 (template steps only); got {sorted(r['seq'] for r in steps)}"
     )
@@ -489,7 +495,10 @@ def test_endings_skipped_when_play_endings_surface_flag_off(
         activity = _advance(client, parent_headers, activity_id, version)
         version = int(activity["version"])
 
-    steps = _fetch_steps(db_path, activity_id)
+    # Phase L Step L4: filter out the reward-step row (kind='reward')
+    # the post-L4 terminal advance may append; the surface-flag
+    # contract this test pins is K14-scoped.
+    steps = [r for r in _fetch_steps(db_path, activity_id) if r["kind"] != "reward"]
     kinds = {r["kind"] for r in steps}
     assert "song" not in kinds, f"no song row should exist, got kinds={kinds}"
     assert {r["seq"] for r in steps} == {1, 2, 3}

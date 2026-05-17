@@ -778,8 +778,13 @@ def test_k17_e_walk_activity_through_embedded_joke_song_and_ending(
             )
 
     # Inspect persisted steps: AT LEAST one joke kind, AT LEAST one
-    # song kind, and the LAST step is the ending row.
-    rows = _fetch_steps(db_path, activity_id)
+    # song kind, and the LAST K14-shape step is the ending row.
+    #
+    # Phase L Step L4: filter out the reward-step row (kind='reward')
+    # the post-L4 terminal advance may append. This K17 sub-step pins
+    # the K14 embedded + ending row shapes; the L4 reward step is
+    # orthogonal and covered by test_phase_l_reward_step_wiring.py.
+    rows = [r for r in _fetch_steps(db_path, activity_id) if r["kind"] != "reward"]
     kinds_seen = [r["kind"] for r in rows]
     # Debug surface: dump the proposed template id + step bodies so a
     # silent-wiring failure (propose picked a different template) is
@@ -810,8 +815,8 @@ def test_k17_e_walk_activity_through_embedded_joke_song_and_ending(
         f"expected at least one song step (embedded or ending); saw kinds={kinds_seen!r}"
     )
 
-    # The LAST step should be the ending row — it should carry
-    # metadata.interjection == "ending".
+    # The LAST non-reward step should be the ending row — it should
+    # carry metadata.interjection == "ending".
     last_row = rows[-1]
     assert last_row["metadata_json"], f"final step must persist metadata_json; got {last_row}"
     last_meta = json.loads(last_row["metadata_json"])
@@ -950,7 +955,12 @@ def test_k17_h_activity_finishes_through_ending_song_step(
             f"{_fetch_steps(db_path, activity_id)}"
         )
 
-    rows = _fetch_steps(db_path, activity_id)
+    # Phase L Step L4: filter out the reward-step row (kind='reward')
+    # the post-L4 terminal advance may append. This K17 sub-step pins
+    # the K14 ending-step shape (song + interjection='ending'); the L4
+    # reward step is orthogonal and covered by
+    # test_phase_l_reward_step_wiring.py.
+    rows = [r for r in _fetch_steps(db_path, activity_id) if r["kind"] != "reward"]
     last_row = rows[-1]
     assert last_row["kind"] == "song", (
         f"final step must be the ending song; got kind={last_row['kind']!r}"

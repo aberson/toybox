@@ -27,16 +27,19 @@ import uuid
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ..activities.content_resolver import (
     GenericDescriptor,
+    ResolvedReward,
     ResolvedRoom,
     ResolvedToy,
+    RewardActivityContext,
     resolve_child_profiles,
+    resolve_reward,
     resolve_role_slots,
     resolve_rooms,
     resolve_toys,
@@ -57,7 +60,6 @@ from ..activities.generator import (
     resolve_dispatch,
 )
 from ..activities.interjection import build_interjection_step
-from ..activities.topic_extract import extract_themes
 from ..activities.interjections import InterjectionKind
 from ..activities.joke_corpus import Joke, apply_toy_substitution, pick_joke
 from ..activities.roles import (
@@ -66,6 +68,7 @@ from ..activities.roles import (
     Role,
 )
 from ..activities.song_corpus import Song, pick_song
+from ..activities.topic_extract import extract_themes
 from ..ai.judge import judge_and_persist
 from ..ai.labeled_events import (
     GENERATOR_PATH_CLAUDE,
@@ -370,6 +373,14 @@ class ActivityResponse(BaseModel):
     # ``activity.state`` WS envelope. ``None`` on every other code path
     # (real activities never carry a reason).
     reason: str | None = None
+    # Phase L Step L4: per-activity reward type selected by the parent
+    # at approve time. ``None`` ONLY for legacy pre-L activity rows
+    # whose ``activities.reward_type`` column is NULL — post-L4 the
+    # approve handler always writes a value (defaulting to ``"random"``).
+    # The kiosk reads this off the WS envelope to know which reward
+    # step will be appended at activity end. See
+    # documentation/phase-l-plan.md §2 for the NULL-not-coerced contract.
+    reward_type: Literal["picture", "joke", "song", "random"] | None = None
 
 
 class ProposeRequest(BaseModel):
@@ -408,9 +419,19 @@ class ProposeRequest(BaseModel):
 
 
 class ApproveRequest(BaseModel):
-    """Body for ``POST /api/activities/{id}/approve``."""
+    """Body for ``POST /api/activities/{id}/approve``.
+
+    Phase L Step L4: ``reward_type`` selects the kind of reward step
+    that fires at activity end. Server applies the default ``"random"``
+    when the parent UI omits the field, persisted to
+    ``activities.reward_type``. ``None`` from the wire → server writes
+    ``"random"``; persisted NULL means "legacy pre-L row" and is never
+    produced by this code path post-L4. See documentation/phase-l-plan.md
+    §"ApproveRequest" + §8.
+    """
 
     child_ids: list[str] | None = None
+    reward_type: Literal["picture", "joke", "song", "random"] | None = None
 
 
 class RegenerateRequest(BaseModel):
@@ -949,6 +970,24 @@ def _row_to_response(
             interjection_pending = True
         break
 
+    # Phase L Step L4: surface ``reward_type`` at the top of the wire
+    # response. NULL in the DB (pre-L legacy rows where the column was
+    # never written) maps to ``None`` on the wire — we deliberately do
+    # NOT coerce NULL to ``"random"`` per plan §2 ("that would lie
+    # about a never-set value"). Tolerant of rows whose persisted value
+    # somehow drifted outside the four-member literal — we surface as
+    # ``None`` rather than crash the GET path.
+    reward_type_value: Literal["picture", "joke", "song", "random"] | None = None
+    if "reward_type" in row.keys():
+        raw_reward_type = row["reward_type"]
+        if isinstance(raw_reward_type, str) and raw_reward_type in (
+            "picture",
+            "joke",
+            "song",
+            "random",
+        ):
+            reward_type_value = raw_reward_type  # type: ignore[assignment]
+
     return ActivityResponse(
         id=activity_id,
         state=state,
@@ -969,6 +1008,7 @@ def _row_to_response(
         roles=roles_map,
         cast_summary=cast_summary,
         interjection_pending=interjection_pending,
+        reward_type=reward_type_value,
     )
 
 
@@ -2572,7 +2612,23 @@ def post_approve(
     expected_version: Annotated[int, Depends(if_match_version_dependency)],
     _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
 ) -> ActivityResponse:
-    """proposed → approved (optimistically)."""
+    """proposed → approved (optimistically).
+
+    Phase L Step L4 writes two new fields on this transition:
+
+    * ``activities.reward_type`` — defaults to ``"random"`` when the
+      ApproveRequest omits the field. Persisted alongside the state
+      transition in the same UPDATE so a stale retry can't end up with
+      the reward type written but the state unchanged.
+    * ``activities.slot_fills_json["__template_id"]`` — reserved key
+      the L3 reward resolver reads at advance time to look up the
+      template's ``recommended_themes``. We pull the template id from
+      the persisted summary envelope (``{"title", "metadata",
+      "template_id"}``) and rewrite the slot fills blob with the key
+      added. Pre-L approves where the summary envelope is missing the
+      template_id (legacy plaintext summaries) leave slot_fills_json
+      unchanged — the resolver tolerates the missing key.
+    """
     row = _fetch_activity_row(conn, activity_id)
     current_state = str(row["state"])
     current_version = int(row["version"])
@@ -2582,12 +2638,64 @@ def post_approve(
 
     child_ids = body.child_ids or _resolve_default_child_ids(conn)
     encoded_children = json.dumps(child_ids) if child_ids else None
+
+    # Phase L Step L4: default-apply ``random`` when the caller omits
+    # the field. The DB column is nullable to preserve the "legacy
+    # pre-L row = NULL" distinction, but every post-L4 approve writes
+    # a concrete value.
+    reward_type_value: str = body.reward_type or "random"
+
+    # Phase L Step L4: bolt ``__template_id`` onto ``slot_fills_json``
+    # so the L3 reward resolver can find the template's
+    # ``recommended_themes``. The template id lives on the summary
+    # envelope's top-level ``template_id`` key (written at propose-time
+    # by ``_persist_activity``). We decode it best-effort here — a
+    # legacy plaintext summary or a malformed envelope leaves the
+    # slot_fills unchanged and the resolver falls through to the
+    # transcript-only theme source.
+    template_id: str | None = None
+    summary_raw = row["summary"]
+    if summary_raw:
+        try:
+            summary_payload = json.loads(summary_raw)
+        except json.JSONDecodeError:
+            summary_payload = None
+        if isinstance(summary_payload, dict):
+            tid = summary_payload.get("template_id")
+            if isinstance(tid, str) and tid:
+                template_id = tid
+
+    slot_fills_blob: str | None = None
+    if template_id is not None:
+        slot_fills_raw = row["slot_fills_json"] if "slot_fills_json" in row.keys() else None
+        existing_slot_fills: dict[str, Any] = {}
+        if slot_fills_raw:
+            try:
+                decoded_slot_fills = json.loads(slot_fills_raw)
+            except json.JSONDecodeError:
+                decoded_slot_fills = None
+            if isinstance(decoded_slot_fills, dict):
+                existing_slot_fills = decoded_slot_fills
+        existing_slot_fills["__template_id"] = template_id
+        # ``sort_keys=True`` matches ``_persist_activity``'s convention
+        # — keeps byte-identical slot_fills_json across reads, which a
+        # downstream byte-comparison test could otherwise see flap on
+        # dict-iteration order.
+        slot_fills_blob = json.dumps(existing_slot_fills, sort_keys=True)
+
+    additional_sets: tuple[tuple[str, Any], ...] = (
+        ("child_ids", encoded_children),
+        ("reward_type", reward_type_value),
+    )
+    if slot_fills_blob is not None:
+        additional_sets = (*additional_sets, ("slot_fills_json", slot_fills_blob))
+
     ok, row = _attempt_transition(
         conn,
         activity_id=activity_id,
         expected_version=expected_version,
         new_state=STATE_APPROVED,
-        additional_sets=(("child_ids", encoded_children),),
+        additional_sets=additional_sets,
     )
     if not ok:
         raise VersionConflictError(int(row["version"]), str(row["state"]))
@@ -4709,6 +4817,165 @@ def _advance_to_ending_or_terminal(
     return response
 
 
+def _has_reward_step(conn: sqlite3.Connection, activity_id: str) -> bool:
+    """Phase L Step L4: True iff this activity already has a reward step.
+
+    Idempotency guard for :func:`_terminal_advance` — the state
+    transition itself already wedges a second call (post-COMPLETED
+    advance returns 409), but the check provides defense-in-depth and
+    pins the contract that a reward step is appended at most once.
+    """
+    row = conn.execute(
+        "SELECT 1 FROM activity_steps WHERE activity_id = ? AND kind = 'reward' LIMIT 1",
+        (activity_id,),
+    ).fetchone()
+    return row is not None
+
+
+def _build_reward_step_metadata(resolved: ResolvedReward) -> dict[str, Any]:
+    """Phase L Step L4: build the per-step metadata blob for a reward step.
+
+    Mirrors the wire shape locked in documentation/phase-l-plan.md §8:
+    every key is present in every reward kind (uniform shape on the
+    kiosk wire) but only the kind-appropriate keys carry non-NULL
+    values. The L3 resolver already filtered the values per-kind; we
+    just project them into the dict shape.
+    """
+    return {
+        "reward_kind": resolved.kind,
+        "reward_id": resolved.reward_id,
+        "image_url": resolved.image_url,
+        "animation": resolved.animation.value if resolved.animation is not None else None,
+        "audio_url": resolved.audio_url,
+        "body": resolved.body,
+        "setup": resolved.setup,
+        "punchline": resolved.punchline,
+    }
+
+
+def _maybe_append_reward_step(
+    conn: sqlite3.Connection,
+    *,
+    activity_id: str,
+    row: sqlite3.Row,
+) -> bool:
+    """Phase L Step L4: resolve + INSERT a reward step at activity end.
+
+    Reads ``activities.reward_type`` (the parent's pick at approve
+    time; defaults to ``"random"`` when L4's post_approve wrote it).
+    Pre-L legacy rows have NULL here → the resolver is NOT called and
+    no reward step is appended.
+
+    Builds a :class:`RewardActivityContext` from the activity row +
+    the current step count, calls :func:`resolve_reward`, and on a hit
+    INSERTs a ``kind="reward"`` row at ``seq = max(seq) + 1``. The new
+    row is marked ``current=0`` because the terminal advance has
+    already flipped every prior row's ``current`` to 0; the kid sees
+    the reward via the kiosk's "last completed-state response carries
+    the reward step" rendering. For picture rewards, updates
+    ``rewards.last_used_at`` to the current ISO timestamp so the
+    sort-by-recency picker rotates picks across rewards.
+
+    Returns ``True`` when a reward step was appended (and the activity
+    version was bumped by one), ``False`` otherwise (no resolver hit
+    / pre-L row / already has a reward step).
+    """
+    if _has_reward_step(conn, activity_id):
+        return False
+
+    reward_type_raw = row["reward_type"] if "reward_type" in row.keys() else None
+    if reward_type_raw is None:
+        return False
+    if reward_type_raw not in ("picture", "joke", "song", "random"):
+        _logger.warning(
+            "reward step skipped: activity %r has unknown reward_type %r",
+            activity_id,
+            reward_type_raw,
+        )
+        return False
+
+    persona_id_raw = row["persona_id"] if "persona_id" in row.keys() else None
+    session_id_raw = row["session_id"] if "session_id" in row.keys() else None
+    slot_fills_raw = row["slot_fills_json"] if "slot_fills_json" in row.keys() else None
+
+    # ``current_step_count`` mixes into the deterministic seed in the
+    # L3 resolver. Use ``COUNT(*)`` over existing steps — this counts
+    # the steps the kid has actually walked, matching the L3 contract
+    # ("re-advancing produces a different outcome when the step
+    # counter changes").
+    step_count_row = conn.execute(
+        "SELECT COUNT(*) AS c, COALESCE(MAX(seq), 0) AS max_seq "
+        "FROM activity_steps WHERE activity_id = ?",
+        (activity_id,),
+    ).fetchone()
+    current_step_count = int(step_count_row["c"])
+    new_seq = int(step_count_row["max_seq"]) + 1
+
+    context = RewardActivityContext(
+        id=activity_id,
+        session_id=str(session_id_raw) if session_id_raw is not None else "",
+        persona_id=str(persona_id_raw) if persona_id_raw is not None else None,
+        slot_fills_json=str(slot_fills_raw) if slot_fills_raw is not None else None,
+        current_step_count=current_step_count,
+    )
+    resolved = resolve_reward(conn, context, reward_type_raw)
+    if resolved is None:
+        return False
+
+    metadata = _build_reward_step_metadata(resolved)
+    metadata_blob = json.dumps(metadata, sort_keys=True)
+    # Reward body text on the kiosk-rendered ``activity_steps.body``
+    # field: this is what the kiosk's default text dispatcher would
+    # show for an unknown ``kind``. Use the resolver's ``body`` which
+    # is the display name for picture, punchline for joke, or title
+    # for song — a sensible fallback if the kiosk's L10 RewardStep
+    # component is missing in the wire (e.g. a stale parent-only
+    # build). The ``activity_steps.body`` NOT NULL constraint requires
+    # a non-empty value; ResolvedReward.body is always non-empty by
+    # the L3 contract.
+    body_text = resolved.body
+    with conn:
+        # The terminal-advance transition flipped current=0 on every
+        # prior step but the reward row itself is also ``current=0``
+        # — the activity is in ``completed`` state by the time we get
+        # here, so no step is current. The kiosk renders the reward
+        # off the steps list + state=completed combination, not off
+        # ``current=1``.
+        conn.execute(
+            "INSERT INTO activity_steps "
+            "(id, activity_id, seq, body, sfx, expected_action, current, action_slot, "
+            " choices_json, step_template_id, kind, metadata_json) "
+            "VALUES (?, ?, ?, ?, NULL, NULL, 0, NULL, NULL, NULL, ?, ?)",
+            (
+                str(uuid.uuid4()),
+                activity_id,
+                new_seq,
+                body_text,
+                "reward",
+                metadata_blob,
+            ),
+        )
+        # Bump version so optimistic-concurrency clients see the new
+        # reward step on their next read. The version bump here is
+        # separate from the state-transition bump in
+        # :func:`_terminal_advance` — that one wrote V → V+1 for the
+        # state change; this one writes V+1 → V+2 for the reward step
+        # insertion.
+        conn.execute(
+            "UPDATE activities SET version = version + 1 WHERE id = ?",
+            (activity_id,),
+        )
+        # Per-row recency tracking for picture rewards only — the joke
+        # / song corpora live in JSON-on-disk and have no per-entry
+        # timestamp column (v2 candidate; see plan §4 "Out of scope").
+        if resolved.kind == "picture":
+            conn.execute(
+                "UPDATE rewards SET last_used_at = ? WHERE id = ?",
+                (_now_iso(), resolved.reward_id),
+            )
+    return True
+
+
 def _terminal_advance(
     conn: sqlite3.Connection,
     pubsub: PubSub,
@@ -4720,6 +4987,14 @@ def _terminal_advance(
     Pulled out of :func:`post_advance` so all the "no successor"
     branches (template missing, edge unresolved, last-array entry)
     share the exact same transition + WS broadcast path.
+
+    Phase L Step L4: after the state transition lands, optionally
+    resolve + INSERT a reward step via
+    :func:`_maybe_append_reward_step`. The reward fires AFTER the
+    state transition (rather than before) so the activity's final
+    state on the wire is always ``completed`` regardless of whether
+    the reward picker found a hit — a kid who runs an activity with
+    no eligible rewards still sees the activity wrap cleanly.
     """
     ok, row = _attempt_transition(
         conn,
@@ -4735,6 +5010,14 @@ def _terminal_advance(
             "UPDATE activity_steps SET current = 0 WHERE activity_id = ?",
             (activity_id,),
         )
+    # Phase L Step L4: append the reward step (if eligible) AFTER the
+    # state transition. The helper handles the idempotency guard, the
+    # version bump, and the rewards.last_used_at update internally.
+    # Re-read the row so the returned response sees the post-insert
+    # version + the new step.
+    appended = _maybe_append_reward_step(conn, activity_id=activity_id, row=row)
+    if appended:
+        row = _fetch_activity_row(conn, activity_id)
     response = _row_to_response(conn, row)
     _emit_state(pubsub, response)
     return response

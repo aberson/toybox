@@ -213,14 +213,19 @@ def test_branching_path_a_persists_chosen_path(
     conn = connect(db_path, check_same_thread=False)
     try:
         rows = conn.execute(
-            "SELECT seq, step_template_id, chosen_label FROM activity_steps "
-            "WHERE activity_id = ? ORDER BY seq",
+            "SELECT seq, step_template_id, chosen_label, kind FROM activity_steps "
+            "WHERE activity_id = ? AND kind IS NOT 'reward' ORDER BY seq",
             (body["id"],),
         ).fetchall()
     finally:
         conn.close()
 
     template_path = [str(r["step_template_id"]) for r in rows]
+    # Phase L Step L4: the terminal advance may append a reward step
+    # (kind='reward', step_template_id=NULL) when the default
+    # ``reward_type='random'`` resolves to an eligible pool. The path
+    # assertion below ignores reward rows so it stays focused on the
+    # template-path persistence contract.
     assert template_path == ["open", "sneak", "snack_ending", "victory_ending"]
     # The choice was made at seq=1 ("open"); chosen_label populated.
     assert str(rows[0]["chosen_label"]) == "Sneak closer quietly"
@@ -257,14 +262,17 @@ def test_branching_path_b_persists_different_chosen_path(
     conn = connect(db_path, check_same_thread=False)
     try:
         rows = conn.execute(
-            "SELECT seq, step_template_id, chosen_label FROM activity_steps "
-            "WHERE activity_id = ? ORDER BY seq",
+            "SELECT seq, step_template_id, chosen_label, kind FROM activity_steps "
+            "WHERE activity_id = ? AND kind IS NOT 'reward' ORDER BY seq",
             (body["id"],),
         ).fetchall()
     finally:
         conn.close()
 
     template_path = [str(r["step_template_id"]) for r in rows]
+    # Phase L Step L4: exclude reward rows so the path assertion stays
+    # focused on the template-path persistence contract (kid's pick
+    # path, not the reward that fires at end).
     assert template_path == ["open", "announce", "victory_ending"]
     assert str(rows[0]["chosen_label"]) == "Announce yourself bravely"
     generator.clear_template_cache()
@@ -377,14 +385,17 @@ def test_branch_destination_leaf_terminates_no_fall_through(
     conn = connect(db_path, check_same_thread=False)
     try:
         rows = conn.execute(
-            "SELECT seq, step_template_id FROM activity_steps "
-            "WHERE activity_id = ? ORDER BY seq",
+            "SELECT seq, step_template_id, kind FROM activity_steps "
+            "WHERE activity_id = ? AND kind IS NOT 'reward' ORDER BY seq",
             (body["id"],),
         ).fetchall()
     finally:
         conn.close()
 
     template_path = [str(r["step_template_id"]) for r in rows]
+    # Phase L Step L4: filter the L4 reward row out of the path
+    # assertion so the rule-2.5 "no sibling fall-through" contract
+    # stays the focus of this test.
     assert template_path == ["fork", "cat_end"], (
         f"branch destination leaf must terminate, got {template_path!r}; "
         "fall-through into the sibling branch's ending is the bug."

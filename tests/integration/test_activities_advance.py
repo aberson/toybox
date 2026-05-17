@@ -309,7 +309,7 @@ def test_advance_past_terminal_completes(
     """Rule 4: choosing through the choice point lands on a
     terminal step (last entry in the template array, no ``next``,
     no ``choices``); one more /advance flips the activity into
-    ``completed`` without inserting a new row.
+    ``completed``.
 
     The fixture's two endings are at template indices 1 and 2.
     Index 2 (``charge_ending``) is the LAST entry, so picking
@@ -318,6 +318,14 @@ def test_advance_past_terminal_completes(
     would land on ``sneak_ending`` (index 1) which falls through
     via rule 3 to ``charge_ending`` — also fine, but doesn't
     exercise rule 4 cleanly.
+
+    Phase L Step L4: the terminal advance MAY append a reward step
+    (the server defaults ``reward_type`` to ``"random"`` when the
+    parent doesn't pin one). The new step has ``kind="reward"`` and
+    is the only allowed addition on terminal — every other row count
+    stays put. This test no longer asserts "no new row" but does
+    assert "no non-reward row was inserted" so the rule-4 contract
+    stays pinned.
     """
     _set_branching_templates_dir(monkeypatch, slot_substituted_choices_dir)
     body = _propose_branching(client, parent_headers)
@@ -326,12 +334,14 @@ def test_advance_past_terminal_completes(
     state = _advance(client, parent_headers, body["id"], state["version"], choice_index=1)
     # We're now on seq=2, the "charge_ending" — last entry in array,
     # so rule 4 terminal applies on the next /advance.
-    rows_before = len(state["steps"])
+    non_reward_rows_before = sum(1 for s in state["steps"] if s.get("kind") != "reward")
     state = _advance(client, parent_headers, body["id"], state["version"])
     assert state["state"] == "completed"
-    # No new row inserted on the terminal advance.
-    assert len(state["steps"]) == rows_before
-    # No row is current after completion.
+    # Rule 4: no non-reward row inserted on the terminal advance.
+    non_reward_rows_after = sum(1 for s in state["steps"] if s.get("kind") != "reward")
+    assert non_reward_rows_after == non_reward_rows_before
+    # No row is current after completion (the reward row inserts at
+    # current=0 too — kiosk renders off state=completed).
     assert all(s["current"] is False for s in state["steps"])
 
 
