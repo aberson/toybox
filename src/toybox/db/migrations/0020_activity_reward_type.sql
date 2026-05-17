@@ -1,0 +1,28 @@
+-- Phase L Step L1 — per-activity reward_type column.
+--
+-- The parent picks a reward type when approving an activity (``picture``
+-- | ``joke`` | ``song`` | ``random``); the kiosk advance handler fires
+-- the chosen type as an end-of-activity reward step. See
+-- documentation/phase-l-plan.md §"Activities table" for the full design.
+--
+-- Wire / DB representation choice:
+--
+--   * Canonical wire shape is one of the four literal strings of
+--     :data:`toybox.activities.models.RewardType` (``"picture"``,
+--     ``"joke"``, ``"song"``, ``"random"``). Default = ``"random"`` is
+--     applied by the API layer (L2) on approve when the parent omits
+--     the field — NOT by the DB. The column itself is nullable.
+--   * NULL means "legacy pre-L activity" — every row in the catalog
+--     before this migration ran has NULL here. The reward resolver
+--     (L3) treats NULL as "no reward step" so historical activities
+--     replay unchanged.
+--
+-- No CHECK constraint: validator lives in the Pydantic API layer
+-- (matching the convention 0016 sets for ``activity_steps.kind``).
+-- Forward-only philosophy (invariant 10) means a future reward-type
+-- taxonomy expansion does not need a follow-up migration to alter
+-- the constraint.
+--
+-- Forward-only (invariant 10); no rollback.
+
+ALTER TABLE activities ADD COLUMN reward_type TEXT;

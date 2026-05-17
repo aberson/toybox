@@ -285,6 +285,8 @@ resolve_reward(activity, reward_type)  ──┐
 
 **Flags:** `--reviewers code`
 
+**Status:** DONE (2026-05-16) — 3 migrations + Animation StrEnum + RewardType Literal shipped; codegen wiring added in tools/gen_types_ts.py; tests/integration/migrations/test_0019_0020_0021_phase_l_foundation.py covers all four; iteration 1 NEEDS WORK on 3 medium findings (test skip-list extension + SQL CRLF + import hoist) → iteration 2 PASS. Net +8 tests (1890 collected).
+
 ### Step L2: Rewards CRUD API
 
 **Problem:** New module [`src/toybox/api/rewards.py`](../src/toybox/api/rewards.py) mirroring [`toys.py`](../src/toybox/api/toys.py:80-324). Endpoints: `POST /api/rewards/upload` (stages image, returns staging key), `POST /api/rewards` (confirms — body: `RewardConfirmRequest { staging_key, display_name, tags, animation, active=True }`), `GET /api/rewards`, `GET /api/rewards/{id}`, `PATCH /api/rewards/{id}` (`RewardUpdateRequest { display_name?, tags?, animation?, active?, archived? }`), `DELETE /api/rewards/{id}` (sets archived=1, never hard-delete). Slug derivation from `display_name` per invariant 8. Tag normalization: lowercase + strip + dedupe on every write path. Pydantic `RewardResponse` shape mirrored to TS. **Image storage:** under `data/images/rewards/<id>.<ext>` via existing [`storage/images.py`](../src/toybox/storage/images.py) entry points. Parent-scope auth via `RequireScope({TokenScope.parent})`.

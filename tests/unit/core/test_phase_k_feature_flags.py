@@ -95,6 +95,16 @@ def test_get_returns_seeded_default(db: sqlite3.Connection, flag: FlagFixture) -
     match the per-module default constants. A drift between the SQL
     seed and the Python default would surface here.
     """
+    # Phase L L1: migration 0021 deletes the three play-surface flag rows
+    # (see _PHASE_L_DROPPED_FLAG_KEYS below). Without this skip the test
+    # silently asserts on the row-absent fallback path rather than the
+    # seeded-value path it documents. The per-flag module + FLAGS row
+    # will be removed in L5 along with this branch.
+    if flag.key in _PHASE_L_DROPPED_FLAG_KEYS:
+        pytest.skip(
+            f"{flag.key} row deleted by migration 0021 (Phase L L1); "
+            f"per-flag module will be removed in L5."
+        )
     assert flag.module.get(db) is flag.default
 
 
@@ -211,15 +221,40 @@ def test_helper_get_falls_back_on_missing_row(
     assert helper_flag.get(db) is helper_flag.default
 
 
+# Phase L L1: migration 0021 deletes three Phase K play-surface flag
+# rows (``play_embedded_enabled``, ``play_endings_enabled``,
+# ``play_spontaneity_enabled``) as the first step of re-framing
+# jokes/songs as per-activity reward types. The per-setting helper
+# modules and ``FLAGS`` list are L5's territory to remove; until then
+# the "seeded value" guard below excludes the three deprecated keys.
+# Their absence is verified end-to-end by
+# ``tests/integration/migrations/test_0019_0020_0021_phase_l_foundation.py``.
+_PHASE_L_DROPPED_FLAG_KEYS: frozenset[str] = frozenset(
+    {
+        "play_embedded_enabled",
+        "play_endings_enabled",
+        "play_spontaneity_enabled",
+    }
+)
+
+
 def test_migration_seeds_match_defaults(db: sqlite3.Connection) -> None:
-    """Sanity guard: every Phase K flag has a seed row matching its default.
+    """Sanity guard: every still-active Phase K flag has a seed row
+    matching its default.
 
     Complements the per-flag ``test_get_returns_seeded_default`` by
     reading the raw stored strings rather than going through the
     helper, so a hypothetical "helper returns default even when row
     is wrong" bug can't mask a seed drift.
+
+    Phase L L1: the three deprecated play-surface keys in
+    :data:`_PHASE_L_DROPPED_FLAG_KEYS` are skipped here — migration
+    0021 deletes those rows. The per-flag ``get`` fallback path covers
+    that case (returns the helper default when the row is absent).
     """
     for flag in FLAGS:
+        if flag.key in _PHASE_L_DROPPED_FLAG_KEYS:
+            continue
         row = db.execute("SELECT value FROM settings WHERE key = ?", (flag.key,)).fetchone()
         assert row is not None, f"migration 0015 must seed {flag.key}"
         raw = row["value"] if isinstance(row, sqlite3.Row) else row[0]

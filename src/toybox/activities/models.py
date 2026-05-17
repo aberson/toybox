@@ -10,6 +10,7 @@ step can serialize without translation gymnastics. Both models are
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Annotated, Any, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
@@ -17,6 +18,48 @@ from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validat
 from ..image_gen.models import ACTION_SLOTS
 from .roles import Role
 from .themes import Theme
+
+
+class Animation(StrEnum):
+    """Phase L Step L1: the six picture-reward animations.
+
+    Member names match the lowercase CSS-friendly keyframe identifiers
+    used in the frontend's ``rewardAnimations.css`` module (L11). Member
+    values are the same strings — they appear verbatim as JSON keys in
+    ``rewards.animation``, in the per-activity reward step metadata, and
+    as ``RewardName`` string-literal union entries in
+    ``frontend/src/shared/types.ts`` (auto-derived at codegen time).
+
+    Order is the parent-UI presentation order (matches the dropdown in
+    L6's RewardsList component) — NOT alphabetical. The codegen step
+    (``tools/gen_types_ts.py``, L1 extension) preserves member-definition
+    order when emitting the TS union so the frontend dropdown matches.
+
+    Single source of truth per code-quality.md §2: no duplicate string
+    literals in the frontend; the TS union is derived from this enum.
+    """
+
+    shine = "shine"
+    jump = "jump"
+    spin = "spin"
+    pulse = "pulse"
+    wobble = "wobble"
+    float = "float"
+
+
+# Phase L Step L1: per-activity reward type.
+#
+# Wire shape: one of the four literal strings; persisted to
+# ``activities.reward_type`` (0020). NULL in that column means "legacy
+# pre-L activity" — the resolver (L3) treats NULL as "no reward step".
+# ``"random"`` is the documented default that the API layer (L2) writes
+# when the parent's ApproveRequest omits the field.
+#
+# Declared as a ``typing.Literal`` alias rather than a StrEnum because
+# the four values are wire-only — they never appear as Python attribute
+# accesses; the API layer and resolver consume them as raw strings. Per
+# documentation/phase-l-plan.md design decision.
+RewardType = Literal["picture", "joke", "song", "random"]
 
 # Phase G: pattern + max length for step ids used as branch targets.
 # Tighter than template ids (which allow up to 64 chars) because step ids
@@ -380,8 +423,10 @@ class Template(BaseModel):
 __all__ = [
     "Activity",
     "ActivityStep",
+    "Animation",
     "Choice",
     "EndingStep",
+    "RewardType",
     "Step",
     "StepKind",
     "Template",

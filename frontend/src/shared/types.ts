@@ -72,3 +72,22 @@ export const ROLE_DISPLAY_NAMES: Record<RoleName, string> = {
   sidekick: "Sidekick",
   trickster: "Trickster",
 };
+
+/**
+ * Phase L L1 picture-reward animation taxonomy — derived at
+ * codegen time from the ``Animation`` StrEnum in
+ * ``src/toybox/activities/models.py``. Order is member-
+ * definition order (NOT alphabetical) so the parent UI's
+ * RewardsList animation dropdown renders the six options in
+ * the spec order.
+ */
+export type Animation = "shine" | "jump" | "spin" | "pulse" | "wobble" | "float";
+
+/**
+ * Phase L L1 per-activity reward type — derived at codegen
+ * time from the ``RewardType`` Literal alias in
+ * ``src/toybox/activities/models.py``. The parent's approve
+ * dropdown and the kiosk's reward-step renderer both branch
+ * on these four wire strings.
+ */
+export type RewardType = "picture" | "joke" | "song" | "random";

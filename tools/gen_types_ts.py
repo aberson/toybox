@@ -36,6 +36,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import get_args
 
 # Run-time import of the role taxonomy so changes to roles.py
 # automatically flow into the generated types.ts — there is no
@@ -45,6 +46,10 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
+from toybox.activities.models import (  # noqa: E402
+    Animation,
+    RewardType,
+)
 from toybox.activities.roles import (  # noqa: E402
     ROLE_DISPLAY_NAMES,
     Role,
@@ -81,6 +86,29 @@ def _emit_role_display_names_const() -> str:
         lines.append(f"  {value}: {json.dumps(display)},")
     lines.append("};")
     return "\n".join(lines)
+
+
+def _emit_animation_union() -> str:
+    """Emit the ``Animation`` string-literal union from the Python enum.
+
+    Phase L L1: order is preserved as member-definition order (NOT
+    alphabetical) so the parent UI's reward-animation dropdown in
+    ``RewardsList`` (L6) renders the six options in the spec order
+    documented in ``documentation/phase-l-plan.md``.
+    """
+    parts = " | ".join(f'"{member.value}"' for member in Animation)
+    return f"export type Animation = {parts};"
+
+
+def _emit_reward_type_union() -> str:
+    """Emit the ``RewardType`` string-literal union from the Literal alias.
+
+    Phase L L1: derives the four wire strings from the source-of-truth
+    ``typing.Literal`` alias in ``activities/models.py`` so the
+    frontend never hand-mirrors the wire vocabulary.
+    """
+    parts = " | ".join(f'"{value}"' for value in get_args(RewardType))
+    return f"export type RewardType = {parts};"
 
 
 def _build_types_ts_content() -> str:
@@ -163,7 +191,28 @@ def _build_types_ts_content() -> str:
         f"{_emit_role_display_names_const()}\n"
     )
 
-    return header + choice_step + role_block
+    reward_block = (
+        "\n/**\n"
+        " * Phase L L1 picture-reward animation taxonomy — derived at\n"
+        " * codegen time from the ``Animation`` StrEnum in\n"
+        " * ``src/toybox/activities/models.py``. Order is member-\n"
+        " * definition order (NOT alphabetical) so the parent UI's\n"
+        " * RewardsList animation dropdown renders the six options in\n"
+        " * the spec order.\n"
+        " */\n"
+        f"{_emit_animation_union()}\n"
+        "\n"
+        "/**\n"
+        " * Phase L L1 per-activity reward type — derived at codegen\n"
+        " * time from the ``RewardType`` Literal alias in\n"
+        " * ``src/toybox/activities/models.py``. The parent's approve\n"
+        " * dropdown and the kiosk's reward-step renderer both branch\n"
+        " * on these four wire strings.\n"
+        " */\n"
+        f"{_emit_reward_type_union()}\n"
+    )
+
+    return header + choice_step + role_block + reward_block
 
 
 def run_error_codes_fallback() -> int:
