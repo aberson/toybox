@@ -69,7 +69,9 @@ interface Handlers {
   // Phase L L9: onApprove now carries the reward-type selection
   // alongside the activity. Pre-L9 the signature was [Activity];
   // updated here so the mock matches the PlayQueueList prop.
-  onApprove: Mock<[Activity, RewardType], Promise<void>>;
+  // L follow-up Change E: third arg is the specific picture-reward id
+  // (or null for "(any)" / non-picture types).
+  onApprove: Mock<[Activity, RewardType, string | null], Promise<void>>;
   onDismiss: Mock<[Activity], Promise<void>>;
   onRegenerate: Mock<[Activity], Promise<void>>;
   onEnd: Mock<[Activity], Promise<void>>;
@@ -85,6 +87,7 @@ function buildHandlers(): Handlers {
   const approveNoop = async (
     _target: Activity,
     _rewardType: RewardType,
+    _rewardId: string | null,
   ): Promise<void> => undefined;
   return {
     onApprove: vi.fn(approveNoop),

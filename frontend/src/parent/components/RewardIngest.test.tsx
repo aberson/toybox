@@ -361,7 +361,11 @@ describe("RewardIngest", () => {
     expect(stub.confirmReward).not.toHaveBeenCalled();
   });
 
-  it("archive button: clicking PATCHes archived=true and the reward leaves the active list", async () => {
+  it("delete button: clicking PATCHes archived=true and the reward leaves the active list", async () => {
+    // L follow-up Change B: archive button renamed to delete (mirrors
+    // the toy ingest UX). Wire shape unchanged — still PATCHes
+    // archived=true; only the operator-facing label / data-testid
+    // changed.
     const stub = buildStubApi([
       fakeReward({ id: "r-bye", display_name: "Old Star" }),
       fakeReward({ id: "r-keep", display_name: "Keeper" }),
@@ -371,16 +375,18 @@ describe("RewardIngest", () => {
       expect(screen.getAllByTestId("reward-row")).toHaveLength(2),
     );
 
-    // Click archive on the first row.
+    // Click delete on the first row.
     const rows = screen.getAllByTestId("reward-row");
     const targetRow = rows.find(
       (r) => r.getAttribute("data-reward-id") === "r-bye",
     );
     expect(targetRow).toBeTruthy();
-    const archiveBtn = targetRow!.querySelector(
-      "[data-testid='archive-reward-button']",
+    const deleteBtn = targetRow!.querySelector(
+      "[data-testid='delete-reward-button']",
     ) as HTMLButtonElement;
-    fireEvent.click(archiveBtn);
+    expect(deleteBtn).toBeTruthy();
+    expect(deleteBtn.textContent?.toLowerCase()).toContain("delete");
+    fireEvent.click(deleteBtn);
 
     await waitFor(() => {
       expect(stub.updateReward).toHaveBeenCalledTimes(1);
@@ -393,13 +399,73 @@ describe("RewardIngest", () => {
     expect(args[0]).toBe("r-bye");
     expect(args[1].archived).toBe(true);
 
-    // List refetches and the archived row is gone (stub filters it out
+    // List refetches and the deleted row is gone (stub filters it out
     // to mirror the server's WHERE archived = 0 clause).
     await waitFor(() => {
       const remaining = screen.getAllByTestId("reward-row");
       expect(remaining).toHaveLength(1);
       expect(remaining[0]?.getAttribute("data-reward-id")).toBe("r-keep");
     });
+  });
+
+  it("active toggle: clicking on an active reward PATCHes active=false", async () => {
+    // L follow-up Change B: per-row active/inactive toggle mirroring
+    // ToyIngest. Wire shape PATCH {active: !current}; the row stays
+    // in the list (active=false rows are still visible — they're
+    // dimmed / sorted last via the existing sort-by-active path).
+    const stub = buildStubApi([
+      fakeReward({ id: "r-on", display_name: "Live Trophy", active: true }),
+    ]);
+    render(<RewardIngest api={stub as unknown as ApiClient} />);
+    await waitFor(() =>
+      expect(screen.getAllByTestId("reward-row")).toHaveLength(1),
+    );
+
+    const toggleBtn = screen.getByTestId(
+      "toggle-reward-active-button",
+    ) as HTMLButtonElement;
+    expect(toggleBtn.getAttribute("aria-pressed")).toBe("true");
+    expect(toggleBtn.textContent?.toLowerCase()).toContain("active");
+    fireEvent.click(toggleBtn);
+
+    await waitFor(() => {
+      expect(stub.updateReward).toHaveBeenCalledTimes(1);
+    });
+    const args = stub.updateReward.mock.calls[0] as [
+      string,
+      RewardUpdateRequest,
+      unknown,
+    ];
+    expect(args[0]).toBe("r-on");
+    expect(args[1].active).toBe(false);
+  });
+
+  it("active toggle: clicking on an inactive reward PATCHes active=true", async () => {
+    const stub = buildStubApi([
+      fakeReward({ id: "r-off", display_name: "Dim Trophy", active: false }),
+    ]);
+    render(<RewardIngest api={stub as unknown as ApiClient} />);
+    await waitFor(() =>
+      expect(screen.getAllByTestId("reward-row")).toHaveLength(1),
+    );
+
+    const toggleBtn = screen.getByTestId(
+      "toggle-reward-active-button",
+    ) as HTMLButtonElement;
+    expect(toggleBtn.getAttribute("aria-pressed")).toBe("false");
+    expect(toggleBtn.textContent?.toLowerCase()).toContain("inactive");
+    fireEvent.click(toggleBtn);
+
+    await waitFor(() => {
+      expect(stub.updateReward).toHaveBeenCalledTimes(1);
+    });
+    const args = stub.updateReward.mock.calls[0] as [
+      string,
+      RewardUpdateRequest,
+      unknown,
+    ];
+    expect(args[0]).toBe("r-off");
+    expect(args[1].active).toBe(true);
   });
 
   it("validation: empty display_name disables submit; oversize tag rejected client-side", async () => {

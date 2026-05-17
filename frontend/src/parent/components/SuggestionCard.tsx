@@ -1,18 +1,29 @@
 import type { ChangeEvent, JSX } from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
-import type { Activity, RewardType, RoleAssignment } from "../api";
+import type { Activity, Reward, RewardType, RoleAssignment } from "../api";
 
 // Phase L L9: reward dropdown options surfaced on the SuggestionCard.
 // Wire strings match the L1 ``RewardType`` Literal alias verbatim
-// (``picture | joke | song | random``); the visible label is the
-// title-cased variant. Order is "random first" so the default option
-// is also the first one rendered.
+// (``picture | joke | song | random | none``); the visible label is
+// the title-cased variant. Order is "random first" so the default
+// option is also the first one rendered.
+//
+// L follow-up Change A: per-toggle eligibility is enforced by the
+// component (joke / song options hide when their master toggle is
+// off). The catalog list still carries every option here; the render
+// loop filters by eligibility.
+//
+// L follow-up Change D: ``"none"`` is the explicit opt-out — always
+// rendered, always enabled (the parent's "no reward this activity"
+// option is a per-activity choice that must not be gated by other
+// settings).
 const REWARD_OPTIONS: ReadonlyArray<{ value: RewardType; label: string }> = [
   { value: "random", label: "Random" },
   { value: "picture", label: "Picture" },
   { value: "joke", label: "Joke" },
   { value: "song", label: "Song" },
+  { value: "none", label: "None" },
 ];
 
 export interface SuggestionCardBusy {
@@ -36,7 +47,19 @@ export interface SuggestionCardProps {
   // zero-arg lambda would break the type, so we made the parameter
   // required — every existing caller in this tree (PlayQueueList) is
   // updated in the same step.
-  onApprove: (rewardType: RewardType) => Promise<void>;
+  //
+  // L follow-up Change E: ``rewardId`` is the optional specific
+  // picture-reward pick from the second dropdown. ``null`` (the
+  // default "(any)" selection) means the resolver uses the existing
+  // random tag-match logic; a concrete id pins the resolver to that
+  // reward (with fallback to random if the reward got archived/deleted
+  // between approve and play). Only meaningful when ``rewardType ===
+  // "picture"``; passed verbatim regardless so the caller can audit
+  // the wire shape without re-deriving the eligibility rule.
+  onApprove: (
+    rewardType: RewardType,
+    rewardId: string | null,
+  ) => Promise<void>;
   onSkip: () => Promise<void>;
   onDismiss: () => Promise<void>;
   // Phase K K7: "New cast" calls ``recastActivity`` (re-rolls the
@@ -62,13 +85,30 @@ export interface SuggestionCardProps {
   // disabling the dropdown, leaning on the L4 backend's fallback
   // chain to gracefully degrade if the picture pool is actually
   // empty. ``jokesEnabled`` / ``songsEnabled`` are the App-lifted
-  // master toggles (see RewardsSection). When all three lanes are
-  // ineligible (0 active pictures AND jokes off AND songs off), the
-  // ``<select>`` is disabled and a "No rewards configured" hint
-  // renders below.
+  // master toggles (see RewardsSection).
+  //
+  // L follow-up Change A: when the master toggle for a lane is off,
+  // the matching dropdown option is HIDDEN (not just disabled). When
+  // ALL three lanes are ineligible (no pictures AND jokes off AND
+  // songs off), the dropdown still surfaces "Random" + "None" as
+  // selections — "None" because it's the explicit opt-out and is
+  // always meaningful, "Random" because the L4 resolver internally
+  // handles the all-empty case by returning no reward (same observable
+  // outcome as None). The "No rewards configured" hint still appears
+  // when ALL three lanes are ineligible, alongside the limited
+  // dropdown, so the parent has a quick visual cue about the state.
   activeRewardsCount?: number | null;
   jokesEnabled?: boolean;
   songsEnabled?: boolean;
+  // L follow-up Change E: list of active (active=true, archived=false)
+  // picture rewards in the library. Threaded by App through
+  // PlayQueueList so the second dropdown (rendered only when the main
+  // dropdown is on "Picture") can list rewards by display_name.
+  // Optional + undefined for non-Change-E callers (kiosk-side surfaces,
+  // legacy tests) — when absent, the second dropdown still renders
+  // with just the "(any)" option, which falls through to random
+  // tag-match on the backend.
+  activeRewards?: ReadonlyArray<Pick<Reward, "id" | "display_name">>;
 }
 
 // Phase K K7: prefer the backend-rendered ``cast_summary`` string when
@@ -116,6 +156,7 @@ export function SuggestionCard(props: SuggestionCardProps): JSX.Element {
     activeRewardsCount,
     jokesEnabled,
     songsEnabled,
+    activeRewards,
   } = props;
   const busy: SuggestionCardBusy = props.busy ?? {
     approve: false,
@@ -129,6 +170,14 @@ export function SuggestionCard(props: SuggestionCardProps): JSX.Element {
   // default; mirroring it here as the initial state keeps the dropdown
   // UI default and the backend default aligned.
   const [rewardType, setRewardType] = useState<RewardType>("random");
+  // L follow-up Change E: per-card specific picture-reward pick. The
+  // empty string is the UI "(any)" sentinel — wire-side it maps to
+  // ``null`` (no pin), so the resolver falls back to the random tag-
+  // match. A concrete reward id pins the resolver. The second dropdown
+  // is only rendered when ``rewardType === "picture"``; the state
+  // stays around when the parent toggles types so a "Picture → Joke →
+  // Picture" round-trip restores the prior pick.
+  const [rewardId, setRewardId] = useState<string>("");
 
   // Eligibility for each reward lane. ``null`` activeRewardsCount is
   // "unknown" — treat as eligible (don't disable) and let the L4
@@ -143,10 +192,39 @@ export function SuggestionCard(props: SuggestionCardProps): JSX.Element {
   const jokeEligible = jokesEnabled !== false;
   const songEligible = songsEnabled !== false;
   const anyRewardEligible = pictureEligible || jokeEligible || songEligible;
-  const rewardDisabled = !anyRewardEligible;
+  // L follow-up Change A+D: when all three lanes are ineligible the
+  // dropdown still surfaces Random + None (always-on options); the
+  // hint surfaces alongside so the parent has a visual cue. The
+  // dropdown is therefore never disabled — keeping it enabled lets the
+  // parent still pick None (explicit opt-out) or Random (which the L4
+  // resolver handles gracefully when pools are empty).
+  const rewardDisabled = false;
+
+  // L follow-up Change A: filter the catalog options by per-lane
+  // eligibility. "Random" + "None" survive every filter (always-on);
+  // "Picture" survives unless the parent threaded a known-zero count
+  // (we still allow Picture when count is null/undefined for the
+  // "unknown → assume available" default). "Joke" / "Song" hide when
+  // their master toggle is explicitly off.
+  const visibleRewardOptions = useMemo(
+    () =>
+      REWARD_OPTIONS.filter((opt) => {
+        if (opt.value === "random" || opt.value === "none") return true;
+        if (opt.value === "picture") return pictureEligible;
+        if (opt.value === "joke") return jokeEligible;
+        if (opt.value === "song") return songEligible;
+        return true;
+      }),
+    [pictureEligible, jokeEligible, songEligible],
+  );
 
   const handleRewardChange = (e: ChangeEvent<HTMLSelectElement>): void => {
     setRewardType(e.target.value as RewardType);
+  };
+  const handleRewardIdChange = (
+    e: ChangeEvent<HTMLSelectElement>,
+  ): void => {
+    setRewardId(e.target.value);
   };
   const title = activity.title ?? activity.summary ?? "Untitled activity";
   const castLabel = renderCastLabel(activity);
@@ -248,13 +326,40 @@ export function SuggestionCard(props: SuggestionCardProps): JSX.Element {
           onChange={handleRewardChange}
           style={{ fontSize: 13, padding: "2px 4px" }}
         >
-          {REWARD_OPTIONS.map((opt) => (
+          {visibleRewardOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
             </option>
           ))}
         </select>
-        {rewardDisabled && (
+        {/* L follow-up Change E: second dropdown for specific picture
+            pick. Renders only when the main dropdown is on "Picture";
+            otherwise stays out of the DOM so the row height doesn't
+            change per the operator's "keep text so the size of the UI
+            line doesn't change" constraint. Native ``<select>`` with
+            the same inline styling as the main dropdown. The "(any)"
+            sentinel maps wire-side to ``null`` (no pin) — see
+            ``onApprove`` below. Renders even when ``activeRewards`` is
+            undefined / empty so a stale-bootstrap kiosk shell still
+            has a visible UI; the empty-list case just shows the
+            "(any)" placeholder. */}
+        {rewardType === "picture" && (
+          <select
+            data-testid="reward-id-select"
+            aria-label="Specific picture reward"
+            value={rewardId}
+            onChange={handleRewardIdChange}
+            style={{ fontSize: 13, padding: "2px 4px" }}
+          >
+            <option value="">(any)</option>
+            {(activeRewards ?? []).map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.display_name}
+              </option>
+            ))}
+          </select>
+        )}
+        {!anyRewardEligible && (
           <span
             data-testid="reward-disabled-hint"
             style={{ color: "#6b7280", fontSize: 12 }}
@@ -269,7 +374,16 @@ export function SuggestionCard(props: SuggestionCardProps): JSX.Element {
           data-testid="approve-button"
           disabled={busy.approve}
           onClick={() => {
-            void onApprove(rewardType);
+            // L follow-up Change E: thread the specific-pick id through
+            // alongside the reward type. Empty-string sentinel ("(any)"
+            // selection or non-picture types) maps to ``null`` so the
+            // backend's ApproveRequest.reward_id stays absent — the
+            // resolver then falls back to the existing random tag-match
+            // pick. A concrete id pins the resolver to that reward.
+            const idForWire = rewardType === "picture" && rewardId !== ""
+              ? rewardId
+              : null;
+            void onApprove(rewardType, idForWire);
           }}
         >
           {busy.approve ? "approving..." : "approve"}

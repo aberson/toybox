@@ -918,11 +918,23 @@ export class ApiClient {
     // omit-default. Optional so pre-L9 callers (e.g. legacy test
     // helpers) keep compiling.
     rewardType?: RewardType,
+    // L follow-up Change E: optional specific picture-reward pick from
+    // the second dropdown. Only meaningful when ``rewardType ===
+    // "picture"``; ignored server-side otherwise. Threaded into
+    // ``ApproveRequest.reward_id`` (snake_case wire); the backend
+    // persists it into ``slot_fills_json["__reward_id"]`` so the L3
+    // resolver can prefer this specific reward at advance time.
+    // Optional + undefined for pre-Change-E callers (the "(any)"
+    // dropdown selection) so existing call sites keep compiling.
+    rewardId?: string | null,
     opts: RequestOptions = {},
   ): Promise<Activity> {
     const body: Record<string, unknown> = { child_ids: childIds ?? null };
     if (rewardType !== undefined) {
       body["reward_type"] = rewardType;
+    }
+    if (rewardId !== undefined && rewardId !== null) {
+      body["reward_id"] = rewardId;
     }
     return this.request<Activity>(`/api/activities/${encodeURIComponent(id)}/approve`, {
       method: "POST",

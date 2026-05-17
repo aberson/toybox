@@ -57,7 +57,7 @@ describe("SuggestionCard why-toggle", () => {
     render(
       <SuggestionCard
         activity={fakeActivity()}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
       />,
@@ -70,7 +70,7 @@ describe("SuggestionCard why-toggle", () => {
     render(
       <SuggestionCard
         activity={fakeActivity()}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
       />,
@@ -85,7 +85,7 @@ describe("SuggestionCard why-toggle", () => {
     render(
       <SuggestionCard
         activity={fakeActivity()}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
       />,
@@ -99,7 +99,7 @@ describe("SuggestionCard why-toggle", () => {
     render(
       <SuggestionCard
         activity={fakeActivity()}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
       />,
@@ -117,7 +117,7 @@ describe("SuggestionCard why-toggle", () => {
     render(
       <SuggestionCard
         activity={fakeActivity()}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
       />,
@@ -135,7 +135,7 @@ describe("SuggestionCard why-toggle", () => {
     render(
       <SuggestionCard
         activity={fakeActivity({ trigger_phrase: null })}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
       />,
@@ -149,7 +149,7 @@ describe("SuggestionCard why-toggle", () => {
     render(
       <SuggestionCard
         activity={fakeActivity({ persona_reasoning: null })}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
       />,
@@ -169,7 +169,7 @@ describe("SuggestionCard why-toggle", () => {
     render(
       <SuggestionCard
         activity={fakeActivity({ trigger_phrase: undefined })}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
       />,
@@ -187,7 +187,7 @@ describe("SuggestionCard why-toggle", () => {
     render(
       <SuggestionCard
         activity={fakeActivity({ persona_reasoning: undefined })}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
       />,
@@ -214,7 +214,7 @@ describe("SuggestionCard K7 cast list", () => {
             friend: fakeRole({ role_name: "friend", display_name: "Captain Bear" }),
           },
         })}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
       />,
@@ -237,7 +237,7 @@ describe("SuggestionCard K7 cast list", () => {
             quest_giver: fakeRole(),
           },
         })}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
       />,
@@ -253,7 +253,7 @@ describe("SuggestionCard K7 cast list", () => {
     render(
       <SuggestionCard
         activity={fakeActivity({ roles: {}, cast_summary: "" })}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
       />,
@@ -266,7 +266,7 @@ describe("SuggestionCard K7 cast list", () => {
     render(
       <SuggestionCard
         activity={fakeActivity({ roles: undefined, cast_summary: undefined })}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
       />,
@@ -284,7 +284,7 @@ describe("SuggestionCard K7 re-roll buttons", () => {
           cast_summary: "Quest Giver: Wise Owl",
           roles: { quest_giver: fakeRole() },
         })}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
         onRecast={onRecast}
@@ -300,7 +300,7 @@ describe("SuggestionCard K7 re-roll buttons", () => {
     render(
       <SuggestionCard
         activity={fakeActivity()}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
         onRecast={async () => undefined}
@@ -320,7 +320,7 @@ describe("SuggestionCard K7 re-roll buttons", () => {
     render(
       <SuggestionCard
         activity={fakeActivity({ state: "approved" })}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
         onRecast={async () => undefined}
@@ -339,7 +339,7 @@ describe("SuggestionCard K7 re-roll buttons", () => {
     render(
       <SuggestionCard
         activity={fakeActivity({ state: "proposed" })}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
         onRecast={async () => undefined}
@@ -362,7 +362,7 @@ describe("SuggestionCard K7 re-roll buttons", () => {
     render(
       <SuggestionCard
         activity={fakeActivity()}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
       />,
@@ -378,7 +378,7 @@ describe("SuggestionCard K7 re-roll buttons", () => {
     render(
       <SuggestionCard
         activity={fakeActivity()}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
         onRecast={async () => undefined}
@@ -406,7 +406,7 @@ describe("SuggestionCard K7 re-roll buttons", () => {
     const { rerender } = render(
       <SuggestionCard
         activity={fakeActivity({ state: "proposed", version: 1 })}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
         onRecast={async () => undefined}
@@ -428,7 +428,7 @@ describe("SuggestionCard K7 re-roll buttons", () => {
     rerender(
       <SuggestionCard
         activity={fakeActivity({ state: "proposed", version: 2 })}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
         onRecast={async () => undefined}
@@ -456,7 +456,7 @@ describe("SuggestionCard K7 re-roll buttons", () => {
     const { rerender } = render(
       <SuggestionCard
         activity={fakeActivity({ state: "proposed", version: 1 })}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
         onRecast={async () => undefined}
@@ -473,7 +473,7 @@ describe("SuggestionCard K7 re-roll buttons", () => {
     rerender(
       <SuggestionCard
         activity={fakeActivity({ state: "approved", version: 2 })}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
         onRecast={async () => undefined}
@@ -497,15 +497,15 @@ describe("SuggestionCard K7 re-roll buttons", () => {
 });
 
 describe("SuggestionCard L9 reward dropdown", () => {
-  it("renders four options with 'Random' selected by default", () => {
-    // Spec: dropdown shows Random / Picture / Joke / Song, with
-    // Random pre-selected on first render. Default matches the L4
-    // wire default so the UI value + omit-default backend resolve
-    // align — see L9 plan §default semantics.
+  it("renders five options with 'Random' selected by default", () => {
+    // Spec (post L follow-up Change D): dropdown shows Random /
+    // Picture / Joke / Song / None, with Random pre-selected on first
+    // render. Default matches the L4 wire default so the UI value +
+    // omit-default backend resolve align.
     render(
       <SuggestionCard
         activity={fakeActivity()}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
       />,
@@ -513,15 +513,18 @@ describe("SuggestionCard L9 reward dropdown", () => {
     const select = screen.getByTestId("reward-select") as HTMLSelectElement;
     expect(select.value).toBe("random");
     const labels = Array.from(select.options).map((o) => o.textContent);
-    expect(labels).toEqual(["Random", "Picture", "Joke", "Song"]);
+    expect(labels).toEqual(["Random", "Picture", "Joke", "Song", "None"]);
     // values match the wire union literal
     const values = Array.from(select.options).map((o) => o.value);
-    expect(values).toEqual(["random", "picture", "joke", "song"]);
+    expect(values).toEqual(["random", "picture", "joke", "song", "none"]);
   });
 
-  it("approving with the default selection passes 'random' to onApprove", async () => {
+  it("approving with the default selection passes 'random' + null to onApprove", async () => {
     const onApprove = vi.fn(
-      async (_rewardType: RewardType): Promise<void> => undefined,
+      async (
+        _rewardType: RewardType,
+        _rewardId: string | null,
+      ): Promise<void> => undefined,
     );
     render(
       <SuggestionCard
@@ -533,12 +536,17 @@ describe("SuggestionCard L9 reward dropdown", () => {
     );
     fireEvent.click(screen.getByTestId("approve-button"));
     expect(onApprove).toHaveBeenCalledTimes(1);
-    expect(onApprove).toHaveBeenCalledWith("random");
+    // L follow-up Change E: second arg is the specific-pick id; null
+    // for the default ("Random" type + "(any)" sentinel).
+    expect(onApprove).toHaveBeenCalledWith("random", null);
   });
 
   it("selecting 'Picture' then approving passes 'picture' to onApprove", () => {
     const onApprove = vi.fn(
-      async (_rewardType: RewardType): Promise<void> => undefined,
+      async (
+        _rewardType: RewardType,
+        _rewardId: string | null,
+      ): Promise<void> => undefined,
     );
     render(
       <SuggestionCard
@@ -552,17 +560,22 @@ describe("SuggestionCard L9 reward dropdown", () => {
     fireEvent.change(select, { target: { value: "picture" } });
     expect(select.value).toBe("picture");
     fireEvent.click(screen.getByTestId("approve-button"));
-    expect(onApprove).toHaveBeenCalledWith("picture");
+    // No specific reward selected → rewardId still null.
+    expect(onApprove).toHaveBeenCalledWith("picture", null);
   });
 
-  it("disables dropdown + renders hint when ALL three lanes are ineligible", () => {
-    // Picture pool empty (activeRewardsCount=0) AND jokes off AND
-    // songs off → no useful selection available, so the dropdown
-    // disables and a "No rewards configured" hint surfaces below.
+  it("when ALL three lanes are ineligible, dropdown stays enabled and only shows Random + None + hint", () => {
+    // L follow-up Change A: per-lane filtering. With all three
+    // content lanes off (no pictures AND jokes off AND songs off),
+    // the Picture / Joke / Song options are hidden but Random + None
+    // remain (always-on). The dropdown stays enabled (the parent can
+    // still pick None to opt out, or Random — the L4 resolver
+    // handles the all-empty case gracefully). Hint still renders so
+    // the parent has the visual cue.
     render(
       <SuggestionCard
         activity={fakeActivity()}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
         activeRewardsCount={0}
@@ -571,7 +584,9 @@ describe("SuggestionCard L9 reward dropdown", () => {
       />,
     );
     const select = screen.getByTestId("reward-select") as HTMLSelectElement;
-    expect(select.disabled).toBe(true);
+    expect(select.disabled).toBe(false);
+    const values = Array.from(select.options).map((o) => o.value);
+    expect(values).toEqual(["random", "none"]);
     const hint = screen.getByTestId("reward-disabled-hint");
     expect(hint.textContent).toContain("No rewards configured");
   });
@@ -584,7 +599,7 @@ describe("SuggestionCard L9 reward dropdown", () => {
     render(
       <SuggestionCard
         activity={fakeActivity()}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
         activeRewardsCount={1}
@@ -597,14 +612,70 @@ describe("SuggestionCard L9 reward dropdown", () => {
     expect(screen.queryByTestId("reward-disabled-hint")).toBeNull();
   });
 
+  it("Change A: hides 'Joke' option when jokes_enabled is false", () => {
+    // L follow-up Change A: per-toggle filter. With jokes off, the
+    // Joke option vanishes from the dropdown; Picture + Song + Random
+    // + None remain.
+    render(
+      <SuggestionCard
+        activity={fakeActivity()}
+        onApprove={async (_rt, _rid) => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+        activeRewardsCount={3}
+        jokesEnabled={false}
+        songsEnabled={true}
+      />,
+    );
+    const select = screen.getByTestId("reward-select") as HTMLSelectElement;
+    const values = Array.from(select.options).map((o) => o.value);
+    expect(values).toEqual(["random", "picture", "song", "none"]);
+  });
+
+  it("Change A: hides 'Song' option when songs_enabled is false", () => {
+    render(
+      <SuggestionCard
+        activity={fakeActivity()}
+        onApprove={async (_rt, _rid) => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+        activeRewardsCount={3}
+        jokesEnabled={true}
+        songsEnabled={false}
+      />,
+    );
+    const select = screen.getByTestId("reward-select") as HTMLSelectElement;
+    const values = Array.from(select.options).map((o) => o.value);
+    expect(values).toEqual(["random", "picture", "joke", "none"]);
+  });
+
+  it("Change A: hides 'Picture' option when activeRewardsCount is 0", () => {
+    // With zero active pictures but jokes/songs on, Picture hides.
+    // Random / None remain (always-on); Joke + Song are still visible.
+    render(
+      <SuggestionCard
+        activity={fakeActivity()}
+        onApprove={async (_rt, _rid) => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+        activeRewardsCount={0}
+        jokesEnabled={true}
+        songsEnabled={true}
+      />,
+    );
+    const select = screen.getByTestId("reward-select") as HTMLSelectElement;
+    const values = Array.from(select.options).map((o) => o.value);
+    expect(values).toEqual(["random", "joke", "song", "none"]);
+  });
+
   it("Picture option works regardless of joke/song eligibility", () => {
     // With pictures eligible but jokes/songs disabled, selecting
-    // Picture must still ride through to onApprove. Pins that the
-    // dropdown options are NOT individually disabled when their
-    // lane is off — only the entire select disables when ALL three
-    // lanes are off.
+    // Picture must still ride through to onApprove.
     const onApprove = vi.fn(
-      async (_rewardType: RewardType): Promise<void> => undefined,
+      async (
+        _rewardType: RewardType,
+        _rewardId: string | null,
+      ): Promise<void> => undefined,
     );
     render(
       <SuggestionCard
@@ -620,7 +691,7 @@ describe("SuggestionCard L9 reward dropdown", () => {
     const select = screen.getByTestId("reward-select") as HTMLSelectElement;
     fireEvent.change(select, { target: { value: "picture" } });
     fireEvent.click(screen.getByTestId("approve-button"));
-    expect(onApprove).toHaveBeenCalledWith("picture");
+    expect(onApprove).toHaveBeenCalledWith("picture", null);
   });
 
   it("select carries an accessible label", () => {
@@ -631,14 +702,14 @@ describe("SuggestionCard L9 reward dropdown", () => {
     render(
       <SuggestionCard
         activity={fakeActivity()}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
       />,
     );
     // getByLabelText walks both <label htmlFor> and aria-label so
     // hitting either branch counts.
-    const select = screen.getByLabelText(/reward/i) as HTMLSelectElement;
+    const select = screen.getByLabelText("Reward type") as HTMLSelectElement;
     expect(select.tagName).toBe("SELECT");
     expect(select.getAttribute("aria-label")).toBe("Reward type");
   });
@@ -646,13 +717,11 @@ describe("SuggestionCard L9 reward dropdown", () => {
   it("treats null activeRewardsCount as 'unknown → enabled'", () => {
     // Per L9 spec: when activeRewardsCount is null (e.g. the bootstrap
     // listRewards fetch failed), the card defaults to "rewards are
-    // available" and relies on the L4 backend fallback chain. This
-    // guards against the failure mode where a slow / errored bootstrap
-    // would otherwise paint a falsely-disabled dropdown.
+    // available" and relies on the L4 backend fallback chain.
     render(
       <SuggestionCard
         activity={fakeActivity()}
-        onApprove={async () => undefined}
+        onApprove={async (_rt, _rid) => undefined}
         onSkip={async () => undefined}
         onDismiss={async () => undefined}
         activeRewardsCount={null}
@@ -663,5 +732,188 @@ describe("SuggestionCard L9 reward dropdown", () => {
     const select = screen.getByTestId("reward-select") as HTMLSelectElement;
     expect(select.disabled).toBe(false);
     expect(screen.queryByTestId("reward-disabled-hint")).toBeNull();
+  });
+});
+
+describe("SuggestionCard L follow-up Change D — None option", () => {
+  it("selecting 'None' passes 'none' + null to onApprove", () => {
+    // The explicit opt-out. The backend's L4 wiring short-circuits
+    // _insert_reward_step_as_current when reward_type === "none" and
+    // the activity wraps cleanly with no reward step.
+    const onApprove = vi.fn(
+      async (
+        _rewardType: RewardType,
+        _rewardId: string | null,
+      ): Promise<void> => undefined,
+    );
+    render(
+      <SuggestionCard
+        activity={fakeActivity()}
+        onApprove={onApprove}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+      />,
+    );
+    const select = screen.getByTestId("reward-select") as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: "none" } });
+    fireEvent.click(screen.getByTestId("approve-button"));
+    expect(onApprove).toHaveBeenCalledWith("none", null);
+  });
+
+  it("'None' option is always rendered even when no other lanes are eligible", () => {
+    // The opt-out must survive every filter — it's the parent's
+    // way to say "no reward this activity" regardless of catalog
+    // state or master toggles.
+    render(
+      <SuggestionCard
+        activity={fakeActivity()}
+        onApprove={async (_rt, _rid) => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+        activeRewardsCount={0}
+        jokesEnabled={false}
+        songsEnabled={false}
+      />,
+    );
+    const select = screen.getByTestId("reward-select") as HTMLSelectElement;
+    const values = Array.from(select.options).map((o) => o.value);
+    expect(values).toContain("none");
+  });
+});
+
+describe("SuggestionCard L follow-up Change E — specific picture pick", () => {
+  it("second dropdown does not render unless 'Picture' is selected", () => {
+    render(
+      <SuggestionCard
+        activity={fakeActivity()}
+        onApprove={async (_rt, _rid) => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+        activeRewards={[
+          { id: "r-1", display_name: "Gold Trophy" },
+          { id: "r-2", display_name: "Silver Star" },
+        ]}
+      />,
+    );
+    // Default selection is "Random" → second dropdown absent.
+    expect(screen.queryByTestId("reward-id-select")).toBeNull();
+    // Switch to Joke — still absent.
+    const select = screen.getByTestId("reward-select") as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: "joke" } });
+    expect(screen.queryByTestId("reward-id-select")).toBeNull();
+    // Switch to Picture — appears.
+    fireEvent.change(select, { target: { value: "picture" } });
+    expect(screen.getByTestId("reward-id-select")).toBeTruthy();
+  });
+
+  it("second dropdown lists '(any)' + each active reward by display_name", () => {
+    render(
+      <SuggestionCard
+        activity={fakeActivity()}
+        onApprove={async (_rt, _rid) => undefined}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+        activeRewards={[
+          { id: "r-1", display_name: "Gold Trophy" },
+          { id: "r-2", display_name: "Silver Star" },
+        ]}
+      />,
+    );
+    fireEvent.change(screen.getByTestId("reward-select"), {
+      target: { value: "picture" },
+    });
+    const idSelect = screen.getByTestId(
+      "reward-id-select",
+    ) as HTMLSelectElement;
+    const labels = Array.from(idSelect.options).map((o) => o.textContent);
+    expect(labels).toEqual(["(any)", "Gold Trophy", "Silver Star"]);
+    const values = Array.from(idSelect.options).map((o) => o.value);
+    expect(values).toEqual(["", "r-1", "r-2"]);
+  });
+
+  it("'(any)' selection wire-side maps to null rewardId on approve", () => {
+    const onApprove = vi.fn(
+      async (
+        _rewardType: RewardType,
+        _rewardId: string | null,
+      ): Promise<void> => undefined,
+    );
+    render(
+      <SuggestionCard
+        activity={fakeActivity()}
+        onApprove={onApprove}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+        activeRewards={[{ id: "r-1", display_name: "Gold Trophy" }]}
+      />,
+    );
+    fireEvent.change(screen.getByTestId("reward-select"), {
+      target: { value: "picture" },
+    });
+    // Don't change the id dropdown — stays on "(any)".
+    fireEvent.click(screen.getByTestId("approve-button"));
+    expect(onApprove).toHaveBeenCalledWith("picture", null);
+  });
+
+  it("concrete pick wire-side maps to that reward id on approve", () => {
+    const onApprove = vi.fn(
+      async (
+        _rewardType: RewardType,
+        _rewardId: string | null,
+      ): Promise<void> => undefined,
+    );
+    render(
+      <SuggestionCard
+        activity={fakeActivity()}
+        onApprove={onApprove}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+        activeRewards={[
+          { id: "r-1", display_name: "Gold Trophy" },
+          { id: "r-2", display_name: "Silver Star" },
+        ]}
+      />,
+    );
+    fireEvent.change(screen.getByTestId("reward-select"), {
+      target: { value: "picture" },
+    });
+    fireEvent.change(screen.getByTestId("reward-id-select"), {
+      target: { value: "r-2" },
+    });
+    fireEvent.click(screen.getByTestId("approve-button"));
+    expect(onApprove).toHaveBeenCalledWith("picture", "r-2");
+  });
+
+  it("switching back from Picture clears the wire id (rewardId null even if previously pinned)", () => {
+    // Behavior contract: the second dropdown only matters when the
+    // main dropdown is Picture. Switching to anything else → rewardId
+    // null on the wire even if a concrete pick remains in local state.
+    const onApprove = vi.fn(
+      async (
+        _rewardType: RewardType,
+        _rewardId: string | null,
+      ): Promise<void> => undefined,
+    );
+    render(
+      <SuggestionCard
+        activity={fakeActivity()}
+        onApprove={onApprove}
+        onSkip={async () => undefined}
+        onDismiss={async () => undefined}
+        activeRewards={[{ id: "r-1", display_name: "Gold Trophy" }]}
+      />,
+    );
+    fireEvent.change(screen.getByTestId("reward-select"), {
+      target: { value: "picture" },
+    });
+    fireEvent.change(screen.getByTestId("reward-id-select"), {
+      target: { value: "r-1" },
+    });
+    // Switch to Joke.
+    fireEvent.change(screen.getByTestId("reward-select"), {
+      target: { value: "joke" },
+    });
+    fireEvent.click(screen.getByTestId("approve-button"));
+    expect(onApprove).toHaveBeenCalledWith("joke", null);
   });
 });

@@ -860,3 +860,125 @@ def test_explicit_joke_is_deterministic_for_same_seed(conn: sqlite3.Connection) 
     assert a == b
     assert a is not None
     assert a.kind == "joke"
+
+
+# ---------------------------------------------------------------------
+# L follow-up Change D — ``requested_type="none"`` short-circuits.
+# Distinct from NULL on the column: the resolver is even called with
+# the value, but it returns ``None`` immediately without touching the
+# theme/load paths.
+# ---------------------------------------------------------------------
+
+
+def test_requested_type_none_returns_none_with_active_rewards(
+    conn: sqlite3.Connection,
+) -> None:
+    """Even with picture rewards available, ``"none"`` returns ``None``."""
+    _insert_reward(conn, reward_id="trophy", display_name="Trophy", tags=["adventure"])
+    # No theme mock needed — the short-circuit happens before
+    # ``_compute_activity_themes`` would call ``extract_themes``.
+    result = resolve_reward(conn, _ctx(), "none")  # type: ignore[arg-type]
+    assert result is None
+
+
+def test_requested_type_none_returns_none_with_empty_pools(
+    conn: sqlite3.Connection,
+) -> None:
+    """``"none"`` short-circuits regardless of pool state."""
+    result = resolve_reward(conn, _ctx(), "none")  # type: ignore[arg-type]
+    assert result is None
+
+
+# ---------------------------------------------------------------------
+# L follow-up Change E — picture branch honours the pinned
+# ``__reward_id`` from ``slot_fills_json`` when the reward is in the
+# active pool. Falls back to the random tag-match pick when the pinned
+# reward is missing / archived / deleted between approve and play.
+# ---------------------------------------------------------------------
+
+
+def _ctx_with_pin(
+    *,
+    pinned_id: str,
+    activity_id: str = "act-1",
+    template_id: str | None = None,
+) -> RewardActivityContext:
+    """Build a context whose slot_fills_json carries ``__reward_id``."""
+    slot_fills: dict[str, Any] = {"__reward_id": pinned_id}
+    if template_id is not None:
+        slot_fills["__template_id"] = template_id
+    return RewardActivityContext(
+        id=activity_id,
+        session_id="sess-1",
+        persona_id=None,
+        slot_fills_json=json.dumps(slot_fills),
+        current_step_count=5,
+    )
+
+
+def test_picture_pin_returns_pinned_reward(conn: sqlite3.Connection) -> None:
+    """Pinned id present in the active pool → resolver returns THAT reward."""
+    # Three rewards. Without the pin, the theme-overlap sort would
+    # pick whichever overlaps best; the pin must override that order.
+    _insert_reward(conn, reward_id="r-popular", display_name="Popular", tags=["adventure"])
+    _insert_reward(conn, reward_id="r-pinned", display_name="Pinned", tags=[])
+    _insert_reward(conn, reward_id="r-other", display_name="Other", tags=["food"])
+    with patch(
+        "toybox.activities.content_resolver.extract_themes",
+        return_value=[Theme.adventure],
+    ):
+        result = resolve_reward(conn, _ctx_with_pin(pinned_id="r-pinned"), "picture")
+    assert result is not None
+    assert result.kind == "picture"
+    assert result.reward_id == "r-pinned"
+    # Display name + image URL also reflect the pinned row, not the
+    # would-have-won "Popular" overlap.
+    assert result.body == "Pinned"
+
+
+def test_picture_pin_falls_back_when_pin_missing(conn: sqlite3.Connection) -> None:
+    """Pinned id absent from active pool → fall back to random tag-match.
+
+    Models the "deleted between approve and play" race per operator's
+    decision (resolver MUST still fire a reward, not refuse).
+    """
+    # Active pool has one reward, NOT the one pinned.
+    _insert_reward(conn, reward_id="r-other", display_name="Other", tags=["adventure"])
+    with patch(
+        "toybox.activities.content_resolver.extract_themes",
+        return_value=[Theme.adventure],
+    ):
+        result = resolve_reward(
+            conn,
+            _ctx_with_pin(pinned_id="r-archived-or-gone"),
+            "picture",
+        )
+    assert result is not None
+    assert result.reward_id == "r-other"
+
+
+def test_picture_pin_falls_back_when_pin_archived(conn: sqlite3.Connection) -> None:
+    """Archived rewards are filtered by the SQL — pin against one falls back."""
+    # The "pinned" reward is archived → never loaded → pin missed → fall back.
+    _insert_reward(conn, reward_id="r-pinned", display_name="Pinned", tags=[], archived=1)
+    _insert_reward(conn, reward_id="r-active", display_name="Active", tags=["adventure"])
+    with patch(
+        "toybox.activities.content_resolver.extract_themes",
+        return_value=[Theme.adventure],
+    ):
+        result = resolve_reward(conn, _ctx_with_pin(pinned_id="r-pinned"), "picture")
+    assert result is not None
+    assert result.reward_id == "r-active"
+
+
+def test_picture_pin_falls_back_when_pin_inactive(conn: sqlite3.Connection) -> None:
+    """Inactive rewards (active=0) likewise fall back, matching the SQL filter."""
+    _insert_reward(conn, reward_id="r-pinned", display_name="Pinned", tags=[], active=0)
+    _insert_reward(conn, reward_id="r-live", display_name="Live", tags=["adventure"])
+    with patch(
+        "toybox.activities.content_resolver.extract_themes",
+        return_value=[Theme.adventure],
+    ):
+        result = resolve_reward(conn, _ctx_with_pin(pinned_id="r-pinned"), "picture")
+    assert result is not None
+    assert result.reward_id == "r-live"

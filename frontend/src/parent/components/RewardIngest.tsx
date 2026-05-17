@@ -382,6 +382,14 @@ export function RewardIngest(props: RewardIngestProps): JSX.Element {
     Record<string, string>
   >({});
   const [archivingId, setArchivingId] = useState<string | null>(null);
+  // L follow-up Change B: mirror ToyIngest's per-row active/inactive
+  // toggle. ``togglingActiveId`` tracks the id of the reward whose
+  // PATCH is in flight so we can disable that single control + show a
+  // brief "..." label without locking out the rest of the list.
+  // ``null`` = no toggle currently in flight.
+  const [togglingActiveId, setTogglingActiveId] = useState<string | null>(
+    null,
+  );
 
   // Sort mode for the reward list. "active" puts active rewards first
   // (alpha within each group); "name" is pure alpha A→Z. Mirrors the
@@ -627,11 +635,18 @@ export function RewardIngest(props: RewardIngestProps): JSX.Element {
     }
   }, [api, cancelRewardEdit, editForm, editingRewardId, refetchRewards]);
 
-  const archiveReward = useCallback(
+  // L follow-up Change B: replaces the archive button with a delete
+  // button (semantics + label match the toy ingest UX). The backend
+  // operation is still ``archived=true`` — soft delete; the file
+  // stays on disk and we filter ``archived = 0`` on read — but the
+  // parent-facing label is "delete" because from the parent's
+  // perspective the reward is gone. ``archivingId`` keeps its name to
+  // avoid churning the in-flight tracker.
+  const deleteReward = useCallback(
     async (reward: Reward): Promise<void> => {
       if (archivingId !== null) return;
       const ok = window.confirm(
-        `Archive ${reward.display_name}? It will no longer appear in the rewards list.`,
+        `Delete ${reward.display_name}? It will no longer appear in the rewards list.`,
       );
       if (!ok) return;
       setArchivingId(reward.id);
@@ -645,13 +660,39 @@ export function RewardIngest(props: RewardIngestProps): JSX.Element {
         if (editingRewardId === reward.id) cancelRewardEdit();
       } catch (err) {
         if (isAbortError(err)) return;
-        const message = err instanceof Error ? err.message : "archive failed";
+        const message = err instanceof Error ? err.message : "delete failed";
         setListError(message);
       } finally {
         setArchivingId(null);
       }
     },
     [api, archivingId, cancelRewardEdit, editingRewardId, refetchRewards],
+  );
+
+  // L follow-up Change B: per-reward active/inactive toggle. Mirrors
+  // ToyIngest's ``toggleToyActive`` exactly — single global in-flight
+  // tracker so a rapid double-click can't fire two PATCHes for the
+  // same row, but other rows stay responsive.
+  const toggleRewardActive = useCallback(
+    async (reward: Reward): Promise<void> => {
+      if (togglingActiveId !== null) return;
+      setTogglingActiveId(reward.id);
+      try {
+        await api.updateReward(
+          reward.id,
+          { active: !reward.active },
+          { signal: aborterRef.current?.signal },
+        );
+        await refetchRewards();
+      } catch (err) {
+        if (isAbortError(err)) return;
+        const message = err instanceof Error ? err.message : "toggle failed";
+        setListError(message);
+      } finally {
+        setTogglingActiveId(null);
+      }
+    },
+    [api, refetchRewards, togglingActiveId],
   );
 
   const updateEditField = useCallback(
@@ -1080,6 +1121,31 @@ export function RewardIngest(props: RewardIngestProps): JSX.Element {
                       )}
                     </div>
                     <div style={{ display: "flex", gap: 6 }}>
+                      {/* L follow-up Change B: active/inactive toggle
+                          mirroring ToyIngest. ``aria-pressed`` reflects
+                          the current active state. Disabled briefly
+                          while the PATCH is in flight (single-row
+                          guard via ``togglingActiveId``). */}
+                      <button
+                        type="button"
+                        data-testid="toggle-reward-active-button"
+                        aria-pressed={r.active}
+                        disabled={togglingActiveId === r.id}
+                        onClick={() => {
+                          void toggleRewardActive(r);
+                        }}
+                        title={
+                          r.active
+                            ? "Deactivate this reward (exclude from picks)"
+                            : "Activate this reward"
+                        }
+                      >
+                        {togglingActiveId === r.id
+                          ? "..."
+                          : r.active
+                            ? "active"
+                            : "inactive"}
+                      </button>
                       <button
                         type="button"
                         data-testid="edit-reward-button"
@@ -1087,17 +1153,24 @@ export function RewardIngest(props: RewardIngestProps): JSX.Element {
                       >
                         edit
                       </button>
+                      {/* L follow-up Change B: archive button → delete
+                          label. Wire shape unchanged (still PATCHes
+                          ``archived=true``); operator-facing label
+                          matches the toy ingest UX so the two surfaces
+                          read consistently. ``data-testid`` renamed to
+                          ``delete-reward-button`` accordingly; the
+                          old ``archive-reward-button`` testid is
+                          retired (RewardIngest.test.tsx updated in
+                          step). */}
                       <button
                         type="button"
-                        data-testid="archive-reward-button"
+                        data-testid="delete-reward-button"
                         disabled={archivingId === r.id}
                         onClick={() => {
-                          void archiveReward(r);
+                          void deleteReward(r);
                         }}
                       >
-                        {archivingId === r.id
-                          ? "archiving..."
-                          : "archive"}
+                        {archivingId === r.id ? "deleting..." : "delete"}
                       </button>
                     </div>
                   </div>

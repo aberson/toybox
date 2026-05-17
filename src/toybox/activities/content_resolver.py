@@ -1164,14 +1164,24 @@ class ResolvedReward:
 
 
 # Public type alias for the requested-type wire string. The resolver
-# accepts the four-member Literal from :data:`toybox.activities.models.RewardType`
+# accepts the five-member Literal from :data:`toybox.activities.models.RewardType`
 # but exposes it locally so callers don't have to thread the import.
-_RewardTypeRequest = Literal["picture", "joke", "song", "random"]
+# L follow-up Change D: ``"none"`` is the explicit-opt-out value; the
+# resolver short-circuits and returns ``None`` so the caller skips the
+# reward-step append entirely.
+_RewardTypeRequest = Literal["picture", "joke", "song", "random", "none"]
 
 # Reserved key the L4 approve handler writes into ``slot_fills_json``
 # to carry the template id through to the resolver. Reads tolerate its
 # absence gracefully.
 _TEMPLATE_ID_KEY: Final[str] = "__template_id"
+# L follow-up Change E: reserved key the approve handler writes into
+# ``slot_fills_json`` when the parent picked a specific picture reward
+# from the second dropdown. The resolver's picture branch reads this
+# and prefers it over the random-tag-match pick. Missing/archived/
+# deleted-between-approve-and-play → fall back to the random pool pick
+# (operator's decision; preserves the "reward fires somehow" contract).
+_REWARD_ID_KEY: Final[str] = "__reward_id"
 
 # Default cap on transcripts pulled per resolve call. Mirrors the
 # ``LIMIT 50`` in ``ai/tools.py:404`` (the producer this duplicates by
@@ -1232,6 +1242,35 @@ def _decode_template_id(slot_fills_json: str | None) -> str | None:
     if not isinstance(decoded, dict):
         return None
     raw = decoded.get(_TEMPLATE_ID_KEY)
+    if isinstance(raw, str) and raw:
+        return raw
+    return None
+
+
+def _decode_reward_id(slot_fills_json: str | None) -> str | None:
+    """Extract the reserved ``__reward_id`` key from ``slot_fills_json``.
+
+    L follow-up Change E: the approve handler writes
+    ``slot_fills["__reward_id"] = body.reward_id`` when the parent picked
+    a specific picture reward via the second dropdown. Pre-Change-E
+    rows (or approves where the parent left the second dropdown on
+    "(any)") do not carry the key — return ``None`` and the picture
+    branch falls through to the random tag-match pick.
+
+    Tolerant of malformed JSON / non-dict payloads / non-string values
+    (returns ``None`` silently) to mirror :func:`_decode_template_id`.
+    """
+    if not slot_fills_json:
+        return None
+    try:
+        decoded = json.loads(slot_fills_json)
+    except json.JSONDecodeError:
+        # Sibling decoder already logged on malformed input; stay quiet
+        # to avoid spamming the same WARNING twice per advance.
+        return None
+    if not isinstance(decoded, dict):
+        return None
+    raw = decoded.get(_REWARD_ID_KEY)
     if isinstance(raw, str) and raw:
         return raw
     return None
@@ -1409,10 +1448,20 @@ def _pick_picture(
     rewards: list[dict[str, object]],
     activity_themes: list[str],
     rng: random.Random,
+    *,
+    pinned_reward_id: str | None = None,
 ) -> ResolvedReward | None:
     """Pick one picture reward from ``rewards`` per the L3 sort rules.
 
     Empty input → ``None`` (caller falls through to the next type).
+
+    L follow-up Change E: when ``pinned_reward_id`` is set AND a reward
+    in ``rewards`` (already filtered to active + non-archived) matches
+    that id, return THAT specific reward directly. Otherwise (id missing
+    from the active pool — archived/deleted between approve and play)
+    fall through to the random tag-match pick. Operator's decision
+    locks the "missing-pin → random pool" behaviour rather than failing
+    silently or refusing to fire.
 
     Sort keys (per phase-l-plan §7 L3):
 
@@ -1429,6 +1478,20 @@ def _pick_picture(
     """
     if not rewards:
         return None
+    # L follow-up Change E: honour the parent's specific pick when the
+    # reward is still in the active pool. Reads the dict by id; the
+    # row already passed the ``active=1 AND archived=0`` SQL filter
+    # in :func:`_load_active_rewards`, so a match here is automatically
+    # eligible.
+    if pinned_reward_id is not None:
+        for row in rewards:
+            if str(row["id"]) == pinned_reward_id:
+                return _reward_row_to_resolved(row)
+        # Pin missed — fall through to the random pool pick below. We
+        # deliberately do NOT log here at WARNING level: the operator
+        # chose "deleted-between-approve-and-play → fall back to
+        # random" as the policy, so the missed-pin case is a normal
+        # outcome rather than an alarm.
     # Single pass: compute overlap counts and find the max.
     enriched = [
         (_theme_overlap_count(cast("list[str]", r["tags"]), activity_themes), r) for r in rewards
@@ -1689,10 +1752,29 @@ def resolve_reward(
     activity.current_step_count)`` — repeated calls within one advance
     return the same :class:`ResolvedReward`. The contract is what L4
     relies on for idempotency.
+
+    L follow-up Change D: ``requested_type == "none"`` short-circuits
+    and returns ``None`` immediately — no DB reads, no fallback chain.
+    The L4 caller (:func:`_insert_reward_step_as_current`) treats
+    ``None`` identically to "all pools empty", so the activity wraps
+    cleanly with no reward step appended.
     """
+    # L follow-up Change D: explicit opt-out. Distinct from NULL (legacy
+    # pre-L row) on the column, but produces the same observable
+    # outcome — no reward step. Short-circuit BEFORE the theme + load
+    # queries so the no-op approve case is also a no-IO advance.
+    if requested_type == "none":
+        return None
     activity_themes = _compute_activity_themes(conn, activity)
     rewards = _load_active_rewards(conn)
     seed = _seed_for_activity(activity.id, activity.current_step_count)
+    # L follow-up Change E: the parent may have pinned a specific
+    # picture reward via the second dropdown. Read once here; the
+    # picture branch in the fallback chain consumes it. Always read —
+    # even when ``requested_type != "picture"``, the fallback may walk
+    # into picture and the pin still applies in that case (operator's
+    # intent: "if a picture reward fires, prefer my pick").
+    pinned_reward_id = _decode_reward_id(activity.slot_fills_json)
 
     # Determine starting type.
     if requested_type == "random":
@@ -1721,7 +1803,12 @@ def resolve_reward(
         if not _type_is_eligible(conn, kind, rewards):
             continue
         if kind == "picture":
-            picked = _pick_picture(rewards, activity_themes, rng_for_picture)
+            picked = _pick_picture(
+                rewards,
+                activity_themes,
+                rng_for_picture,
+                pinned_reward_id=pinned_reward_id,
+            )
             if picked is not None:
                 return picked
         elif kind == "joke":

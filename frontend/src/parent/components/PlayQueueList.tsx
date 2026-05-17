@@ -45,7 +45,16 @@ export interface PlayQueueListProps {
   // backend ApproveRequest. Same arrow shape as ``onApprove`` on
   // ``ApiClient.approve`` so App.tsx's handler can pass it straight
   // through without unpacking.
-  onApprove: (activity: Activity, rewardType: RewardType) => Promise<void>;
+  //
+  // L follow-up Change E: third arg ``rewardId`` carries the specific
+  // picture-reward pick from the second dropdown (or ``null`` for the
+  // "(any)" sentinel / non-picture types). Threaded through to
+  // ApiClient.approve's new ``rewardId`` parameter.
+  onApprove: (
+    activity: Activity,
+    rewardType: RewardType,
+    rewardId: string | null,
+  ) => Promise<void>;
   onDismiss: (activity: Activity) => Promise<void>;
   onRegenerate: (activity: Activity) => Promise<void>;
   onEnd: (activity: Activity) => Promise<void>;
@@ -77,6 +86,11 @@ export interface PlayQueueListProps {
   // that as "rewards are available" and relies on the L4 fallback
   // chain if the pool actually turns out to be empty.
   activeRewardsCount?: number | null;
+  // L follow-up Change E: full list of active picture rewards (id +
+  // display_name pairs) for the SuggestionCard's second dropdown.
+  // Threaded App-side from the same bootstrap ``listRewards`` GET as
+  // ``activeRewardsCount``.
+  activeRewards?: ReadonlyArray<{ id: string; display_name: string }>;
 }
 
 // Keyed busy map: (action, id) → in-flight flag. A nested record keeps
@@ -132,6 +146,7 @@ export function PlayQueueList(props: PlayQueueListProps): JSX.Element {
     jokesEnabled,
     songsEnabled,
     activeRewardsCount,
+    activeRewards,
   } = props;
 
   const [busy, setBusy] = useState<BusyMap>(() => emptyBusy());
@@ -369,9 +384,9 @@ export function PlayQueueList(props: PlayQueueListProps): JSX.Element {
           >
             <SuggestionCard
               activity={row}
-              onApprove={(rewardType) =>
+              onApprove={(rewardType, rewardId) =>
                 runGuarded("approve", row.id, () =>
-                  onApprove(row, rewardType),
+                  onApprove(row, rewardType, rewardId),
                 )
               }
               onSkip={() =>
@@ -394,6 +409,7 @@ export function PlayQueueList(props: PlayQueueListProps): JSX.Element {
                 newActivity: busy.newActivity.has(row.id),
               }}
               activeRewardsCount={activeRewardsCount}
+              activeRewards={activeRewards}
               jokesEnabled={jokesEnabled}
               songsEnabled={songsEnabled}
             />

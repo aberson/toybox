@@ -90,4 +90,4 @@ export type Animation = "shine" | "jump" | "spin" | "pulse" | "wobble" | "float"
  * dropdown and the kiosk's reward-step renderer both branch
  * on these four wire strings.
  */
-export type RewardType = "picture" | "joke" | "song" | "random";
+export type RewardType = "picture" | "joke" | "song" | "random" | "none";

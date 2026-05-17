@@ -197,10 +197,13 @@ def _approve(
     version: int,
     *,
     reward_type: str | None = None,
+    reward_id: str | None = None,
 ) -> dict[str, Any]:
     body: dict[str, Any] = {}
     if reward_type is not None:
         body["reward_type"] = reward_type
+    if reward_id is not None:
+        body["reward_id"] = reward_id
     response = client.post(
         f"/api/activities/{activity_id}/approve",
         json=body,
@@ -294,6 +297,25 @@ def _png_bytes() -> bytes:
     return out.getvalue()
 
 
+def _png_bytes_unique(seed: int) -> bytes:
+    """PNG bytes with a per-seed RGB tint so multiple uploads in one
+    test get distinct SHA-256 hashes and don't trip the upload-dedup
+    409. The ``_png_bytes`` helper is kept for the original "one reward
+    per test" tests; ``_create_reward`` now uses this variant keyed
+    on the (low-entropy) call counter below."""
+    img = Image.new("RGB", (32, 32), (seed % 256, (seed * 7) % 256, (seed * 13) % 256))
+    out = io.BytesIO()
+    img.save(out, format="PNG")
+    return out.getvalue()
+
+
+# Module-scoped counter so each ``_create_reward`` call in a single
+# test gets a unique image. ``pytest-xdist`` would scope this per
+# worker if it were ever introduced — both are fine; the per-test
+# distinctness is what matters for the dedup.
+_REWARD_IMAGE_COUNTER: list[int] = [0]
+
+
 def _create_reward(
     client: TestClient,
     parent_headers: dict[str, str],
@@ -303,9 +325,16 @@ def _create_reward(
     animation: str = "shine",
 ) -> dict[str, Any]:
     """Upload + confirm one reward."""
+    _REWARD_IMAGE_COUNTER[0] += 1
     upload_resp = client.post(
         "/api/rewards/upload",
-        files={"file": ("reward.png", _png_bytes(), "image/png")},
+        files={
+            "file": (
+                f"reward-{_REWARD_IMAGE_COUNTER[0]}.png",
+                _png_bytes_unique(_REWARD_IMAGE_COUNTER[0]),
+                "image/png",
+            )
+        },
         headers=parent_headers,
     )
     assert upload_resp.status_code == 200, upload_resp.text
@@ -921,3 +950,186 @@ def test_terminal_advance_publishes_reward_step_envelope_and_strips_trigger_phra
             )
     finally:
         sub.close()
+
+
+# ---------------------------------------------------------------------
+# L follow-up Change D — explicit ``reward_type="none"`` short-circuits.
+# The activity wraps cleanly with NO reward step appended; state ends
+# at ``completed`` after one terminal advance (legacy single-advance
+# path is reached because Phase 1 returns False from
+# ``_insert_reward_step_as_current``).
+# ---------------------------------------------------------------------
+
+
+def test_approve_with_reward_type_none_appends_no_reward_step(
+    client: TestClient,
+    parent_headers: dict[str, str],
+    db_path: Path,
+    l4_corpus: Path,
+    l4_template: Path,
+) -> None:
+    """L follow-up Change D: even with picture rewards in the catalog
+    and joke/song corpora populated, ``reward_type="none"`` causes no
+    reward step to land."""
+    _create_reward(client, parent_headers)
+    activity = _propose(client, parent_headers)
+    activity_id = activity["id"]
+    state = _approve(client, parent_headers, activity_id, activity["version"], reward_type="none")
+    # Single terminal advance suffices — no reward fires, so the
+    # activity transitions completed in one shot (legacy path).
+    state = _walk_to_reward(client, parent_headers, activity_id, state["version"])
+    assert state["state"] == "completed", (
+        f"reward_type=none should fall through to the legacy completed "
+        f"transition in one advance; got state={state['state']!r}"
+    )
+    rows = _fetch_steps(db_path, activity_id)
+    reward_rows = [r for r in rows if r["kind"] == "reward"]
+    assert reward_rows == [], (
+        f"reward_type=none must NOT append a reward step; got {[r['seq'] for r in reward_rows]}"
+    )
+
+
+def test_approve_persists_reward_type_none_in_db(
+    client: TestClient,
+    parent_headers: dict[str, str],
+    db_path: Path,
+    l4_corpus: Path,
+    l4_template: Path,
+) -> None:
+    """Confirm ``"none"`` is persisted verbatim (distinct from NULL
+    legacy rows) so metrics can tell explicit opt-out apart from
+    pre-Phase-L rows."""
+    activity = _propose(client, parent_headers)
+    activity_id = activity["id"]
+    _approve(client, parent_headers, activity_id, activity["version"], reward_type="none")
+    conn = connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT reward_type FROM activities WHERE id = ?",
+            (activity_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+    assert row["reward_type"] == "none"
+
+
+# ---------------------------------------------------------------------
+# L follow-up Change E — specific picture pick via ApproveRequest.reward_id.
+# The approve handler MUST write ``__reward_id`` into
+# ``slot_fills_json`` so the L3 resolver can prefer the parent's pick.
+# ---------------------------------------------------------------------
+
+
+def test_approve_with_reward_id_writes_into_slot_fills_json(
+    client: TestClient,
+    parent_headers: dict[str, str],
+    db_path: Path,
+    l4_corpus: Path,
+    l4_template: Path,
+) -> None:
+    """L follow-up Change E: approve with picture + reward_id persists
+    the pinned id into ``slot_fills_json["__reward_id"]`` alongside the
+    existing ``__template_id`` key."""
+    reward = _create_reward(client, parent_headers, display_name="Pinned Star")
+    activity = _propose(client, parent_headers)
+    activity_id = activity["id"]
+    _approve(
+        client,
+        parent_headers,
+        activity_id,
+        activity["version"],
+        reward_type="picture",
+        reward_id=reward["id"],
+    )
+    conn = connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT slot_fills_json FROM activities WHERE id = ?",
+            (activity_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+    slot_fills = json.loads(row["slot_fills_json"])
+    assert slot_fills.get("__reward_id") == reward["id"], (
+        f"approve must persist the specific picture pick into "
+        f"__reward_id; got slot_fills={slot_fills}"
+    )
+    # ``__template_id`` still present alongside.
+    assert slot_fills.get("__template_id") == "l4_three_step"
+
+
+def test_approve_with_reward_id_ignored_for_non_picture_type(
+    client: TestClient,
+    parent_headers: dict[str, str],
+    db_path: Path,
+    l4_corpus: Path,
+    l4_template: Path,
+) -> None:
+    """A defensive client could submit ``reward_id`` alongside a non-
+    picture ``reward_type``; the backend ignores it (the second
+    dropdown only fires on Picture)."""
+    reward = _create_reward(client, parent_headers, display_name="Misplaced Pin")
+    activity = _propose(client, parent_headers)
+    activity_id = activity["id"]
+    _approve(
+        client,
+        parent_headers,
+        activity_id,
+        activity["version"],
+        reward_type="random",
+        reward_id=reward["id"],
+    )
+    conn = connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT slot_fills_json FROM activities WHERE id = ?",
+            (activity_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+    slot_fills = json.loads(row["slot_fills_json"])
+    assert "__reward_id" not in slot_fills, (
+        f"reward_id should be ignored when reward_type != 'picture'; got slot_fills={slot_fills}"
+    )
+
+
+def test_pinned_picture_reward_wins_through_advance(
+    client: TestClient,
+    parent_headers: dict[str, str],
+    db_path: Path,
+    l4_corpus: Path,
+    l4_template: Path,
+) -> None:
+    """Full wire path: approve with a specific reward_id → walk to
+    terminal → the reward step's metadata carries THAT reward's id,
+    not whatever the random tag-match would have picked."""
+    # Two rewards: one tagged "adventure" (the template's recommended
+    # theme, so this would win the tag-match), one without tags.
+    _create_reward(
+        client,
+        parent_headers,
+        display_name="Adventure Trophy",
+        tags=["adventure"],
+    )
+    pinned = _create_reward(client, parent_headers, display_name="My Picked Star", tags=[])
+    activity = _propose(client, parent_headers)
+    activity_id = activity["id"]
+    state = _approve(
+        client,
+        parent_headers,
+        activity_id,
+        activity["version"],
+        reward_type="picture",
+        reward_id=pinned["id"],
+    )
+    state = _walk_to_reward(client, parent_headers, activity_id, state["version"])
+    rows = _fetch_steps(db_path, activity_id)
+    reward_rows = [r for r in rows if r["kind"] == "reward"]
+    assert len(reward_rows) == 1
+    metadata = json.loads(reward_rows[0]["metadata_json"])
+    assert metadata["reward_kind"] == "picture"
+    assert metadata["reward_id"] == pinned["id"], (
+        f"specific picture pick must override the random tag-match; "
+        f"got reward_id={metadata['reward_id']!r}, pinned was {pinned['id']!r}"
+    )
+    assert metadata["body"] == "My Picked Star"

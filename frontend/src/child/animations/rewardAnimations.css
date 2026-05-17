@@ -86,3 +86,45 @@
     transform: translateY(0);
   }
 }
+
+/*
+ * L follow-up Change C: "All done!" heading shine.
+ *
+ * Applied to the kiosk's terminal "All done! Great playing!" headline
+ * when the activity's last (reward) step was ``reward_kind=joke`` or
+ * ``reward_kind=song``. Picture rewards have their own visual finale
+ * (the reward step itself, with its picked image-shine animation) and
+ * "no reward" stays plain — so the heading shines only when the joke
+ * / song reward step doesn't otherwise leave a lingering visual
+ * gesture on screen.
+ *
+ * Distinct keyframe from the picture-reward ``shine`` above: the
+ * picture variant uses ``box-shadow`` (a 240px image makes the glow
+ * read), but a text heading reads better with ``text-shadow`` +
+ * brightness pulse. Keeping the two keyframes separate also avoids
+ * an awkward "if the operator picks the shine animation for a picture
+ * reward, does the heading shine TOO?" coupling — they fire on
+ * disjoint surfaces.
+ *
+ * Class is consumed as ``className="all-done-shine"`` on the heading;
+ * the CSS module ships in the same kiosk bundle so global class names
+ * are safe (no clash with the parent route).
+ */
+@keyframes all-done-shine {
+  0% {
+    text-shadow: 0 0 0 rgba(255, 215, 0, 0);
+    filter: brightness(1);
+  }
+  50% {
+    text-shadow: 0 0 24px rgba(255, 215, 0, 0.85);
+    filter: brightness(1.25);
+  }
+  100% {
+    text-shadow: 0 0 0 rgba(255, 215, 0, 0);
+    filter: brightness(1);
+  }
+}
+
+.all-done-shine {
+  animation: all-done-shine 2s ease-in-out infinite;
+}

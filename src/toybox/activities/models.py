@@ -49,17 +49,21 @@ class Animation(StrEnum):
 
 # Phase L Step L1: per-activity reward type.
 #
-# Wire shape: one of the four literal strings; persisted to
+# Wire shape: one of the five literal strings; persisted to
 # ``activities.reward_type`` (0020). NULL in that column means "legacy
 # pre-L activity" — the resolver (L3) treats NULL as "no reward step".
 # ``"random"`` is the documented default that the API layer (L2) writes
-# when the parent's ApproveRequest omits the field.
+# when the parent's ApproveRequest omits the field. ``"none"`` is the
+# explicit opt-out (L follow-up Change D): the parent picked "no reward
+# this activity"; the resolver short-circuits and no reward step is
+# appended. Distinct from NULL (legacy) so we can tell "parent opted
+# out" apart from "row predates Phase L" in metrics.
 #
 # Declared as a ``typing.Literal`` alias rather than a StrEnum because
-# the four values are wire-only — they never appear as Python attribute
+# the five values are wire-only — they never appear as Python attribute
 # accesses; the API layer and resolver consume them as raw strings. Per
 # documentation/phase-l-plan.md design decision.
-RewardType = Literal["picture", "joke", "song", "random"]
+RewardType = Literal["picture", "joke", "song", "random", "none"]
 
 # Phase G: pattern + max length for step ids used as branch targets.
 # Tighter than template ids (which allow up to 64 chars) because step ids

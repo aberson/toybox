@@ -606,6 +606,35 @@ export function App(): JSX.Element {
   const showAllDone = activity !== null && isTerminalState(activity.state);
   const showActive = isActiveKioskActivity(activity);
 
+  // L follow-up Change C: when the terminal "All done!" screen shows
+  // and the activity's last reward step was a joke or song, apply the
+  // ``all-done-shine`` class to the heading so the kiosk has a lingering
+  // visual gesture (the joke/song reward step itself doesn't leave a
+  // persistent image on screen the way the picture reward does). Picture
+  // rewards already have their per-image animation as the finale, so
+  // the heading stays plain in that case. No reward step → plain
+  // heading (legacy / opt-out path).
+  //
+  // Walk the steps array tail-first to find the LAST ``kind=reward``
+  // step. The reward step is the only reward in any activity (L4
+  // contract) so a single match wins, but tail-first is robust against
+  // a future "multiple reward steps" extension.
+  const allDoneShineEnabled = ((): boolean => {
+    if (!showAllDone || activity === null) return false;
+    const steps = activity.steps;
+    if (!Array.isArray(steps) || steps.length === 0) return false;
+    for (let i = steps.length - 1; i >= 0; i--) {
+      const step = steps[i];
+      if (step === undefined) continue;
+      if (step.kind !== "reward") continue;
+      const meta = step.metadata as Record<string, unknown> | null | undefined;
+      if (meta === null || meta === undefined) return false;
+      const rewardKind = meta["reward_kind"];
+      return rewardKind === "joke" || rewardKind === "song";
+    }
+    return false;
+  })();
+
   if (pinPromptVisible) {
     return (
       <KioskPinPrompt
@@ -704,6 +733,9 @@ export function App(): JSX.Element {
               size={240}
             />
             <h1
+              data-testid="all-done-heading"
+              data-shine={allDoneShineEnabled ? "true" : "false"}
+              className={allDoneShineEnabled ? "all-done-shine" : undefined}
               style={{
                 margin: 0,
                 fontSize: "clamp(2.5rem, 6vw, 5rem)",

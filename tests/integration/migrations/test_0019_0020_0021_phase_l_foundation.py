@@ -297,12 +297,16 @@ def test_animation_enum_has_expected_members_in_order() -> None:
     assert Animation.float == "float"
 
 
-def test_reward_type_literal_exposes_four_wire_strings() -> None:
+def test_reward_type_literal_exposes_five_wire_strings() -> None:
     """``RewardType`` is a ``typing.Literal`` alias; ``get_args`` returns
-    the four wire strings. The API layer (L2) consumes these as raw
+    the five wire strings. The API layer (L2) consumes these as raw
     strings — there is no Enum coercion path.
+
+    L follow-up Change D added ``"none"`` as the explicit opt-out (the
+    parent's "no reward this activity" dropdown choice); distinct from
+    NULL on the column (legacy pre-L row).
     """
     args = typing.get_args(RewardType)
-    assert set(args) == {"picture", "joke", "song", "random"}
+    assert set(args) == {"picture", "joke", "song", "random", "none"}
     # Order is also part of the contract for the TS union; pin it.
-    assert args == ("picture", "joke", "song", "random")
+    assert args == ("picture", "joke", "song", "random", "none")

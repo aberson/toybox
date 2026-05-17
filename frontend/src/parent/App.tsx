@@ -139,6 +139,16 @@ export function App(): JSX.Element {
   const [activeRewardsCount, setActiveRewardsCount] = useState<number | null>(
     null,
   );
+  // L follow-up Change E: the full list of active picture rewards
+  // (id + display_name pairs) threaded down to each SuggestionCard so
+  // its second dropdown can render the catalog. Seeded by the same
+  // bootstrap ``listRewards`` GET that derives ``activeRewardsCount``
+  // below — one fetch covers both surfaces. Empty list (or never-
+  // populated) is fine: the SuggestionCard's second dropdown still
+  // renders with just the "(any)" option in that case.
+  const [activeRewards, setActiveRewards] = useState<
+    ReadonlyArray<{ id: string; display_name: string }>
+  >([]);
   const [authMode, setAuthMode] = useState<AuthMode>("bootstrap");
   const [authStatus, setAuthStatus] = useState<ParentAuthStatus | null>(null);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
@@ -409,8 +419,19 @@ export function App(): JSX.Element {
         // available) rather than crashing the whole bootstrap effect.
         const rewards = rewardsListResult.value.rewards;
         if (Array.isArray(rewards)) {
-          const count = rewards.filter((r) => r.active).length;
-          setActiveRewardsCount(count);
+          const activeOnly = rewards.filter((r) => r.active && !r.archived);
+          setActiveRewardsCount(activeOnly.length);
+          // L follow-up Change E: seed the active-rewards list for the
+          // SuggestionCard's second dropdown. Project down to
+          // ``{id, display_name}`` (the dropdown doesn't need image
+          // paths / tags / animation) so the threaded prop stays
+          // narrow + cacheable.
+          setActiveRewards(
+            activeOnly.map((r) => ({
+              id: r.id,
+              display_name: r.display_name,
+            })),
+          );
         }
       } else if (!isAbortError(rewardsListResult.reason)) {
         // eslint-disable-next-line no-console
@@ -630,7 +651,11 @@ export function App(): JSX.Element {
   // action + id) so two different rows can have concurrent in-flight
   // mutations without one row's spinner blocking the other.
   const handleApprove = useCallback(
-    async (target: Activity, rewardType: RewardType): Promise<void> => {
+    async (
+      target: Activity,
+      rewardType: RewardType,
+      rewardId: string | null,
+    ): Promise<void> => {
       // Phase J step J9: switch-confirm flow. When an active activity
       // exists with a DIFFERENT id, approving a queued suggestion would
       // implicitly displace the current activity. Surface a confirm so
@@ -666,7 +691,13 @@ export function App(): JSX.Element {
         if (endResult === null) return;
         const approveResult = await withConflictHandler({
           mutation: () =>
-            api.approve(target.id, target.version, undefined, rewardType),
+            api.approve(
+              target.id,
+              target.version,
+              undefined,
+              rewardType,
+              rewardId,
+            ),
           refetch: () => refetchActivity(target.id),
           onConflict: (conflict, fresh) => {
             useParentStore.getState().applyVersionConflict(conflict, fresh);
@@ -678,7 +709,13 @@ export function App(): JSX.Element {
       }
       const result = await withConflictHandler({
         mutation: () =>
-          api.approve(target.id, target.version, undefined, rewardType),
+          api.approve(
+            target.id,
+            target.version,
+            undefined,
+            rewardType,
+            rewardId,
+          ),
         refetch: () => refetchActivity(target.id),
         onConflict: (conflict, fresh) => {
           useParentStore.getState().applyVersionConflict(conflict, fresh);
@@ -1066,6 +1103,7 @@ export function App(): JSX.Element {
                       jokesEnabled={featureFlags.jokes_enabled}
                       songsEnabled={featureFlags.songs_enabled}
                       activeRewardsCount={activeRewardsCount}
+                      activeRewards={activeRewards}
                     />
                     {/* Phase J step J8: TriggerButton restyled and
                         repositioned below the queue. Pre-J8 it was the

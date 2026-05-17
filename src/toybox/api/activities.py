@@ -374,7 +374,7 @@ class ActivityResponse(BaseModel):
     # The kiosk reads this off the WS envelope to know which reward
     # step will be appended at activity end. See
     # documentation/phase-l-plan.md §2 for the NULL-not-coerced contract.
-    reward_type: Literal["picture", "joke", "song", "random"] | None = None
+    reward_type: Literal["picture", "joke", "song", "random", "none"] | None = None
 
 
 class ProposeRequest(BaseModel):
@@ -422,10 +422,25 @@ class ApproveRequest(BaseModel):
     ``"random"``; persisted NULL means "legacy pre-L row" and is never
     produced by this code path post-L4. See documentation/phase-l-plan.md
     §"ApproveRequest" + §8.
+
+    L follow-up Change D: the ``"none"`` member is the explicit opt-out
+    — the parent picked "no reward this activity". Persisted verbatim
+    so we can tell "parent opted out" apart from "row predates Phase L"
+    (NULL) in metrics.
+
+    L follow-up Change E: ``reward_id`` is the optional specific
+    picture-reward pick from the second dropdown. Only meaningful when
+    ``reward_type == "picture"``; ignored otherwise. Persisted into
+    ``activities.slot_fills_json`` under the reserved ``__reward_id``
+    key — no new column — so the L3 resolver can prefer the pin at
+    advance time. Missing/archived/deleted-between-approve-and-play
+    pins fall back to the random tag-match pool pick (resolver's
+    contract; see ``_pick_picture``).
     """
 
     child_ids: list[str] | None = None
-    reward_type: Literal["picture", "joke", "song", "random"] | None = None
+    reward_type: Literal["picture", "joke", "song", "random", "none"] | None = None
+    reward_id: str | None = None
 
 
 class RegenerateRequest(BaseModel):
@@ -960,7 +975,7 @@ def _row_to_response(
     # about a never-set value"). Tolerant of rows whose persisted value
     # somehow drifted outside the four-member literal — we surface as
     # ``None`` rather than crash the GET path.
-    reward_type_value: Literal["picture", "joke", "song", "random"] | None = None
+    reward_type_value: Literal["picture", "joke", "song", "random", "none"] | None = None
     if "reward_type" in row.keys():
         raw_reward_type = row["reward_type"]
         if isinstance(raw_reward_type, str) and raw_reward_type in (
@@ -968,6 +983,7 @@ def _row_to_response(
             "joke",
             "song",
             "random",
+            "none",
         ):
             reward_type_value = raw_reward_type  # type: ignore[assignment]
 
@@ -2404,6 +2420,17 @@ def post_approve(
     # a concrete value.
     reward_type_value: str = body.reward_type or "random"
 
+    # L follow-up Change E: capture the specific picture pick (when
+    # set) so the slot_fills writer below persists it. We honour
+    # ``reward_id`` ONLY when the approve also pins
+    # ``reward_type == "picture"`` — the second dropdown is hidden on
+    # other reward types, so a non-None ``reward_id`` arriving with
+    # ``reward_type != "picture"`` is silently dropped rather than
+    # 422-rejecting (defensive against a client racing the dropdown).
+    pinned_reward_id: str | None = None
+    if reward_type_value == "picture" and body.reward_id:
+        pinned_reward_id = body.reward_id
+
     # Phase L Step L4: bolt ``__template_id`` onto ``slot_fills_json``
     # so the L3 reward resolver can find the template's
     # ``recommended_themes``. The template id lives on the summary
@@ -2425,7 +2452,10 @@ def post_approve(
                 template_id = tid
 
     slot_fills_blob: str | None = None
-    if template_id is not None:
+    # L follow-up Change E: write slot_fills whenever EITHER template_id
+    # is resolvable OR the parent pinned a specific reward — both keys
+    # share the same JSON blob, so we serialize once.
+    if template_id is not None or pinned_reward_id is not None:
         slot_fills_raw = row["slot_fills_json"] if "slot_fills_json" in row.keys() else None
         existing_slot_fills: dict[str, Any] = {}
         if slot_fills_raw:
@@ -2435,7 +2465,10 @@ def post_approve(
                 decoded_slot_fills = None
             if isinstance(decoded_slot_fills, dict):
                 existing_slot_fills = decoded_slot_fills
-        existing_slot_fills["__template_id"] = template_id
+        if template_id is not None:
+            existing_slot_fills["__template_id"] = template_id
+        if pinned_reward_id is not None:
+            existing_slot_fills["__reward_id"] = pinned_reward_id
         # ``sort_keys=True`` matches ``_persist_activity``'s convention
         # — keeps byte-identical slot_fills_json across reads, which a
         # downstream byte-comparison test could otherwise see flap on
@@ -3466,9 +3499,7 @@ def post_advance(
         current_step_row = next((s for s in steps if int(s["current"]) == 1), None)
         if current_step_row is not None and str(current_step_row["kind"]) == "reward":
             if advance_body.choice_index is not None:
-                raise _bad_advance(
-                    "choice_not_allowed", reason="current_step_is_reward"
-                )
+                raise _bad_advance("choice_not_allowed", reason="current_step_is_reward")
             return _terminal_advance(conn, pubsub, activity_id, expected_version)
 
     # Special-case ``approved → running``: the first /advance after
@@ -3800,12 +3831,19 @@ def _insert_reward_step_as_current(
     reward_type_raw = row["reward_type"] if "reward_type" in row.keys() else None
     if reward_type_raw is None:
         return False
-    if reward_type_raw not in ("picture", "joke", "song", "random"):
+    if reward_type_raw not in ("picture", "joke", "song", "random", "none"):
         _logger.warning(
             "reward step skipped: activity %r has unknown reward_type %r",
             activity_id,
             reward_type_raw,
         )
+        return False
+    # L follow-up Change D: explicit opt-out short-circuits before the
+    # resolver runs. Distinct from NULL (legacy) but produces the same
+    # observable outcome — no reward step appended; the activity wraps
+    # cleanly via the legacy single-advance path in
+    # :func:`_maybe_fire_reward_or_complete`.
+    if reward_type_raw == "none":
         return False
 
     persona_id_raw = row["persona_id"] if "persona_id" in row.keys() else None
