@@ -1,0 +1,82 @@
+/*
+ * Phase L Step L7: parent-side preview animations for the RewardIngest
+ * segmented control. Six keyframes — one per Animation enum member.
+ *
+ * Distinct file from the kiosk's runtime animations (L10 ships
+ * frontend/src/child/animations/rewardAnimations.css with the same six
+ * keyframes). Keeping them separate matches the existing parent/child
+ * separation in the codebase and lets the kiosk evolve its lifecycle
+ * (e.g. "play once then settle") without changing the parent preview.
+ */
+
+@keyframes reward-preview-shine {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 215, 0, 0);
+    filter: brightness(1);
+  }
+  50% {
+    box-shadow: 0 0 24px 4px rgba(255, 215, 0, 0.7);
+    filter: brightness(1.4);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 215, 0, 0);
+    filter: brightness(1);
+  }
+}
+
+@keyframes reward-preview-jump {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-40px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes reward-preview-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes reward-preview-pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes reward-preview-wobble {
+  0% {
+    transform: rotate(-10deg);
+  }
+  50% {
+    transform: rotate(10deg);
+  }
+  100% {
+    transform: rotate(-10deg);
+  }
+}
+
+@keyframes reward-preview-float {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
