@@ -257,6 +257,68 @@ def test_find_dedup_matches_non_archived_toy(tmp_path: Path) -> None:
         conn.close()
 
 
+def test_find_dedup_matches_non_archived_reward(tmp_path: Path) -> None:
+    """Phase L L2 mirror of ``test_find_dedup_matches_non_archived_toy``.
+
+    Confirms the shared helper's whitelist extension to ``"rewards"``
+    behaves the same as the ``"toys"`` branch: matches a live row,
+    skips an archived row with the same hash, returns ``None`` for an
+    unknown hash. Pins the contract per code-quality.md §2.
+    """
+    from toybox.db.connection import connect
+    from toybox.db.migrations import run_migrations
+
+    db_path = tmp_path / "t.db"
+    conn = connect(db_path)
+    try:
+        run_migrations(conn)
+        with conn:
+            conn.execute(
+                "INSERT INTO rewards (id, display_name, image_path, image_hash, "
+                "tags, animation, active, archived, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    "r1",
+                    "Sparkle",
+                    "data/images/rewards/r1.png",
+                    "abc123",
+                    "[]",
+                    "shine",
+                    1,
+                    0,
+                    "2026-01-01T00:00:00Z",
+                ),
+            )
+        match = images.find_dedup(conn, "rewards", "abc123")
+        assert match is not None
+        assert match["id"] == "r1"
+
+        # Archived reward with same hash → no match.
+        with conn:
+            conn.execute(
+                "INSERT INTO rewards (id, display_name, image_path, image_hash, "
+                "tags, animation, active, archived, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    "r2",
+                    "Old",
+                    "data/images/rewards/r2.png",
+                    "def456",
+                    "[]",
+                    "spin",
+                    1,
+                    1,
+                    "2026-01-01T00:00:00Z",
+                ),
+            )
+        assert images.find_dedup(conn, "rewards", "def456") is None
+
+        # Hash that doesn't exist
+        assert images.find_dedup(conn, "rewards", "no-such-hash") is None
+    finally:
+        conn.close()
+
+
 def test_find_dedup_rejects_unknown_table(tmp_path: Path) -> None:
     import sqlite3
 
@@ -308,6 +370,22 @@ def test_commit_staging_supports_rooms_subdir() -> None:
     final = images.commit_staging(handle, target_subdir="rooms")
     assert final.is_file()
     assert "rooms" in final.parts
+
+
+def test_commit_staging_supports_rewards_subdir() -> None:
+    """Phase L L2 extends the whitelist for ``rewards`` images.
+
+    Mirrors ``test_commit_staging_supports_rooms_subdir`` so the
+    whitelist extension has direct unit coverage (the rewards CRUD
+    integration test exercises the same path end-to-end but this
+    keeps storage/images.py's contract self-documenting).
+    """
+    payload = _png_bytes()
+    validated = images.validate_upload(payload, "image/png")
+    handle = images.stage(payload, validated)
+    final = images.commit_staging(handle, target_subdir="rewards")
+    assert final.is_file()
+    assert "rewards" in final.parts
 
 
 def test_commit_staging_rejects_unknown_subdir() -> None:

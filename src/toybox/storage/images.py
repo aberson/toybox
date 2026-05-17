@@ -196,8 +196,17 @@ def committed_dir(subdir: str) -> Path:
 
     ``subdir`` is restricted to a small whitelist so a caller can't
     accidentally write into ``../`` or absolute paths via path traversal.
+
+    Phase L L2 adds ``"rewards"`` to the whitelist so the rewards CRUD
+    API can reuse the same staging → commit pipeline as the toys
+    ingest. The choice here over a sibling rewards-specific function
+    (per documentation/phase-l-plan.md §"Image storage path"): a
+    single-line whitelist extension preserves one staging registry,
+    one validation routine, and one janitor sweep across all image
+    kinds, which keeps the producer/consumer surface stable per
+    code-quality.md §2.
     """
-    if subdir not in {"toys", "rooms"}:
+    if subdir not in {"toys", "rooms", "rewards"}:
         raise ValueError(f"unsupported committed subdir {subdir!r}")
     path = _data_root() / _IMAGES_SUBDIR / subdir
     path.mkdir(parents=True, exist_ok=True)
@@ -446,11 +455,19 @@ def find_dedup(
 
     For ``rooms``, the ``archived`` column doesn't exist in the v1
     schema; we treat every row as live.
+
+    Phase L L2 adds ``"rewards"`` to the whitelist so the rewards CRUD
+    API uses the same shared helper rather than reimplementing the
+    same ``archived = 0`` lookup (code-quality.md §2 — one source of
+    truth). ``rewards`` ships an ``archived`` column (migration 0019)
+    so it follows the same shape as ``toys``.
     """
-    if table not in {"toys", "rooms"}:
+    if table not in {"toys", "rooms", "rewards"}:
         raise ValueError(f"unsupported dedup table {table!r}")
     if table == "toys":
         sql = "SELECT * FROM toys WHERE image_hash = ? AND archived = 0 LIMIT 1"
+    elif table == "rewards":
+        sql = "SELECT * FROM rewards WHERE image_hash = ? AND archived = 0 LIMIT 1"
     else:
         sql = "SELECT * FROM rooms WHERE image_hash = ? LIMIT 1"
     row = conn.execute(sql, (image_hash,)).fetchone()
@@ -532,6 +549,37 @@ def commit_staging(
     assert last_exc is not None
     _logger.warning("commit_staging: PermissionError on os.replace after 3 attempts (%s)", last_exc)
     raise StagingLockedError(str(last_exc)) from last_exc
+
+
+def rename_committed_image(
+    subdir: str,
+    old_filename: str,
+    new_filename: str,
+) -> str:
+    """Rename a committed file within the same ``data/images/<subdir>/`` dir.
+
+    Phase L L2 caller: after :func:`commit_staging` parks a file under
+    its UUID stem (``<staging_uuid>.<ext>``), the rewards API derives a
+    slug-based id from ``display_name`` and renames the file to
+    ``<slug>.<ext>`` BEFORE inserting the DB row. This keeps the on-disk
+    name aligned with ``rewards.image_path`` per invariant 8.
+
+    Returns the relative DB-portable path (``data/images/<subdir>/<new>``)
+    on success. Raises :class:`FileNotFoundError` when the source file
+    doesn't exist, and propagates :class:`OSError` for any other rename
+    failure — the rewards API catches and rolls back the commit.
+
+    The rename uses :func:`os.replace` which is atomic when source and
+    destination are on the same filesystem (which they are by
+    construction — both under ``data/images/<subdir>/``).
+    """
+    dst_dir = committed_dir(subdir)
+    src = dst_dir / old_filename
+    dst = dst_dir / new_filename
+    if not src.is_file():
+        raise FileNotFoundError(str(src))
+    os.replace(src, dst)
+    return relative_committed_path(subdir, new_filename)
 
 
 def discard_staging(staging_id: StagingId) -> None:
@@ -648,6 +696,7 @@ __all__ = [
     "max_upload_bytes",
     "on_disk_image_path",
     "relative_committed_path",
+    "rename_committed_image",
     "stage",
     "staging_dir",
     "staging_path",

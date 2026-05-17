@@ -297,6 +297,8 @@ resolve_reward(activity, reward_type)  ──┐
 
 **Flags:** `--reviewers code`
 
+**Status:** DONE (2026-05-16) — `src/toybox/api/rewards.py` (~800 lines) ships full CRUD + auth + image storage; `storage/images.py` whitelist extended to "rewards" + new `rename_committed_image` helper enforces slug-named on-disk files; `RewardListResponse` envelope wraps the list; `_normalise_tags` (British spelling) on every write path; 37 integration tests + 2 unit tests added. Iteration 1 NEEDS WORK (2 high + 5 medium findings); iteration 2 PASS. **Plan corrections discovered during build:** GET /api/rewards and GET /api/rewards/{id} require `parent` scope (the §8 table previously said `none`; mismatched the established toys.py/rooms.py pattern); POST /api/rewards returns 409 `reward_slug_collision` on race only (not 400 — the code auto-suffixes duplicate display_names per toys precedent). §8 below updated to reflect shipped reality.
+
 ### Step L3: Reward picker (server-side resolver)
 
 **Problem:** New function `resolve_reward(conn, activity, requested_type) -> ResolvedReward | None` in [`src/toybox/activities/content_resolver.py`](../src/toybox/activities/content_resolver.py). `ResolvedReward` is a dataclass: `kind ∈ {picture, joke, song}`, `reward_id`, `image_url | None`, `animation | None`, `audio_url | None`, `body`, `setup | None`, `punchline | None`.
@@ -506,9 +508,9 @@ Please run M1 after L11 reports green.
 | Method + Path | Headers | Request body | Response (200) | Other status codes |
 |---|---|---|---|---|
 | `POST /api/rewards/upload` | parent | multipart `file` | `{staging_key, image_hash, mime_type, width, height}` | 400 invalid image; 401/403 auth |
-| `POST /api/rewards` | parent | `RewardConfirmRequest {staging_key, display_name, tags: list[str], animation: Animation, active: bool = true}` | `RewardResponse` | 400 duplicate slug; 404 staging key missing |
-| `GET /api/rewards` | none | — | `list[RewardResponse]` (active-first by `last_used_at` desc within active partition) | — |
-| `GET /api/rewards/{id}` | none | — | `RewardResponse` | 404 |
+| `POST /api/rewards` | parent | `RewardConfirmRequest {staging_key, display_name, tags: list[str], animation: Animation, active: bool = true}` | `RewardResponse` | 404 staging key missing; 409 `reward_slug_collision` (race only — auto-suffix handles non-race duplicates per toys/rooms convention) |
+| `GET /api/rewards` | parent | — | `RewardListResponse {rewards: list[RewardResponse]}` (active-first by `last_used_at` desc within active partition) | — |
+| `GET /api/rewards/{id}` | parent | — | `RewardResponse` | 404 |
 | `PATCH /api/rewards/{id}` | parent | `RewardUpdateRequest {display_name?, tags?, animation?, active?, archived?}` | `RewardResponse` | 404; 400 invalid animation |
 | `DELETE /api/rewards/{id}` | parent | — | `RewardResponse` (with `archived=true`) | 404 |
 

@@ -47,6 +47,7 @@ from .api.play_target_depth_settings import router as play_target_depth_settings
 from .api.read_me_button_enabled_settings import (
     router as read_me_button_enabled_settings_router,
 )
+from .api.rewards import router as rewards_router
 from .api.rooms import router as rooms_router
 from .api.songs_enabled_settings import router as songs_enabled_settings_router
 from .api.toys import router as toys_router
@@ -95,6 +96,7 @@ def create_app() -> FastAPI:
     app.include_router(activities_router)
     app.include_router(children_router)
     app.include_router(toys_router)
+    app.include_router(rewards_router)
     app.include_router(rooms_router)
     app.include_router(transcripts_router)
     app.include_router(metrics_router)

@@ -24,6 +24,7 @@ from toybox.api.auth_dep import get_auth_db
 from toybox.api.children import get_children_db
 from toybox.api.listening import get_db as get_listening_db
 from toybox.api.metrics import get_metrics_breaker, get_metrics_db
+from toybox.api.rewards import get_rewards_db
 from toybox.api.rooms import get_rooms_db
 from toybox.api.toys import get_toys_db
 from toybox.api.transcripts import get_transcripts_db
@@ -82,6 +83,7 @@ def app(db_path: Path, pubsub: PubSub) -> Iterator[FastAPI]:
         get_activities_db,
         get_children_db,
         get_toys_db,
+        get_rewards_db,
         get_rooms_db,
         get_transcripts_db,
         get_metrics_db,
