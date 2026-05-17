@@ -463,6 +463,8 @@ New component [`frontend/src/child/components/RewardStep.tsx`](../frontend/src/c
 
 **Flags:** `--reviewers code`
 
+**Status:** DONE (2026-05-17) — `tests/integration/test_phase_l_reward_e2e.py` (6 new tests filling gaps L4's `test_phase_l_reward_step_wiring.py` didn't cover): (1) image_url reachable via static file route + PNG magic-bytes check; (2) random distribution across 30 trials covers all 3 types ≥ 2× each; (3) determinism per `step_count` + variation across counts; (4) migration round-trip 0018→0021 preserves legacy NULL reward_type rows + erases the 3 deprecated settings rows + accepts old templates with inert `ending_step` keys; (5) theme union (template `recommended_themes` ∪ transcript `extract_themes` — resolver-direct rather than HTTP since full-stack theme injection was too brittle for a 5-line test); (6) picture→song fallback when jokes_enabled=false (the middle node of the fallback chain L4 doesn't exercise). 4 planned scenarios skipped because L4 already covers them: picture→joke fallback, all-empty/disabled no-reward, WS envelope strip, NULL legacy. Backend pytest 1919 pass + 3 skipped (+6 from baseline). mypy + ruff clean. Iter 1 PASS.
+
 ### Step L12 (M1): iPad operator UAT
 
 **Tracking issue:** #151 (manual-section step — `/build-phase` does not dispatch)
