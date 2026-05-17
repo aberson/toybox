@@ -1,4 +1,7 @@
-// Phase K step K2: eight parent-controlled feature-flag toggles.
+// Phase K step K2 (Phase L step L6): five parent-controlled feature-
+// flag toggles. Originally eight; L5 removed play_embedded_enabled +
+// play_endings_enabled + play_spontaneity_enabled when jokes/songs
+// became per-activity reward types.
 //
 // Pattern mirrors PlayQueueSettingsControls.tsx (Phase J J10) — the
 // parent (App.tsx → SettingsPanel) holds the source-of-truth bool
@@ -9,9 +12,9 @@
 //
 // Visual style: a simple two-state segmented control (On / Off) per
 // flag. Mirrors PlayQueueSettingsControls' segmented-button shape so
-// SettingsPanel renders consistently. The eight controls share a
+// SettingsPanel renders consistently. The five controls share a
 // single component definition driven by the canonical flag list
-// imported from ../api — one source of truth so a future ninth flag
+// imported from ../api — one source of truth so a future sixth flag
 // is a single-line edit (code-quality §2).
 //
 // Each toggle's aria-pressed reflects the *displayed* value (the
@@ -56,17 +59,16 @@ const ROW_STYLE: CSSProperties = {
   borderTop: "1px solid #f3f4f6",
 };
 
-// Single source of truth for the eight flag setters routed from
+// Single source of truth for the five flag setters routed from
 // ``ApiClient``. The key is the canonical Pydantic name (matches the
 // settings table row); the API client setter method name follows the
-// same convention as Phase J's ``setPlayCadenceSeconds``.
+// same convention as Phase J's ``setPlayCadenceSeconds``. Phase L L5
+// removed setPlayEmbeddedEnabled / setPlayEndingsEnabled /
+// setPlaySpontaneityEnabled when those surfaces were deleted.
 type FlagSetterName =
   | "setJokesEnabled"
   | "setSongsEnabled"
   | "setPlayStandaloneEnabled"
-  | "setPlayEmbeddedEnabled"
-  | "setPlayEndingsEnabled"
-  | "setPlaySpontaneityEnabled"
   | "setClickableWordsEnabled"
   | "setReadMeButtonEnabled";
 
@@ -119,14 +121,14 @@ export const FEATURE_TOGGLES: readonly FeatureToggleSpec[] = [
 
 export interface PlayFeaturesControlsProps {
   api: Pick<ApiClient, FlagSetterName>;
-  // The lifted, source-of-truth values for all eight flags. Seeded by
+  // The lifted, source-of-truth values for all five flags. Seeded by
   // App.tsx's bootstrap parallel-fetch; updated via
   // ``onValueChanged`` after each successful PUT.
   values: Record<PhaseKFeatureFlag, boolean>;
   // Bubble each successful PUT response back up so App.tsx can update
   // its lifted state. The kiosk also reads these for its own bootstrap
   // path; SettingsPanel uses ``values`` directly. Callback is a single
-  // function (rather than eight per-flag callbacks) so adding a ninth
+  // function (rather than five per-flag callbacks) so adding a sixth
   // flag stays a one-line edit.
   onValueChanged: (key: PhaseKFeatureFlag, value: boolean) => void;
 }
@@ -167,7 +169,7 @@ function FeatureToggleRow(props: FeatureToggleRowProps): JSX.Element {
       abortRef.current = controller;
       setPendingValue(next);
       setError(null);
-      // Setter shape is identical for all 8: ``(value, opts) =>
+      // Setter shape is identical for all 5: ``(value, opts) =>
       // Promise<FeatureFlagResponse>``. Cast through `Pick<ApiClient,
       // FlagSetterName>` so we only need to widen at the boundary.
       //

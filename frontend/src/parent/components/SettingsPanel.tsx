@@ -427,9 +427,6 @@ export interface SettingsPanelProps {
     | "setJokesEnabled"
     | "setSongsEnabled"
     | "setPlayStandaloneEnabled"
-    | "setPlayEmbeddedEnabled"
-    | "setPlayEndingsEnabled"
-    | "setPlaySpontaneityEnabled"
     | "setClickableWordsEnabled"
     | "setReadMeButtonEnabled"
   >;
