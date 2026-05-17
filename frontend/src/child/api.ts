@@ -200,9 +200,6 @@ export const KIOSK_FEATURE_FLAG_PATHS: Readonly<
   jokes_enabled: "/api/settings/jokes-enabled",
   songs_enabled: "/api/settings/songs-enabled",
   play_standalone_enabled: "/api/settings/play-standalone-enabled",
-  play_embedded_enabled: "/api/settings/play-embedded-enabled",
-  play_endings_enabled: "/api/settings/play-endings-enabled",
-  play_spontaneity_enabled: "/api/settings/play-spontaneity-enabled",
   clickable_words_enabled: "/api/settings/clickable-words-enabled",
   read_me_button_enabled: "/api/settings/read-me-button-enabled",
 };

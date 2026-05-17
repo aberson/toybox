@@ -6,28 +6,21 @@ this file converts it into a permanent CI regression test for the
 integrated K1-K16b surface so the smoke gate survives beyond the
 operator UAT moment.
 
-Sub-step coverage map (from documentation/phase-k-plan.md §"Step K17"):
+Phase L Step L5 deleted the embedded mid-activity picker, the ending
+auto-append, and the spontaneity advance hook (jokes/songs migrated to
+per-activity reward types resolved at terminal advance). The K17 sub-
+steps that exercised those three surfaces (e, h, and three of the
+flag-effect spot-checks in i) were removed. Surviving coverage:
 
 * (a) propose role-aware activity from backfilled catalog
 * (b) recast pre-approval — version increments, state stays proposed
 * (c) approve — proposed → running
-* (e) walk steps including embedded joke + song; ending step is final;
-      ``interjection_pending`` stays False under deterministic conditions
 * (g) parent inserts a joke mid-activity → next step on advance
-* (h) finish through ending song step
-* (i) toggle each of the 8 feature flags + verify behavioral effect
+* (i) toggle each of the surviving 5 feature flags + verify behavior
 
 Sub-steps (d) avatar render and (f) audio playback are inherently
 frontend/PWA and are covered by K18 iPad UAT, not this test. K17's
 "no kiosk console errors" acceptance criterion is also frontend-only.
-
-The test suite uses synthesized templates for the embedded joke + song
-case because the K16/K16b backfill produced 0/200 templates with embedded
-``step.kind ∈ {joke, song}`` steps (inspected at K17 dev-time — the
-backfill agents shipped role + ending coverage but not embedded). The
-embedded surface lives in production code (K14) and is tested through
-``test_embedded_endings_surfaces.py``; we re-test the production caller
-here through the K17 lens to satisfy this step's acceptance criterion.
 
 For (a) we point ``generator.TEMPLATES_DIR`` at the real backfilled
 ``src/toybox/activities/templates/branching/`` directory (overriding
@@ -61,15 +54,6 @@ from toybox.api.clickable_words_enabled_settings import (
     get_db as clickable_words_enabled_get_db,
 )
 from toybox.api.jokes_enabled_settings import get_db as jokes_enabled_get_db
-from toybox.api.play_embedded_enabled_settings import (
-    get_db as play_embedded_enabled_get_db,
-)
-from toybox.api.play_endings_enabled_settings import (
-    get_db as play_endings_enabled_get_db,
-)
-from toybox.api.play_spontaneity_enabled_settings import (
-    get_db as play_spontaneity_enabled_get_db,
-)
 from toybox.api.play_standalone_enabled_settings import (
     get_db as play_standalone_enabled_get_db,
 )
@@ -80,12 +64,15 @@ from toybox.api.songs_enabled_settings import get_db as songs_enabled_get_db
 from toybox.db.connection import connect
 
 # ---------------------------------------------------------------------
-# Fixture: extend the conftest ``app`` with the 8 Phase K settings
-# get_db overrides so PUTs to ``/api/settings/<flag>`` route to the
-# per-test SQLite DB. The conftest fixture overrides the activities
-# / auth / children deps but NOT the per-setting get_db deps; without
-# this extension every settings PUT hits the production-default DB and
-# returns 500 ("no such table: settings").
+# Fixture: extend the conftest ``app`` with the 5 surviving Phase K
+# settings get_db overrides so PUTs to ``/api/settings/<flag>`` route
+# to the per-test SQLite DB. The conftest fixture overrides the
+# activities / auth / children deps but NOT the per-setting get_db
+# deps; without this extension every settings PUT hits the
+# production-default DB and returns 500 ("no such table: settings").
+# Phase L Step L5 reduced the Phase K flag count from 8 to 5; the
+# read_corpus, spontaneity, and embedded flags were deleted alongside
+# their corresponding surfaces.
 # ---------------------------------------------------------------------
 
 
@@ -93,9 +80,6 @@ PHASE_K_SETTINGS_DB_DEPS = [
     jokes_enabled_get_db,
     songs_enabled_get_db,
     play_standalone_enabled_get_db,
-    play_embedded_enabled_get_db,
-    play_endings_enabled_get_db,
-    play_spontaneity_enabled_get_db,
     clickable_words_enabled_get_db,
     read_me_button_enabled_get_db,
 ]
@@ -106,11 +90,14 @@ def _override_phase_k_settings_deps(
     app: FastAPI,
     db_path: Path,
 ) -> None:
-    """Wire the 8 Phase K settings ``get_db`` deps into the per-test DB.
+    """Wire the 5 surviving Phase K settings ``get_db`` deps into the
+    per-test DB.
 
     Autouse so every test in this module gets the overrides without
     repeating the boilerplate. Mirrors the per-endpoint override
-    pattern from :mod:`test_phase_k_feature_flags_api`.
+    pattern from :mod:`test_phase_k_feature_flags_api`. Phase L Step
+    L5 deleted three of the original eight settings (read_corpus,
+    spontaneity, embedded) alongside their corresponding surfaces.
     """
 
     def _override_db() -> Iterator[sqlite3.Connection]:
@@ -128,17 +115,16 @@ def _override_phase_k_settings_deps(
 # Constants
 # ---------------------------------------------------------------------
 
-# The 8 canonical Phase K feature flags, paired with their kebab-case
-# endpoint suffixes + spec'd defaults. The kebab keys come from the
-# plan §7 settings table; the defaults come from migration 0015.
-# This list is the smoke gate's coverage matrix for sub-step (i).
+# The surviving Phase K feature flags, paired with their kebab-case
+# endpoint suffixes + spec'd defaults. Phase L Step L5 removed three
+# play-surface flags (``play_embedded_enabled``, ``play_endings_enabled``,
+# ``play_spontaneity_enabled``) when jokes/songs migrated to per-activity
+# reward types. The kebab keys come from the plan §7 settings table;
+# the defaults come from migration 0015.
 PHASE_K_FLAGS: list[tuple[str, str, bool]] = [
     ("jokes_enabled", "jokes-enabled", True),
     ("songs_enabled", "songs-enabled", True),
     ("play_standalone_enabled", "play-standalone-enabled", True),
-    ("play_embedded_enabled", "play-embedded-enabled", True),
-    ("play_endings_enabled", "play-endings-enabled", True),
-    ("play_spontaneity_enabled", "play-spontaneity-enabled", False),
     ("clickable_words_enabled", "clickable-words-enabled", True),
     ("read_me_button_enabled", "read-me-button-enabled", True),
 ]
@@ -225,40 +211,11 @@ def k17_corpus(
         joke_corpus.clear_joke_cache()
 
 
-# Synthesized template that combines all three K17 sub-step (e)
-# requirements: declared roles, embedded joke step, embedded song step,
-# AND an ending_step. The K16/K16b backfill produced 0/200 templates with
-# embedded joke/song steps (see file docstring). We synthesize the
-# combination here so K17 exercises the integrated surface.
-_TEMPLATE_ROLES_EMBEDDED_AND_ENDING: dict[str, Any] = {
-    "intent": "boredom",
-    "templates": [
-        {
-            "id": "k17_full_combo",
-            "title": "K17 full combo template",
-            "buckets": ["always"],
-            "required_roles": ["guide_mentor"],
-            "recommended_themes": ["adventure"],
-            "ending_step": {"kind": "song", "auto": True},
-            "steps": [
-                {"text": "{guide_mentor} starts the adventure."},
-                {
-                    "id": "joke_slot",
-                    "text": "joke goes here",
-                    "kind": "joke",
-                    "auto": True,
-                },
-                {
-                    "id": "song_slot",
-                    "text": "song goes here",
-                    "kind": "song",
-                    "auto": True,
-                },
-                {"text": "{guide_mentor} celebrates with you."},
-            ],
-        }
-    ],
-}
+# Phase L Step L5: the K17 ``_TEMPLATE_ROLES_EMBEDDED_AND_ENDING``
+# fixture was retired alongside the embedded mid-activity picker and
+# ending auto-append deletion. The K17 sub-steps that consumed it (e,
+# h) were removed in the L5 surface deletion. The plain three-step
+# fixture below remains and is exercised by the surviving K17 tests.
 
 
 # Plain three-step text template — used for the parent-insert-joke
@@ -687,149 +644,6 @@ def test_k17_c_approve_transitions_proposed_to_running(
 
 
 # ---------------------------------------------------------------------
-# Sub-step (e): walk activity through embedded joke + song; ending step
-# is final; interjection_pending stays correct under deterministic conds
-# ---------------------------------------------------------------------
-
-
-def test_k17_e_walk_activity_through_embedded_joke_song_and_ending(
-    client: TestClient,
-    parent_headers: dict[str, str],
-    db_path: Path,
-    k17_corpus: Path,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Sub-step (e): walk a synthesized template that has BOTH an
-    embedded joke step (auto), an embedded song step (auto), AND an
-    ending_step (auto song). Spontaneity is OFF so
-    ``interjection_pending`` is False on every advance.
-
-    Asserts along the way:
-    * AT LEAST one joke step observed in the persisted step sequence.
-    * AT LEAST one song step observed.
-    * The ending row is the LAST step.
-    * Activity reaches state ``completed`` after walking the final
-      advance past the ending row.
-    * ``interjection_pending`` is False for every advance (no spontaneity
-      hook configured).
-
-    The K16 backfill produced 0/200 templates with embedded joke/song
-    steps (see file docstring) — this test uses a synthesized template
-    so the embedded surface is still exercised through the production
-    advance handler. The embedded path itself is shared production code
-    (K14's ``build_interjection_step``).
-    """
-    staged = _stage_templates(tmp_path, _TEMPLATE_ROLES_EMBEDDED_AND_ENDING)
-    monkeypatch.setattr("toybox.activities.generator.TEMPLATES_DIR", staged)
-    clear_template_cache()
-    # Spontaneity OFF (default) so interjection_pending stays False under
-    # deterministic conditions — embedded interjections do NOT set the
-    # pending flag (per phase-k-plan §7 wire-shape table: only
-    # spontaneity flips it).
-    _set_flag(db_path, "play_spontaneity_enabled", False)
-
-    _seed_toys(db_path)
-
-    # Pin persona to the role-weighted fixture so the role engine has
-    # deterministic role_weights to read.
-    persona_id = _seed_role_weighted_persona(db_path)
-
-    proposed = _propose(
-        client,
-        parent_headers,
-        intent="boredom",
-        seed=17,
-        persona_id=persona_id,
-    )
-    activity_id = proposed["id"]
-    version = int(proposed["version"])
-
-    # Approve → first advance lands on running with seq=1 current.
-    approved = _approve(client, parent_headers, activity_id, version)
-    version = int(approved["version"])
-    state = _advance(client, parent_headers, activity_id, version)
-    version = int(state["version"])
-    assert state["state"] == "running"
-    # interjection_pending is False because spontaneity is off and the
-    # advance just handled the approve→running transition (no hook).
-    assert state.get("interjection_pending") in (False, None), (
-        f"approve→running advance must not flip interjection_pending; got "
-        f"{state.get('interjection_pending')!r}"
-    )
-
-    # Walk advances until the activity reaches ``completed``. Cap the
-    # loop at 20 iterations as a defensive bound — the synthesized
-    # template has 4 template steps + 1 ending = 5 advances max.
-    advance_count = 0
-    while state["state"] != "completed":
-        state = _advance(client, parent_headers, activity_id, version)
-        version = int(state["version"])
-        advance_count += 1
-        assert state.get("interjection_pending") in (False, None), (
-            f"advance #{advance_count} flipped interjection_pending unexpectedly "
-            f"(spontaneity OFF); got {state.get('interjection_pending')!r}"
-        )
-        if advance_count > 20:
-            raise AssertionError(
-                f"activity failed to reach 'completed' in 20 advances; "
-                f"current state={state['state']!r}, persisted steps="
-                f"{_fetch_steps(db_path, activity_id)}"
-            )
-
-    # Inspect persisted steps: AT LEAST one joke kind, AT LEAST one
-    # song kind, and the LAST K14-shape step is the ending row.
-    #
-    # Phase L Step L4: filter out the reward-step row (kind='reward')
-    # the post-L4 terminal advance may append. This K17 sub-step pins
-    # the K14 embedded + ending row shapes; the L4 reward step is
-    # orthogonal and covered by test_phase_l_reward_step_wiring.py.
-    rows = [r for r in _fetch_steps(db_path, activity_id) if r["kind"] != "reward"]
-    kinds_seen = [r["kind"] for r in rows]
-    # Debug surface: dump the proposed template id + step bodies so a
-    # silent-wiring failure (propose picked a different template) is
-    # visible in the assertion message rather than guessable.
-    # Pull template_id from the persisted summary envelope.
-    conn_dbg = connect(db_path)
-    try:
-        sum_row = conn_dbg.execute(
-            "SELECT summary FROM activities WHERE id = ?",
-            (activity_id,),
-        ).fetchone()
-    finally:
-        conn_dbg.close()
-    template_id_dbg = "<unknown>"
-    if sum_row and sum_row["summary"]:
-        try:
-            template_id_dbg = json.loads(sum_row["summary"]).get("template_id", "<missing>")
-        except (json.JSONDecodeError, AttributeError):
-            template_id_dbg = "<unparseable>"
-    bodies = [(r["seq"], (r["body"] or "")[:40]) for r in rows]
-    assert "joke" in kinds_seen, (
-        f"expected at least one embedded joke step in walked activity; "
-        f"saw kinds={kinds_seen!r}; "
-        f"template_id={template_id_dbg!r}; "
-        f"bodies={bodies!r}; advance_count={advance_count}"
-    )
-    assert "song" in kinds_seen, (
-        f"expected at least one song step (embedded or ending); saw kinds={kinds_seen!r}"
-    )
-
-    # The LAST non-reward step should be the ending row — it should
-    # carry metadata.interjection == "ending".
-    last_row = rows[-1]
-    assert last_row["metadata_json"], f"final step must persist metadata_json; got {last_row}"
-    last_meta = json.loads(last_row["metadata_json"])
-    assert last_meta.get("interjection") == InterjectionKind.ending.value, (
-        f"final step must be the ending interjection; got "
-        f"interjection={last_meta.get('interjection')!r} on row {last_row}"
-    )
-
-    # Final state assertion.
-    assert state["state"] == "completed"
-
-
-# ---------------------------------------------------------------------
 # Sub-step (g): parent inserts a joke mid-activity → kid sees it next
 # ---------------------------------------------------------------------
 
@@ -897,82 +711,6 @@ def test_k17_g_parent_inserts_joke_mid_activity_kid_sees_it_next(
         f"source_id must point at the corpus entry; got {meta.get('source_id')!r}"
     )
     assert isinstance(meta.get("punchline"), str) and meta["punchline"]
-
-
-# ---------------------------------------------------------------------
-# Sub-step (h): finish through ending song step
-# ---------------------------------------------------------------------
-
-
-def test_k17_h_activity_finishes_through_ending_song_step(
-    client: TestClient,
-    parent_headers: dict[str, str],
-    db_path: Path,
-    k17_corpus: Path,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Sub-step (h): walk a template with an ending_step.kind="song" all
-    the way through. Final persisted step is the ending row carrying
-    ``kind="song"`` + ``metadata.interjection="ending"`` and the
-    ``audio_url`` points at the K13 static mount. Activity reaches
-    ``completed``.
-
-    Uses the role+embedded+ending combo template so this test ALSO
-    indirectly exercises the role engine + embedded surfaces alongside
-    the ending — but the load-bearing assertion is the ending shape.
-    """
-    staged = _stage_templates(tmp_path, _TEMPLATE_ROLES_EMBEDDED_AND_ENDING)
-    monkeypatch.setattr("toybox.activities.generator.TEMPLATES_DIR", staged)
-    clear_template_cache()
-    _set_flag(db_path, "play_spontaneity_enabled", False)
-
-    _seed_toys(db_path)
-    persona_id = _seed_role_weighted_persona(db_path)
-
-    proposed = _propose(
-        client,
-        parent_headers,
-        intent="boredom",
-        seed=17,
-        persona_id=persona_id,
-    )
-    activity_id = proposed["id"]
-    version = int(proposed["version"])
-    approved = _approve(client, parent_headers, activity_id, version)
-    version = int(approved["version"])
-
-    # Walk advances until completed.
-    state = _advance(client, parent_headers, activity_id, version)
-    version = int(state["version"])
-    safety = 0
-    while state["state"] != "completed":
-        state = _advance(client, parent_headers, activity_id, version)
-        version = int(state["version"])
-        safety += 1
-        assert safety < 25, (
-            f"failed to reach completed in 25 advances; persisted steps="
-            f"{_fetch_steps(db_path, activity_id)}"
-        )
-
-    # Phase L Step L4: filter out the reward-step row (kind='reward')
-    # the post-L4 terminal advance may append. This K17 sub-step pins
-    # the K14 ending-step shape (song + interjection='ending'); the L4
-    # reward step is orthogonal and covered by
-    # test_phase_l_reward_step_wiring.py.
-    rows = [r for r in _fetch_steps(db_path, activity_id) if r["kind"] != "reward"]
-    last_row = rows[-1]
-    assert last_row["kind"] == "song", (
-        f"final step must be the ending song; got kind={last_row['kind']!r}"
-    )
-    assert last_row["metadata_json"]
-    meta = json.loads(last_row["metadata_json"])
-    assert meta["interjection"] == InterjectionKind.ending.value
-    assert meta.get("source_id") == "k17-stub-song"
-    audio_url = meta.get("audio_url", "")
-    assert isinstance(audio_url, str) and audio_url.endswith(
-        "/api/static/songs/audio/k17-stub-song.mp3"
-    ), f"ending row audio_url must hit K13 static mount; got {audio_url!r}"
 
 
 # ---------------------------------------------------------------------
@@ -1112,207 +850,3 @@ def test_k17_i_play_standalone_disabled_dismisses_standalone_intent(
     assert body["state"] == "dismissed"
     assert body["reason"] == "surface_disabled"
 
-
-def test_k17_i_play_endings_disabled_skips_ending_row(
-    client: TestClient,
-    parent_headers: dict[str, str],
-    db_path: Path,
-    k17_corpus: Path,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Sub-step (i) part 2 — flag-effect spot-check #4: with
-    ``play_endings_enabled=False`` a template with an ``ending_step``
-    finishes WITHOUT inserting an ending row. Walks a 3-step text
-    template with ending_step set, finds no song row at the tail.
-
-    Uses _TEMPLATE_ROLES_EMBEDDED_AND_ENDING because it has an
-    ending_step set. We turn off endings + embedded + spontaneity to
-    isolate the endings-flag effect.
-    """
-    staged = _stage_templates(tmp_path, _TEMPLATE_ROLES_EMBEDDED_AND_ENDING)
-    monkeypatch.setattr("toybox.activities.generator.TEMPLATES_DIR", staged)
-    clear_template_cache()
-    # Surface gates: endings off, embedded off, spontaneity off.
-    put_endings = client.put(
-        "/api/settings/play-endings-enabled",
-        json={"value": False},
-        headers=parent_headers,
-    )
-    assert put_endings.status_code == 200
-    put_embedded = client.put(
-        "/api/settings/play-embedded-enabled",
-        json={"value": False},
-        headers=parent_headers,
-    )
-    assert put_embedded.status_code == 200
-    _set_flag(db_path, "play_spontaneity_enabled", False)
-
-    _seed_toys(db_path)
-    persona_id = _seed_role_weighted_persona(db_path)
-
-    proposed = _propose(
-        client,
-        parent_headers,
-        intent="boredom",
-        seed=17,
-        persona_id=persona_id,
-    )
-    activity_id = proposed["id"]
-    version = int(proposed["version"])
-    approved = _approve(client, parent_headers, activity_id, version)
-    version = int(approved["version"])
-    state = _advance(client, parent_headers, activity_id, version)
-    version = int(state["version"])
-    safety = 0
-    while state["state"] != "completed":
-        state = _advance(client, parent_headers, activity_id, version)
-        version = int(state["version"])
-        safety += 1
-        assert safety < 25, (
-            f"failed to reach completed in 25 advances; persisted steps="
-            f"{_fetch_steps(db_path, activity_id)}"
-        )
-
-    # No ending row: scan persisted steps and assert NO row carries
-    # metadata.interjection == "ending".
-    rows = _fetch_steps(db_path, activity_id)
-    ending_rows = []
-    for r in rows:
-        if r["metadata_json"]:
-            meta = json.loads(r["metadata_json"])
-            if meta.get("interjection") == InterjectionKind.ending.value:
-                ending_rows.append(r)
-    assert ending_rows == [], (
-        f"play_endings_enabled=False but ending row(s) appeared: {ending_rows}; full rows={rows}"
-    )
-
-
-def test_k17_i_play_embedded_disabled_walks_past_embedded_steps(
-    client: TestClient,
-    parent_headers: dict[str, str],
-    db_path: Path,
-    k17_corpus: Path,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Sub-step (i) part 2 — flag-effect spot-check #5: with
-    ``play_embedded_enabled=False`` the advance handler walks past
-    embedded auto:true joke/song steps server-side; the kid never sees
-    a placeholder kind=joke or kind=song row in the persisted sequence.
-    """
-    staged = _stage_templates(tmp_path, _TEMPLATE_ROLES_EMBEDDED_AND_ENDING)
-    monkeypatch.setattr("toybox.activities.generator.TEMPLATES_DIR", staged)
-    clear_template_cache()
-    put_resp = client.put(
-        "/api/settings/play-embedded-enabled",
-        json={"value": False},
-        headers=parent_headers,
-    )
-    assert put_resp.status_code == 200
-    # Endings + spontaneity OFF too so the only surfaces affected are
-    # template-text steps.
-    _set_flag(db_path, "play_endings_enabled", False)
-    _set_flag(db_path, "play_spontaneity_enabled", False)
-
-    _seed_toys(db_path)
-    persona_id = _seed_role_weighted_persona(db_path)
-
-    proposed = _propose(
-        client,
-        parent_headers,
-        intent="boredom",
-        seed=17,
-        persona_id=persona_id,
-    )
-    activity_id = proposed["id"]
-    version = int(proposed["version"])
-    approved = _approve(client, parent_headers, activity_id, version)
-    version = int(approved["version"])
-    state = _advance(client, parent_headers, activity_id, version)
-    version = int(state["version"])
-    safety = 0
-    while state["state"] != "completed":
-        state = _advance(client, parent_headers, activity_id, version)
-        version = int(state["version"])
-        safety += 1
-        assert safety < 25, (
-            f"failed to reach completed in 25 advances; persisted steps="
-            f"{_fetch_steps(db_path, activity_id)}"
-        )
-
-    rows = _fetch_steps(db_path, activity_id)
-    embedded_rows = []
-    for r in rows:
-        if r["metadata_json"]:
-            meta = json.loads(r["metadata_json"])
-            if meta.get("interjection") == InterjectionKind.embedded.value:
-                embedded_rows.append(r)
-    assert embedded_rows == [], (
-        f"play_embedded_enabled=False but embedded interjection(s) appeared: {embedded_rows}"
-    )
-
-
-def test_k17_i_play_spontaneity_disabled_no_spontaneity_step(
-    client: TestClient,
-    parent_headers: dict[str, str],
-    db_path: Path,
-    k17_corpus: Path,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Sub-step (i) part 2 — flag-effect spot-check #6: with
-    ``play_spontaneity_enabled=False`` (the K2 default), no spontaneity
-    interjection fires across a full activity walk — even if cast
-    contains a Trickster-like role with high jokes_rate.
-
-    This is the integration counterpart to the unit test in
-    test_active_surfaces.py — here we drive it through the wire-level
-    PUT to confirm the API toggle has the same effect as the direct
-    SQLite write.
-    """
-    staged = _stage_templates(tmp_path, _TEMPLATE_PLAIN_3STEP)
-    monkeypatch.setattr("toybox.activities.generator.TEMPLATES_DIR", staged)
-    clear_template_cache()
-    put_resp = client.put(
-        "/api/settings/play-spontaneity-enabled",
-        json={"value": False},
-        headers=parent_headers,
-    )
-    assert put_resp.status_code == 200
-
-    proposed = _propose(client, parent_headers, intent="boredom", seed=17)
-    activity_id = proposed["id"]
-    version = int(proposed["version"])
-    approved = _approve(client, parent_headers, activity_id, version)
-    version = int(approved["version"])
-    state = _advance(client, parent_headers, activity_id, version)
-    version = int(state["version"])
-    safety = 0
-    while state["state"] != "completed":
-        state = _advance(client, parent_headers, activity_id, version)
-        version = int(state["version"])
-        safety += 1
-        assert safety < 25
-        assert state.get("interjection_pending") in (False, None), (
-            f"spontaneity off but interjection_pending flipped True: {state!r}"
-        )
-
-    rows = _fetch_steps(db_path, activity_id)
-    spontaneity_rows = []
-    for r in rows:
-        if r["metadata_json"]:
-            meta = json.loads(r["metadata_json"])
-            if meta.get("interjection") == InterjectionKind.spontaneity.value:
-                spontaneity_rows.append(r)
-    assert spontaneity_rows == [], (
-        f"play_spontaneity_enabled=False but spontaneity row(s) appeared: {spontaneity_rows}"
-    )
-
-
-# Note: clickable-words-enabled and read-me-button-enabled are
-# kiosk-side flags. The API round-trip is covered above by the
-# parametrized test_k17_i_each_flag_round_trips_via_settings_api;
-# the client-side gating is exercised by frontend vitest tests in
-# frontend/src/child/components/__tests__/. The K17 acceptance covers
-# kiosk behavior under the K18 iPad UAT (see plan §6 K18 row 10).

@@ -70,6 +70,12 @@ export interface Activity {
   // spontaneity roll). Used by the parent UI to render a "a toy is
   // being silly!" badge. Optional + defaults to false so pre-K15
   // callers compile.
+  //
+  // @deprecated Phase L Step L5 deleted the spontaneity advance hook;
+  // the backend now always emits ``interjection_pending: false``. Field
+  // retained on the wire for backward-compatibility with any pinned
+  // parent build; new callers should not read it. Removal scheduled
+  // for a future phase once stragglers update.
   interjection_pending?: boolean;
 }
 
@@ -893,8 +899,10 @@ export class ApiClient {
 
   // Phase K K15 Surface P: parent inserts a joke at current_step+1 on
   // a running/paused activity. Server picks the corpus entry (parent
-  // picked "any joke" via the button — themed embedded picks live on
-  // template ``recommended_themes``). Returns the updated activity
+  // picked "any joke" via the button). Phase L Step L5 deleted the
+  // template-level ``recommended_themes``-driven embedded picker, so
+  // theme-aware selection is no longer wired; the parent-insert path
+  // still selects from the full corpus. Returns the updated activity
   // with a new ``activity_steps`` row carrying ``kind: "joke"`` +
   // ``metadata.interjection = "parent"``. 409 codes:
   // ``insert_only_when_running_or_paused`` (wrong state),
@@ -1583,75 +1591,6 @@ export class ApiClient {
   ): Promise<FeatureFlagResponse> {
     return this.request<FeatureFlagResponse>(
       "/api/settings/play-standalone-enabled",
-      {
-        method: "PUT",
-        body: JSON.stringify({ value }),
-        signal: opts.signal,
-      },
-    );
-  }
-
-  async getPlayEmbeddedEnabled(
-    opts: RequestOptions = {},
-  ): Promise<FeatureFlagResponse> {
-    return this.request<FeatureFlagResponse>(
-      "/api/settings/play-embedded-enabled",
-      { method: "GET", signal: opts.signal },
-    );
-  }
-
-  async setPlayEmbeddedEnabled(
-    value: boolean,
-    opts: RequestOptions = {},
-  ): Promise<FeatureFlagResponse> {
-    return this.request<FeatureFlagResponse>(
-      "/api/settings/play-embedded-enabled",
-      {
-        method: "PUT",
-        body: JSON.stringify({ value }),
-        signal: opts.signal,
-      },
-    );
-  }
-
-  async getPlayEndingsEnabled(
-    opts: RequestOptions = {},
-  ): Promise<FeatureFlagResponse> {
-    return this.request<FeatureFlagResponse>(
-      "/api/settings/play-endings-enabled",
-      { method: "GET", signal: opts.signal },
-    );
-  }
-
-  async setPlayEndingsEnabled(
-    value: boolean,
-    opts: RequestOptions = {},
-  ): Promise<FeatureFlagResponse> {
-    return this.request<FeatureFlagResponse>(
-      "/api/settings/play-endings-enabled",
-      {
-        method: "PUT",
-        body: JSON.stringify({ value }),
-        signal: opts.signal,
-      },
-    );
-  }
-
-  async getPlaySpontaneityEnabled(
-    opts: RequestOptions = {},
-  ): Promise<FeatureFlagResponse> {
-    return this.request<FeatureFlagResponse>(
-      "/api/settings/play-spontaneity-enabled",
-      { method: "GET", signal: opts.signal },
-    );
-  }
-
-  async setPlaySpontaneityEnabled(
-    value: boolean,
-    opts: RequestOptions = {},
-  ): Promise<FeatureFlagResponse> {
-    return this.request<FeatureFlagResponse>(
-      "/api/settings/play-spontaneity-enabled",
       {
         method: "PUT",
         body: JSON.stringify({ value }),

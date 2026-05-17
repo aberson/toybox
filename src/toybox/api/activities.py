@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import asyncio
 import functools
-import hashlib
 import json
 import logging
 import secrets
@@ -63,7 +62,6 @@ from ..activities.interjection import build_interjection_step
 from ..activities.interjections import InterjectionKind
 from ..activities.joke_corpus import Joke, apply_toy_substitution, pick_joke
 from ..activities.roles import (
-    DEFAULT_ROLE_SPONTANEITY_RATES,
     ROLE_DISPLAY_NAMES,
     Role,
 )
@@ -74,7 +72,6 @@ from ..ai.labeled_events import (
     GENERATOR_PATH_CLAUDE,
     GENERATOR_PATH_OFFLINE,
     INTERJECTION_SOURCE_PARENT_INSERT,
-    INTERJECTION_SOURCE_SPONTANEITY,
     PARENT_SIGNAL_DISMISS,
     PARENT_SIGNAL_END_EARLY,
     PARENT_SIGNAL_THUMBS_UP,
@@ -85,9 +82,6 @@ from ..ai.labeled_events import (
 )
 from ..core import (
     jokes_enabled,
-    play_embedded_enabled,
-    play_endings_enabled,
-    play_spontaneity_enabled,
     play_standalone_enabled,
     play_target_depth,
     songs_enabled,
@@ -951,24 +945,13 @@ def _row_to_response(
     if steps is None:
         steps = _fetch_steps(conn, activity_id)
 
-    # Phase K K15 Surface S: ``interjection_pending`` reflects whether
-    # the activity's CURRENT step is a spontaneity interjection. Read
-    # off the current step's metadata.interjection rather than carrying
-    # a per-handler bool through every response builder — the source of
-    # truth (persisted step row) is one query away and the flag stays
-    # consistent across REST GETs, the WS envelope, and parent-side
-    # refresh after a server restart. Mid-activity advance flips the
-    # current pointer to the next non-spontaneity step, so the flag
-    # auto-clears without any extra plumbing.
+    # Phase L Step L5: the K15 spontaneity advance-hook (the only path
+    # that ever flipped ``interjection_pending`` to True) was removed.
+    # The field stays on the wire model so the parent UI's existing
+    # conditional rendering keeps working — it just permanently reads
+    # False now. A future cleanup phase can drop the field entirely
+    # once the parent UI's reference is also removed.
     interjection_pending = False
-    spontaneity_value = InterjectionKind.spontaneity.value
-    for s in steps:
-        if not s.current:
-            continue
-        meta = s.metadata
-        if isinstance(meta, dict) and meta.get("interjection") == spontaneity_value:
-            interjection_pending = True
-        break
 
     # Phase L Step L4: surface ``reward_type`` at the top of the wire
     # response. NULL in the DB (pre-L legacy rows where the column was
@@ -1291,78 +1274,6 @@ def _load_persona_role_weights(
             continue
         if isinstance(value, int | float):
             out[key] = float(value)
-    return out
-
-
-def _load_persona_spontaneity_rates(
-    conn: sqlite3.Connection, persona_id: str | None
-) -> dict[str, float]:
-    """Phase K K15 Surface S: fetch ``personas.spontaneity_rates`` JSON.
-
-    Returns ``{"jokes": float, "songs": float}`` with both keys always
-    present (defaulting to ``0.0``) so the advance-hook's max-rate
-    computation never has to None-guard. Mirrors
-    :func:`_load_persona_role_weights`'s defensive shape: a missing row,
-    NULL column, malformed JSON, or non-dict payload all degrade to the
-    ``{"jokes": 0.0, "songs": 0.0}`` no-spontaneity baseline. Per
-    code-quality §1 the JSON shape is the canonical persona-side mirror
-    of :class:`toybox.activities.roles.SpontaneityRatePair` (with
-    ``jokes_rate``/``songs_rate`` keys on the role side and
-    ``jokes``/``songs`` on the persona side — the plan documents both
-    spellings; this helper normalises to the persona shape internally).
-
-    Values outside the ``[0.0, 1.0]`` interval are clamped to the
-    interval rather than treated as schema violations — defense-in-depth
-    against a parent-authored custom persona that wrote ``1.5``. The
-    K15 advance hook's ``r < effective_jokes + effective_songs``
-    comparison is robust against absent / NaN values via the dict-get
-    fallback (we never produce NaN here).
-    """
-    default = {"jokes": 0.0, "songs": 0.0}
-    if persona_id is None:
-        return default
-    try:
-        row = conn.execute(
-            "SELECT spontaneity_rates FROM personas WHERE id = ?",
-            (persona_id,),
-        ).fetchone()
-    except sqlite3.Error:
-        _logger.warning(
-            "spontaneity_rates read failed for persona %r; treating as 0.0/0.0",
-            persona_id,
-            exc_info=True,
-        )
-        return default
-    if row is None:
-        return default
-    raw = row["spontaneity_rates"]
-    if not raw:
-        return default
-    try:
-        payload = json.loads(raw)
-    except json.JSONDecodeError:
-        _logger.warning(
-            "spontaneity_rates JSON malformed for persona %r; treating as 0.0/0.0",
-            persona_id,
-        )
-        return default
-    if not isinstance(payload, dict):
-        return default
-    out: dict[str, float] = dict(default)
-    for key in ("jokes", "songs"):
-        value = payload.get(key)
-        if isinstance(value, bool):
-            # Reject bool (subtype of int) explicitly — see role_weights.
-            continue
-        if isinstance(value, int | float):
-            # Clamp to [0.0, 1.0]. NaN comparisons return False on both
-            # bounds so a NaN input falls through to the default 0.0
-            # via the unchanged ``out`` dict — same defense-in-depth
-            # the K4 picker uses.
-            v = float(value)
-            if v != v:  # NaN check
-                continue
-            out[key] = max(0.0, min(1.0, v))
     return out
 
 
@@ -1696,156 +1607,6 @@ def _standalone_surface_enabled(conn: sqlite3.Connection, intent: str) -> bool:
     else:
         raise KeyError(f"non-standalone intent {intent!r}")
     return content_master_on and play_standalone_enabled.get(conn)
-
-
-def _embedded_surface_enabled(conn: sqlite3.Connection, kind: str) -> bool:
-    """Phase K K14: return True when (content_master AND play_embedded_enabled).
-
-    ``kind`` MUST be ``"song"`` or ``"joke"``; any other value raises
-    ``KeyError`` to surface caller bugs rather than silently degrading.
-    Mirrors :func:`_standalone_surface_enabled`'s shape so a future
-    consolidation (one gate-resolver per surface kind) drops in cleanly.
-    """
-    if kind == "song":
-        content_master_on = songs_enabled.get(conn)
-    elif kind == "joke":
-        content_master_on = jokes_enabled.get(conn)
-    else:
-        raise KeyError(f"unknown interjection kind {kind!r}")
-    return content_master_on and play_embedded_enabled.get(conn)
-
-
-def _endings_surface_enabled(conn: sqlite3.Connection, kind: str) -> bool:
-    """Phase K K14: return True when (content_master AND play_endings_enabled).
-
-    Same shape as :func:`_embedded_surface_enabled`. Kept as separate
-    functions (rather than one parametric helper) so each surface flag
-    is one grep target — code-quality §1 grep-all-consumers discipline.
-    """
-    if kind == "song":
-        content_master_on = songs_enabled.get(conn)
-    elif kind == "joke":
-        content_master_on = jokes_enabled.get(conn)
-    else:
-        raise KeyError(f"unknown interjection kind {kind!r}")
-    return content_master_on and play_endings_enabled.get(conn)
-
-
-def _build_ending_row(
-    conn: sqlite3.Connection,
-    *,
-    template: Any,
-    seed: int,
-    persona_id: str | None,
-    slot_fills: dict[str, str],
-    new_seq: int,
-) -> dict[str, Any] | None:
-    """Phase K K14 Surface E: pick + build the persisted-row dict for an
-    activity's ending interjection.
-
-    Called at advance-time from :func:`post_advance`'s terminal branches
-    when the kid has cleared the last renderable template step. Mirrors
-    :func:`_pick_embedded_corpus_step`'s shape: a pure function that
-    returns the :func:`build_interjection_step` dict (or ``None`` when
-    the gate is off / no entry matches / the template carries no
-    ending). The caller INSERTs the row via
-    :func:`_insert_interjection_step_row` inside the version-bumped
-    transaction; lazy insertion at advance-time matches G2's
-    "one row per visible step" persistence pattern.
-
-    Why lazy: eagerly INSERTing the ending at propose time (with
-    ``seq = last_template_seq + 1``, ``current = 0``) is incompatible
-    with G2's single-step persistence: ``_persist_activity`` only writes
-    seq=1, so an eager ending visible to the pre-G2 / legacy-linear
-    branch (``current_index + 1 < len(steps)``) makes the FIRST advance
-    promote directly to seq=4, jumping the kid past template steps 2
-    and 3 entirely. The K14 review (issue #127) caught this.
-
-    The corpus pick is deterministic: ``pick_song`` / ``pick_joke``
-    filter on ``theme = recommended_themes[0]`` (the strongest theme
-    per phase-k-plan §6 K14 step) + ``persona_compat`` + (for songs)
-    ``require_audio=True``. ``seed`` is the deterministic value the
-    caller derives from ``(activity_id, new_seq)`` — same shape as the
-    embedded picker so replay + recast stability survive.
-
-    Returns:
-        The :func:`build_interjection_step` dict on success, or
-        ``None`` when:
-
-        * ``template.ending_step`` is ``None``.
-        * ``(<content_master> AND play_endings_enabled)`` is False for
-          the ending's kind.
-        * ``template.recommended_themes`` is empty (no theme to filter
-          on — the K3 validator already gates this for ``auto: true``
-          steps, but is silent on ``ending_step`` alone because Phase G
-          templates without theme tags can still set an ending; we
-          degrade silently rather than crash).
-        * The corpus pick returns ``None`` (no matching entry — fresh
-          install before audio rendering, or persona has no compatible
-          entries). Logged at INFO so an operator can grep occurrences.
-    """
-    if template is None or template.ending_step is None:
-        return None
-    ending = template.ending_step
-    kind = ending.kind  # "song" | "joke"
-    if not _endings_surface_enabled(conn, kind):
-        return None
-    if not template.recommended_themes:
-        _logger.info(
-            "ending step for template %r requested but recommended_themes is "
-            "empty; skipping ending pick (no row built)",
-            template.id,
-        )
-        return None
-    theme = template.recommended_themes[0]
-
-    corpus_entry: Joke | Song | None
-    if kind == "song":
-        corpus_entry = pick_song(
-            seed=seed,
-            persona_id=persona_id,
-            theme=theme,
-            require_audio=True,
-        )
-    else:  # joke
-        corpus_entry = pick_joke(
-            seed=seed,
-            persona_id=persona_id,
-            theme=theme,
-        )
-    if corpus_entry is None:
-        _logger.info(
-            "ending step for template %r kind=%s theme=%s found no corpus entry; "
-            "skipping (no row built)",
-            template.id,
-            kind,
-            theme.value,
-        )
-        return None
-
-    # Toy display name for the joke {toy} placeholder — best-effort via
-    # the catalog resolver. Failure degrades to no-toy form (same as
-    # the K13 standalone + K14 embedded paths).
-    toy_display_name: str | None = None
-    if kind == "joke":
-        try:
-            toys = resolve_toys(conn)
-        except sqlite3.Error:
-            _logger.warning(
-                "ending pick: resolve_toys failed; joke degrades to no-toy form",
-                exc_info=True,
-            )
-            toys = []
-        if toys:
-            toy_display_name = toys[0].display_name
-
-    return build_interjection_step(
-        interjection=InterjectionKind.ending,
-        corpus_entry=corpus_entry,
-        slot_fills=slot_fills,
-        seq=new_seq,
-        toy_display_name=toy_display_name,
-    )
 
 
 def _dismissed_surface_disabled_response() -> ActivityResponse:
@@ -2498,16 +2259,14 @@ def _do_propose(
         slot_fills=slot_fills_arg,
     )
 
-    # Phase K K14 Surface E: the ending step is NOT inserted here. It is
-    # built and persisted lazily at advance-time in :func:`post_advance`
-    # when the kid clears the last renderable template step. Eager
-    # insertion at propose-time is incompatible with G2's lazy single-
-    # step persistence: the only template row written here is seq=1, so
-    # an eager ending at seq=last_template_seq+1 would be visible to the
-    # pre-G2 / legacy-linear advance branch (``current_index + 1 <
-    # len(steps)``) on the very first advance, jumping the kid past the
-    # template's middle steps entirely. The :func:`_build_ending_row`
-    # picker is called from the terminal-advance branches below.
+    # Phase L Step L5: the K14 ending auto-append surface was deleted —
+    # ``_build_ending_row`` no longer exists. Phase L's per-activity
+    # reward step (resolved by :func:`resolve_reward` and inserted at
+    # terminal advance, see L3/L4) replaces it. Propose-time inserts
+    # only seq=1; the L4 reward row is appended lazily when the kid
+    # clears the last renderable template step. See
+    # ``documentation/phase-l-plan.md`` for the surface-deletion
+    # rationale.
 
     # Phase C step 15: write a labeled_events row BEFORE returning the
     # activity. The recorder is best-effort — a failure here must NOT
@@ -3498,105 +3257,6 @@ def _is_branch_destination_leaf(template_steps: Sequence[Any], step: Any) -> boo
     return False
 
 
-def _pick_embedded_corpus_step(
-    conn: sqlite3.Connection,
-    *,
-    template: Any,
-    template_step: Any,
-    slot_fills: dict[str, str],
-    seed: int,
-    persona_id: str | None,
-    new_seq: int,
-) -> dict[str, Any] | None:
-    """Phase K K14 Surface B (enabled path): pick a corpus entry whose
-    theme matches the template's ``recommended_themes`` and return the
-    persist-row dict produced by :func:`build_interjection_step`.
-
-    Caller has already gated ``(content_master AND play_embedded_enabled)``
-    via :func:`_embedded_surface_enabled` for this step's kind. The
-    function still defends: if the picker finds no candidate (corpus
-    not yet rendered, persona-incompatible theme, etc.), it returns
-    ``None`` and the caller degrades to a terminal advance.
-
-    Picks deterministically:
-
-    * Filter by ``theme = template.recommended_themes[0]`` (the
-      strongest theme, per phase-k-plan §6 K14 step).
-    * ``persona_id`` filter mirrors the standalone path so persona
-      compatibility carries through.
-    * ``require_audio=True`` for songs so the kiosk doesn't 404 on a
-      not-yet-rendered entry — same logic as the K13 standalone song
-      surface.
-
-    Returns the build_interjection_step dict (``kind``, ``body``,
-    ``metadata``, ``seq``, etc.) with ``new_seq`` and ``slot_fills``
-    threaded so the caller can INSERT directly. ``None`` means no
-    corpus row available.
-    """
-    if not template.recommended_themes:
-        _logger.info(
-            "embedded pick for template %r: recommended_themes empty; "
-            "auto step kind=%s degrades to terminal",
-            template.id,
-            template_step.kind,
-        )
-        return None
-    theme = template.recommended_themes[0]
-    kind = template_step.kind
-
-    corpus_entry: Joke | Song | None
-    if kind == "song":
-        corpus_entry = pick_song(
-            seed=seed,
-            persona_id=persona_id,
-            theme=theme,
-            require_audio=True,
-        )
-    elif kind == "joke":
-        corpus_entry = pick_joke(
-            seed=seed,
-            persona_id=persona_id,
-            theme=theme,
-        )
-    else:
-        # Caller is expected to dispatch only on song/joke auto steps;
-        # any other kind is a programming error.
-        raise ValueError(f"_pick_embedded_corpus_step: unsupported kind {kind!r}")
-
-    if corpus_entry is None:
-        _logger.info(
-            "embedded pick for template %r kind=%s theme=%s found no entry",
-            template.id,
-            kind,
-            theme.value,
-        )
-        return None
-
-    # Toy display name for the joke {toy} placeholder — best-effort via
-    # the catalog resolver. Failure degrades to no-toy form (same as
-    # the K13 standalone path).
-    toy_display_name: str | None = None
-    if kind == "joke":
-        try:
-            toys = resolve_toys(conn)
-        except sqlite3.Error:
-            _logger.warning(
-                "embedded pick: resolve_toys failed; joke degrades to no-toy form",
-                exc_info=True,
-            )
-            toys = []
-        if toys:
-            toy_display_name = toys[0].display_name
-
-    return build_interjection_step(
-        interjection=InterjectionKind.embedded,
-        corpus_entry=corpus_entry,
-        slot_fills=slot_fills,
-        seq=new_seq,
-        toy_display_name=toy_display_name,
-    )
-
-
 def _insert_interjection_step_row(
     conn: sqlite3.Connection,
     *,
@@ -3657,98 +3317,6 @@ def _insert_interjection_step_row(
             metadata_blob,
         ),
     )
-
-
-def _resolve_template_index_by_id(template_steps: Sequence[Any], target_id: str) -> int:
-    """Return the array index of the template step whose id equals
-    ``target_id``, or ``-1`` if none. Mirrors the inline loop the
-    advance handler uses for ``next`` / ``choices[].next`` resolution;
-    pulled out so the K14 embedded skip-loop can reuse it.
-    """
-    for idx, t_step in enumerate(template_steps):
-        if t_step.id == target_id:
-            return idx
-    return -1
-
-
-def _skip_disabled_embedded(
-    *,
-    template_steps: Sequence[Any],
-    starting_index: int,
-    starting_step: Any,
-    is_enabled: dict[str, bool],
-) -> tuple[Any, int] | None:
-    """Phase K K14 Surface B (disabled path): walk past auto song/joke
-    steps when their surface gate is off.
-
-    Mirrors the post_advance edge resolution rules in miniature, but
-    only for templates step kinds ``"song"``/``"joke"`` with
-    ``auto=True``. Linear / fall-through / explicit-next steps pass
-    through unchanged. Branching steps (``choices``) are NEVER auto
-    interjections (the K3 validator gates that via
-    ``_check_song_joke_shape``: song/joke kinds cannot carry choices),
-    so the skip walk never has to dispatch on a choice fork.
-
-    Arguments:
-        template_steps: The template's full step array.
-        starting_index: Array index of the auto step the caller wants
-            to potentially skip past.
-        starting_step: ``template_steps[starting_index]``, passed
-            explicitly so callers that already resolved it don't double-
-            lookup.
-        is_enabled: ``{"song": <bool>, "joke": <bool>}`` — the
-            ``(content_master AND play_embedded_enabled)`` resolution
-            for each kind. Pre-computed by the caller so the skip walk
-            is pure (no conn dependency, trivially testable).
-
-    Returns:
-        ``(skipped_target_step, skipped_target_index)`` — the FIRST
-        non-skipped step the engine should advance to. ``None`` means
-        every reachable step from ``starting_index`` forward is an
-        auto step whose surface is off → caller treats as terminal.
-
-    The walk is bounded by ``len(template_steps)`` iterations so a
-    pathological template (every step an auto interjection) cannot loop
-    forever. Pre-K14 templates have zero auto steps, so the typical
-    cost is one iteration of the early-exit guard.
-    """
-    current_idx = starting_index
-    current_step = starting_step
-    # Defense-in-depth: bound the walk by the template's length so a
-    # malformed template (cycle in explicit-next pointers, all auto
-    # interjections) can't wedge advance.
-    for _ in range(len(template_steps) + 1):
-        is_auto_song_joke = current_step.kind in ("song", "joke") and current_step.auto is True
-        if not is_auto_song_joke:
-            return current_step, current_idx
-        if is_enabled.get(current_step.kind, False):
-            # Surface is enabled — keep this step; the caller will
-            # write a real corpus pick for it.
-            return current_step, current_idx
-        # Auto interjection whose surface is OFF. Walk its outgoing
-        # edge. Auto interjections never carry ``choices`` (K3 validator
-        # bars it); they may have ``next`` or fall through.
-        if current_step.next is not None:
-            target_idx = _resolve_template_index_by_id(template_steps, current_step.next)
-            if target_idx < 0:
-                return None
-            current_idx = target_idx
-            current_step = template_steps[current_idx]
-            continue
-        # Branch-destination leaves terminate — same rule 2.5 the
-        # advance handler applies. Auto song/joke shouldn't be a branch
-        # destination (validator gates), but defense-in-depth.
-        if _is_branch_destination_leaf(template_steps, current_step):
-            return None
-        if current_idx + 1 < len(template_steps):
-            current_idx += 1
-            current_step = template_steps[current_idx]
-            continue
-        # Last array entry with no next → terminal.
-        return None
-    # Fell off the iteration bound — treat as terminal so the activity
-    # completes rather than wedging. Logged at WARNING by the caller.
-    return None
 
 
 def _insert_next_step(
@@ -3816,450 +3384,6 @@ def _insert_next_step(
             template_step.action_slot,
             choices_blob,
             template_step.id,
-        ),
-    )
-
-
-# ---------------------------------------------------------------------
-# Phase K K15 Surface S — spontaneity advance hook
-# ---------------------------------------------------------------------
-
-
-@dataclass(frozen=True, slots=True)
-class _SpontaneityPick:
-    """Output of :func:`_resolve_spontaneity` describing a fired roll.
-
-    ``corpus_entry`` is the picked :class:`Joke` / :class:`Song`,
-    ``content_kind`` is ``"joke"`` / ``"song"``, ``attribution`` is the
-    dict stamped onto the interjection step's
-    ``metadata.spontaneity_attribution``. ``None`` is returned by
-    :func:`_resolve_spontaneity` when no roll fires (most common case).
-    """
-
-    corpus_entry: Joke | Song
-    content_kind: str
-    attribution: dict[str, Any]
-
-
-def _parse_persisted_role_records(activity_row: sqlite3.Row) -> list[dict[str, Any]]:
-    """Phase K K15: pull the role_assignments list off a persisted
-    activity's summary envelope. Defensive against missing/malformed
-    summary blobs so a legacy activity (no roles persisted) returns
-    ``[]`` rather than raising.
-    """
-    summary_raw = activity_row["summary"]
-    if not summary_raw:
-        return []
-    try:
-        payload = json.loads(summary_raw)
-    except json.JSONDecodeError:
-        return []
-    if not isinstance(payload, dict):
-        return []
-    meta = payload.get("metadata")
-    if not isinstance(meta, dict):
-        return []
-    raw_records = meta.get("role_assignments")
-    if not isinstance(raw_records, list):
-        return []
-    out: list[dict[str, Any]] = []
-    for entry in raw_records:
-        if isinstance(entry, dict):
-            out.append(entry)
-    return out
-
-
-def _resolve_spontaneity(
-    conn: sqlite3.Connection,
-    *,
-    activity_id: str,
-    activity_row: sqlite3.Row,
-    new_seq: int,
-) -> _SpontaneityPick | None:
-    """Phase K K15 Surface S: roll the per-content spontaneity dice.
-
-    Computes the effective per-content-type rate as
-    ``max(persona.spontaneity_rates.<kind>,
-    max(role.spontaneity_rates.<kind>_rate for role in cast))``,
-    rolls a deterministic float in ``[0, 1)`` derived from
-    ``sha256(activity_id:new_seq:"spontaneity")``, and dispatches:
-
-    * ``r < effective_jokes`` AND ``jokes_enabled`` → joke interjection.
-    * ``r < effective_jokes + effective_songs`` AND ``songs_enabled``
-      → song interjection.
-    * else → no interjection (returns ``None``).
-
-    The cap-at-sum semantics prevents the same advance from firing both
-    a joke and a song; plan §6 K15 documents that explicitly.
-
-    Attribution per plan §3 S: the participant whose rate matched the
-    chosen content type wins narration. Ties broken by **sorted toy_id,
-    then persona last** — so a cast with a Trickster + a Sidekick whose
-    songs_rate equals the persona's loses the tie to whichever toy
-    sorts first lexicographically (and the persona only narrates when
-    no role had a strictly-higher rate). Returns:
-
-    * ``speaker_kind`` = ``"role"`` | ``"persona"``.
-    * ``display_name`` — the toy's display_name OR the persona's
-      display_name (best-effort read from the personas table).
-    * ``role_name`` — set only when ``speaker_kind == "role"`` (the
-      role slot the toy was filling, e.g. ``"trickster"``).
-
-    Returns ``None`` when:
-
-    * ``play_spontaneity_enabled`` is off (cheap early-exit).
-    * Both effective rates are 0.0 (nothing to roll).
-    * The dice land in the no-fire zone.
-    * The selected content kind's master flag is off (cap-at-sum still
-      considers the rate, but disabled-master suppresses the actual
-      fire — matches plan §3 S "(content_master AND surface_flag)").
-    * The corpus pick returns ``None`` (empty/unrendered corpus). Log +
-      degrade so a half-rendered song corpus doesn't 500 advance.
-    """
-    if not play_spontaneity_enabled.get(conn):
-        return None
-
-    persona_id = activity_row["persona_id"]
-    persona_rates = _load_persona_spontaneity_rates(conn, persona_id)
-    role_records = _parse_persisted_role_records(activity_row)
-
-    # Per-content-type effective rate. We compute alongside the
-    # attribution-candidate-list so a tie-break later can pick a single
-    # winner deterministically without re-scanning.
-    #
-    # Each entry: (rate, sort_key_for_tiebreak, speaker_kind, display_name, role_name)
-    # sort_key_for_tiebreak: toys → toy_id; persona → "~" (sorts after
-    # all toy_ids since "~" > any alnum/underscore role id). Plan §3 S:
-    # "ties broken by sorted toy_id then persona last".
-    jokes_candidates: list[tuple[float, str, str, str, str | None]] = []
-    songs_candidates: list[tuple[float, str, str, str, str | None]] = []
-
-    for record in role_records:
-        role_name_raw = record.get("role_name")
-        display_name_raw = record.get("display_name")
-        toy_id_raw = record.get("toy_id")
-        if not isinstance(role_name_raw, str) or not role_name_raw:
-            continue
-        if not isinstance(display_name_raw, str) or not display_name_raw:
-            continue
-        try:
-            role_enum = Role(role_name_raw)
-        except ValueError:
-            # Unknown role string — skip; the K1 taxonomy validator
-            # gates this at template load, so this branch is defense-
-            # in-depth only.
-            continue
-        role_rates = DEFAULT_ROLE_SPONTANEITY_RATES.get(role_enum)
-        if role_rates is None:
-            continue
-        # Toys sort by toy_id; generic descriptors (no toy_id) sort by
-        # display_name so the tiebreak still has a deterministic key.
-        if isinstance(toy_id_raw, str) and toy_id_raw:
-            sort_key = toy_id_raw
-        else:
-            sort_key = display_name_raw
-        jokes_candidates.append(
-            (
-                float(role_rates["jokes_rate"]),
-                sort_key,
-                "role",
-                display_name_raw,
-                role_name_raw,
-            )
-        )
-        songs_candidates.append(
-            (
-                float(role_rates["songs_rate"]),
-                sort_key,
-                "role",
-                display_name_raw,
-                role_name_raw,
-            )
-        )
-
-    # Persona display_name — best-effort read so a missing/legacy row
-    # falls through to the persona_id string. Used only for attribution
-    # narration (the voice profile is still the persona's regardless).
-    persona_display_name: str = str(persona_id) if persona_id is not None else "Narrator"
-    if persona_id is not None:
-        try:
-            persona_row = conn.execute(
-                "SELECT display_name FROM personas WHERE id = ?",
-                (persona_id,),
-            ).fetchone()
-        except sqlite3.Error:
-            persona_row = None
-        if persona_row is not None and persona_row["display_name"]:
-            persona_display_name = str(persona_row["display_name"])
-    # Persona enters both candidate lists with sort_key "~" so the
-    # plan's "persona last" tie-break holds across all role-name
-    # spellings (all 10 Role.value strings start with letters).
-    jokes_candidates.append(
-        (
-            float(persona_rates.get("jokes", 0.0)),
-            "~",
-            "persona",
-            persona_display_name,
-            None,
-        )
-    )
-    songs_candidates.append(
-        (
-            float(persona_rates.get("songs", 0.0)),
-            "~",
-            "persona",
-            persona_display_name,
-            None,
-        )
-    )
-
-    effective_jokes = max((c[0] for c in jokes_candidates), default=0.0)
-    effective_songs = max((c[0] for c in songs_candidates), default=0.0)
-    if effective_jokes <= 0.0 and effective_songs <= 0.0:
-        return None
-
-    # Roll: derive deterministic [0,1) float from sha256. Same shape as
-    # the K14 embedded picker's seed, but with a distinct salt so the
-    # spontaneity roll never coincides with the embedded pick's seed
-    # (which would produce inverted-deterministic correlations).
-    seed_input = f"{activity_id}:{new_seq}:spontaneity".encode()
-    digest = hashlib.sha256(seed_input).digest()
-    seed_int = int.from_bytes(digest[:8], byteorder="big", signed=False)
-    # 2**64 = 18446744073709551616. Dividing by this maps to [0, 1).
-    roll = seed_int / float(1 << 64)
-
-    jokes_master_on = jokes_enabled.get(conn)
-    songs_master_on = songs_enabled.get(conn)
-
-    pick_kind: str | None = None
-    pick_candidates: list[tuple[float, str, str, str, str | None]] | None = None
-    if roll < effective_jokes and jokes_master_on:
-        pick_kind = "joke"
-        pick_candidates = jokes_candidates
-    elif roll < effective_jokes + effective_songs and songs_master_on:
-        pick_kind = "song"
-        pick_candidates = songs_candidates
-    if pick_kind is None or pick_candidates is None:
-        return None
-
-    # Winner: highest rate, ties broken by sort_key (toys before
-    # persona via the "~" trick). Python's tuple sort is stable + the
-    # ``-rate`` key flips to max-first.
-    winner = min(pick_candidates, key=lambda c: (-c[0], c[1]))
-    _winner_rate, _winner_sort_key, speaker_kind, display_name, role_name = winner
-
-    # Corpus pick — themed if a role drove the rate (we don't have a
-    # role→theme map yet, so theme=None for v1; spontaneity is "any
-    # joke/song" by design per plan §3 S). Fresh seed per roll so
-    # successive spontaneity hits don't deliver the same content. Same
-    # persona-compat filter as embedded so a wizard persona still gets
-    # wizard-compatible content.
-    pick_seed = int.from_bytes(digest[8:16], byteorder="big", signed=False)
-    persona_id_str = str(persona_id) if persona_id is not None else None
-    corpus_entry: Joke | Song | None
-    if pick_kind == "song":
-        corpus_entry = pick_song(
-            seed=pick_seed,
-            persona_id=persona_id_str,
-            theme=None,
-            require_audio=True,
-        )
-    else:  # joke
-        corpus_entry = pick_joke(
-            seed=pick_seed,
-            persona_id=persona_id_str,
-            theme=None,
-        )
-    if corpus_entry is None:
-        _logger.info(
-            "spontaneity roll fired (activity=%s kind=%s roll=%.4f) but corpus is empty; skipping",
-            activity_id,
-            pick_kind,
-            roll,
-        )
-        return None
-
-    attribution: dict[str, Any] = {
-        "speaker_kind": speaker_kind,
-        "display_name": display_name,
-    }
-    if role_name is not None:
-        attribution["role_name"] = role_name
-    return _SpontaneityPick(
-        corpus_entry=corpus_entry,
-        content_kind=pick_kind,
-        attribution=attribution,
-    )
-
-
-def _persist_spontaneity_then_template_step(
-    conn: sqlite3.Connection,
-    *,
-    activity_id: str,
-    spontaneity_corpus: Joke | Song,
-    attribution: dict[str, Any],
-    slot_fills: dict[str, str],
-    new_seq: int,
-    previous_step_id: str,
-    chosen_label: str | None,
-    template_step: Any,
-    embedded_interjection_row: dict[str, Any] | None,
-) -> None:
-    """Phase K K15 Surface S: persist BOTH the spontaneity interjection
-    (at ``new_seq``, ``current=1``) AND the originally-planned next
-    step (at ``new_seq+1``, ``current=0``) in one transaction.
-
-    Plan §6 K15: "Template position pointer NOT advanced through
-    interjection". The kid's next /advance hits the legacy ``current_index
-    + 1 < len(steps)`` branch and flips current to the template step;
-    the spontaneity step doesn't burn a template position.
-
-    Two persisted rows means TWO inserts inside the version-bumped
-    transaction. Order matters only for the SQLite atomicity guarantee
-    (both rows present after commit); seq is the ordering key on
-    read-back.
-
-    Toy display name for the spontaneity joke's ``{toy}`` substitution
-    comes from the attribution when speaker_kind == "role" (the toy
-    whose rate drove the roll); falls back to the catalog resolver for
-    persona-driven rolls. Defense-in-depth: a failure to resolve
-    degrades to no-toy form.
-    """
-    toy_display_name: str | None = None
-    if isinstance(spontaneity_corpus, Joke):
-        if attribution.get("speaker_kind") == "role":
-            display = attribution.get("display_name")
-            if isinstance(display, str) and display:
-                toy_display_name = display
-        else:
-            try:
-                toys = resolve_toys(conn)
-            except sqlite3.Error:
-                toys = []
-            if toys:
-                toy_display_name = toys[0].display_name
-
-    spontaneity_row = build_interjection_step(
-        interjection=InterjectionKind.spontaneity,
-        corpus_entry=spontaneity_corpus,
-        slot_fills=slot_fills,
-        seq=new_seq,
-        toy_display_name=toy_display_name,
-    )
-    # Attach attribution to the metadata blob. The build_interjection_step
-    # helper produces metadata.{interjection, source_id, ...kind-specific};
-    # we extend with spontaneity_attribution so the kiosk can render the
-    # speaker line ("Captain Bear giggles:" vs "Marvelous chants:").
-    metadata = dict(spontaneity_row.get("metadata") or {})
-    metadata["spontaneity_attribution"] = attribution
-    spontaneity_row["metadata"] = metadata
-
-    _insert_interjection_step_row(
-        conn,
-        activity_id=activity_id,
-        interjection_row=spontaneity_row,
-        new_seq=new_seq,
-        previous_step_id=previous_step_id,
-        chosen_label=chosen_label,
-    )
-
-    # Insert the originally-planned next step at new_seq+1 with
-    # current=0. The kid's next /advance flips current to it via the
-    # legacy linear branch. We support BOTH paths the post_advance
-    # handler considers: a regular template step (most common) AND an
-    # embedded interjection step (if the template's next position is
-    # an auto song/joke). The embedded row is pre-built by the caller
-    # so we don't duplicate the picker logic here.
-    if embedded_interjection_row is not None:
-        embedded_for_persist = dict(embedded_interjection_row)
-        embedded_for_persist["seq"] = new_seq + 1
-        _insert_followup_interjection_step_row_current_zero(
-            conn,
-            activity_id=activity_id,
-            interjection_row=embedded_for_persist,
-        )
-    else:
-        _insert_followup_template_step_row_current_zero(
-            conn,
-            activity_id=activity_id,
-            template_step=template_step,
-            slot_fills=slot_fills,
-            new_seq=new_seq + 1,
-        )
-
-
-def _insert_followup_template_step_row_current_zero(
-    conn: sqlite3.Connection,
-    *,
-    activity_id: str,
-    template_step: Any,
-    slot_fills: dict[str, str],
-    new_seq: int,
-) -> None:
-    """Phase K K15 Surface S: persist the originally-planned template
-    step at ``new_seq`` with ``current=0``. Sibling of
-    :func:`_insert_next_step` but skips the ``previous_step_id`` flip
-    (the spontaneity row already grabbed ``current=1``).
-    """
-    body_text = render_with_slot_fills(template_step.text, slot_fills)
-    choices_blob: str | None = None
-    if template_step.choices is not None:
-        rendered_labels = [
-            render_with_slot_fills(label, slot_fills) for label, _next in template_step.choices
-        ]
-        choices_blob = json.dumps(rendered_labels)
-    conn.execute(
-        "INSERT INTO activity_steps "
-        "(id, activity_id, seq, body, sfx, expected_action, current, action_slot, "
-        " choices_json, step_template_id) "
-        "VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)",
-        (
-            str(uuid.uuid4()),
-            activity_id,
-            new_seq,
-            body_text,
-            template_step.sfx,
-            template_step.expected_action,
-            template_step.action_slot,
-            choices_blob,
-            template_step.id,
-        ),
-    )
-
-
-def _insert_followup_interjection_step_row_current_zero(
-    conn: sqlite3.Connection,
-    *,
-    activity_id: str,
-    interjection_row: dict[str, Any],
-) -> None:
-    """Phase K K15 Surface S: persist a pre-built embedded interjection
-    row at its ``seq`` with ``current=0``. Sibling of
-    :func:`_insert_interjection_step_row` but skips the prev-row flip.
-    """
-    metadata = interjection_row.get("metadata") or {}
-    metadata_blob: str | None
-    if isinstance(metadata, dict) and metadata:
-        metadata_blob = json.dumps(metadata, sort_keys=True)
-    else:
-        metadata_blob = None
-    conn.execute(
-        "INSERT INTO activity_steps "
-        "(id, activity_id, seq, body, sfx, expected_action, current, action_slot, "
-        " choices_json, step_template_id, kind, metadata_json) "
-        "VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)",
-        (
-            str(uuid.uuid4()),
-            activity_id,
-            int(interjection_row["seq"]),
-            interjection_row["body"],
-            interjection_row.get("sfx"),
-            interjection_row.get("expected_action"),
-            interjection_row.get("action_slot"),
-            None,
-            None,
-            interjection_row.get("kind"),
-            metadata_blob,
         ),
     )
 
@@ -4519,44 +3643,25 @@ def post_advance(
         # target of some step's ``choices[*].next``; implicit fall-through
         # to the next array entry is the wrong semantics here because
         # the next entry is typically a SIBLING branch's ending.
-        # Phase K K14 Surface E: before completing, give the K14 ending
-        # picker a chance to insert a themed interjection.
+        # Phase L Step L5: the K14 ending-picker branch was removed
+        # when jokes/songs became per-activity reward types — the
+        # L4 ``_terminal_advance`` path appends a reward step if one
+        # is configured for this activity, supplanting the old ending.
         if advance_body.choice_index is not None:
             raise _bad_advance("choice_not_allowed", reason="current_step_is_terminal")
-        return _advance_to_ending_or_terminal(
-            conn,
-            pubsub,
-            activity_id=activity_id,
-            expected_version=expected_version,
-            target=target,
-            template=template,
-            slot_fills=slot_fills,
-            persona_id=row["persona_id"],
-            current_row=current_row,
-        )
+        return _terminal_advance(conn, pubsub, activity_id, expected_version)
     elif current_template_index + 1 < len(template.steps):
         # Rule 3: fall through to next array position.
         if advance_body.choice_index is not None:
             raise _bad_advance("choice_not_allowed", reason="current_step_is_linear")
         target_template_step = template.steps[current_template_index + 1]
     else:
-        # Rule 4: terminal. Phase K K14 Surface E: before completing,
-        # give the K14 ending picker a chance to insert a themed
-        # interjection at ``seq = current_row.seq + 1`` so the kid
-        # gets a song/joke wrap-up before the activity completes.
+        # Rule 4: terminal. Phase L Step L5: the K14 ending-picker
+        # branch was removed; ``_terminal_advance`` (L4) appends the
+        # per-activity reward step if one is configured.
         if advance_body.choice_index is not None:
             raise _bad_advance("choice_not_allowed", reason="current_step_is_terminal")
-        return _advance_to_ending_or_terminal(
-            conn,
-            pubsub,
-            activity_id=activity_id,
-            expected_version=expected_version,
-            target=target,
-            template=template,
-            slot_fills=slot_fills,
-            persona_id=row["persona_id"],
-            current_row=current_row,
-        )
+        return _terminal_advance(conn, pubsub, activity_id, expected_version)
 
     if target_template_step is None:
         # An ``id`` reference that didn't resolve — graph validator
@@ -4569,97 +3674,13 @@ def post_advance(
         )
         return _terminal_advance(conn, pubsub, activity_id, expected_version)
 
-    # Phase K K14 Surface B: if the resolved target is an auto song/joke
-    # step AND the embedded surface is disabled, walk past it (and any
-    # subsequent auto interjections) until a renderable template step is
-    # found OR the walk falls off the end → terminate. The skip is
-    # entirely server-side; the kid never sees a placeholder.
-    is_enabled = {
-        "song": _embedded_surface_enabled(conn, "song"),
-        "joke": _embedded_surface_enabled(conn, "joke"),
-    }
-    target_template_index = _resolve_template_index_by_id(
-        template.steps, target_template_step.id or ""
-    )
-    if target_template_index < 0:
-        # The target step has no id (legacy linear step reached by
-        # fall-through). Use the array-index path: find its position by
-        # identity. Fallback to current_template_index + 1 since the
-        # rule-3 branch above set it that way.
-        for idx, t_step in enumerate(template.steps):
-            if t_step is target_template_step:
-                target_template_index = idx
-                break
-    skip_result = _skip_disabled_embedded(
-        template_steps=template.steps,
-        starting_index=target_template_index,
-        starting_step=target_template_step,
-        is_enabled=is_enabled,
-    )
-    if skip_result is None:
-        # Every reachable step is a disabled-surface auto interjection.
-        # Treat as terminal — the kid completes the activity cleanly.
-        return _terminal_advance(conn, pubsub, activity_id, expected_version)
-    target_template_step, _target_index = skip_result
-
-    # Phase K K14 Surface B: when the (post-skip) target is an auto
-    # song/joke step, pick a corpus entry from
-    # ``template.recommended_themes`` and use ``build_interjection_step``
-    # to produce the persisted row shape. Otherwise the legacy
-    # ``_insert_next_step`` path renders a plain text/fork step.
-    interjection_row: dict[str, Any] | None = None
-    if target_template_step.kind in ("song", "joke") and target_template_step.auto is True:
-        # Phase K K14: derive a deterministic seed for the corpus
-        # pick from ``(activity_id, new_seq)`` per phase-k-plan §6 K14
-        # step. Same ``(activity, position)`` always produces the same
-        # interjection → recast-stability + telemetry replay both work.
-        # The python ``hash`` builtin is salted per process, so we use
-        # the first 8 bytes of a SHA-256 digest (stable across restarts)
-        # interpreted as an unsigned int. The picker only does
-        # ``seed % len(candidates)`` so any uniform-ish 64-bit value is
-        # acceptable.
-        new_seq_for_seed = int(current_row["seq"]) + 1
-        seed_input = f"{activity_id}:{new_seq_for_seed}".encode()
-        seed_value = int.from_bytes(
-            hashlib.sha256(seed_input).digest()[:8],
-            byteorder="big",
-            signed=False,
-        )
-        interjection_row = _pick_embedded_corpus_step(
-            conn,
-            template=template,
-            template_step=target_template_step,
-            slot_fills=slot_fills,
-            seed=seed_value,
-            persona_id=row["persona_id"],
-            new_seq=new_seq_for_seed,
-        )
-        # ``None`` means no corpus entry matched the theme filter — the
-        # kid's experience would be a 404'd kiosk step; degrade to a
-        # graceful skip via terminal (no row inserted). Logged INFO by
-        # the picker.
-        if interjection_row is None:
-            return _terminal_advance(conn, pubsub, activity_id, expected_version)
-
-    # Phase K K15 Surface S: roll the spontaneity dice BEFORE the
-    # version-bumped transaction so a fired roll can be persisted
-    # atomically with the regular template-step write. The hook reads
-    # ``play_spontaneity_enabled`` + persona/role spontaneity rates,
-    # rolls a deterministic float from ``(activity_id, new_seq)``, and
-    # returns a ``_SpontaneityPick`` on hit / ``None`` on miss. Placement
-    # AFTER the embedded picker is intentional: when the template step
-    # already IS a (themed) embedded interjection, the spontaneity roll
-    # still fires alongside it — the kid first sees the spontaneity
-    # interjection at new_seq, then the embedded auto-step at new_seq+1
-    # on the next /advance (both surfaces stack rather than racing for
-    # the slot).
+    # Phase L Step L5: removed the K14 Surface B (embedded auto song/
+    # joke picker) and the K15 Surface S (spontaneity roll). Both
+    # surfaces have been replaced by per-activity reward types resolved
+    # at terminal advance (L4). The remaining branches insert the
+    # resolved template step verbatim through the legacy
+    # ``_insert_next_step`` path.
     new_seq = int(current_row["seq"]) + 1
-    spontaneity_pick = _resolve_spontaneity(
-        conn,
-        activity_id=activity_id,
-        activity_row=row,
-        new_seq=new_seq,
-    )
 
     # Atomically: bump version + state, INSERT next step, mark current
     # ``not current`` (and write ``chosen_label`` if branching). All
@@ -4675,143 +3696,16 @@ def post_advance(
     if not ok:
         raise VersionConflictError(int(row["version"]), str(row["state"]))
     with conn:
-        if spontaneity_pick is not None:
-            # K15 S fire: INSERT (spontaneity at new_seq, current=1)
-            # + (template step / embedded at new_seq+1, current=0).
-            # Plan §6 K15: template-position pointer not advanced.
-            _persist_spontaneity_then_template_step(
-                conn,
-                activity_id=activity_id,
-                spontaneity_corpus=spontaneity_pick.corpus_entry,
-                attribution=spontaneity_pick.attribution,
-                slot_fills=slot_fills,
-                new_seq=new_seq,
-                previous_step_id=str(current_row["id"]),
-                chosen_label=chosen_label,
-                template_step=target_template_step,
-                embedded_interjection_row=interjection_row,
-            )
-        elif interjection_row is not None:
-            _insert_interjection_step_row(
-                conn,
-                activity_id=activity_id,
-                interjection_row=interjection_row,
-                new_seq=new_seq,
-                previous_step_id=str(current_row["id"]),
-                chosen_label=chosen_label,
-            )
-        else:
-            _insert_next_step(
-                conn,
-                activity_id=activity_id,
-                template_step=target_template_step,
-                slot_fills=slot_fills,
-                new_seq=new_seq,
-                previous_step_id=str(current_row["id"]),
-                chosen_label=chosen_label,
-            )
-
-    # Phase K K15 Surface S telemetry: append a labeled_events
-    # tool_calls entry with source="spontaneity" + attribution shape so
-    # downstream learning loops can reconstruct which participant fired
-    # which roll. Best-effort (matches parent_insert pattern).
-    if spontaneity_pick is not None:
-        try:
-            append_interjection_event(
-                conn,
-                activity_id=activity_id,
-                source=INTERJECTION_SOURCE_SPONTANEITY,
-                interjection_kind=InterjectionKind.spontaneity.value,
-                corpus_entry_id=spontaneity_pick.corpus_entry.id,
-                step_seq=new_seq,
-                attribution=spontaneity_pick.attribution,
-            )
-        except Exception:  # noqa: BLE001 -- telemetry must never break advance
-            _logger.warning(
-                "spontaneity: append_interjection_event failed for activity %s",
-                activity_id,
-                exc_info=True,
-            )
-
-    response = _row_to_response(conn, row)
-    _emit_state(pubsub, response)
-    return response
-
-
-def _advance_to_ending_or_terminal(
-    conn: sqlite3.Connection,
-    pubsub: PubSub,
-    *,
-    activity_id: str,
-    expected_version: int,
-    target: str,
-    template: Any,
-    slot_fills: dict[str, str],
-    persona_id: str | None,
-    current_row: Any,
-    chosen_label: str | None = None,
-) -> ActivityResponse:
-    """Phase K K14 Surface E: insert a themed ending interjection if the
-    template defined one and the surface gate is on; otherwise complete.
-
-    Called from :func:`post_advance` at the two "no more template steps"
-    points (Rule 2.5 branch-destination-leaf and Rule 4 last-array-entry).
-    Mirrors :func:`_terminal_advance`'s transition + WS broadcast shape so
-    a kid who completes a template that has NO ending (or with the
-    surface off, or whose corpus has no matching entry) still hits the
-    exact-same completed-state path.
-
-    On the happy path (ending built): same transaction shape as the
-    embedded picker — version bump, current=0 on previous, INSERT new
-    interjection at ``seq = current_row.seq + 1`` with ``current=1``,
-    ``activity.state`` envelope on the pubsub. Activity stays at
-    ``running`` (the kid still has one more step to clear before
-    completion).
-
-    The seed for the ending pick is derived from ``(activity_id,
-    new_seq)`` — the same shape the embedded picker uses — so the same
-    ``(activity, position)`` always produces the same ending entry.
-    Replay + telemetry parity with the embedded path is the goal.
-    """
-    new_seq = int(current_row["seq"]) + 1
-    seed_input = f"{activity_id}:{new_seq}:ending".encode()
-    seed_value = int.from_bytes(
-        hashlib.sha256(seed_input).digest()[:8],
-        byteorder="big",
-        signed=False,
-    )
-    ending_row = _build_ending_row(
-        conn,
-        template=template,
-        seed=seed_value,
-        persona_id=persona_id,
-        slot_fills=slot_fills,
-        new_seq=new_seq,
-    )
-    if ending_row is None:
-        # No ending applicable: complete the activity as before.
-        return _terminal_advance(conn, pubsub, activity_id, expected_version)
-
-    # Ending row built — INSERT it as the kid's next step. Same
-    # transaction shape as the embedded picker path: bump version,
-    # flip previous current=0, INSERT new current=1 interjection row.
-    ok, row = _attempt_transition(
-        conn,
-        activity_id=activity_id,
-        expected_version=expected_version,
-        new_state=target,
-    )
-    if not ok:
-        raise VersionConflictError(int(row["version"]), str(row["state"]))
-    with conn:
-        _insert_interjection_step_row(
+        _insert_next_step(
             conn,
             activity_id=activity_id,
-            interjection_row=ending_row,
+            template_step=target_template_step,
+            slot_fills=slot_fills,
             new_seq=new_seq,
             previous_step_id=str(current_row["id"]),
             chosen_label=chosen_label,
         )
+
     response = _row_to_response(conn, row)
     _emit_state(pubsub, response)
     return response

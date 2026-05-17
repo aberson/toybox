@@ -3,20 +3,25 @@
 Pins:
 
 1. The K3 Pydantic additions (``Step.kind`` / ``Step.corpus_id`` /
-   ``Step.auto``, the new :class:`EndingStep` and :class:`Template`
-   models, the role / theme / ending-step top-level fields) round-trip
-   correctly through Pydantic + jsonschema.
-2. :func:`validate_template` rejects each new K3 invariant violation
-   (undeclared role placeholder, ``required_roles`` count over the
-   distinct-toy ceiling, song/joke step with neither ``corpus_id``
-   nor ``auto=True``, song/joke step with BOTH, song/joke step on a
-   non-song/joke kind, ending_step out-of-range kind via direct
-   instantiation) with a clear message that names the template id
-   and the offending field / placeholder.
+   ``Step.auto``, the :class:`Template` model, the role / theme
+   top-level fields) round-trip correctly through Pydantic + jsonschema.
+2. :func:`validate_template` rejects each surviving K3 invariant
+   violation (undeclared role placeholder, ``required_roles`` count
+   over the distinct-toy ceiling, song/joke step missing ``corpus_id``,
+   song/joke step with ``auto=True`` after the L5 picker deletion,
+   song/joke fields on a non-song/joke kind) with a clear message that
+   names the template id and the offending field / placeholder. Phase
+   L Step L5 removed the ``ending_step`` shape gate and the K14.1
+   ``recommended_themes``-required gate when the embedded/ending
+   surfaces were deleted, and additionally now refuses ``auto=True`` on
+   song/joke steps because the advance-time embedded picker that
+   consumed it is gone — without the picker the placeholder body text
+   would render verbatim on the kiosk.
 3. Backward-compat: existing pre-K3 fixtures still load + validate,
    and ALL 200 production branching templates plus the 25 linear
-   templates parse cleanly through the new validator path
-   (regression assertion for the 200-template no-touch guarantee).
+   templates parse cleanly through the new validator path. After
+   Phase L Step L5 the templates' lingering ``ending_step`` keys are
+   silently ignored by Pydantic.
 4. Loader-level integration: K3 violations surface as Pydantic
    ValidationError / TemplateGraphError that the loader catches
    as a logged WARNING + skip (Pydantic path) or hard-raise
@@ -48,7 +53,6 @@ from toybox.activities.generator import (
 )
 from toybox.activities.models import (
     Choice,
-    EndingStep,
     Step,
     Template,
 )
@@ -89,7 +93,6 @@ def _build_template(
     required_roles: list[Role] | None = None,
     optional_roles: list[Role] | None = None,
     recommended_themes: list[Theme] | None = None,
-    ending_step: EndingStep | None = None,
 ) -> Template:
     return Template(
         id=template_id,
@@ -99,7 +102,6 @@ def _build_template(
         required_roles=required_roles or [],
         optional_roles=optional_roles or [],
         recommended_themes=recommended_themes or [],
-        ending_step=ending_step,
     )
 
 
@@ -133,7 +135,8 @@ def test_step_kind_defaults_to_text() -> None:
 @pytest.mark.parametrize("kind", ["text", "fork", "song", "joke"])
 def test_step_kind_accepts_all_four_values(kind: str) -> None:
     if kind in ("song", "joke"):
-        step = Step(text="t", kind=kind, auto=True)  # type: ignore[arg-type]
+        # Phase L Step L5: ``auto=true`` no longer valid — pin a corpus_id.
+        step = Step(text="t", kind=kind, corpus_id="rhyme-01")  # type: ignore[arg-type]
     else:
         step = Step(text="t", kind=kind)  # type: ignore[arg-type]
     assert step.kind == kind
@@ -144,23 +147,56 @@ def test_step_kind_rejects_unknown_value() -> None:
         Step(text="t", kind="dance")  # type: ignore[arg-type]
 
 
-def test_step_song_requires_corpus_or_auto() -> None:
+def test_step_song_requires_corpus_id() -> None:
+    """Phase L Step L5: ``auto=true`` was the only alternative to
+    ``corpus_id``; with the embedded picker gone, ``corpus_id`` is
+    now the sole valid source-of-content for song steps."""
     with pytest.raises(ValidationError) as excinfo:
         Step(text="sing", kind="song")
-    assert "corpus_id" in str(excinfo.value) or "auto" in str(excinfo.value)
+    assert "corpus_id" in str(excinfo.value)
 
 
-def test_step_joke_requires_corpus_or_auto() -> None:
+def test_step_joke_requires_corpus_id() -> None:
+    """Phase L Step L5: ``auto=true`` was the only alternative to
+    ``corpus_id``; with the embedded picker gone, ``corpus_id`` is
+    now the sole valid source-of-content for joke steps."""
     with pytest.raises(ValidationError) as excinfo:
         Step(text="joke", kind="joke")
-    assert "corpus_id" in str(excinfo.value) or "auto" in str(excinfo.value)
+    assert "corpus_id" in str(excinfo.value)
 
 
-def test_step_song_rejects_both_corpus_and_auto() -> None:
+def test_step_song_rejects_auto_true() -> None:
+    """Phase L Step L5: ``auto=true`` on a song step is rejected
+    because the advance-time embedded picker that consumed it
+    (``_pick_embedded_corpus_step`` in ``api/activities.py``) was
+    deleted. Without that picker, the template's placeholder body
+    text would render verbatim on the kiosk."""
+    with pytest.raises(ValidationError) as excinfo:
+        Step(text="sing", kind="song", auto=True)
+    msg = str(excinfo.value)
+    assert "auto" in msg
+    # Error message must point at the L5 plan section so the operator
+    # can find the deletion that motivated the rejection.
+    assert "L5" in msg
+
+
+def test_step_joke_rejects_auto_true() -> None:
+    """Phase L Step L5: ``auto=true`` on a joke step is rejected (same
+    rationale as the song-step rejection above)."""
+    with pytest.raises(ValidationError) as excinfo:
+        Step(text="joke", kind="joke", auto=True)
+    msg = str(excinfo.value)
+    assert "auto" in msg
+    assert "L5" in msg
+
+
+def test_step_song_with_corpus_id_and_auto_true_rejected() -> None:
+    """``auto=true`` is rejected regardless of whether ``corpus_id`` is
+    also set; the auto field is dead under Phase L Step L5."""
     with pytest.raises(ValidationError) as excinfo:
         Step(text="sing", kind="song", corpus_id="x", auto=True)
     msg = str(excinfo.value)
-    assert "corpus_id" in msg or "auto" in msg
+    assert "auto" in msg
 
 
 @pytest.mark.parametrize(
@@ -193,41 +229,13 @@ def test_step_song_accepts_corpus_id_only() -> None:
     assert step.auto is None
 
 
-def test_step_joke_accepts_auto_only() -> None:
-    step = Step(text="joke", kind="joke", auto=True)
+def test_step_joke_accepts_corpus_id_only() -> None:
+    """Phase L Step L5: ``auto=true`` is dead; ``corpus_id`` is the
+    sole valid source-of-content for joke steps."""
+    step = Step(text="joke", kind="joke", corpus_id="silly-01")
     assert step.kind == "joke"
-    assert step.corpus_id is None
-    assert step.auto is True
-
-
-# ---------------------------------------------------------------------------
-# Pydantic-layer EndingStep shape
-# ---------------------------------------------------------------------------
-
-
-def test_ending_step_accepts_song_and_joke() -> None:
-    assert EndingStep(kind="song").kind == "song"
-    assert EndingStep(kind="joke").kind == "joke"
-
-
-def test_ending_step_rejects_text_kind() -> None:
-    with pytest.raises(ValidationError):
-        EndingStep(kind="text")  # type: ignore[arg-type]
-
-
-def test_ending_step_rejects_fork_kind() -> None:
-    with pytest.raises(ValidationError):
-        EndingStep(kind="fork")  # type: ignore[arg-type]
-
-
-def test_ending_step_auto_defaults_true() -> None:
-    es = EndingStep(kind="song")
-    assert es.auto is True
-
-
-def test_ending_step_rejects_auto_false() -> None:
-    with pytest.raises(ValidationError):
-        EndingStep(kind="song", auto=False)  # type: ignore[arg-type]
+    assert step.corpus_id == "silly-01"
+    assert step.auto is None
 
 
 # ---------------------------------------------------------------------------
@@ -236,9 +244,8 @@ def test_ending_step_rejects_auto_false() -> None:
 
 
 def test_template_minimal_fields_only() -> None:
-    """The pre-K3 shape (id + title + steps; no roles, themes, or
-    ending_step) still parses — backward-compat for the 200 existing
-    branching templates."""
+    """The pre-K3 shape (id + title + steps; no roles, themes) still
+    parses — backward-compat for the 200 existing branching templates."""
     template = Template(
         id="legacy",
         title="Legacy",
@@ -248,7 +255,6 @@ def test_template_minimal_fields_only() -> None:
     assert template.required_roles == []
     assert template.optional_roles == []
     assert template.recommended_themes == []
-    assert template.ending_step is None
 
 
 def test_template_round_trip_with_k3_fields() -> None:
@@ -264,13 +270,28 @@ def test_template_round_trip_with_k3_fields() -> None:
         required_roles=[Role.quest_giver],
         optional_roles=[Role.sidekick],
         recommended_themes=[Theme.adventure, Theme.magic],
-        ending_step=EndingStep(kind="song"),
     )
     assert template.required_roles == [Role.quest_giver]
     assert template.optional_roles == [Role.sidekick]
     assert template.recommended_themes == [Theme.adventure, Theme.magic]
-    assert template.ending_step is not None
-    assert template.ending_step.kind == "song"
+
+
+def test_template_ignores_legacy_ending_step_field() -> None:
+    """Phase L Step L5: the ``ending_step`` template field was removed.
+    Existing template JSONs still carry the key — the Pydantic model's
+    ``extra="ignore"`` config silently drops it instead of raising.
+    """
+    template = Template.model_validate(
+        {
+            "id": "legacy_ending",
+            "title": "Legacy with ending",
+            "buckets": ["always"],
+            "steps": [{"text": "a"}, {"text": "b"}, {"text": "c"}],
+            "ending_step": {"kind": "song", "auto": True},
+        }
+    )
+    # No attribute leaks onto the model; reading would raise AttributeError.
+    assert not hasattr(template, "ending_step")
 
 
 def test_template_rejects_duplicate_required_roles() -> None:
@@ -322,19 +343,24 @@ def test_template_rejects_unknown_theme_string() -> None:
         )
 
 
-def test_template_extra_forbid() -> None:
-    """``extra='forbid'`` so an unknown top-level field (e.g. a
-    stale rename) fails loudly rather than silently no-oping."""
-    with pytest.raises(ValidationError):
-        Template.model_validate(
-            {
-                "id": "weird",
-                "title": "t",
-                "buckets": ["always"],
-                "steps": [{"text": "a"}, {"text": "b"}, {"text": "c"}],
-                "unknown_field": 1,
-            }
-        )
+def test_template_extra_ignore() -> None:
+    """Phase L Step L5 relaxed ``extra='forbid'`` to ``extra='ignore'``
+    so existing template JSONs that still carry the deprecated
+    ``ending_step`` key parse cleanly. The trade-off is that an
+    unknown top-level field is silently dropped rather than raised.
+    Future drift on the schema's required-field list still fails
+    loudly via missing-field validation.
+    """
+    template = Template.model_validate(
+        {
+            "id": "weird",
+            "title": "t",
+            "buckets": ["always"],
+            "steps": [{"text": "a"}, {"text": "b"}, {"text": "c"}],
+            "unknown_field": 1,
+        }
+    )
+    assert not hasattr(template, "unknown_field")
 
 
 # ---------------------------------------------------------------------------
@@ -343,8 +369,9 @@ def test_template_extra_forbid() -> None:
 
 
 def test_validate_template_accepts_legacy_no_k3_fields() -> None:
-    """No roles, no themes, no ending_step — same shape as every
-    one of the 200 existing branching templates."""
+    """No roles, no themes — same shape as every one of the 200
+    existing branching templates (the lingering ``ending_step`` key on
+    those JSONs is dropped by Pydantic's ``extra="ignore"`` config)."""
     template = _build_template()
     validate_template(template)
 
@@ -510,72 +537,61 @@ def test_validate_template_accepts_song_step_with_corpus_id() -> None:
     validate_template(template)
 
 
-def test_validate_template_accepts_joke_step_with_auto() -> None:
-    # K14: ``auto: true`` song/joke steps require a non-empty
-    # ``recommended_themes`` so the embedded picker has a theme to
-    # filter on. Tests that exercise the auto-step path must declare
-    # one theme.
+def test_validate_template_accepts_joke_step_with_corpus_id() -> None:
+    """Phase L Step L5: the previous ``auto=true`` variant of this
+    test was retired alongside the embedded picker. ``corpus_id`` is
+    the sole valid source-of-content for joke steps; this test pins
+    the validator accepts the (now sole) shape end-to-end."""
     template = _build_template(
         steps=[
             Step(text="a"),
-            Step(text="joke", kind="joke", auto=True),
+            Step(text="joke", kind="joke", corpus_id="silly-01"),
             Step(text="c"),
         ],
-        recommended_themes=[Theme.silly],
     )
     validate_template(template)
 
 
-def test_validate_template_rejects_auto_song_step_without_recommended_themes() -> None:
-    """K14: ``auto: true`` song/joke steps without
-    ``recommended_themes`` are misconfigured — the K14 embedded picker
-    has nothing to filter on. The K3 validator's K14.1 gate catches
-    this at template-load time so the author sees the gap before
-    runtime.
-    """
-    template = _build_template(
-        steps=[
-            Step(text="a"),
-            Step(text="sing", kind="song", auto=True),
-            Step(text="c"),
-        ],
-        recommended_themes=[],
-    )
-    with pytest.raises(TemplateGraphError) as excinfo:
-        validate_template(template)
-    msg = str(excinfo.value)
-    assert "recommended_themes" in msg
-    assert "auto" in msg
+def test_validate_template_rejects_joke_step_with_auto_true() -> None:
+    """Phase L Step L5: ``auto=true`` on a joke step must be rejected
+    at the :func:`validate_template` layer as well as the Pydantic
+    layer — defense-in-depth per code-quality.md §1 (one place gates
+    once Step is constructed via ``model_validate``, the other
+    catches callers that bypass the Pydantic gate). Pydantic catches
+    this at ``Step`` construction, so the assertion target is the
+    Pydantic ``ValidationError`` raised inside ``_build_template`` /
+    ``Step(...)``."""
+    with pytest.raises(ValidationError) as excinfo:
+        _build_template(
+            steps=[
+                Step(text="a"),
+                Step(text="joke", kind="joke", auto=True),
+                Step(text="c"),
+            ],
+        )
+    assert "auto" in str(excinfo.value)
 
 
-def test_validate_template_accepts_ending_step_song() -> None:
-    template = _build_template(ending_step=EndingStep(kind="song"))
-    validate_template(template)
+def test_validate_template_rejects_song_step_with_auto_true() -> None:
+    """Same shape as the joke-step rejection — pin both for symmetry."""
+    with pytest.raises(ValidationError) as excinfo:
+        _build_template(
+            steps=[
+                Step(text="a"),
+                Step(text="sing", kind="song", auto=True),
+                Step(text="c"),
+            ],
+        )
+    assert "auto" in str(excinfo.value)
 
 
-def test_validate_template_accepts_ending_step_joke() -> None:
-    template = _build_template(ending_step=EndingStep(kind="joke"))
-    validate_template(template)
-
-
-def test_validate_template_ending_step_kind_invalid_via_construct() -> None:
-    """Hand-construct a Template bypassing Pydantic by directly mutating
-    a model attr to simulate a future caller that uses ``model_construct``.
-    The defense-in-depth gate inside :func:`validate_template` must
-    catch a kind outside {'song', 'joke'} even when Pydantic was
-    bypassed.
-    """
-
-    # Build a normal template, then swap ``ending_step`` with a stub
-    # whose ``kind`` is out of range. Pydantic's ``frozen=True`` on
-    # the Template model blocks direct attr assignment, so we use
-    # ``model_construct`` to bypass validation entirely.
-    bad_ending_step = EndingStep.model_construct(kind="weird", auto=True)  # type: ignore[arg-type]
-    template = _build_template(ending_step=bad_ending_step)
-    with pytest.raises(TemplateGraphError) as excinfo:
-        validate_template(template)
-    msg = str(excinfo.value)
-    assert "ending_step" in msg
+# Phase L Step L5: the K14.1 ``recommended_themes`` gate for ``auto:
+# true`` song/joke steps and the K3.3 ``ending_step`` gate were both
+# removed alongside the deletion of the embedded mid-activity picker
+# and the ending auto-append. The test cases that exercised those
+# gates have been deleted accordingly. The remaining validator checks
+# (K3.1 placeholder / K3.2 ceiling / K3.4 corpus-id XOR auto) still
+# fire and are covered by tests above.
 
 
 # ---------------------------------------------------------------------------
@@ -642,14 +658,28 @@ def test_loader_accepts_song_step_with_corpus_id_fixture(
     assert any(t.id == "fixture_song_corpus" for t in templates)
 
 
-def test_loader_accepts_joke_step_with_auto_fixture(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def test_loader_skips_joke_step_with_auto_fixture(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """Phase L Step L5: a joke step with ``auto: true`` is now caught
+    at the Pydantic layer (``Step._check_song_joke_shape``), which the
+    loader catches as a logged WARNING + skip — matching the Phase G
+    precedent for per-template Pydantic shape errors. Before L5 this
+    fixture was the happy-path test; it is now the regression guard
+    for the picker-removal."""
     fake = _make_templates_dir(tmp_path, boredom_fixture=K3_FIXTURES_DIR / "joke_step_auto.json")
     monkeypatch.setattr("toybox.activities.generator.TEMPLATES_DIR", fake)
     clear_template_cache()
-    templates = _load_intent_templates("boredom")
-    assert any(t.id == "fixture_joke_auto" for t in templates)
+    with caplog.at_level(logging.WARNING, logger="toybox.activities.generator"):
+        templates = _load_intent_templates("boredom")
+    ids = {t.id for t in templates}
+    assert "fixture_joke_auto" not in ids
+    assert any(
+        rec.levelno == logging.WARNING and "fixture_joke_auto" in rec.getMessage()
+        for rec in caplog.records
+    )
 
 
 def test_loader_skips_song_step_without_source_fixture(

@@ -1,12 +1,12 @@
-"""Integration coverage for the eight Phase K feature-flag endpoints.
+"""Integration coverage for the surviving Phase K feature-flag endpoints.
 
-One parametrized test class covers GET / PUT round-trip + auth gating
-for every flag (eight endpoints x four assertions = full matrix). Two
-representative flags (``jokes_enabled``, ``play_spontaneity_enabled``)
-also get an explicit GET-PUT-GET persistence test against the live
-SQLite file — the latter exercises the false-default path so the
-``play_spontaneity_enabled`` opt-in semantics survive a regression
-that would silently flip the wire to default-true.
+Phase L Step L5 removed three of the original eight flags
+(``play_embedded_enabled``, ``play_endings_enabled``,
+``play_spontaneity_enabled``) when jokes/songs migrated to per-activity
+reward types. A single parametrized test class covers GET / PUT
+round-trip + auth gating for each remaining flag. One representative
+flag (``jokes_enabled``) gets an explicit GET-PUT-GET persistence test
+against the live SQLite file.
 
 Mirrors :mod:`tests.integration.test_play_cadence_seconds_api`.
 """
@@ -27,15 +27,6 @@ from toybox.api.clickable_words_enabled_settings import (
     get_db as clickable_words_enabled_get_db,
 )
 from toybox.api.jokes_enabled_settings import get_db as jokes_enabled_get_db
-from toybox.api.play_embedded_enabled_settings import (
-    get_db as play_embedded_enabled_get_db,
-)
-from toybox.api.play_endings_enabled_settings import (
-    get_db as play_endings_enabled_get_db,
-)
-from toybox.api.play_spontaneity_enabled_settings import (
-    get_db as play_spontaneity_enabled_get_db,
-)
 from toybox.api.play_standalone_enabled_settings import (
     get_db as play_standalone_enabled_get_db,
 )
@@ -51,7 +42,7 @@ from toybox.db.migrations import run_migrations
 
 @dataclass(frozen=True)
 class FlagEndpoint:
-    """Parameterizes the suite over the eight Phase K flag endpoints.
+    """Parameterizes the suite over each surviving Phase K flag endpoint.
 
     ``get_db_dep`` is each module's ``get_db`` FastAPI dependency so
     the per-endpoint override is targeted (mirrors the pattern in
@@ -72,24 +63,6 @@ FLAG_ENDPOINTS: list[FlagEndpoint] = [
         "/api/settings/play-standalone-enabled",
         True,
         play_standalone_enabled_get_db,
-    ),
-    FlagEndpoint(
-        "play_embedded_enabled",
-        "/api/settings/play-embedded-enabled",
-        True,
-        play_embedded_enabled_get_db,
-    ),
-    FlagEndpoint(
-        "play_endings_enabled",
-        "/api/settings/play-endings-enabled",
-        True,
-        play_endings_enabled_get_db,
-    ),
-    FlagEndpoint(
-        "play_spontaneity_enabled",
-        "/api/settings/play-spontaneity-enabled",
-        False,
-        play_spontaneity_enabled_get_db,
     ),
     FlagEndpoint(
         "clickable_words_enabled",
@@ -249,11 +222,11 @@ def test_put_non_bool_value_returns_422(
     assert response.status_code == 422
 
 
-# --- Representative deep round-trip tests -----------------------------
-# Two endpoints get an explicit "the value persists to disk across a
-# fresh DB connection" test. ``jokes_enabled`` exercises the default-
-# true branch; ``play_spontaneity_enabled`` exercises the
-# default-false branch — the only opt-in flag of the eight.
+# --- Representative deep round-trip test ------------------------------
+# One endpoint (``jokes_enabled``) gets an explicit "the value persists
+# to disk across a fresh DB connection" test. After Phase L Step L5 all
+# remaining flags share the default-true branch, so a single
+# representative exercise covers the storage-shape regression class.
 
 
 def test_jokes_enabled_persists_to_disk(
@@ -288,41 +261,3 @@ def test_jokes_enabled_persists_to_disk(
     assert row is not None
     raw = row["value"] if isinstance(row, sqlite3.Row) else row[0]
     assert raw == "false"
-
-
-def test_play_spontaneity_enabled_persists_to_disk(
-    client: TestClient,
-    parent_headers: dict[str, str],
-    db_path: Path,
-) -> None:
-    """Same shape as ``test_jokes_enabled_persists_to_disk`` but for the opt-in flag.
-
-    Toggles the spontaneity flag ON and verifies the raw stored value
-    flipped to ``'true'``. The default of this flag is ``False`` —
-    Phase K's only opt-in — so this test also pins the migration seed
-    against silent drift.
-    """
-    # Confirm starting state via GET first.
-    initial_response = client.get("/api/settings/play-spontaneity-enabled")
-    assert initial_response.status_code == 200
-    assert initial_response.json() == {"value": False}
-
-    put_response = client.put(
-        "/api/settings/play-spontaneity-enabled",
-        json={"value": True},
-        headers=parent_headers,
-    )
-    assert put_response.status_code == 200
-    assert put_response.json() == {"value": True}
-
-    conn = connect(db_path)
-    try:
-        row = conn.execute(
-            "SELECT value FROM settings WHERE key = ?",
-            ("play_spontaneity_enabled",),
-        ).fetchone()
-    finally:
-        conn.close()
-    assert row is not None
-    raw = row["value"] if isinstance(row, sqlite3.Row) else row[0]
-    assert raw == "true"

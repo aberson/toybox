@@ -250,9 +250,6 @@ export function App(): JSX.Element {
         jokesEnabledResult,
         songsEnabledResult,
         playStandaloneResult,
-        playEmbeddedResult,
-        playEndingsResult,
-        playSpontaneityResult,
         clickableWordsResult,
         readMeButtonResult,
       ] = await Promise.allSettled([
@@ -263,17 +260,16 @@ export function App(): JSX.Element {
           { include_active: true },
           { signal: aborter.signal },
         ),
-        // Phase K step K2: eight feature flags fetched in parallel
-        // alongside the existing settings GETs. Each result is handled
-        // independently below so one bad endpoint doesn't poison the
-        // others — optimistic defaults (matching the backend's seeded
-        // migration 0015 values) stay in place when a probe rejects.
+        // Phase K step K2: feature flags fetched in parallel alongside
+        // the existing settings GETs. Phase L Step L5 removed the three
+        // Phase K play-surface flags; the remaining five share the same
+        // independent-result handling so a single bad endpoint doesn't
+        // poison the others — optimistic defaults (matching the
+        // backend's seeded migration 0015 values) stay in place when a
+        // probe rejects.
         api.getJokesEnabled({ signal: aborter.signal }),
         api.getSongsEnabled({ signal: aborter.signal }),
         api.getPlayStandaloneEnabled({ signal: aborter.signal }),
-        api.getPlayEmbeddedEnabled({ signal: aborter.signal }),
-        api.getPlayEndingsEnabled({ signal: aborter.signal }),
-        api.getPlaySpontaneityEnabled({ signal: aborter.signal }),
         api.getClickableWordsEnabled({ signal: aborter.signal }),
         api.getReadMeButtonEnabled({ signal: aborter.signal }),
       ]);
@@ -325,9 +321,6 @@ export function App(): JSX.Element {
         ["jokes_enabled", jokesEnabledResult],
         ["songs_enabled", songsEnabledResult],
         ["play_standalone_enabled", playStandaloneResult],
-        ["play_embedded_enabled", playEmbeddedResult],
-        ["play_endings_enabled", playEndingsResult],
-        ["play_spontaneity_enabled", playSpontaneityResult],
         ["clickable_words_enabled", clickableWordsResult],
         ["read_me_button_enabled", readMeButtonResult],
       ];

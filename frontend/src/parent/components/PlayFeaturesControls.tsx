@@ -104,24 +104,6 @@ export const FEATURE_TOGGLES: readonly FeatureToggleSpec[] = [
     setter: "setPlayStandaloneEnabled",
   },
   {
-    key: "play_embedded_enabled",
-    label: "Themed embedded interjections",
-    hint: "Themed song/joke steps mid-activity, picked at advance time.",
-    setter: "setPlayEmbeddedEnabled",
-  },
-  {
-    key: "play_endings_enabled",
-    label: "Themed ending steps",
-    hint: "Templates with an ending step (song or joke) append it on creation.",
-    setter: "setPlayEndingsEnabled",
-  },
-  {
-    key: "play_spontaneity_enabled",
-    label: "Spontaneity interjections",
-    hint: "Probabilistic mid-activity interjections from the persona's spontaneity rates. Opt-in — interjections can disrupt flow.",
-    setter: "setPlaySpontaneityEnabled",
-  },
-  {
     key: "clickable_words_enabled",
     label: "Tap-to-read words",
     hint: "Tap any word on the kiosk to hear that word. When off, words render as plain text.",

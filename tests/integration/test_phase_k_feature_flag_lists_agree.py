@@ -1,12 +1,17 @@
-"""Source-of-truth-lock for the eight Phase K feature flags.
+"""Source-of-truth-lock for the five surviving Phase K feature flags.
+
+Phase L Step L5 deleted three of the original eight settings
+(read_corpus, spontaneity, embedded) alongside their corresponding
+surfaces. Five flags survive: jokes_enabled, songs_enabled,
+play_standalone_enabled, clickable_words_enabled, read_me_button_enabled.
 
 Three independent declarations exist:
 
-1. **Backend canonical list** — built here from the eight per-setting
-   modules in :mod:`toybox.core` (each exposes a ``<KEY>_DEFAULT``
-   constant and a bound ``FeatureFlagSetting``). This IS the source of
-   truth — the migration seed + the API endpoints all reach back to
-   these instances.
+1. **Backend canonical list** — built here from the five surviving
+   per-setting modules in :mod:`toybox.core` (each exposes a
+   ``<KEY>_DEFAULT`` constant and a bound ``FeatureFlagSetting``). This
+   IS the source of truth — the migration seed + the API endpoints all
+   reach back to these instances.
 2. **Frontend shared** — ``frontend/src/shared/feature_flags.ts`` declares
    ``PHASE_K_FEATURE_FLAG_DEFAULTS``. Both parent and kiosk import from
    this file (re-exporting under their own names for grep-friendliness)
@@ -40,9 +45,6 @@ import pytest
 from toybox.core import (
     clickable_words_enabled,
     jokes_enabled,
-    play_embedded_enabled,
-    play_endings_enabled,
-    play_spontaneity_enabled,
     play_standalone_enabled,
     read_me_button_enabled,
     songs_enabled,
@@ -69,9 +71,6 @@ def _backend_canonical_defaults() -> dict[str, bool]:
         "jokes_enabled": jokes_enabled.JOKES_ENABLED_DEFAULT,
         "songs_enabled": songs_enabled.SONGS_ENABLED_DEFAULT,
         "play_standalone_enabled": (play_standalone_enabled.PLAY_STANDALONE_ENABLED_DEFAULT),
-        "play_embedded_enabled": play_embedded_enabled.PLAY_EMBEDDED_ENABLED_DEFAULT,
-        "play_endings_enabled": play_endings_enabled.PLAY_ENDINGS_ENABLED_DEFAULT,
-        "play_spontaneity_enabled": (play_spontaneity_enabled.PLAY_SPONTANEITY_ENABLED_DEFAULT),
         "clickable_words_enabled": (clickable_words_enabled.CLICKABLE_WORDS_ENABLED_DEFAULT),
         "read_me_button_enabled": read_me_button_enabled.READ_ME_BUTTON_ENABLED_DEFAULT,
     }

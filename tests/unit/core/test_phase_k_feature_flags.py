@@ -1,12 +1,11 @@
-"""Unit coverage for the eight Phase K boolean feature-flag modules.
+"""Unit coverage for the surviving Phase K boolean feature-flag modules.
 
-Tests are parameterized over all eight per-setting modules so the
-shared :mod:`toybox.core._feature_flag` storage contract is exercised
-identically for each flag. Per-flag specifics (key name + default)
-come from the per-setting module's ``_SETTING`` instance. The
-intentional defaults divergence — seven default ``True``,
-``play_spontaneity_enabled`` defaults ``False`` — is its own
-parameterized test below.
+Originally eight flags; Phase L Step L5 removed the three Phase K
+play-surface flags (``play_embedded_enabled``, ``play_endings_enabled``,
+``play_spontaneity_enabled``) when jokes/songs migrated to per-activity
+reward types. The five remaining flags share the
+:mod:`toybox.core._feature_flag` storage contract; tests below are
+parameterized over those five so any future drift surfaces uniformly.
 
 Mirrors :mod:`tests.unit.core.test_play_cadence_seconds` for shape —
 same fresh-migrated-DB fixture, same defensive-fallback assertions,
@@ -26,9 +25,6 @@ import pytest
 from toybox.core import (
     clickable_words_enabled,
     jokes_enabled,
-    play_embedded_enabled,
-    play_endings_enabled,
-    play_spontaneity_enabled,
     play_standalone_enabled,
     read_me_button_enabled,
     songs_enabled,
@@ -47,16 +43,13 @@ class FlagFixture:
     default: bool
 
 
-# Canonical fixture list — one row per Phase K feature flag. The
-# ``default`` column is the spec'd default from
-# ``documentation/phase-k-plan.md §5`` (seven ``True`` + one ``False``).
+# Canonical fixture list — one row per surviving Phase K feature flag.
+# All five default to True after the L5 removal of the three Phase K
+# play-surface flags.
 FLAGS: list[FlagFixture] = [
     FlagFixture(jokes_enabled, "jokes_enabled", True),
     FlagFixture(songs_enabled, "songs_enabled", True),
     FlagFixture(play_standalone_enabled, "play_standalone_enabled", True),
-    FlagFixture(play_embedded_enabled, "play_embedded_enabled", True),
-    FlagFixture(play_endings_enabled, "play_endings_enabled", True),
-    FlagFixture(play_spontaneity_enabled, "play_spontaneity_enabled", False),
     FlagFixture(clickable_words_enabled, "clickable_words_enabled", True),
     FlagFixture(read_me_button_enabled, "read_me_button_enabled", True),
 ]
@@ -91,20 +84,10 @@ def test_default_matches_spec(flag: FlagFixture) -> None:
 def test_get_returns_seeded_default(db: sqlite3.Connection, flag: FlagFixture) -> None:
     """Migrated DB → ``get`` returns the seeded default for each flag.
 
-    Migration 0015 seeds all eight rows; this asserts the seed values
-    match the per-module default constants. A drift between the SQL
-    seed and the Python default would surface here.
+    Migration 0015 seeds the row; this asserts the seed value matches
+    the per-module default constant. A drift between the SQL seed and
+    the Python default would surface here.
     """
-    # Phase L L1: migration 0021 deletes the three play-surface flag rows
-    # (see _PHASE_L_DROPPED_FLAG_KEYS below). Without this skip the test
-    # silently asserts on the row-absent fallback path rather than the
-    # seeded-value path it documents. The per-flag module + FLAGS row
-    # will be removed in L5 along with this branch.
-    if flag.key in _PHASE_L_DROPPED_FLAG_KEYS:
-        pytest.skip(
-            f"{flag.key} row deleted by migration 0021 (Phase L L1); "
-            f"per-flag module will be removed in L5."
-        )
     assert flag.module.get(db) is flag.default
 
 
@@ -221,23 +204,6 @@ def test_helper_get_falls_back_on_missing_row(
     assert helper_flag.get(db) is helper_flag.default
 
 
-# Phase L L1: migration 0021 deletes three Phase K play-surface flag
-# rows (``play_embedded_enabled``, ``play_endings_enabled``,
-# ``play_spontaneity_enabled``) as the first step of re-framing
-# jokes/songs as per-activity reward types. The per-setting helper
-# modules and ``FLAGS`` list are L5's territory to remove; until then
-# the "seeded value" guard below excludes the three deprecated keys.
-# Their absence is verified end-to-end by
-# ``tests/integration/migrations/test_0019_0020_0021_phase_l_foundation.py``.
-_PHASE_L_DROPPED_FLAG_KEYS: frozenset[str] = frozenset(
-    {
-        "play_embedded_enabled",
-        "play_endings_enabled",
-        "play_spontaneity_enabled",
-    }
-)
-
-
 def test_migration_seeds_match_defaults(db: sqlite3.Connection) -> None:
     """Sanity guard: every still-active Phase K flag has a seed row
     matching its default.
@@ -246,15 +212,8 @@ def test_migration_seeds_match_defaults(db: sqlite3.Connection) -> None:
     reading the raw stored strings rather than going through the
     helper, so a hypothetical "helper returns default even when row
     is wrong" bug can't mask a seed drift.
-
-    Phase L L1: the three deprecated play-surface keys in
-    :data:`_PHASE_L_DROPPED_FLAG_KEYS` are skipped here — migration
-    0021 deletes those rows. The per-flag ``get`` fallback path covers
-    that case (returns the helper default when the row is absent).
     """
     for flag in FLAGS:
-        if flag.key in _PHASE_L_DROPPED_FLAG_KEYS:
-            continue
         row = db.execute("SELECT value FROM settings WHERE key = ?", (flag.key,)).fetchone()
         assert row is not None, f"migration 0015 must seed {flag.key}"
         raw = row["value"] if isinstance(row, sqlite3.Row) else row[0]
@@ -262,15 +221,12 @@ def test_migration_seeds_match_defaults(db: sqlite3.Connection) -> None:
         assert raw == expected, f"settings.{flag.key} seeded {raw!r}, expected {expected!r}"
 
 
-def test_spontaneity_is_the_only_opt_in() -> None:
-    """Lock the §5 table: exactly one of the eight defaults is False.
+def test_all_surviving_flags_default_true() -> None:
+    """After Phase L Step L5 the lone opt-in flag (``play_spontaneity_enabled``)
+    was deleted; every remaining flag defaults to ``True``.
 
-    Code-quality §2 (one source of truth): if any future PR flips the
-    default of one of the seven opt-out flags, or removes
-    play_spontaneity_enabled's opt-in semantics, this assertion fails
-    loudly.
+    Code-quality §2 (one source of truth): if any future PR flips a
+    default this assertion fails loudly, prompting the author to
+    update the §5 defaults table alongside the module change.
     """
-    off_count = sum(1 for f in FLAGS if f.default is False)
-    assert off_count == 1
-    (off_flag,) = [f for f in FLAGS if f.default is False]
-    assert off_flag.key == "play_spontaneity_enabled"
+    assert all(f.default is True for f in FLAGS)

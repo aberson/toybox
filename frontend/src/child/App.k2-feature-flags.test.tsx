@@ -2,22 +2,27 @@
 //
 // Production-call coverage (code-quality §4 — new components require
 // an integration test through the production caller). The kiosk's
-// App.tsx bootstrap parallel-fetches the eight settings GETs and
+// App.tsx bootstrap parallel-fetches the remaining settings GETs and
 // lifts the resolved values into component state, then surfaces them
 // as data-* attributes on the kiosk root (the K2 wiring seam — later
 // K-steps will replace the attributes with prop drilling into
 // StepCard / ChoiceButton).
 //
+// Phase L Step L5 removed the three Phase K play-surface flags
+// (``play_embedded_enabled``, ``play_endings_enabled``,
+// ``play_spontaneity_enabled``) when jokes/songs migrated to
+// per-activity reward types. Five flags remain.
+//
 // Two tests pin the contract:
 //
-//   1. Happy path — all eight endpoints respond with non-default
-//      values; the data-flag-* attributes on <main> reflect the
-//      fetched values exactly. This is the silent-wiring guard: a
-//      regression where the fetch fires but the result is never
-//      assigned would leave the data attrs at the defaults despite
-//      the fetch responses.
+//   1. Happy path — every surviving endpoint responds with a
+//      non-default value; the data-flag-* attributes on <main>
+//      reflect the fetched values exactly. This is the silent-wiring
+//      guard: a regression where the fetch fires but the result is
+//      never assigned would leave the data attrs at the defaults
+//      despite the fetch responses.
 //
-//   2. Per-endpoint rejection — one flag's GET 500s; the other seven
+//   2. Per-endpoint rejection — one flag's GET 500s; the others
 //      land their fetched values and the rejected flag stays at its
 //      optimistic default. Catches a regression where one bad endpoint
 //      poisons the whole bootstrap.
@@ -39,7 +44,7 @@ afterEach(() => {
     .__TOYBOX_KIOSK_PIN__;
 });
 
-// Eight kebab paths, in the order ``KIOSK_FEATURE_FLAG_PATHS`` declares
+// The kebab paths, in the order ``KIOSK_FEATURE_FLAG_PATHS`` declares
 // them. Local copy here so the production constant isn't its own
 // test fixture (defending against a "test passes only because both
 // halves are imported from the same file" failure mode).
@@ -47,9 +52,6 @@ const FLAG_PATHS: ReadonlyArray<readonly [string, string]> = [
   ["jokes_enabled", "/api/settings/jokes-enabled"],
   ["songs_enabled", "/api/settings/songs-enabled"],
   ["play_standalone_enabled", "/api/settings/play-standalone-enabled"],
-  ["play_embedded_enabled", "/api/settings/play-embedded-enabled"],
-  ["play_endings_enabled", "/api/settings/play-endings-enabled"],
-  ["play_spontaneity_enabled", "/api/settings/play-spontaneity-enabled"],
   ["clickable_words_enabled", "/api/settings/clickable-words-enabled"],
   ["read_me_button_enabled", "/api/settings/read-me-button-enabled"],
 ];
@@ -98,15 +100,12 @@ function stubKioskBootstrapFetch(args: FetchStubArgs = {}): {
             { status, headers: { "Content-Type": "application/json" } },
           );
         }
-        // Default body per the backend's seeded migration: seven
-        // true + one false.
+        // Default body per the backend's seeded migration: all five
+        // surviving flags default to true after Phase L Step L5.
         const defaultByPath: Record<string, boolean> = {
           "/api/settings/jokes-enabled": true,
           "/api/settings/songs-enabled": true,
           "/api/settings/play-standalone-enabled": true,
-          "/api/settings/play-embedded-enabled": true,
-          "/api/settings/play-endings-enabled": true,
-          "/api/settings/play-spontaneity-enabled": false,
           "/api/settings/clickable-words-enabled": true,
           "/api/settings/read-me-button-enabled": true,
         };
@@ -133,12 +132,12 @@ async function bootKioskWithPin(): Promise<void> {
 }
 
 describe("Kiosk K2 bootstrap — feature flag parallel fetch", () => {
-  it("fires GET for all eight settings endpoints after token issuance", async () => {
+  it("fires GET for every settings endpoint after token issuance", async () => {
     const { calls } = stubKioskBootstrapFetch();
     await bootKioskWithPin();
 
     // Wait until every flag endpoint has been called at least once.
-    // The eight endpoints fire in parallel via Promise.allSettled.
+    // The endpoints fire in parallel via Promise.allSettled.
     await waitFor(() => {
       for (const [, path] of FLAG_PATHS) {
         expect(
@@ -158,9 +157,6 @@ describe("Kiosk K2 bootstrap — feature flag parallel fetch", () => {
         "/api/settings/jokes-enabled": false,
         "/api/settings/songs-enabled": false,
         "/api/settings/play-standalone-enabled": false,
-        "/api/settings/play-embedded-enabled": false,
-        "/api/settings/play-endings-enabled": false,
-        "/api/settings/play-spontaneity-enabled": true,
         "/api/settings/clickable-words-enabled": false,
         "/api/settings/read-me-button-enabled": false,
       },
@@ -176,15 +172,6 @@ describe("Kiosk K2 bootstrap — feature flag parallel fetch", () => {
       expect(
         root!.getAttribute("data-flag-play-standalone-enabled"),
       ).toBe("false");
-      expect(root!.getAttribute("data-flag-play-embedded-enabled")).toBe(
-        "false",
-      );
-      expect(root!.getAttribute("data-flag-play-endings-enabled")).toBe(
-        "false",
-      );
-      expect(
-        root!.getAttribute("data-flag-play-spontaneity-enabled"),
-      ).toBe("true");
       expect(
         root!.getAttribute("data-flag-clickable-words-enabled"),
       ).toBe("false");
@@ -195,9 +182,9 @@ describe("Kiosk K2 bootstrap — feature flag parallel fetch", () => {
   });
 
   it("isolates a single endpoint rejection — others land + bad one stays default", async () => {
-    // jokes-enabled 500s; the other seven respond with their inverted
-    // values. The kiosk state must reflect: jokes_enabled stays at
-    // its optimistic default (true), the other seven flipped.
+    // jokes-enabled 500s; the other surviving flags respond with their
+    // inverted values. The kiosk state must reflect: jokes_enabled
+    // stays at its optimistic default (true), the others flipped.
     stubKioskBootstrapFetch({
       flagStatuses: {
         "/api/settings/jokes-enabled": 500,
@@ -205,9 +192,6 @@ describe("Kiosk K2 bootstrap — feature flag parallel fetch", () => {
       flagValues: {
         "/api/settings/songs-enabled": false,
         "/api/settings/play-standalone-enabled": false,
-        "/api/settings/play-embedded-enabled": false,
-        "/api/settings/play-endings-enabled": false,
-        "/api/settings/play-spontaneity-enabled": true,
         "/api/settings/clickable-words-enabled": false,
         "/api/settings/read-me-button-enabled": false,
       },
@@ -226,11 +210,8 @@ describe("Kiosk K2 bootstrap — feature flag parallel fetch", () => {
         expect(root).not.toBeNull();
         // The rejected flag stayed at its optimistic default (true).
         expect(root!.getAttribute("data-flag-jokes-enabled")).toBe("true");
-        // The other seven landed their inverted (resolved) values.
+        // The others landed their inverted (resolved) values.
         expect(root!.getAttribute("data-flag-songs-enabled")).toBe("false");
-        expect(
-          root!.getAttribute("data-flag-play-spontaneity-enabled"),
-        ).toBe("true");
         expect(
           root!.getAttribute("data-flag-clickable-words-enabled"),
         ).toBe("false");

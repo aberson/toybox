@@ -52,7 +52,7 @@ import re
 from collections import deque
 from typing import Final
 
-from .models import EndingStep, Step, Template
+from .models import Step, Template
 from .roles import Role
 from .slots import KNOWN_SLOTS
 
@@ -410,61 +410,40 @@ def validate_template(template: Template) -> None:
             f"least one step / choice / title"
         )
 
-    # ----- (K3.3) ending_step.kind ∈ {"song", "joke"} ----------------------
-    # The Pydantic ``EndingStep`` model already gates this via
-    # ``Literal["song", "joke"]``; the defense-in-depth re-check here
-    # catches in-memory construction paths that bypass Pydantic (e.g.,
-    # a future caller building ``Template`` with ``model_construct`` to
-    # skip validation). Cheap to verify; consistent error shape.
-    if template.ending_step is not None:
-        if not isinstance(template.ending_step, EndingStep):
-            raise TemplateGraphError(
-                f"template {template_id!r}: ending_step is not an EndingStep instance"
-            )
-        if template.ending_step.kind not in ("song", "joke"):
-            raise TemplateGraphError(
-                f"template {template_id!r}: ending_step.kind="
-                f"{template.ending_step.kind!r} is not 'song' or 'joke'"
-            )
+    # Phase L Step L5 — the K14 ending-step shape gate and the K14.1
+    # auto-song/joke recommended_themes gate have been removed. The
+    # ``EndingStep`` model itself was deleted from ``models.py``; any
+    # ``ending_step:`` key still present on a template JSON is parsed
+    # via the ``extra="ignore"`` Pydantic config and ignored at runtime.
 
-    # ----- (K3.4) song / joke step shape: corpus_id XOR auto=True ----------
-    # Same defense-in-depth rationale as (K3.3). The Pydantic
-    # ``Step._check_song_joke_shape`` validator already catches these
-    # at model construction; re-checked here so callers using
-    # ``validate_template`` directly get a uniform
+    # ----- (K3.4) song / joke step shape: corpus_id required, auto=true REJECTED
+    # Defense-in-depth. The Pydantic ``Step._check_song_joke_shape``
+    # validator already catches these at model construction; re-checked
+    # here so callers using ``validate_template`` directly get a uniform
     # :class:`TemplateGraphError` shape.
-    has_auto_song_joke = False
+    #
+    # Phase L Step L5 — ``auto=true`` is now REJECTED on song / joke
+    # steps. The advance-time embedded picker (``_pick_embedded_corpus_step``
+    # in ``api/activities.py``) that consumed it was deleted in L5;
+    # without that picker, the template's placeholder body text would
+    # render literally on the kiosk. See documentation/phase-l-plan.md.
     for idx, step in enumerate(template.steps):
         label = step.id if step.id is not None else f"index {idx}"
         if step.kind in ("song", "joke"):
-            if step.corpus_id is None and step.auto is not True:
-                raise TemplateGraphError(
-                    f"template {template_id!r}: step {label!r} "
-                    f"kind={step.kind!r} must set `corpus_id` or `auto=true`"
-                )
-            if step.corpus_id is not None and step.auto is True:
-                raise TemplateGraphError(
-                    f"template {template_id!r}: step {label!r} "
-                    f"kind={step.kind!r} sets both `corpus_id` and "
-                    f"`auto=true`; pick one"
-                )
             if step.auto is True:
-                has_auto_song_joke = True
-
-    # ----- (K14.1) auto song/joke steps require recommended_themes -------
-    # The K14 embedded picker (post_advance lazy-render) filters the
-    # corpus on the template's first ``recommended_themes`` entry. A
-    # template with an ``auto: true`` step but no themes leaves the
-    # picker with no filter, which silently degrades to "no corpus
-    # entry" → the engine terminates the activity instead of inserting
-    # the embedded step. Fail at template-load time so the author sees
-    # the gap before runtime.
-    if has_auto_song_joke and not template.recommended_themes:
-        raise TemplateGraphError(
-            f"template {template_id!r}: has `auto: true` song/joke step "
-            f"but `recommended_themes` is empty; K14 embedded picker "
-            f"requires at least one theme to filter on"
-        )
+                raise TemplateGraphError(
+                    f"template {template_id!r}: step {label!r} "
+                    f"kind={step.kind!r} sets `auto=true`, but the "
+                    f"embedded picker was removed in Phase L Step L5 "
+                    f"(see documentation/phase-l-plan.md). Pin a specific "
+                    f"corpus entry via `corpus_id` instead."
+                )
+            if step.corpus_id is None:
+                raise TemplateGraphError(
+                    f"template {template_id!r}: step {label!r} "
+                    f"kind={step.kind!r} must set `corpus_id` "
+                    f"(Phase L Step L5 removed the `auto=true` path)"
+                )
 
 
 __all__ = [

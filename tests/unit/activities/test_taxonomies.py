@@ -166,12 +166,17 @@ def test_theme_display_names_cover_all_themes() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_interjection_kind_membership_is_exactly_four_canonical_names() -> None:
-    """4 interjection kinds match plan §2's metadata.interjection wire shape."""
-    expected = {"embedded", "ending", "parent", "spontaneity"}
+def test_interjection_kind_membership_matches_post_l5_taxonomy() -> None:
+    """Phase L Step L5 reduced the K1 four-member interjection taxonomy
+    to a single member: ``parent``. The other three (``embedded``,
+    ``ending``, ``spontaneity``) were deleted when their delivery
+    surfaces migrated to per-activity reward types. A future
+    reintroduction must update this assertion alongside the enum.
+    """
+    expected = {"parent"}
     actual = {k.value for k in InterjectionKind}
     assert actual == expected, f"InterjectionKind taxonomy drift: {actual ^ expected!r}"
-    assert len(InterjectionKind) == 4
+    assert len(InterjectionKind) == 1
 
 
 def test_interjection_display_names_cover_all_kinds() -> None:

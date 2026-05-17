@@ -118,12 +118,11 @@ describe("PlayFeaturesControls — integration with real ApiClient", () => {
     expect(puts[0].body).toBe(JSON.stringify({ value: false }));
   });
 
-  it("clicking On on play_spontaneity_enabled (opt-in) fires PUT with {value:true}", async () => {
-    // Pin the opt-in flag's wire shape too — different default
-    // (false), so the displayed→target transition is the inverse of
-    // the jokes_enabled case. If a future refactor flips the wire
-    // body or the URL, this test fails alongside the jokes_enabled
-    // one (both share the same code path).
+  it("clicking Off on songs_enabled fires PUT /api/settings/songs-enabled with {value:false}", async () => {
+    // Companion canary covering a second flag's setter wiring through
+    // the real ApiClient. Different snake_case → kebab-case mapping
+    // shape than jokes_enabled so a unitary regex regression in the
+    // URL builder surfaces here.
     const { api, observed } = buildRealApiClient();
     const onValueChanged = vi.fn();
     render(
@@ -133,19 +132,14 @@ describe("PlayFeaturesControls — integration with real ApiClient", () => {
         onValueChanged={onValueChanged}
       />,
     );
-    fireEvent.click(
-      screen.getByTestId("feature-toggle-play_spontaneity_enabled-on"),
-    );
+    fireEvent.click(screen.getByTestId("feature-toggle-songs_enabled-off"));
     await waitFor(() => {
-      expect(onValueChanged).toHaveBeenCalledWith(
-        "play_spontaneity_enabled",
-        true,
-      );
+      expect(onValueChanged).toHaveBeenCalledWith("songs_enabled", false);
     });
     const puts = observed.filter((r) => r.method === "PUT");
     expect(puts).toHaveLength(1);
-    expect(puts[0].url).toMatch(/\/api\/settings\/play-spontaneity-enabled$/);
-    expect(puts[0].body).toBe(JSON.stringify({ value: true }));
+    expect(puts[0].url).toMatch(/\/api\/settings\/songs-enabled$/);
+    expect(puts[0].body).toBe(JSON.stringify({ value: false }));
   });
 
   it("every flag's setter routes to its kebab-case URL when invoked through the real client", async () => {
@@ -168,9 +162,6 @@ describe("PlayFeaturesControls — integration with real ApiClient", () => {
       jokes_enabled: "/api/settings/jokes-enabled",
       songs_enabled: "/api/settings/songs-enabled",
       play_standalone_enabled: "/api/settings/play-standalone-enabled",
-      play_embedded_enabled: "/api/settings/play-embedded-enabled",
-      play_endings_enabled: "/api/settings/play-endings-enabled",
-      play_spontaneity_enabled: "/api/settings/play-spontaneity-enabled",
       clickable_words_enabled: "/api/settings/clickable-words-enabled",
       read_me_button_enabled: "/api/settings/read-me-button-enabled",
     };

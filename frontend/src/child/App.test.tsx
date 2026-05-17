@@ -65,20 +65,15 @@ function stubFetchCapturingAuthCalls(
         headers: { "Content-Type": "application/json" },
       });
     }
-    // Phase K step K2: the kiosk bootstrap parallel-fetches the eight
+    // Phase K step K2: the kiosk bootstrap parallel-fetches the
     // feature flags after token issuance. Return the spec'd seeded
     // defaults so the existing PIN-source tests don't 404 on the
-    // bootstrap's new probes. The wire body is ``{value: bool}`` per
-    // flag — seven true + one false (play_spontaneity_enabled). The
-    // dedicated feature-flag bootstrap test below overrides this
-    // when it needs a specific shape.
+    // bootstrap's probes. Phase L Step L5 removed the three play-
+    // surface flags; the five surviving flags all default to true.
     const k2DefaultFlags: Record<string, boolean> = {
       "/api/settings/jokes-enabled": true,
       "/api/settings/songs-enabled": true,
       "/api/settings/play-standalone-enabled": true,
-      "/api/settings/play-embedded-enabled": true,
-      "/api/settings/play-endings-enabled": true,
-      "/api/settings/play-spontaneity-enabled": false,
       "/api/settings/clickable-words-enabled": true,
       "/api/settings/read-me-button-enabled": true,
     };

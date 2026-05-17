@@ -20,7 +20,7 @@
   "$defs": {
     "template": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "required": ["id", "title", "steps"],
       "properties": {
         "id": {
@@ -71,11 +71,7 @@
           "items": { "$ref": "#/$defs/theme" },
           "uniqueItems": true,
           "default": [],
-          "description": "Phase K K3: theme tags driving the K14 embedded-interjection picker. Each entry must be a valid Theme (toybox.activities.themes.Theme)."
-        },
-        "ending_step": {
-          "$ref": "#/$defs/ending_step",
-          "description": "Phase K K3: optional auto-appended interjection step. When present AND the play_endings_enabled surface flag is on, the engine appends a themed song/joke step after the template's last step at activity-creation time."
+          "description": "Phase K K3: theme tags. Phase L Step L5 removed the K14 embedded-interjection picker that consumed these; the field is accepted for backward compatibility with the existing template catalog and remains available for future surfaces."
         }
       }
     },
@@ -112,21 +108,6 @@
         "silly"
       ],
       "description": "Phase K K1 theme taxonomy. Source of truth: toybox.activities.themes.Theme. Enum values mirrored here so the jsonschema layer can reject typos before they reach the Pydantic layer."
-    },
-    "ending_step": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["kind", "auto"],
-      "properties": {
-        "kind": {
-          "type": "string",
-          "enum": ["song", "joke"]
-        },
-        "auto": {
-          "type": "boolean",
-          "const": true
-        }
-      }
     },
     "step": {
       "type": "object",

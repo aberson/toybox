@@ -20,16 +20,13 @@ import {
   PlayFeaturesControls,
 } from "./PlayFeaturesControls";
 
-// Build a stub api whose 8 setters echo back the requested value.
+// Build a stub api whose setters echo back the requested value.
 // ``vi.fn(async (value: boolean) => ({ value }))`` per setter — the
 // signature matches ApiClient's ``Promise<FeatureFlagResponse>``.
 type StubApi = Record<
   | "setJokesEnabled"
   | "setSongsEnabled"
   | "setPlayStandaloneEnabled"
-  | "setPlayEmbeddedEnabled"
-  | "setPlayEndingsEnabled"
-  | "setPlaySpontaneityEnabled"
   | "setClickableWordsEnabled"
   | "setReadMeButtonEnabled",
   Mock
@@ -40,11 +37,6 @@ function buildStubApi(): StubApi {
     setJokesEnabled: vi.fn(async (v: boolean) => ({ value: v })) as Mock,
     setSongsEnabled: vi.fn(async (v: boolean) => ({ value: v })) as Mock,
     setPlayStandaloneEnabled: vi.fn(
-      async (v: boolean) => ({ value: v }),
-    ) as Mock,
-    setPlayEmbeddedEnabled: vi.fn(async (v: boolean) => ({ value: v })) as Mock,
-    setPlayEndingsEnabled: vi.fn(async (v: boolean) => ({ value: v })) as Mock,
-    setPlaySpontaneityEnabled: vi.fn(
       async (v: boolean) => ({ value: v }),
     ) as Mock,
     setClickableWordsEnabled: vi.fn(
@@ -60,9 +52,6 @@ const ALL_FLAG_KEYS: readonly PhaseKFeatureFlag[] = [
   "jokes_enabled",
   "songs_enabled",
   "play_standalone_enabled",
-  "play_embedded_enabled",
-  "play_endings_enabled",
-  "play_spontaneity_enabled",
   "clickable_words_enabled",
   "read_me_button_enabled",
 ];
@@ -73,21 +62,18 @@ afterEach(() => {
 });
 
 describe("PlayFeaturesControls — canonical flag list", () => {
-  it("exposes exactly the 8 expected Phase K flags in spec order", () => {
+  it("exposes exactly the expected Phase K flags in spec order", () => {
     expect(FEATURE_TOGGLES.map((t) => t.key)).toEqual(ALL_FLAG_KEYS);
   });
 
   it("PHASE_K_FEATURE_FLAG_DEFAULTS matches the §5 defaults exactly", () => {
-    // Lock the spec defaults — seven on, one off (spontaneity). A
-    // future "improvement" that flips spontaneity to true must fail
-    // this test before reaching the kid.
+    // Lock the surviving Phase K defaults. Phase L Step L5 removed the
+    // three play-surface flags (embedded/endings/spontaneity). Every
+    // remaining flag defaults to On.
     expect(PHASE_K_FEATURE_FLAG_DEFAULTS).toEqual({
       jokes_enabled: true,
       songs_enabled: true,
       play_standalone_enabled: true,
-      play_embedded_enabled: true,
-      play_endings_enabled: true,
-      play_spontaneity_enabled: false,
       clickable_words_enabled: true,
       read_me_button_enabled: true,
     });
@@ -95,7 +81,7 @@ describe("PlayFeaturesControls — canonical flag list", () => {
 });
 
 describe("PlayFeaturesControls — render", () => {
-  it("renders 8 toggle rows with the spec'd labels", () => {
+  it("renders one toggle row per spec'd flag with the right label", () => {
     const api = buildStubApi();
     render(
       <PlayFeaturesControls
@@ -156,10 +142,11 @@ describe("PlayFeaturesControls — click-to-toggle", () => {
     });
   });
 
-  it("clicking On on play_spontaneity_enabled (opt-in) calls setPlaySpontaneityEnabled(true)", async () => {
-    // The opt-in flag — defaults Off — gets a dedicated test so the
-    // happy-path "operator opts in" flow is explicitly covered, not
-    // just hidden in a loop.
+  it("clicking Off on songs_enabled calls setSongsEnabled(false) + onValueChanged", async () => {
+    // Companion to the jokes_enabled click test above — exercises a
+    // second flag's setter wiring so a copy-paste mismatch between two
+    // adjacent rows surfaces here rather than via the more-fan-out
+    // "every flag clicks once" matrix test further down.
     const api = buildStubApi();
     const onValueChanged = vi.fn();
     render(
@@ -169,18 +156,13 @@ describe("PlayFeaturesControls — click-to-toggle", () => {
         onValueChanged={onValueChanged}
       />,
     );
-    fireEvent.click(
-      screen.getByTestId("feature-toggle-play_spontaneity_enabled-on"),
-    );
+    fireEvent.click(screen.getByTestId("feature-toggle-songs_enabled-off"));
     await waitFor(() => {
-      expect(api.setPlaySpontaneityEnabled).toHaveBeenCalledWith(
-        true,
+      expect(api.setSongsEnabled).toHaveBeenCalledWith(
+        false,
         expect.anything(),
       );
-      expect(onValueChanged).toHaveBeenCalledWith(
-        "play_spontaneity_enabled",
-        true,
-      );
+      expect(onValueChanged).toHaveBeenCalledWith("songs_enabled", false);
     });
   });
 
@@ -202,11 +184,11 @@ describe("PlayFeaturesControls — click-to-toggle", () => {
     expect(onValueChanged).not.toHaveBeenCalled();
   });
 
-  it("clicking each of the 8 flags routes to the right setter exactly once", async () => {
+  it("clicking each surviving flag routes to the right setter exactly once", async () => {
     // Code-quality §3 (audit wire shape): one click per flag, assert
     // the right setter saw it. Catches a wiring regression where two
-    // toggles share a setter (one of the easiest silent-wiring fails
-    // when copy-pasting eight near-identical rows).
+    // toggles share a setter (the most common silent-wiring fail when
+    // copy-pasting near-identical rows).
     const api = buildStubApi();
     const onValueChanged = vi.fn();
     render(

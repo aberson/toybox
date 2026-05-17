@@ -1,19 +1,21 @@
 """Internal helper for Phase K boolean feature-flag settings.
 
-The eight Phase K feature flags
+The surviving Phase K feature flags
 (``jokes_enabled``, ``songs_enabled``, ``play_standalone_enabled``,
-``play_embedded_enabled``, ``play_endings_enabled``,
-``play_spontaneity_enabled``, ``clickable_words_enabled``,
-``read_me_button_enabled``) share an identical storage shape: a TEXT
-``settings.<key>`` row holding ``'true'`` or ``'false'``, with a
-defensive read that falls back to a per-flag default on missing /
-unparseable / out-of-set values.
+``clickable_words_enabled``, ``read_me_button_enabled``) share an
+identical storage shape: a TEXT ``settings.<key>`` row holding
+``'true'`` or ``'false'``, with a defensive read that falls back to a
+per-flag default on missing / unparseable / out-of-set values. Phase L
+Step L5 removed three Phase K play-surface flags
+(``play_embedded_enabled``, ``play_endings_enabled``,
+``play_spontaneity_enabled``) when jokes/songs migrated to
+per-activity reward types.
 
 This private module factors that shared shape out into one
-:class:`FeatureFlagSetting` instance per flag. The eight per-setting
-modules in :mod:`toybox.core.<name>_enabled` re-export ``get`` /
-``set`` / the default constant from their bound instance, preserving
-the per-setting-module convention from Phase H/I/J while keeping the
+:class:`FeatureFlagSetting` instance per flag. The per-setting modules
+in :mod:`toybox.core.<name>_enabled` re-export ``get`` / ``set`` / the
+default constant from their bound instance, preserving the
+per-setting-module convention from Phase H/I/J while keeping the
 storage logic in a single source of truth (cf.
 [code-quality.md §2](.claude/rules/code-quality.md) — one source of
 truth for data-shape constants).

@@ -31,15 +31,6 @@ from .api.jokes_enabled_settings import router as jokes_enabled_settings_router
 from .api.listening import router as listening_router
 from .api.metrics import router as metrics_router
 from .api.play_cadence_seconds_settings import router as play_cadence_seconds_settings_router
-from .api.play_embedded_enabled_settings import (
-    router as play_embedded_enabled_settings_router,
-)
-from .api.play_endings_enabled_settings import (
-    router as play_endings_enabled_settings_router,
-)
-from .api.play_spontaneity_enabled_settings import (
-    router as play_spontaneity_enabled_settings_router,
-)
 from .api.play_standalone_enabled_settings import (
     router as play_standalone_enabled_settings_router,
 )
@@ -81,14 +72,13 @@ def create_app() -> FastAPI:
     app.include_router(transcript_retention_settings_router)
     app.include_router(play_target_depth_settings_router)
     app.include_router(play_cadence_seconds_settings_router)
-    # Phase K Step K2: eight parent-controlled feature flags. Order
-    # within the cohort is alphabetical so the router list stays
-    # mechanically scannable.
+    # Phase K Step K2 + Phase L Step L5: five parent-controlled feature
+    # flags (originally eight; L5 removed the three Phase K play-surface
+    # flags as part of re-framing jokes/songs as per-activity reward
+    # types). Order within the cohort is alphabetical so the router list
+    # stays mechanically scannable.
     app.include_router(clickable_words_enabled_settings_router)
     app.include_router(jokes_enabled_settings_router)
-    app.include_router(play_embedded_enabled_settings_router)
-    app.include_router(play_endings_enabled_settings_router)
-    app.include_router(play_spontaneity_enabled_settings_router)
     app.include_router(play_standalone_enabled_settings_router)
     app.include_router(read_me_button_enabled_settings_router)
     app.include_router(songs_enabled_settings_router)

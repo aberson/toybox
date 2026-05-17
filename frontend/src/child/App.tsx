@@ -266,9 +266,6 @@ export function App(): JSX.Element {
           "jokes_enabled",
           "songs_enabled",
           "play_standalone_enabled",
-          "play_embedded_enabled",
-          "play_endings_enabled",
-          "play_spontaneity_enabled",
           "clickable_words_enabled",
           "read_me_button_enabled",
         ];
