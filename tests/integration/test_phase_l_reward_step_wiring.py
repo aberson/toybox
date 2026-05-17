@@ -227,13 +227,23 @@ def _advance(
     return cast("dict[str, Any]", response.json())
 
 
-def _walk_to_terminal(
+def _walk_to_reward(
     client: TestClient,
     parent_headers: dict[str, str],
     activity_id: str,
     starting_version: int,
 ) -> dict[str, Any]:
-    """Walk the three-step boredom template to completion.
+    """Walk the three-step boredom template up to and including the
+    Phase-1 terminal advance that inserts the reward step.
+
+    Phase L two-phase contract (post-UAT fix): the first terminal
+    advance INSERTs the reward step at ``current=1`` and KEEPS the
+    activity in ``state=running`` so the kiosk's StepCard mounts on
+    the reward step. A SECOND terminal advance (dismiss) transitions
+    to ``state=completed``. Tests asserting on the reward step's
+    presence (and ``state=running`` Phase-1) call this helper; tests
+    asserting on ``state=completed`` call :func:`_walk_to_terminal`
+    which also fires the dismiss.
 
     Sequence after ``approve``:
 
@@ -241,8 +251,9 @@ def _walk_to_terminal(
        pre-seeded by ``_persist_activity``).
     2. advance: lazy-INSERT seq=2 (template step 2).
     3. advance: lazy-INSERT seq=3 (template step 3).
-    4. advance: terminal — state → completed; L4 appends reward step
-       (if eligible).
+    4. advance: Phase 1 — reward step INSERTed at current=1, state
+       stays running (when a reward fires) OR state → completed (when
+       no reward fires — legacy single-advance path preserved).
     """
     version = starting_version
     state = _advance(client, parent_headers, activity_id, version)
@@ -252,6 +263,27 @@ def _walk_to_terminal(
     state = _advance(client, parent_headers, activity_id, version)
     version = int(state["version"])
     state = _advance(client, parent_headers, activity_id, version)
+    return state
+
+
+def _walk_to_terminal(
+    client: TestClient,
+    parent_headers: dict[str, str],
+    activity_id: str,
+    starting_version: int,
+) -> dict[str, Any]:
+    """Walk to ``state=completed`` via the two-phase terminal advance.
+
+    Calls :func:`_walk_to_reward` first (Phase 1 — reward step
+    inserted at current=1 OR state→completed if no reward fires);
+    then if the activity is still running (a reward fired) issues
+    ONE MORE advance (Phase 2 — dismiss the reward, transition to
+    completed). Callers that need to inspect the Phase-1 mid-state
+    should call :func:`_walk_to_reward` directly.
+    """
+    state = _walk_to_reward(client, parent_headers, activity_id, starting_version)
+    if state["state"] == "running":
+        state = _advance(client, parent_headers, activity_id, int(state["version"]))
     return state
 
 
@@ -313,6 +345,77 @@ def _fetch_steps(db_path: Path, activity_id: str) -> list[dict[str, Any]]:
         }
         for r in rows
     ]
+
+
+# ---------------------------------------------------------------------
+# Regression test for the L12 UAT bug: the kiosk's render is mutually
+# exclusive between StepCard (state=running) and "All done!"
+# (isTerminalState(state)). Pre-fix L4 transitioned state→completed
+# BEFORE inserting the reward step, so the kiosk jumped straight to
+# "All done!" and the reward step never rendered.
+#
+# This test pins the two-phase invariant that fixes the UAT regression:
+# after the first terminal advance with a fireable reward, state must
+# be ``running`` AND the new reward step must be ``current=1`` AND its
+# ``kind`` must be ``"reward"``. A second advance then transitions to
+# completed.
+# ---------------------------------------------------------------------
+
+
+def test_reward_step_renders_before_completed_state(
+    client: TestClient,
+    parent_headers: dict[str, str],
+    db_path: Path,
+    l4_corpus: Path,
+    l4_template: Path,
+) -> None:
+    """L12 UAT regression: the kiosk must see ``state=running`` +
+    reward step ``current=1`` after the first terminal advance so the
+    StepCard mounts the RewardStep. Pre-fix wire transitioned to
+    completed immediately, which routed the kiosk to "All done!"
+    skipping the reward render entirely."""
+    _create_reward(client, parent_headers)
+    activity = _propose(client, parent_headers)
+    activity_id = activity["id"]
+    state = _approve(
+        client, parent_headers, activity_id, activity["version"], reward_type="picture"
+    )
+
+    # Phase 1: walk to (and including) the first terminal advance.
+    # Pin the invariants the L12 UAT bug violated.
+    state = _walk_to_reward(client, parent_headers, activity_id, state["version"])
+    assert state["state"] == "running", (
+        f"Phase 1 must keep state=running so kiosk's isActiveKioskActivity "
+        f"returns true and StepCard mounts; got {state['state']!r}"
+    )
+    rows = _fetch_steps(db_path, activity_id)
+    reward_rows = [r for r in rows if r["kind"] == "reward"]
+    assert len(reward_rows) == 1, (
+        f"Phase 1 must insert exactly one reward step; got {len(reward_rows)}"
+    )
+    assert reward_rows[0]["current"] is True, (
+        f"reward step must be current=1 so StepCard renders it; got current="
+        f"{reward_rows[0]['current']!r}"
+    )
+    # No other step should be current=1 (the kiosk picks the first
+    # current step via ``activity.steps.find((s) => s.current)``).
+    other_currents = [r for r in rows if r["kind"] != "reward" and r["current"]]
+    assert other_currents == [], (
+        f"only the reward step may be current=1 in Phase 1; other currents={other_currents}"
+    )
+
+    # Phase 2: the kid taps past the reward (or the 6s auto-advance
+    # fires). State transitions to completed and ALL steps go
+    # current=0; the kiosk's showAllDone branch renders "All done!".
+    state = _advance(client, parent_headers, activity_id, int(state["version"]))
+    assert state["state"] == "completed", (
+        f"Phase 2 must transition state→completed; got {state['state']!r}"
+    )
+    rows_after = _fetch_steps(db_path, activity_id)
+    assert all(not r["current"] for r in rows_after), (
+        f"Phase 2 must flip all steps current=0; got "
+        f"{[(r['seq'], r['current']) for r in rows_after]}"
+    )
 
 
 # ---------------------------------------------------------------------
@@ -708,11 +811,12 @@ def test_reward_step_insertion_bumps_version(
     l4_corpus: Path,
     l4_template: Path,
 ) -> None:
-    """The reward step append bumps ``activities.version`` by 1 (on top
-    of the +1 the state transition already applied). Captured here so
-    a future refactor that drops the version bump surfaces the
-    optimistic-concurrency regression at test time, not at parent-UI
-    "409 mystery" time."""
+    """The Phase L two-phase terminal advance bumps ``activities.version``
+    by 1 per phase: V → V+1 on Phase 1 (reward step INSERT, state
+    stays running), V+1 → V+2 on Phase 2 (state→completed dismiss).
+    Captured so a future refactor that drops EITHER version bump
+    surfaces the optimistic-concurrency regression at test time, not
+    at parent-UI "409 mystery" time."""
     _create_reward(client, parent_headers)
     activity = _propose(client, parent_headers)
     activity_id = activity["id"]
@@ -729,12 +833,29 @@ def test_reward_step_insertion_bumps_version(
     state = _advance(client, parent_headers, activity_id, version)  # → seq 3
     pre_terminal_version = int(state["version"])
 
-    # The terminal advance: state→completed (+1) + reward step append (+1).
+    # Phase 1: reward step inserted at current=1, state STAYS running,
+    # version bumps by exactly 1 (the insert; no state transition).
     state = _advance(client, parent_headers, activity_id, pre_terminal_version)
-    assert state["state"] == "completed"
-    assert state["version"] == pre_terminal_version + 2, (
-        f"expected version to jump by 2 (state transition + reward step), got "
+    assert state["state"] == "running", (
+        f"Phase 1 must keep state=running so kiosk renders reward step; got {state['state']!r}"
+    )
+    assert state["version"] == pre_terminal_version + 1, (
+        f"expected version to jump by 1 on Phase 1 (reward step INSERT), got "
         f"{state['version']} from pre-terminal {pre_terminal_version}"
+    )
+
+    # Phase 2: dismiss-advance transitions state → completed and bumps
+    # version by exactly 1 more (V+1 → V+2 from the pre-terminal mark).
+    phase1_version = int(state["version"])
+    state = _advance(client, parent_headers, activity_id, phase1_version)
+    assert state["state"] == "completed"
+    assert state["version"] == phase1_version + 1, (
+        f"expected version to jump by 1 on Phase 2 (state→completed), got "
+        f"{state['version']} from Phase-1 {phase1_version}"
+    )
+    assert state["version"] == pre_terminal_version + 2, (
+        f"total two-phase delta must be +2; got {state['version']} from "
+        f"pre-terminal {pre_terminal_version}"
     )
 
 

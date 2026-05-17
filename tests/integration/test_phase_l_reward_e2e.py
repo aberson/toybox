@@ -267,13 +267,23 @@ def _walk_to_terminal(
     activity_id: str,
     starting_version: int,
 ) -> dict[str, Any]:
-    """Walk the three-step boredom template to completion (4 advances:
-    approved→running, two lazy-INSERTs, then terminal)."""
+    """Walk the three-step boredom template to ``state=completed`` via
+    the Phase L two-phase terminal advance.
+
+    4 advances reach Phase 1 (approved→running, two lazy-INSERTs,
+    then the terminal advance that inserts the reward step at
+    ``current=1`` and KEEPS state=running). If a reward fired we
+    issue ONE MORE advance to dismiss the reward and transition to
+    completed; if no reward fired (state is already completed after
+    advance 4 — the legacy single-advance path) we return as-is."""
     version = starting_version
     state = _advance(client, parent_headers, activity_id, version)
     for _ in range(3):
         version = int(state["version"])
         state = _advance(client, parent_headers, activity_id, version)
+    if state["state"] == "running":
+        # Phase 2: dismiss the reward step → state=completed.
+        state = _advance(client, parent_headers, activity_id, int(state["version"]))
     return state
 
 

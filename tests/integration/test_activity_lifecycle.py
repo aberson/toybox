@@ -159,13 +159,25 @@ def test_approve_then_advance_to_completed(
         state = adv.json()
         assert state["version"] == version
 
-    # 6th advance after the 5th step was the current → finishes the activity.
+    # 6th advance after the 5th step was the current → terminal
+    # advance. Phase L two-phase: if a reward fires the state stays
+    # running (Phase 1) and a 7th advance flips to completed (Phase
+    # 2); if no reward fires the state goes to completed in this one
+    # advance (legacy single-advance path).
     final = client.post(
         f"/api/activities/{activity_id}/advance",
         headers={**parent_headers, "If-Match-Version": str(state["version"])},
     )
     assert final.status_code == 200
-    assert final.json()["state"] == "completed"
+    final_state = final.json()
+    if final_state["state"] == "running":
+        final = client.post(
+            f"/api/activities/{activity_id}/advance",
+            headers={**parent_headers, "If-Match-Version": str(final_state["version"])},
+        )
+        assert final.status_code == 200, final.text
+        final_state = final.json()
+    assert final_state["state"] == "completed"
 
 
 def test_invalid_transition_advance_from_proposed_409(
@@ -524,18 +536,28 @@ def test_step_back_from_completed_rejects(
     state = _approve_and_advance_to_seq(
         client, parent_headers, target_seq=5, db_path=db_path
     )
-    # One more advance flips to completed.
+    # Phase L two-phase terminal advance: Phase 1 may insert a reward
+    # step and keep state=running; Phase 2 flips to completed. Drive
+    # both to land on state=completed before exercising step-back.
     final = client.post(
         f"/api/activities/{state['id']}/advance",
         headers={**parent_headers, "If-Match-Version": str(state["version"])},
     )
     assert final.status_code == 200
-    assert final.json()["state"] == "completed"
+    final_state = final.json()
+    if final_state["state"] == "running":
+        final = client.post(
+            f"/api/activities/{state['id']}/advance",
+            headers={**parent_headers, "If-Match-Version": str(final_state["version"])},
+        )
+        assert final.status_code == 200, final.text
+        final_state = final.json()
+    assert final_state["state"] == "completed"
     response = client.post(
         f"/api/activities/{state['id']}/step-back",
         headers={
             **parent_headers,
-            "If-Match-Version": str(final.json()["version"]),
+            "If-Match-Version": str(final_state["version"]),
         },
     )
     assert response.status_code == 409

@@ -161,6 +161,10 @@ def _walk_path_a(
     """open (choice 0 = sneak) → sneak (next → snack_ending) →
     snack_ending (fall-through to victory_ending) →
     victory_ending → completed.
+
+    Phase L two-phase terminal advance: if a reward fires the
+    terminal advance keeps state=running and requires a second
+    dismiss-advance to flip to completed.
     """
     version = start_version
     state = _advance(client, parent_headers, activity_id, version)  # → running, seq=1
@@ -168,6 +172,8 @@ def _walk_path_a(
     state = _advance(client, parent_headers, activity_id, state["version"])
     state = _advance(client, parent_headers, activity_id, state["version"])
     state = _advance(client, parent_headers, activity_id, state["version"])
+    if state["state"] == "running":
+        state = _advance(client, parent_headers, activity_id, state["version"])
     return state
 
 
@@ -179,12 +185,18 @@ def _walk_path_b(
 ) -> dict[str, Any]:
     """open (choice 1 = announce) → announce (next → victory_ending) →
     victory_ending → completed.
+
+    Phase L two-phase terminal advance: if a reward fires the
+    terminal advance keeps state=running and requires a second
+    dismiss-advance to flip to completed.
     """
     version = start_version
     state = _advance(client, parent_headers, activity_id, version)  # → running, seq=1
     state = _advance(client, parent_headers, activity_id, state["version"], choice_index=1)
     state = _advance(client, parent_headers, activity_id, state["version"])
     state = _advance(client, parent_headers, activity_id, state["version"])
+    if state["state"] == "running":
+        state = _advance(client, parent_headers, activity_id, state["version"])
     return state
 
 
@@ -379,7 +391,11 @@ def test_branch_destination_leaf_terminates_no_fall_through(
     state = _advance(client, parent_headers, body["id"], state["version"], choice_index=0)
     assert state["state"] == "running"
     # Advance past cat_end → must terminate, NOT insert baby_end.
+    # Phase L two-phase: Phase 1 may insert a reward step at
+    # current=1 (state stays running); Phase 2 flips to completed.
     state = _advance(client, parent_headers, body["id"], state["version"])
+    if state["state"] == "running":
+        state = _advance(client, parent_headers, body["id"], state["version"])
     assert state["state"] == "completed"
 
     conn = connect(db_path, check_same_thread=False)

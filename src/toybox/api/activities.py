@@ -3442,7 +3442,7 @@ def post_advance(
         raise VersionConflictError(current_version, current_state)
 
     steps = conn.execute(
-        "SELECT id, seq, current, choices_json, step_template_id "
+        "SELECT id, seq, current, choices_json, step_template_id, kind "
         "FROM activity_steps WHERE activity_id = ? ORDER BY seq ASC",
         (activity_id,),
     ).fetchall()
@@ -3453,6 +3453,23 @@ def post_advance(
         )
 
     advance_body = body if body is not None else AdvanceRequest()
+
+    # Phase L two-phase terminal advance — Phase 2: the current step
+    # is a reward step (kind="reward"), meaning Phase 1 inserted it.
+    # The kid just tapped past it; dismiss to ``completed``. Short-
+    # circuit here so the lazy-insert path's
+    # ``_resolve_template_step_index`` fallback doesn't mistakenly
+    # land the reward step's NULL ``step_template_id`` + seq-based
+    # fallback array index on an unrelated template entry and insert
+    # a sibling branch's row.
+    if current_state == STATE_RUNNING:
+        current_step_row = next((s for s in steps if int(s["current"]) == 1), None)
+        if current_step_row is not None and str(current_step_row["kind"]) == "reward":
+            if advance_body.choice_index is not None:
+                raise _bad_advance(
+                    "choice_not_allowed", reason="current_step_is_reward"
+                )
+            return _terminal_advance(conn, pubsub, activity_id, expected_version)
 
     # Special-case ``approved → running``: the first /advance after
     # approve doesn't insert a new row — steps[0] is already present
@@ -3747,13 +3764,17 @@ def _build_reward_step_metadata(resolved: ResolvedReward) -> dict[str, Any]:
     }
 
 
-def _maybe_append_reward_step(
+def _insert_reward_step_as_current(
     conn: sqlite3.Connection,
     *,
     activity_id: str,
     row: sqlite3.Row,
 ) -> bool:
-    """Phase L Step L4: resolve + INSERT a reward step at activity end.
+    """Phase L Step L4 (two-phase fix): resolve + INSERT a reward step
+    as the new ``current`` step at activity end. Does NOT touch the
+    activity's state — the caller leaves ``state=running`` so the
+    kiosk's ``isActiveKioskActivity`` predicate keeps StepCard mounted
+    and dispatches on ``step.kind === "reward"`` to RewardStep.
 
     Reads ``activities.reward_type`` (the parent's pick at approve
     time; defaults to ``"random"`` when L4's post_approve wrote it).
@@ -3762,17 +3783,16 @@ def _maybe_append_reward_step(
 
     Builds a :class:`RewardActivityContext` from the activity row +
     the current step count, calls :func:`resolve_reward`, and on a hit
-    INSERTs a ``kind="reward"`` row at ``seq = max(seq) + 1``. The new
-    row is marked ``current=0`` because the terminal advance has
-    already flipped every prior row's ``current`` to 0; the kid sees
-    the reward via the kiosk's "last completed-state response carries
-    the reward step" rendering. For picture rewards, updates
+    INSERTs a ``kind="reward"`` row at ``seq = max(seq) + 1`` with
+    ``current=1``. Flips every prior step's ``current=0`` so the
+    reward step is the sole current row. For picture rewards, updates
     ``rewards.last_used_at`` to the current ISO timestamp so the
     sort-by-recency picker rotates picks across rewards.
 
-    Returns ``True`` when a reward step was appended (and the activity
-    version was bumped by one), ``False`` otherwise (no resolver hit
-    / pre-L row / already has a reward step).
+    Bumps ``activities.version`` once (for the insert + the
+    current-flag move, batched). Returns ``True`` when a reward step
+    was appended, ``False`` otherwise (no resolver hit / pre-L row /
+    already has a reward step).
     """
     if _has_reward_step(conn, activity_id):
         return False
@@ -3829,17 +3849,20 @@ def _maybe_append_reward_step(
     # the L3 contract.
     body_text = resolved.body
     with conn:
-        # The terminal-advance transition flipped current=0 on every
-        # prior step but the reward row itself is also ``current=0``
-        # — the activity is in ``completed`` state by the time we get
-        # here, so no step is current. The kiosk renders the reward
-        # off the steps list + state=completed combination, not off
-        # ``current=1``.
+        # Two-phase terminal advance: the kid just crossed past the
+        # last regular step. We INSERT the reward at ``current=1`` and
+        # flip every other step to ``current=0`` so the kiosk's
+        # StepCard mounts on the reward step (state stays ``running``
+        # — the caller does NOT transition to completed in this phase).
+        conn.execute(
+            "UPDATE activity_steps SET current = 0 WHERE activity_id = ?",
+            (activity_id,),
+        )
         conn.execute(
             "INSERT INTO activity_steps "
             "(id, activity_id, seq, body, sfx, expected_action, current, action_slot, "
             " choices_json, step_template_id, kind, metadata_json) "
-            "VALUES (?, ?, ?, ?, NULL, NULL, 0, NULL, NULL, NULL, ?, ?)",
+            "VALUES (?, ?, ?, ?, NULL, NULL, 1, NULL, NULL, NULL, ?, ?)",
             (
                 str(uuid.uuid4()),
                 activity_id,
@@ -3850,11 +3873,9 @@ def _maybe_append_reward_step(
             ),
         )
         # Bump version so optimistic-concurrency clients see the new
-        # reward step on their next read. The version bump here is
-        # separate from the state-transition bump in
-        # :func:`_terminal_advance` — that one wrote V → V+1 for the
-        # state change; this one writes V+1 → V+2 for the reward step
-        # insertion.
+        # reward step on their next read. Two-phase contract: Phase 1
+        # is V → V+1 (this insert), Phase 2 is V+1 → V+2 (the
+        # subsequent dismiss-advance that flips to completed).
         conn.execute(
             "UPDATE activities SET version = version + 1 WHERE id = ?",
             (activity_id,),
@@ -3876,19 +3897,114 @@ def _terminal_advance(
     activity_id: str,
     expected_version: int,
 ) -> ActivityResponse:
-    """Phase G G3: complete the activity (rule 4 — terminal node).
+    """Phase G G3: terminal advance dispatcher.
 
-    Pulled out of :func:`post_advance` so all the "no successor"
-    branches (template missing, edge unresolved, last-array entry)
-    share the exact same transition + WS broadcast path.
+    Phase L UAT fix (two-phase contract): the kiosk's render is
+    mutually exclusive between "active kiosk activity" (StepCard) and
+    "All done!" (terminal screen) based on ``isTerminalState(state)``.
+    The pre-fix L4 wire transitioned to ``completed`` BEFORE inserting
+    the reward step, so the kiosk jumped straight to "All done!" and
+    the reward step never rendered.
 
-    Phase L Step L4: after the state transition lands, optionally
-    resolve + INSERT a reward step via
-    :func:`_maybe_append_reward_step`. The reward fires AFTER the
-    state transition (rather than before) so the activity's final
-    state on the wire is always ``completed`` regardless of whether
-    the reward picker found a hit — a kid who runs an activity with
-    no eligible rewards still sees the activity wrap cleanly.
+    The fix splits ``_terminal_advance`` into two phases that the
+    caller (post_advance) re-enters via successive /advance calls:
+
+    * **Phase 1** — no reward step exists yet. If the activity has a
+      fireable reward, INSERT it as ``current=1`` (via
+      :func:`_insert_reward_step_as_current`) and KEEP state=running.
+      The kiosk renders the reward step in StepCard / RewardStep.
+      Otherwise (NULL reward_type, no rewards, all pools empty) fall
+      through to the legacy completed-transition path so activities
+      without a reward still wrap cleanly in one advance.
+
+    * **Phase 2** — reward step already exists (the kid tapped past
+      it). Transition to ``completed``, flip ALL steps to current=0,
+      and bump version. The kiosk receives state=completed and
+      switches to "All done!".
+
+    The dispatch is internal — callers continue to invoke
+    ``_terminal_advance`` and don't need to know which phase fires.
+    """
+    if _has_reward_step(conn, activity_id):
+        return _complete_after_reward(conn, pubsub, activity_id, expected_version)
+    return _maybe_fire_reward_or_complete(conn, pubsub, activity_id, expected_version)
+
+
+def _maybe_fire_reward_or_complete(
+    conn: sqlite3.Connection,
+    pubsub: PubSub,
+    activity_id: str,
+    expected_version: int,
+) -> ActivityResponse:
+    """Phase L two-phase terminal advance — Phase 1.
+
+    The kid has just crossed past the last regular step. Try to fire
+    a reward step (KEEP state=running, INSERT reward at current=1). If
+    the reward picker doesn't fire (NULL reward_type, no eligible
+    rewards, empty pools), fall through to the legacy
+    completed-transition path so the activity still wraps in one call.
+
+    The optimistic-concurrency contract is preserved both ways: if
+    the reward fires we bump version once (V → V+1, the insert); if
+    the reward doesn't fire we bump version once (V → V+1, the state
+    transition). The caller sees a deterministic single-version-bump
+    Phase 1 either way.
+    """
+    # Read the row at the current version so the helper can build the
+    # RewardActivityContext. ``expected_version`` was validated by the
+    # caller (post_advance) before reaching here.
+    row = _fetch_activity_row(conn, activity_id)
+    if int(row["version"]) != expected_version:
+        # Defense-in-depth: a concurrent writer slipped in between
+        # post_advance's check and ours. Surface as 409 same as the
+        # _attempt_transition path below.
+        raise VersionConflictError(int(row["version"]), str(row["state"]))
+
+    appended = _insert_reward_step_as_current(conn, activity_id=activity_id, row=row)
+    if appended:
+        # Reward step now lives as current=1, state still ``running``.
+        # The version bump happened inside the helper; re-read the row
+        # so the response carries V+1 + the new step.
+        row = _fetch_activity_row(conn, activity_id)
+        response = _row_to_response(conn, row)
+        _emit_state(pubsub, response)
+        return response
+
+    # No reward fired (NULL reward_type / no eligible rewards / empty
+    # pools). Legacy single-advance path: transition to completed and
+    # flip all current=0 so the kiosk shows "All done!" in one call.
+    ok, row = _attempt_transition(
+        conn,
+        activity_id=activity_id,
+        expected_version=expected_version,
+        new_state=STATE_COMPLETED,
+        additional_sets=(("ended_at", _now_iso()),),
+    )
+    if not ok:
+        raise VersionConflictError(int(row["version"]), str(row["state"]))
+    with conn:
+        conn.execute(
+            "UPDATE activity_steps SET current = 0 WHERE activity_id = ?",
+            (activity_id,),
+        )
+    response = _row_to_response(conn, row)
+    _emit_state(pubsub, response)
+    return response
+
+
+def _complete_after_reward(
+    conn: sqlite3.Connection,
+    pubsub: PubSub,
+    activity_id: str,
+    expected_version: int,
+) -> ActivityResponse:
+    """Phase L two-phase terminal advance — Phase 2.
+
+    The reward step already exists (Phase 1 inserted it). The kid
+    just tapped past it (or the 6s auto-advance fired). Transition
+    state to ``completed``, flip ALL steps' ``current=0`` (including
+    the reward step), bump version once. The kiosk receives
+    state=completed → ``showAllDone`` → "All done!" screen.
     """
     ok, row = _attempt_transition(
         conn,
@@ -3904,14 +4020,6 @@ def _terminal_advance(
             "UPDATE activity_steps SET current = 0 WHERE activity_id = ?",
             (activity_id,),
         )
-    # Phase L Step L4: append the reward step (if eligible) AFTER the
-    # state transition. The helper handles the idempotency guard, the
-    # version bump, and the rewards.last_used_at update internally.
-    # Re-read the row so the returned response sees the post-insert
-    # version + the new step.
-    appended = _maybe_append_reward_step(conn, activity_id=activity_id, row=row)
-    if appended:
-        row = _fetch_activity_row(conn, activity_id)
     response = _row_to_response(conn, row)
     _emit_state(pubsub, response)
     return response

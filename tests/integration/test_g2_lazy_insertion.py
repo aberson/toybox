@@ -466,7 +466,17 @@ def test_pre_g2_inflight_activity_still_advances(
         headers={**parent_headers, "If-Match-Version": str(state["version"])},
     )
     assert final.status_code == 200
-    assert final.json()["state"] == "completed", (
+    final_state = final.json()
+    if final_state["state"] == "running":
+        # Phase L two-phase: Phase 1 inserted a reward step and kept
+        # state=running; Phase 2 dismiss-advance flips to completed.
+        final = client.post(
+            f"/api/activities/{activity_id}/advance",
+            headers={**parent_headers, "If-Match-Version": str(final_state["version"])},
+        )
+        assert final.status_code == 200, final.text
+        final_state = final.json()
+    assert final_state["state"] == "completed", (
         "pre-G2 in-flight activity must advance through to completed using "
         "the existing linear handler — Phase G must not break running activities"
     )

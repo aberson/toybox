@@ -326,6 +326,12 @@ def test_advance_past_terminal_completes(
     stays put. This test no longer asserts "no new row" but does
     assert "no non-reward row was inserted" so the rule-4 contract
     stays pinned.
+
+    Phase L UAT fix (two-phase terminal advance): when a reward fires,
+    the first terminal advance keeps state=running so the kiosk renders
+    the reward step in StepCard. A SECOND /advance flips state to
+    completed. The test issues both advances and only asserts the
+    final completed state.
     """
     _set_branching_templates_dir(monkeypatch, slot_substituted_choices_dir)
     body = _propose_branching(client, parent_headers)
@@ -335,13 +341,19 @@ def test_advance_past_terminal_completes(
     # We're now on seq=2, the "charge_ending" — last entry in array,
     # so rule 4 terminal applies on the next /advance.
     non_reward_rows_before = sum(1 for s in state["steps"] if s.get("kind") != "reward")
+    # Phase 1 terminal advance: reward step may insert (state=running)
+    # OR state immediately → completed (no reward fired).
     state = _advance(client, parent_headers, body["id"], state["version"])
+    if state["state"] == "running":
+        # Phase 2 dismiss-advance: reward fired in Phase 1, flip to
+        # completed now.
+        state = _advance(client, parent_headers, body["id"], state["version"])
     assert state["state"] == "completed"
     # Rule 4: no non-reward row inserted on the terminal advance.
     non_reward_rows_after = sum(1 for s in state["steps"] if s.get("kind") != "reward")
     assert non_reward_rows_after == non_reward_rows_before
-    # No row is current after completion (the reward row inserts at
-    # current=0 too — kiosk renders off state=completed).
+    # No row is current after completion (the reward row also flips to
+    # current=0 in Phase 2 — kiosk renders off state=completed).
     assert all(s["current"] is False for s in state["steps"])
 
 
@@ -522,10 +534,15 @@ def test_pre_g2_legacy_activity_still_advances_through_completion(
         conn.close()
 
     state = _approve(client, parent_headers, activity_id, 1)
-    # 5 advances + 1 to complete.
+    # 5 advances + 1 terminal advance (Phase L two-phase: may need a
+    # second dismiss-advance if a reward step fired).
     for _ in range(5):
         state = _advance(client, parent_headers, activity_id, state["version"])
     final = _advance(client, parent_headers, activity_id, state["version"])
+    if final["state"] == "running":
+        # Phase L Phase 2: reward step inserted at current=1 in Phase
+        # 1; this advance dismisses it and transitions to completed.
+        final = _advance(client, parent_headers, activity_id, final["version"])
     assert final["state"] == "completed"
 
 
