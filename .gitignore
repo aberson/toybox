@@ -68,6 +68,29 @@ data/songs/audio/
 !data/elements/
 !data/elements/elements.json
 !data/elements/_credits.md
+# Phase M M2: ship 14 canonical element sprites in git (one per
+# Family enum value + popular individuals). Other 104 sprites are
+# rendered locally by scripts/generate_element_sprites.py and stay
+# out of git to keep repo size sane. The wildcard ignore for data/*
+# (line 31) already excludes data/images/; we only need to un-ignore
+# the directory chain + the 14 specific PNGs we want to ship.
+!data/images/
+!data/images/elements/
+data/images/elements/*
+!data/images/elements/h-1.png
+!data/images/elements/he-2.png
+!data/images/elements/li-3.png
+!data/images/elements/c-6.png
+!data/images/elements/o-8.png
+!data/images/elements/f-9.png
+!data/images/elements/ne-10.png
+!data/images/elements/al-13.png
+!data/images/elements/si-14.png
+!data/images/elements/ca-20.png
+!data/images/elements/fe-26.png
+!data/images/elements/au-79.png
+!data/images/elements/la-57.png
+!data/images/elements/u-92.png
 
 # Secrets / OAuth
 secrets.json
