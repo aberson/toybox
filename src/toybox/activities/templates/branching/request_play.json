@@ -19900,6 +19900,1236 @@
         "kind": "joke",
         "auto": true
       }
+    },
+    {
+      "id": "repair_block_tower",
+      "title": "Knocked over the block tower",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "rupture",
+          "text": "{friend} runs past the rug and accidentally knocks over {frenemy}'s tall block tower. The blocks scatter. {frenemy} looks scared, hands frozen. What does {friend} do?",
+          "action_slot": "confused",
+          "choices": [
+            {
+              "label": "say sorry",
+              "next": "apologize_path"
+            },
+            {
+              "label": "help fix it",
+              "next": "fix_path"
+            },
+            {
+              "label": "name the feelings",
+              "next": "feelings_path"
+            }
+          ]
+        },
+        {
+          "id": "apologize_path",
+          "text": "{friend} says, \"sorry!\" really fast and looks down. {frenemy} stays quiet — the apology was too quick to land.",
+          "action_slot": "thinking",
+          "next": "apologize_second"
+        },
+        {
+          "id": "apologize_second",
+          "text": "{friend} tries again, slower: \"I'm sorry for knocking over your tower. I was running too fast.\" {frenemy} nods.",
+          "action_slot": "pointing",
+          "next": "end"
+        },
+        {
+          "id": "fix_path",
+          "text": "{friend} kneels and starts re-stacking the blocks alone. It feels lonely. {frenemy}'s hands stay in their lap.",
+          "action_slot": "thinking",
+          "next": "fix_second"
+        },
+        {
+          "id": "fix_second",
+          "text": "{friend} stops, looks up, and asks, \"want to rebuild it together?\" {frenemy} reaches for a block. They build side by side.",
+          "action_slot": "pointing",
+          "next": "end"
+        },
+        {
+          "id": "feelings_path",
+          "text": "{friend} says, \"don't be sad.\" {frenemy}'s shoulders stay tense — being told what to feel didn't help.",
+          "action_slot": "looking",
+          "next": "feelings_second"
+        },
+        {
+          "id": "feelings_second",
+          "text": "{friend} waits a beat and tries again: \"you look scared. I'd be scared too if my tower fell.\" {frenemy}'s shoulders drop.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "Repair takes more than one try. They keep playing.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
+    },
+    {
+      "id": "repair_forgot_invite",
+      "title": "Forgot to invite a friend",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "rupture",
+          "text": "{friend} started a tag game with two other kids and forgot to invite {frenemy}, who was right there. {frenemy} stands alone at the edge, watching. What does {friend} do?",
+          "action_slot": "looking",
+          "choices": [
+            {
+              "label": "say sorry",
+              "next": "apologize_path"
+            },
+            {
+              "label": "name the feelings",
+              "next": "feelings_path"
+            },
+            {
+              "label": "offer something",
+              "next": "offer_path"
+            }
+          ]
+        },
+        {
+          "id": "apologize_path",
+          "text": "{friend} jogs over: \"sorry, sorry!\" {frenemy} shrugs — a fast sorry doesn't tell them what {friend} is sorry FOR.",
+          "action_slot": "running",
+          "next": "apologize_second"
+        },
+        {
+          "id": "apologize_second",
+          "text": "{friend} stops, breathes, and says, \"I'm sorry I didn't invite you. I should have looked around first.\" {frenemy} nods.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "feelings_path",
+          "text": "{friend} says, \"it's not a big deal.\" {frenemy} looks away — being told their feeling isn't a big deal made it bigger.",
+          "action_slot": "thinking",
+          "next": "feelings_second"
+        },
+        {
+          "id": "feelings_second",
+          "text": "{friend} tries again: \"you look left out. That would hurt me too.\" {frenemy} meets their eyes and steps closer.",
+          "action_slot": "looking",
+          "next": "end"
+        },
+        {
+          "id": "offer_path",
+          "text": "{friend} waves: \"come play later, okay?\" {frenemy} doesn't move — \"later\" feels like another way of saying no-thanks.",
+          "action_slot": "waving",
+          "next": "offer_second"
+        },
+        {
+          "id": "offer_second",
+          "text": "{friend} walks over and says, \"come play right now. You can be It first.\" {frenemy} grins and joins the game.",
+          "action_slot": "running",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "A late invite is still an invite. They run together.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
+    },
+    {
+      "id": "repair_mean_drawing",
+      "title": "Said something mean about a drawing",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "rupture",
+          "text": "{friend} looked at {frenemy}'s drawing and said, \"that doesn't look like a horse.\" {frenemy}'s face crumples and they cover the picture. What does {friend} do?",
+          "action_slot": "confused",
+          "choices": [
+            {
+              "label": "say sorry",
+              "next": "apologize_path"
+            },
+            {
+              "label": "name the feelings",
+              "next": "feelings_path"
+            },
+            {
+              "label": "offer something",
+              "next": "offer_path"
+            }
+          ]
+        },
+        {
+          "id": "apologize_path",
+          "text": "{friend} says \"sorry, I didn't mean it!\" but {frenemy} keeps the paper covered — \"didn't mean it\" doesn't undo the words.",
+          "action_slot": "thinking",
+          "next": "apologize_second"
+        },
+        {
+          "id": "apologize_second",
+          "text": "{friend} tries again: \"I'm sorry I said that about your drawing. It wasn't kind, and I'm the one who was wrong.\" {frenemy} uncovers the paper.",
+          "action_slot": "pointing",
+          "next": "end"
+        },
+        {
+          "id": "feelings_path",
+          "text": "{friend} says, \"don't cry.\" {frenemy}'s shoulders stay hunched — being told not to feel something made the feeling stick.",
+          "action_slot": "thinking",
+          "next": "feelings_second"
+        },
+        {
+          "id": "feelings_second",
+          "text": "{friend} sits down next to them: \"my words hurt your feelings. I'd be hurt too.\" {frenemy} wipes their eyes and nods.",
+          "action_slot": "looking",
+          "next": "end"
+        },
+        {
+          "id": "offer_path",
+          "text": "{friend} says, \"want to draw with me?\" {frenemy} shakes their head — being asked to draw right after the comment feels like more pressure.",
+          "action_slot": "waving",
+          "next": "offer_second"
+        },
+        {
+          "id": "offer_second",
+          "text": "{friend} tries again: \"want me to draw a horse next to yours? Yours can be the parent and mine the baby.\" {frenemy} slides the paper over.",
+          "action_slot": "pointing",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "The drawing now has two horses. They both color it in.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
+    },
+    {
+      "id": "repair_laughed_fall",
+      "title": "Laughed when a friend fell",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "rupture",
+          "text": "{frenemy} tripped on the rug and landed on their knees. {friend} laughed — just for a second, but {frenemy} heard it and turned red. What does {friend} do?",
+          "action_slot": "confused",
+          "choices": [
+            {
+              "label": "say sorry",
+              "next": "apologize_path"
+            },
+            {
+              "label": "name the feelings",
+              "next": "feelings_path"
+            },
+            {
+              "label": "offer something",
+              "next": "offer_path"
+            }
+          ]
+        },
+        {
+          "id": "apologize_path",
+          "text": "{friend} says, \"sorry, it just slipped out!\" {frenemy} looks at the floor — blaming it on \"slipping out\" sounds like {friend} won't be careful next time.",
+          "action_slot": "thinking",
+          "next": "apologize_second"
+        },
+        {
+          "id": "apologize_second",
+          "text": "{friend} kneels next to them: \"I'm sorry I laughed when you fell. That wasn't kind. Are you okay?\" {frenemy} nods, small.",
+          "action_slot": "pointing",
+          "next": "end"
+        },
+        {
+          "id": "feelings_path",
+          "text": "{friend} says, \"don't be embarrassed, it's nothing.\" {frenemy} stays curled up — being told their feeling is \"nothing\" made it heavier.",
+          "action_slot": "thinking",
+          "next": "feelings_second"
+        },
+        {
+          "id": "feelings_second",
+          "text": "{friend} sits beside them: \"you look embarrassed. I'd feel embarrassed too if someone laughed at me.\" {frenemy}'s shoulders soften.",
+          "action_slot": "looking",
+          "next": "end"
+        },
+        {
+          "id": "offer_path",
+          "text": "{friend} reaches out a hand. {frenemy} doesn't take it — being helped up by the kid who laughed feels like the wrong order.",
+          "action_slot": "pointing",
+          "next": "offer_second"
+        },
+        {
+          "id": "offer_second",
+          "text": "{friend} lowers the hand and waits. \"I can sit with you until you're ready.\" After a moment, {frenemy} takes the hand.",
+          "action_slot": "waving",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "They both stand up. The rug is the only thing still on the floor.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
+    },
+    {
+      "id": "repair_took_marker",
+      "title": "Took the last marker without asking",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "rupture",
+          "text": "{friend} grabbed the last blue marker out of the box right as {frenemy} was reaching for it. {frenemy} pulls their hand back, eyes wide. What does {friend} do?",
+          "action_slot": "confused",
+          "choices": [
+            {
+              "label": "say sorry",
+              "next": "apologize_path"
+            },
+            {
+              "label": "help fix it",
+              "next": "fix_path"
+            },
+            {
+              "label": "offer something",
+              "next": "offer_path"
+            }
+          ]
+        },
+        {
+          "id": "apologize_path",
+          "text": "{friend} mutters, \"sorry.\" {frenemy} stays quiet — a quick sorry while still holding the marker doesn't change anything.",
+          "action_slot": "thinking",
+          "next": "apologize_second"
+        },
+        {
+          "id": "apologize_second",
+          "text": "{friend} sets the marker on the table: \"I'm sorry I grabbed the marker. I saw you reaching.\" {frenemy} nods.",
+          "action_slot": "pointing",
+          "next": "end"
+        },
+        {
+          "id": "fix_path",
+          "text": "{friend} hands the marker over. {frenemy} takes it but their face is still tight — getting it now doesn't undo the grab.",
+          "action_slot": "pointing",
+          "next": "fix_second"
+        },
+        {
+          "id": "fix_second",
+          "text": "{friend} digs through the box: \"let me find you another color you like too.\" They pull out a teal. {frenemy} brightens.",
+          "action_slot": "looking",
+          "next": "end"
+        },
+        {
+          "id": "offer_path",
+          "text": "{friend} offers a different marker — a yellow one. {frenemy} shakes their head; they wanted BLUE for the sky.",
+          "action_slot": "pointing",
+          "next": "offer_second"
+        },
+        {
+          "id": "offer_second",
+          "text": "{friend} thinks, then offers a trade: \"I'll use yellow on my picture. You take the blue.\" {frenemy} accepts.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "One marker, two pictures. The sky is blue.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
+    },
+    {
+      "id": "repair_broken_crayon",
+      "title": "Broke a favorite crayon",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "rupture",
+          "text": "{friend} pressed too hard and snapped {frenemy}'s favorite purple crayon in half. {frenemy} stares at the two pieces. What does {friend} do?",
+          "action_slot": "confused",
+          "choices": [
+            {
+              "label": "say sorry",
+              "next": "apologize_path"
+            },
+            {
+              "label": "help fix it",
+              "next": "fix_path"
+            },
+            {
+              "label": "offer something",
+              "next": "offer_path"
+            }
+          ]
+        },
+        {
+          "id": "apologize_path",
+          "text": "{friend} says, \"sorry, it was old anyway.\" {frenemy} frowns — calling it \"old\" makes it sound like the loss doesn't count.",
+          "action_slot": "thinking",
+          "next": "apologize_second"
+        },
+        {
+          "id": "apologize_second",
+          "text": "{friend} picks up both halves and tries again: \"I'm sorry I broke your purple. I know it was your favorite.\" {frenemy}'s frown softens.",
+          "action_slot": "pointing",
+          "next": "end"
+        },
+        {
+          "id": "fix_path",
+          "text": "{friend} grabs the tape and tries to stick the two halves together. The tape doesn't hold; the crayon won't draw. {frenemy} sighs.",
+          "action_slot": "pointing",
+          "next": "fix_second"
+        },
+        {
+          "id": "fix_second",
+          "text": "{friend} thinks again: \"two halves means two crayons we can both use at once. Want to color the same picture together?\" {frenemy} picks up one half and slides over.",
+          "action_slot": "cheering",
+          "next": "end"
+        },
+        {
+          "id": "offer_path",
+          "text": "{friend} offers their own purple crayon. {frenemy} looks at it but doesn't take it — a swap doesn't make the favorite one whole.",
+          "action_slot": "pointing",
+          "next": "offer_second"
+        },
+        {
+          "id": "offer_second",
+          "text": "{friend} sits down: \"you can keep this one, and I'll save my next purple for you too.\" {frenemy} accepts and tucks it into their tin.",
+          "action_slot": "waving",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "Crayons can break. Friendships are bendier than that.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
+    },
+    {
+      "id": "repair_interrupted_story",
+      "title": "Interrupted the pretend story",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "rupture",
+          "text": "{frenemy} was in the middle of telling a long pretend-play story about dragons. {friend} cut in to add their own part and the whole thread got lost. {frenemy} stops talking. What does {friend} do?",
+          "action_slot": "confused",
+          "choices": [
+            {
+              "label": "say sorry",
+              "next": "apologize_path"
+            },
+            {
+              "label": "name the feelings",
+              "next": "feelings_path"
+            },
+            {
+              "label": "offer something",
+              "next": "offer_path"
+            }
+          ]
+        },
+        {
+          "id": "apologize_path",
+          "text": "{friend} says, \"sorry, keep going!\" {frenemy} stays quiet — they don't remember where they were anymore.",
+          "action_slot": "waving",
+          "next": "apologize_second"
+        },
+        {
+          "id": "apologize_second",
+          "text": "{friend} tries again: \"I'm sorry I cut in. Your story was good. Can you start that part over so I can hear it?\" {frenemy} thinks, then begins again.",
+          "action_slot": "pointing",
+          "next": "end"
+        },
+        {
+          "id": "feelings_path",
+          "text": "{friend} says, \"don't be mad.\" {frenemy} crosses their arms — being told not to be mad made them feel madder.",
+          "action_slot": "thinking",
+          "next": "feelings_second"
+        },
+        {
+          "id": "feelings_second",
+          "text": "{friend} tries again: \"you look frustrated. I'd be frustrated too if someone cut me off in the middle.\" {frenemy} uncrosses their arms.",
+          "action_slot": "looking",
+          "next": "end"
+        },
+        {
+          "id": "offer_path",
+          "text": "{friend} offers, \"want me to be a quiet listener now?\" {frenemy} hesitates — the offer sounds like {friend} wants this to be over fast.",
+          "action_slot": "pointing",
+          "next": "offer_second"
+        },
+        {
+          "id": "offer_second",
+          "text": "{friend} sits down cross-legged: \"I'll listen all the way to the end. The dragons can take as long as they need.\" {frenemy} smiles and continues.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "The dragons get their full story. Both kids cheer at the end.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
+    },
+    {
+      "id": "repair_ignored_wave",
+      "title": "Didn't see the wave",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "rupture",
+          "text": "{frenemy} waved from across the room and {friend} walked right past, eyes on the floor. {frenemy}'s hand drops; they look down. {friend} realizes a minute later. What does {friend} do?",
+          "action_slot": "looking",
+          "choices": [
+            {
+              "label": "say sorry",
+              "next": "apologize_path"
+            },
+            {
+              "label": "name the feelings",
+              "next": "feelings_path"
+            },
+            {
+              "label": "offer something",
+              "next": "offer_path"
+            }
+          ]
+        },
+        {
+          "id": "apologize_path",
+          "text": "{friend} calls from across the room: \"sorry, I didn't see you!\" {frenemy} nods but stays sat down — a shout-apology from far away doesn't quite reach.",
+          "action_slot": "waving",
+          "next": "apologize_second"
+        },
+        {
+          "id": "apologize_second",
+          "text": "{friend} walks over and crouches: \"I'm sorry I walked past. I was looking at the floor and didn't see your wave.\" {frenemy} smiles a little.",
+          "action_slot": "pointing",
+          "next": "end"
+        },
+        {
+          "id": "feelings_path",
+          "text": "{friend} says, \"it's no big deal!\" {frenemy} shrugs — being told the moment was nothing made it feel like THEY were nothing.",
+          "action_slot": "thinking",
+          "next": "feelings_second"
+        },
+        {
+          "id": "feelings_second",
+          "text": "{friend} tries again: \"you look ignored. That would hurt me too.\" {frenemy} looks up and scoots over to make room.",
+          "action_slot": "looking",
+          "next": "end"
+        },
+        {
+          "id": "offer_path",
+          "text": "{friend} waves big: \"hi now! hi!\" {frenemy} manages a small wave back — the loud catch-up wave feels a little late.",
+          "action_slot": "waving",
+          "next": "offer_second"
+        },
+        {
+          "id": "offer_second",
+          "text": "{friend} sits down next to them: \"want to do something together? Just us, right now.\" {frenemy} nods and stands up.",
+          "action_slot": "pointing",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "One missed wave doesn't end a friendship. They walk off together.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
+    },
+    {
+      "id": "repair_weird_outfit",
+      "title": "Called the outfit weird",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "rupture",
+          "text": "{frenemy} showed off their rainbow-striped pants and polka-dot shirt. {friend} said, \"that's weird.\" {frenemy}'s smile drops. What does {friend} do?",
+          "action_slot": "confused",
+          "choices": [
+            {
+              "label": "say sorry",
+              "next": "apologize_path"
+            },
+            {
+              "label": "name the feelings",
+              "next": "feelings_path"
+            },
+            {
+              "label": "offer something",
+              "next": "offer_path"
+            }
+          ]
+        },
+        {
+          "id": "apologize_path",
+          "text": "{friend} says, \"sorry, weird is good!\" {frenemy} doesn't smile back — \"weird is good\" is still weird, and it sounds like a save.",
+          "action_slot": "thinking",
+          "next": "apologize_second"
+        },
+        {
+          "id": "apologize_second",
+          "text": "{friend} tries again: \"I'm sorry I said weird. That came out wrong. Your outfit is bright and I like the stripes.\" {frenemy}'s smile peeks back.",
+          "action_slot": "pointing",
+          "next": "end"
+        },
+        {
+          "id": "feelings_path",
+          "text": "{friend} says, \"don't be sad about your clothes!\" {frenemy} looks down — being told not to be sad didn't make the sadness leave.",
+          "action_slot": "thinking",
+          "next": "feelings_second"
+        },
+        {
+          "id": "feelings_second",
+          "text": "{friend} tries again: \"you look hurt. If someone called my favorite outfit weird, I'd feel hurt too.\" {frenemy} looks up.",
+          "action_slot": "looking",
+          "next": "end"
+        },
+        {
+          "id": "offer_path",
+          "text": "{friend} offers, \"want to wear one of MY shirts?\" {frenemy} shakes their head — they liked THIS outfit and the offer felt like a swap-out.",
+          "action_slot": "pointing",
+          "next": "offer_second"
+        },
+        {
+          "id": "offer_second",
+          "text": "{friend} thinks again: \"can I find something stripy of mine so we match?\" {frenemy} brightens and nods.",
+          "action_slot": "cheering",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "They walk off, matching in stripes. Weird is good after all.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
+    },
+    {
+      "id": "repair_team_list",
+      "title": "Left a name off the team list",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "rupture",
+          "text": "{friend} wrote down the team list for the pretend game and forgot to put {frenemy} on it. {frenemy} reads the list twice, hoping. What does {friend} do?",
+          "action_slot": "confused",
+          "choices": [
+            {
+              "label": "say sorry",
+              "next": "apologize_path"
+            },
+            {
+              "label": "help fix it",
+              "next": "fix_path"
+            },
+            {
+              "label": "offer something",
+              "next": "offer_path"
+            }
+          ]
+        },
+        {
+          "id": "apologize_path",
+          "text": "{friend} says, \"oh, sorry!\" and keeps walking. {frenemy} stares at the paper — a sorry-on-the-go didn't change the list.",
+          "action_slot": "running",
+          "next": "apologize_second"
+        },
+        {
+          "id": "apologize_second",
+          "text": "{friend} comes back and looks at the paper: \"I'm sorry I left your name off. That was a real mistake, not just a typo.\" {frenemy} hands them the pen.",
+          "action_slot": "pointing",
+          "next": "end"
+        },
+        {
+          "id": "fix_path",
+          "text": "{friend} scribbles {frenemy}'s name in the margin in tiny letters. {frenemy} sees it — squeezed in the corner doesn't feel like being on the team.",
+          "action_slot": "thinking",
+          "next": "fix_second"
+        },
+        {
+          "id": "fix_second",
+          "text": "{friend} flips the paper over and re-writes the WHOLE list with {frenemy}'s name first this time. {frenemy} smiles big.",
+          "action_slot": "pointing",
+          "next": "end"
+        },
+        {
+          "id": "offer_path",
+          "text": "{friend} offers, \"you can be our cheerleader.\" {frenemy} shakes their head — they wanted to PLAY, not cheer.",
+          "action_slot": "waving",
+          "next": "offer_second"
+        },
+        {
+          "id": "offer_second",
+          "text": "{friend} thinks: \"you can be on my team and we both go first.\" {frenemy} grins and joins the lineup.",
+          "action_slot": "cheering",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "A team list with everyone on it. The game begins.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
+    },
+    {
+      "id": "repair_stepped_puzzle",
+      "title": "Stepped on a puzzle piece",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "rupture",
+          "text": "{friend} walked across the rug and stepped right on {frenemy}'s last puzzle piece. It bent. {frenemy} holds up the crinkled piece. What does {friend} do?",
+          "action_slot": "confused",
+          "choices": [
+            {
+              "label": "say sorry",
+              "next": "apologize_path"
+            },
+            {
+              "label": "help fix it",
+              "next": "fix_path"
+            },
+            {
+              "label": "name the feelings",
+              "next": "feelings_path"
+            }
+          ]
+        },
+        {
+          "id": "apologize_path",
+          "text": "{friend} says, \"sorry, didn't see it.\" {frenemy} doesn't look up — \"didn't see\" doesn't fix the bent piece.",
+          "action_slot": "thinking",
+          "next": "apologize_second"
+        },
+        {
+          "id": "apologize_second",
+          "text": "{friend} kneels down: \"I'm sorry I stepped on your piece. I should have looked where I was walking around your puzzle.\" {frenemy} hands them the piece.",
+          "action_slot": "pointing",
+          "next": "end"
+        },
+        {
+          "id": "fix_path",
+          "text": "{friend} tries to flatten the piece against the floor. It stays bent. {frenemy} sighs.",
+          "action_slot": "pointing",
+          "next": "fix_second"
+        },
+        {
+          "id": "fix_second",
+          "text": "{friend} tries again: \"let me press it under a book for a few minutes — that fixed mine once.\" They slide the piece under a board book together.",
+          "action_slot": "cheering",
+          "next": "end"
+        },
+        {
+          "id": "feelings_path",
+          "text": "{friend} says, \"don't be upset over a puzzle.\" {frenemy}'s shoulders go tight — telling them the feeling is too big made it bigger.",
+          "action_slot": "thinking",
+          "next": "feelings_second"
+        },
+        {
+          "id": "feelings_second",
+          "text": "{friend} sits down: \"you look frustrated. I'd be frustrated too if someone bent my last piece.\" {frenemy}'s shoulders loosen.",
+          "action_slot": "looking",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "A bent piece still fits. The puzzle finishes.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
+    },
+    {
+      "id": "repair_skipped_turn",
+      "title": "Skipped a turn in the game",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "rupture",
+          "text": "{friend} was so excited that they took two turns in a row and skipped {frenemy} completely. {frenemy} sets down their game piece. What does {friend} do?",
+          "action_slot": "confused",
+          "choices": [
+            {
+              "label": "say sorry",
+              "next": "apologize_path"
+            },
+            {
+              "label": "help fix it",
+              "next": "fix_path"
+            },
+            {
+              "label": "offer something",
+              "next": "offer_path"
+            }
+          ]
+        },
+        {
+          "id": "apologize_path",
+          "text": "{friend} says, \"sorry, my bad!\" and rolls again. {frenemy} watches — saying sorry while taking ANOTHER turn doesn't count.",
+          "action_slot": "thinking",
+          "next": "apologize_second"
+        },
+        {
+          "id": "apologize_second",
+          "text": "{friend} puts the dice down: \"I'm sorry I skipped your turn. I got carried away. Your turn now — twice, to make it even.\" {frenemy} picks up the dice.",
+          "action_slot": "pointing",
+          "next": "end"
+        },
+        {
+          "id": "fix_path",
+          "text": "{friend} undoes their second move on the board. {frenemy} watches but their face stays still — undoing the move doesn't undo the missed turn.",
+          "action_slot": "pointing",
+          "next": "fix_second"
+        },
+        {
+          "id": "fix_second",
+          "text": "{friend} also slides {frenemy}'s piece forward to where it would have been, and offers an extra roll: \"your turn now, plus the one I missed.\" {frenemy} nods.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "offer_path",
+          "text": "{friend} offers a swap: \"you go first next round.\" {frenemy} doesn't reach for the dice — \"next round\" still feels like waiting.",
+          "action_slot": "waving",
+          "next": "offer_second"
+        },
+        {
+          "id": "offer_second",
+          "text": "{friend} thinks again: \"actually, you go right now and I'll skip MY next turn to make it even.\" {frenemy} smiles and rolls.",
+          "action_slot": "cheering",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "The game keeps going. Both kids have the same number of turns now.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
+    },
+    {
+      "id": "repair_closed_book",
+      "title": "Closed the book before they were done",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "rupture",
+          "text": "{friend} closed the picture book while {frenemy} was still looking at the last page. {frenemy}'s finger was still on the page. What does {friend} do?",
+          "action_slot": "confused",
+          "choices": [
+            {
+              "label": "say sorry",
+              "next": "apologize_path"
+            },
+            {
+              "label": "help fix it",
+              "next": "fix_path"
+            },
+            {
+              "label": "name the feelings",
+              "next": "feelings_path"
+            }
+          ]
+        },
+        {
+          "id": "apologize_path",
+          "text": "{friend} says, \"sorry, didn't know!\" {frenemy} stays quiet — they had been pointing at the page for a while.",
+          "action_slot": "thinking",
+          "next": "apologize_second"
+        },
+        {
+          "id": "apologize_second",
+          "text": "{friend} opens the book again: \"I'm sorry I closed it. I should have checked if you were still looking.\" {frenemy} points back to the page.",
+          "action_slot": "pointing",
+          "next": "end"
+        },
+        {
+          "id": "fix_path",
+          "text": "{friend} flips back to the page and pushes the book toward {frenemy}. {frenemy} looks at it but their finger doesn't go back down — the moment got interrupted.",
+          "action_slot": "pointing",
+          "next": "fix_second"
+        },
+        {
+          "id": "fix_second",
+          "text": "{friend} sits closer and asks, \"what were you looking at? Show me.\" {frenemy} points to a tiny mouse in the corner of the picture. They study it together.",
+          "action_slot": "looking",
+          "next": "end"
+        },
+        {
+          "id": "feelings_path",
+          "text": "{friend} says, \"don't be upset, it's just a book.\" {frenemy} pulls their hand into their lap — calling the book \"just\" made the feeling smaller and bigger at once.",
+          "action_slot": "thinking",
+          "next": "feelings_second"
+        },
+        {
+          "id": "feelings_second",
+          "text": "{friend} tries again: \"you look interrupted. I'd be frustrated too if someone closed my book.\" {frenemy} nods.",
+          "action_slot": "looking",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "The book opens again. They find the mouse on every page now.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
+    },
+    {
+      "id": "repair_hid_teddy",
+      "title": "Hid the teddy bear as a joke",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "rupture",
+          "text": "{friend} hid {frenemy}'s teddy bear behind the curtain as a joke. {frenemy} got scared and started looking everywhere. The joke didn't land. What does {friend} do?",
+          "action_slot": "confused",
+          "choices": [
+            {
+              "label": "say sorry",
+              "next": "apologize_path"
+            },
+            {
+              "label": "help fix it",
+              "next": "fix_path"
+            },
+            {
+              "label": "name the feelings",
+              "next": "feelings_path"
+            }
+          ]
+        },
+        {
+          "id": "apologize_path",
+          "text": "{friend} pulls the teddy out: \"haha, sorry, joke!\" {frenemy} grabs the teddy and holds it tight — calling it a joke makes the scare feel less serious to {friend}, but not to {frenemy}.",
+          "action_slot": "pointing",
+          "next": "apologize_second"
+        },
+        {
+          "id": "apologize_second",
+          "text": "{friend} sits down: \"I'm sorry I hid Teddy. I thought it would be funny but it scared you. I won't hide your stuff again.\" {frenemy} hugs the bear and nods.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "fix_path",
+          "text": "{friend} hands the teddy back. {frenemy} takes it but won't put it down — getting it back doesn't undo the lost-feeling.",
+          "action_slot": "pointing",
+          "next": "fix_second"
+        },
+        {
+          "id": "fix_second",
+          "text": "{friend} thinks: \"let's make Teddy a safe spot where I PROMISE I won't move them.\" They build a small pillow nest together.",
+          "action_slot": "cheering",
+          "next": "end"
+        },
+        {
+          "id": "feelings_path",
+          "text": "{friend} says, \"it was just a joke!\" {frenemy} squeezes the teddy harder — \"just a joke\" makes their scared-feeling feel wrong.",
+          "action_slot": "thinking",
+          "next": "feelings_second"
+        },
+        {
+          "id": "feelings_second",
+          "text": "{friend} tries again: \"you got really scared. I'd be scared too if my favorite went missing.\" {frenemy} nods, eyes wet but soft.",
+          "action_slot": "looking",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "Teddy gets a nest. Jokes work better when both kids laugh.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
+    },
+    {
+      "id": "repair_loud_song",
+      "title": "Kept playing the song that was too loud",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "rupture",
+          "text": "{frenemy} said the song was too loud for their ears, but {friend} kept playing it. {frenemy} covered their ears and turned away. What does {friend} do?",
+          "action_slot": "confused",
+          "choices": [
+            {
+              "label": "say sorry",
+              "next": "apologize_path"
+            },
+            {
+              "label": "name the feelings",
+              "next": "feelings_path"
+            },
+            {
+              "label": "offer something",
+              "next": "offer_path"
+            }
+          ]
+        },
+        {
+          "id": "apologize_path",
+          "text": "{friend} pauses the music: \"sorry, I forgot.\" {frenemy} keeps their hands near their ears — \"forgot\" sounds like it could happen again.",
+          "action_slot": "thinking",
+          "next": "apologize_second"
+        },
+        {
+          "id": "apologize_second",
+          "text": "{friend} tries again: \"I'm sorry I kept playing it after you said it was too loud. I should have listened the first time.\" {frenemy} lowers their hands.",
+          "action_slot": "pointing",
+          "next": "end"
+        },
+        {
+          "id": "feelings_path",
+          "text": "{friend} says, \"don't be upset, it's a fun song.\" {frenemy} stays turned away — being told the song is fun doesn't change that it was too loud.",
+          "action_slot": "thinking",
+          "next": "feelings_second"
+        },
+        {
+          "id": "feelings_second",
+          "text": "{friend} tries again: \"your ears were overwhelmed. Loud sounds hurt mine too sometimes.\" {frenemy} turns back.",
+          "action_slot": "looking",
+          "next": "end"
+        },
+        {
+          "id": "offer_path",
+          "text": "{friend} offers, \"I'll skip this song.\" {frenemy} shrugs — skipping it sounds like the song just won today, not like {friend} understood.",
+          "action_slot": "pointing",
+          "next": "offer_second"
+        },
+        {
+          "id": "offer_second",
+          "text": "{friend} thinks again: \"you pick the volume. I'll wait until you say it's good.\" {frenemy} turns the dial down themselves and presses play.",
+          "action_slot": "waving",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "A quieter song works for both of them. They dance, ears happy.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
     }
   ]
 }
