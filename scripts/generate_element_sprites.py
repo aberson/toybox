@@ -77,22 +77,44 @@ _CARTOON_CHECKPOINT_DIR = _MODEL_DIR / "cartoon_checkpoint"
 _DEFAULT_OUTPUT_DIR = Path("data/images/elements")
 _OUTPUT_DIM = 512  # plan §5.2 spec — 512×512 PNG per element
 
-# Mirror the prompt template from plan §5.2 verbatim. The placeholders
-# {symbol}, {atomic_number}, {color_description} are substituted from
-# each Element's fields.
+# Prompt template per plan §5.2 (revised 2026-05-18 M2b operator session).
+# The original plan-frozen prompt asked SD to render a card showing the
+# element symbol + atomic number; SD 1.5 + 4-step LCM cannot render
+# legible glyphs at 512², so the card-text reliably came out as mush
+# (operator-spot-checked au-79.png pre-revision). Revised approach: SD
+# renders a clean Iridia-with-element composition with NO text; the
+# symbol + atomic number + name are post-rendered via Pillow as a
+# rounded white overlay panel (see :func:`_overlay_text`).
+#
+# Placeholders {name} and {color_description} are substituted from
+# each :class:`Element`'s fields. The element name (not symbol) is used
+# to bias SD toward depicting the substance itself rather than a
+# letterform.
 _PROMPT_TEMPLATE = (
-    'Professor Iridia, a friendly cartoon scientist with curly hair and '
-    'round glasses, holding up a glowing card showing the element symbol '
-    '"{symbol}" and the number {atomic_number}. The card glows in '
-    '{color_description}. Soft watercolor background, friendly atmosphere, '
-    "children's book illustration style."
+    "Professor Iridia, a friendly cartoon scientist with curly hair and "
+    "round glasses, smiling warmly, holding up a glowing orb of "
+    "{name} in {color_description}. Soft watercolor background, "
+    "friendly atmosphere, children's book illustration style."
 )
 
-# Match toybox.image_gen.pipeline.DEFAULT_NEGATIVE_PROMPT so the
-# rendered style is consistent with the rest of the F.5 outputs.
+# Extends toybox.image_gen.pipeline.DEFAULT_NEGATIVE_PROMPT with explicit
+# text/glyph suppression terms. SD's tendency to scatter pseudo-letters
+# across clothing and backgrounds is a separate failure mode from the
+# card text — these terms cut both. The Pillow overlay (post-render) is
+# the canonical text layer.
 _NEGATIVE_PROMPT = (
-    "photorealistic, 3d, blurry, smooth shading, antialiased, gradient"
+    "photorealistic, 3d, blurry, smooth shading, antialiased, gradient, "
+    "text, letters, numbers, writing, symbols, watermark"
 )
+
+# Font filenames resolved via Pillow's font path search (Windows: walks
+# C:\Windows\Fonts; Linux/macOS: walks platform-standard dirs).
+# Comic Sans is shipped on every Windows install and is the kid-friendly
+# default for the kiosk persona avatars; staying consistent here keeps
+# the overlay legible at iPad-mounted sprite sizes.
+_FONT_SYMBOL = "comicbd.ttf"  # bold, big — element symbol
+_FONT_NAME = "comicbd.ttf"  # bold, medium — element name
+_FONT_NUMBER = "comic.ttf"  # regular, small — atomic number
 
 # Plan §8 risk row "118 sprites style drift" mitigation: derive a
 # stable per-element seed from the element id so re-runs are
@@ -121,8 +143,7 @@ def _derive_seed(element_id: str) -> int:
 def _format_prompt(element: Element) -> str:
     """Substitute the element fields into the plan §5.2 prompt template."""
     return _PROMPT_TEMPLATE.format(
-        symbol=element.symbol,
-        atomic_number=element.atomic_number,
+        name=element.name,
         color_description=element.color_description,
     )
 
@@ -182,8 +203,100 @@ def _build_pipeline() -> Any:
     return pipe
 
 
+def _overlay_text(image: Any, element: Element) -> Any:
+    """Composite the periodic-table-cell text overlay onto a rendered sprite.
+
+    Layout (bottom-left rounded white panel, 42% × 30% of the canvas):
+
+    * Atomic number small, top-left of panel (e.g. ``79``, no hash).
+    * Element symbol big, horizontally + vertically centered (e.g. ``Au``).
+    * Element name medium, bottom-centered (e.g. ``Gold``).
+
+    The panel carries a soft drop shadow so the text reads cleanly over
+    any background (gold-orb yellow, hydrogen blue, uranium grey all
+    spot-checked). PIL is imported locally per the module convention
+    (see :func:`_build_pipeline` docstring) so ``--help`` works
+    without Pillow installed.
+    """
+    from PIL import Image, ImageDraw, ImageFilter, ImageFont
+
+    base = image.convert("RGBA")
+    canvas_w, canvas_h = base.size
+
+    panel_w = int(canvas_w * 0.42)
+    panel_h = int(canvas_h * 0.30)
+    pad = int(canvas_w * 0.04)
+    x0, y0 = pad, canvas_h - panel_h - pad
+
+    # Soft drop-shadow (blurred black rounded rect offset down-right by 6px).
+    shadow = Image.new("RGBA", base.size, (0, 0, 0, 0))
+    ImageDraw.Draw(shadow).rounded_rectangle(
+        (x0 + 6, y0 + 6, x0 + panel_w + 6, y0 + panel_h + 6),
+        radius=24,
+        fill=(0, 0, 0, 110),
+    )
+    shadow = shadow.filter(ImageFilter.GaussianBlur(8))
+
+    # Mostly-opaque white panel (240/255 alpha — a touch of background
+    # bleed-through keeps the panel from looking pasted-on).
+    panel = Image.new("RGBA", base.size, (0, 0, 0, 0))
+    ImageDraw.Draw(panel).rounded_rectangle(
+        (x0, y0, x0 + panel_w, y0 + panel_h),
+        radius=24,
+        fill=(255, 255, 255, 240),
+    )
+
+    base = Image.alpha_composite(base, shadow)
+    base = Image.alpha_composite(base, panel)
+
+    draw = ImageDraw.Draw(base)
+    sym_font = ImageFont.truetype(_FONT_SYMBOL, int(panel_h * 0.55))
+    name_font = ImageFont.truetype(_FONT_NAME, int(panel_h * 0.22))
+    num_font = ImageFont.truetype(_FONT_NUMBER, int(panel_h * 0.18))
+
+    # Atomic number, top-left of panel, no hash prefix.
+    draw.text(
+        (x0 + int(panel_w * 0.08), y0 + int(panel_h * 0.08)),
+        str(element.atomic_number),
+        fill=(120, 120, 120, 255),
+        font=num_font,
+    )
+
+    # Element symbol, h+v centered. Subtract textbbox[1] so the rendered
+    # glyph is visually centered (not its metric box).
+    sym_bb = draw.textbbox((0, 0), element.symbol, font=sym_font)
+    sym_w, sym_h = sym_bb[2] - sym_bb[0], sym_bb[3] - sym_bb[1]
+    draw.text(
+        (
+            x0 + (panel_w - sym_w) // 2 - sym_bb[0],
+            y0 + (panel_h - sym_h) // 2 - sym_bb[1],
+        ),
+        element.symbol,
+        fill=(20, 20, 20, 255),
+        font=sym_font,
+    )
+
+    # Element name, bottom-centered.
+    name_bb = draw.textbbox((0, 0), element.name, font=name_font)
+    name_w = name_bb[2] - name_bb[0]
+    name_h = name_bb[3] - name_bb[1]
+    draw.text(
+        (x0 + (panel_w - name_w) // 2, y0 + panel_h - name_h - int(panel_h * 0.10)),
+        element.name,
+        fill=(60, 60, 60, 255),
+        font=name_font,
+    )
+
+    return base.convert("RGB")
+
+
 def _render_one(pipe: Any, element: Element, seed: int) -> bytes:
     """Generate one PNG for the element. Returns PNG bytes.
+
+    Two-step pipeline: SD 1.5 + LCM renders the cartoon composition,
+    then :func:`_overlay_text` composites the periodic-table-cell text
+    on a rounded white panel (see that function's docstring for why
+    text is overlaid rather than prompted).
 
     Raises whatever the underlying pipeline raises (CUDA OOM,
     diffusers internal errors); the caller decides whether to abort
@@ -202,7 +315,7 @@ def _render_one(pipe: Any, element: Element, seed: int) -> bytes:
         height=_OUTPUT_DIM,
         width=_OUTPUT_DIM,
     )
-    image = result.images[0]
+    image = _overlay_text(result.images[0], element)
     buffer = io.BytesIO()
     image.save(buffer, format="PNG")
     return bytes(buffer.getvalue())

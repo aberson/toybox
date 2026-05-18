@@ -275,6 +275,32 @@ Reasons:
 
 If you intended to run Tier B but capability is False, fix the underlying issue and restart. If you intended Tier C (e.g. testing the fallback path), this is expected.
 
+## Phase M element sprite render (M2b operator step)
+
+[`scripts/generate_element_sprites.py`](../../scripts/generate_element_sprites.py) renders one cartoon sprite per chemical element (118 total) on top of the same Tier B SD 1.5 + LCM-LoRA pipeline this runbook covers. Operator-run, not in the service hot path.
+
+Two-step rendering:
+
+1. **Diffusion** — SD 1.5 + 4-step LCM @ 512² renders Professor Iridia holding a glowing orb of the element (no card-text — see plan §5.2 for why).
+2. **Pillow text overlay** — bottom-left rounded white panel with atomic number top-left, element symbol h+v centered, element name bottom-centered. Comic Sans Bold (`comicbd.ttf`) from the system font path; Windows ships it natively, Linux/macOS Pillow fonts may need install if running there.
+
+Per-element seed is `sha256(element.id) % 2**31` — deterministic, so any individual element can be re-rolled via `--ids <id> --force` without disturbing the rest. Pipeline load is ~60s; per-element render after that is sub-second on a CUDA box.
+
+Operator commands:
+
+```powershell
+# Pre-render gate (3 elements ~1-2 min including pipeline load):
+uv run python scripts/generate_element_sprites.py --ids h-1 au-79 u-92
+
+# Visually inspect data/images/elements/{h-1,au-79,u-92}.png; if good:
+uv run python scripts/generate_element_sprites.py --force   # full 118
+
+# Re-roll an individual element after a bad seed:
+uv run python scripts/generate_element_sprites.py --ids pr-59 --force
+```
+
+14 canonical sprites are committed to git (one per `Family` enum value + gold/helium/oxygen/iron + carbon) as style anchors; the other 104 are gitignored. Fresh-checkout dev runs the full script to fill in the rest; kiosk falls back to the persona avatar when a sprite is missing.
+
 ## What this does NOT cover
 
 - Custom LoRA training per toy. Out of scope for v1.5; if subject identity drifts consistently, follow-up phase adds a per-toy DreamBooth-lite step.
