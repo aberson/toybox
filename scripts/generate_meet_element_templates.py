@@ -275,16 +275,28 @@ def _build_template(element: Element, *, index: int) -> dict[str, Any]:
         "title": f"Meet {name}!",
         "buckets": ["always"],
         "steps": [
+            # `id` fields are load-bearing for the M3 running-state
+            # element_id resolution path: _resolve_element_id_for_
+            # persisted_step (api/activities.py) keys persisted
+            # activity_steps rows on `step.id == step_template_id` to
+            # find the source template step and re-resolve element_id
+            # at WS-serialize time. Without `id`, meet_element templates
+            # ship element_id at proposed/approved (preview path) but
+            # lose it once the kid advances past step 0 (running path).
+            # Caught by M13 smoke-gate sub-test (a) 2026-05-18.
             {
+                "id": "intro",
                 "text": step1_text,
                 "action_slot": "pointing",
                 "element_id": element.id,
             },
             {
+                "id": "fact",
                 "text": step2_text,
                 "action_slot": "thinking",
             },
             {
+                "id": "hook",
                 "text": step3_text,
                 "action_slot": "looking",
             },
