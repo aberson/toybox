@@ -1,19 +1,21 @@
 // Phase K Step K9 — Read Me button.
 //
-// Watermarked "?" bubble positioned by the parent step-card container.
+// Watermarked "?" bubble pinned to the kiosk viewport's bottom-left.
 // Tapping speaks the full step body via the K8 TTS substrate. Render is
 // flag-gated: when ``enabled`` is false the component returns ``null``
 // so an absent flag adds NO DOM nodes (the kiosk is hot-path for the
 // React reconciler; a null return is the cheapest "off").
 //
-// Positioning contract: the consumer (``StepCard``) sets
-// ``position: relative`` on its container; this component renders
-// ``position: absolute`` with ``bottom`` + ``left`` so the watermark
-// pins to the bottom-left of the visible step card regardless of the
-// body text's length. Keeping the positioning rule inside the component
-// (rather than asking each call site to wrap it in a positioned div)
-// means a future StepCard refactor can't accidentally drop the
-// affordance — the button is self-positioning by contract.
+// Positioning contract: ``position: fixed`` with ``bottom`` + ``left``
+// anchors the watermark to the visible viewport, NOT to the parent
+// StepCard section. The original K9 contract pinned to the section's
+// bottom-left via ``position: absolute`` inside a ``position: relative``
+// container — that worked on linear text/joke step cards where the
+// section's height matched the viewport, but drifted to mid-screen on
+// fork cards where the choice-button stack inflated the section's
+// height (fix for #137; operator UAT 2026-05-16). ``fixed`` anchors to
+// the viewport regardless of section height, so the affordance lands
+// in the same on-screen location across every step kind.
 //
 // Hit target: 48×48px (≥44pt per Apple HIG, with breathing room for
 // the watermark's reduced opacity making the boundary less obvious to
@@ -75,7 +77,7 @@ export function ReadMeButton(props: ReadMeButtonProps): JSX.Element | null {
         className="kiosk-read-me-button"
         aria-label="Read Me"
         onClick={handleClick}
-        style={ABSOLUTE_BOTTOM_LEFT_STYLE}
+        style={FIXED_BOTTOM_LEFT_STYLE}
       >
         ?
       </button>
@@ -87,8 +89,8 @@ export function ReadMeButton(props: ReadMeButtonProps): JSX.Element | null {
 // allocate a new object every paint (the kiosk renders this on every
 // StepCard re-render). The opacity transition lives in the CSS block
 // above so the inline style stays static.
-const ABSOLUTE_BOTTOM_LEFT_STYLE: CSSProperties = {
-  position: "absolute",
+const FIXED_BOTTOM_LEFT_STYLE: CSSProperties = {
+  position: "fixed",
   bottom: 16,
   left: 16,
   width: HIT_TARGET_PX,

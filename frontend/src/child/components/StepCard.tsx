@@ -342,11 +342,15 @@ export function StepCard(props: StepCardProps): JSX.Element {
       data-current-index={currentIndex}
       data-step-kind={stepKind}
       style={{
-        // ``position: relative`` is the K9 positioning contract — the
-        // ``ReadMeButton`` renders ``position: absolute`` and pins to
-        // this container's bottom-left. Adding it unconditionally is
-        // safe: the prior layout was static-positioned, so a relative
-        // wrapper doesn't change child sizing.
+        // ``position: relative`` was originally the K9 positioning
+        // contract for ``ReadMeButton`` (absolute → pinned to this
+        // section's bottom-left). #137 moved both Read Me variants to
+        // ``position: fixed`` (anchored to the viewport, not this
+        // section) because the section's intrinsic height varied across
+        // step kinds and the absolute-pinned button drifted to mid-
+        // screen on fork cards. The relative is retained here as a
+        // harmless stacking-context isolator — no current consumer
+        // requires it, but removing it is out of scope for #137.
         position: "relative",
         display: "flex",
         flexDirection: "column",
@@ -539,13 +543,14 @@ export function StepCard(props: StepCardProps): JSX.Element {
       )}
       {/*
         Phase K K9 / K12: watermarked Read Me bubble. Self-positioning
-        via ``position: absolute`` inside this section's ``position:
-        relative`` container (set above). Mounted only on text / fork /
-        joke step kinds — song steps own the audio surface (K12). On
-        joke steps we wire a custom replay path that speaks BOTH the
-        setup and the punchline back-to-back (the ReadMeButton's stock
-        ``text`` would only re-speak the setup; ``replayJoke`` queues
-        both utterances).
+        via ``position: fixed`` anchored to the viewport's bottom-left
+        (#137; was ``position: absolute`` inside this section's
+        ``position: relative`` until fork-step drift surfaced). Mounted
+        only on text / fork / joke step kinds — song steps own the
+        audio surface (K12). On joke steps we wire a custom replay path
+        that speaks BOTH the setup and the punchline back-to-back (the
+        ReadMeButton's stock ``text`` would only re-speak the setup;
+        ``replayJoke`` queues both utterances).
       */}
       {showReadMe && stepKind === "joke" && (
         <JokeReadMeButton
@@ -618,12 +623,14 @@ function JokeReadMeButton(props: JokeReadMeButtonProps): JSX.Element | null {
   );
 }
 
-// Visual treatment matches ReadMeButton's ABSOLUTE_BOTTOM_LEFT_STYLE
+// Visual treatment matches ReadMeButton's FIXED_BOTTOM_LEFT_STYLE
 // (kept inline rather than imported so a future ReadMeButton refactor
 // doesn't drag this component along by accident — K12's joke variant
 // is its own affordance even though it visually mirrors K9's).
+// ``position: fixed`` anchors to the viewport; see #137 + the K9
+// component header for the rationale.
 const JOKE_READ_ME_STYLE = {
-  position: "absolute",
+  position: "fixed",
   bottom: 16,
   left: 16,
   width: 48,

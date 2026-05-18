@@ -439,14 +439,32 @@ describe("StepCard K9 — ReadMeButton mounting", () => {
   });
 
   it.each(["text", "fork", "joke"])(
-    "mounts ReadMeButton for step.kind=%s",
+    "mounts ReadMeButton for step.kind=%s with position:fixed (#137)",
     (kind) => {
       // ``kind`` is read defensively off the previewStep object; the
       // fake spreads it into the step body. The cast to ActivityStep
       // narrows past the not-yet-declared field.
+      //
+      // #137: assert ``position: fixed`` (viewport-anchored) across
+      // every step kind, including ``fork`` whose choice-button stack
+      // would have drifted the button mid-screen under the old
+      // ``position: absolute`` contract. Joke steps use the inline
+      // JOKE_READ_ME_STYLE in StepCard.tsx, not the K9 ReadMeButton
+      // component, so this cross-kind assertion catches drift in
+      // either spot.
+      const fork: ActivityStep["choices"] = kind === "fork"
+        ? [
+            { label: "A", choice_index: 0 },
+            { label: "B", choice_index: 1 },
+          ]
+        : null;
       const activity = fakeActivity({
         steps: [
-          { ...fakeStep({ body: "x" }), kind } as ActivityStep,
+          {
+            ...fakeStep({ body: "x" }),
+            kind,
+            ...(fork !== null ? { choices: fork } : {}),
+          } as ActivityStep,
         ],
       });
       render(
@@ -455,7 +473,10 @@ describe("StepCard K9 — ReadMeButton mounting", () => {
           readMeButtonEnabled={true}
         />,
       );
-      expect(screen.getByTestId("read-me-button")).not.toBeNull();
+      const btn = screen.getByTestId("read-me-button") as HTMLButtonElement;
+      expect(btn.style.position).toBe("fixed");
+      expect(btn.style.bottom).toBe("16px");
+      expect(btn.style.left).toBe("16px");
     },
   );
 
@@ -474,11 +495,14 @@ describe("StepCard K9 — ReadMeButton mounting", () => {
     expect(screen.queryByTestId("read-me-button")).toBeNull();
   });
 
-  it("sets position:relative on the step-card container (K9 positioning contract)", () => {
-    // ReadMeButton renders position:absolute and pins to bottom-left;
-    // that contract requires the parent to be a positioning context.
-    // Guarding the contract here means a future StepCard refactor
-    // can't silently break the watermark placement.
+  it("keeps position:relative on the step-card container (post-#137 invariant)", () => {
+    // #137 moved both Read Me variants to ``position: fixed`` (viewport-
+    // anchored), so the section's ``position: relative`` is no longer
+    // load-bearing for ReadMeButton's pinning. It's retained as a
+    // harmless stacking-context isolator. This test guards against
+    // accidental removal — if a refactor drops it AND a new consumer
+    // re-introduces an absolute-positioned descendant, the same
+    // mid-screen-drift class of bug returns.
     const activity = fakeActivity({
       steps: [fakeStep({ body: "Look at the stars." })],
     });

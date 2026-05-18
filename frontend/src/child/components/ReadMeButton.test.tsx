@@ -65,7 +65,7 @@ describe("ReadMeButton — enabled render", () => {
     expect(btn.getAttribute("aria-label")).toBe("Read Me");
   });
 
-  it("uses absolute positioning at the container's bottom-left", () => {
+  it("uses fixed positioning at the viewport's bottom-left (#137)", () => {
     render(
       <ReadMeButton
         text="anything"
@@ -75,7 +75,11 @@ describe("ReadMeButton — enabled render", () => {
     );
     const btn = screen.getByTestId("read-me-button") as HTMLButtonElement;
     // Inline style — happy-dom exposes the literal style strings we set.
-    expect(btn.style.position).toBe("absolute");
+    // ``position: fixed`` (not ``absolute``) anchors to the viewport so
+    // the affordance doesn't drift mid-screen when a parent section's
+    // intrinsic height varies (e.g. fork steps with a tall choice
+    // button stack vs. linear text steps).
+    expect(btn.style.position).toBe("fixed");
     expect(btn.style.bottom).toBe("16px");
     expect(btn.style.left).toBe("16px");
   });
