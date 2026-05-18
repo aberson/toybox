@@ -727,6 +727,7 @@ to clarify the action's scope is the row, not the activity flow.
 - **Depends on:** J9.
 
 ### Step J11: End-to-end smoke gate (60s, real components, no mocks)
+- **Status:** OPEN — artifact-debt; operator verbally confirmed PASS 2026-05-14 during Phase K session-wrap, but the run doc at `documentation/runs/<YYYY-MM-DD>-play-queue-smoke.md` was never produced. Umbrella #92 closed 2026-05-15; child issue #103 kept open as reminder. Either re-run formally and produce the run doc, or close with a "shipped without formal UAT artifact" note. See `project_phase_j_status_2026-05-12.md`.
 - **Type:** operator
 - **Issue:** #103
 - **Problem:** Run the full play-queue pipeline for 60s and observe
@@ -778,6 +779,7 @@ cd frontend; npm run dev
 | (g) No errors | No console errors in browser DevTools; no 4xx/5xx in backend log; no failed envelopes (no `system` topic warnings). |
 
 ### Step J12: iPad UAT + close
+- **Status:** OPEN — artifact-debt; operator verbally confirmed PASS 2026-05-14 during Phase K session-wrap, but the run doc at `documentation/runs/<YYYY-MM-DD>-play-queue-ipad-uat.md` was never produced. Phase J code shipped via real-world Phase K + L cycles without observable cadence/transcript regressions. Child issue #104 kept open as reminder. See `project_phase_j_status_2026-05-12.md`.
 - **Type:** operator
 - **Issue:** #104
 - **Problem:** Repeat J11 on a real iPad over LAN — speech-driven
