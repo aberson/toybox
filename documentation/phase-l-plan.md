@@ -589,4 +589,17 @@ None remaining; D1–D8 all locked.
 
 ## 10. Status
 
-Plan drafted 2026-05-16. `/plan-review` pass 1 (2026-05-16): 3 blockers + 8 gaps + 4 missing items all resolved inline. `/plan-wrap` pass 1 (2026-05-16): 3 blockers + 10 gaps + 5 minor items all resolved inline. `/repo-sync` 2026-05-16 minted umbrella #139 + 12 step issues #140–#151 (mapping in the §7 note); reciprocal parallel-safe pairs back-edited (#141⇄#142, #144⇄#145, #146⇄#149). Ready for `/build-phase --plan documentation/phase-l-plan.md`.
+**✅ Phase L SHIPPED 2026-05-17.** Final master: `5aaf8ed`.
+
+L1–L11 code steps shipped sequentially via `/build-phase`. L12 (operator iPad UAT) ran 3 iterations:
+- **Iter 1:** 8/10 PASS, 1 critical FAIL (#3 — kiosk skipped reward → straight to "All done!")
+- **Iter 2:** 3 + 6 PASS after L4 two-phase fix; operator surfaced 5 UX follow-ups
+- **Iter 3:** All 5 follow-up features PASS
+
+Two emergent fix commits:
+- `2fd136c` **fix(L4): two-phase terminal advance** — Phase 1 inserts reward step `current=1` keeping `state=running`; Phase 2 (kid taps/auto-advances reward) transitions to `completed`. Also caught a producer/consumer drift in the lazy-insert path where the reward step's NULL `step_template_id` would have silently inserted a sibling branch's `victory_ending` row. Regression test `test_reward_step_renders_before_completed_state` pins both invariants.
+- `5aaf8ed` **feat(L-followup): UAT iter-2 batch** — 5 UX changes: (A) dropdown filter by master-toggle eligibility; (B) active/inactive toggle + delete (mimic ToyIngest); (C) shine animation on "All done!" after joke/song rewards (text-shadow/brightness keyframe sibling to picture's box-shadow shine); (D) "None" RewardType for explicit opt-out; (E) second dropdown for specific picture-reward pick (`__reward_id` reserved key in slot_fills_json; fallback to random when stale).
+
+Final test counts: backend 1932 passed + 2 skipped (1934 collected; +52 net from pre-L 1882); frontend 592 vitest pass (+76 net). mypy + ruff + typecheck + lint all CLEAN.
+
+Plan history: drafted 2026-05-16; `/plan-review` pass 1 resolved 3 blockers + 8 gaps + 4 missing inline; `/plan-wrap` pass 1 resolved 3 blockers + 10 gaps + 5 minor inline; `/repo-sync` 2026-05-16 minted umbrella #139 + 12 step issues #140–#151.
