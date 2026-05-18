@@ -18502,6 +18502,1054 @@
         "kind": "song",
         "auto": true
       }
+    },
+    {
+      "id": "conflict_pick_book",
+      "title": "Which book do we read?",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "intro",
+          "text": "{friend} and {frenemy} are at the bookshelf together. {friend} wants the dinosaur book; {frenemy} wants the space book. There's only time for one read. What should they try?",
+          "action_slot": "looking",
+          "choices": [
+            {
+              "label": "split it",
+              "next": "split_path"
+            },
+            {
+              "label": "find a substitute",
+              "next": "sub_path"
+            },
+            {
+              "label": "take turns",
+              "next": "turns_path"
+            },
+            {
+              "label": "one offers, one accepts",
+              "next": "offer_path"
+            }
+          ]
+        },
+        {
+          "id": "split_path",
+          "text": "They read half of the dinosaur book, then half of the space book. Two stories, one reading time.",
+          "action_slot": "pointing",
+          "next": "split_checkin"
+        },
+        {
+          "id": "split_checkin",
+          "text": "How does {friend} feel? Pretty good — getting half a story still counts.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "sub_path",
+          "text": "{frenemy} spots a book about space-dinosaurs. Both topics in one book. Problem dissolved.",
+          "action_slot": "looking",
+          "next": "sub_checkin"
+        },
+        {
+          "id": "sub_checkin",
+          "text": "How does {frenemy} feel? Clever. Space-dinosaurs is better than either book alone.",
+          "action_slot": "cheering",
+          "next": "end"
+        },
+        {
+          "id": "turns_path",
+          "text": "Today they read the dinosaur book together. Tomorrow they read the space book. Both kids get their pick on different days.",
+          "action_slot": "thinking",
+          "next": "turns_checkin"
+        },
+        {
+          "id": "turns_checkin",
+          "text": "How does {frenemy} feel? Patient. Tomorrow stories are still pretty close.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "offer_path",
+          "text": "{friend} remembers {frenemy} hasn't picked a book all week. They slide the space book over and say, 'your pick today.'",
+          "action_slot": "waving",
+          "next": "offer_checkin"
+        },
+        {
+          "id": "offer_checkin",
+          "text": "How does {friend} feel? Generous, a tiny bit wistful about the dinosaurs — but space is cool too.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "Two kids, one bookshelf, one good story.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
+    },
+    {
+      "id": "conflict_pick_song",
+      "title": "Whose song do we dance to?",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "intro",
+          "text": "{friend} and {frenemy} are picking a song to dance to. {friend} wants the wiggle song; {frenemy} wants the stomp song. The speaker plays one at a time. What should they try?",
+          "action_slot": "thinking",
+          "choices": [
+            {
+              "label": "find a substitute",
+              "next": "sub_path"
+            },
+            {
+              "label": "take turns",
+              "next": "turns_path"
+            },
+            {
+              "label": "one offers, one accepts",
+              "next": "offer_path"
+            }
+          ]
+        },
+        {
+          "id": "sub_path",
+          "text": "{frenemy} finds a song that has BOTH wiggling AND stomping in it. They put it on. Win-win.",
+          "action_slot": "looking",
+          "next": "sub_checkin"
+        },
+        {
+          "id": "sub_checkin",
+          "text": "How does {frenemy} feel? Clever. Two-move songs are the best kind.",
+          "action_slot": "cheering",
+          "next": "end"
+        },
+        {
+          "id": "turns_path",
+          "text": "Wiggle song first, then stomp song. They dance to both, back to back.",
+          "action_slot": "jumping",
+          "next": "turns_checkin"
+        },
+        {
+          "id": "turns_checkin",
+          "text": "How do both kids feel? Patient. Two songs is actually a longer dance party.",
+          "action_slot": "cheering",
+          "next": "end"
+        },
+        {
+          "id": "offer_path",
+          "text": "{friend} sees how much {frenemy} loves the stomp song. They press play on the stomp song and wave {frenemy} into the middle of the floor.",
+          "action_slot": "waving",
+          "next": "offer_checkin"
+        },
+        {
+          "id": "offer_checkin",
+          "text": "How does {friend} feel? Generous. Watching {frenemy} stomp around is honestly hilarious.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "Two kids, one speaker, one good dance.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
+    },
+    {
+      "id": "conflict_pick_snack",
+      "title": "Which snack do we share?",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "intro",
+          "text": "{friend} and {frenemy} are picking a snack together. {friend} wants pretzels; {frenemy} wants crackers. The snack bowl only fits one. What should they try?",
+          "action_slot": "thinking",
+          "choices": [
+            {
+              "label": "split it",
+              "next": "split_path"
+            },
+            {
+              "label": "find a substitute",
+              "next": "sub_path"
+            },
+            {
+              "label": "take turns",
+              "next": "turns_path"
+            },
+            {
+              "label": "one offers, one accepts",
+              "next": "offer_path"
+            }
+          ]
+        },
+        {
+          "id": "split_path",
+          "text": "They put pretzels on one half of the bowl and crackers on the other half. One bowl, two snacks, no fight.",
+          "action_slot": "pointing",
+          "next": "split_checkin"
+        },
+        {
+          "id": "split_checkin",
+          "text": "How do both kids feel? Proud. Mixed-snack bowl is a great idea.",
+          "action_slot": "cheering",
+          "next": "end"
+        },
+        {
+          "id": "sub_path",
+          "text": "{frenemy} opens the cupboard and finds pretzel-crackers — pretzels SHAPED like crackers. They pour those into the bowl.",
+          "action_slot": "looking",
+          "next": "sub_checkin"
+        },
+        {
+          "id": "sub_checkin",
+          "text": "How does {frenemy} feel? Clever. Crackerty-pretzels are the best of both.",
+          "action_slot": "cheering",
+          "next": "end"
+        },
+        {
+          "id": "turns_path",
+          "text": "Today's snack: pretzels. Tomorrow's snack: crackers. They put a sticky note on the cupboard so they remember.",
+          "action_slot": "thinking",
+          "next": "turns_checkin"
+        },
+        {
+          "id": "turns_checkin",
+          "text": "How does {frenemy} feel? Patient. Tomorrow-snack is something to look forward to.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "offer_path",
+          "text": "{friend} had pretzels yesterday already. They tip the cracker box into the bowl and pass it to {frenemy}.",
+          "action_slot": "pointing",
+          "next": "offer_checkin"
+        },
+        {
+          "id": "offer_checkin",
+          "text": "How does {friend} feel? Fair. Crackers are crunchy and good too.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "Two kids, one bowl, full bellies.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
+    },
+    {
+      "id": "conflict_new_rules",
+      "title": "Whose rules for the new game?",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "intro",
+          "text": "{friend} and {frenemy} are inventing a brand-new game together. They each have different ideas for the rules. Whose rules go in? What should they try?",
+          "action_slot": "thinking",
+          "choices": [
+            {
+              "label": "split it",
+              "next": "split_path"
+            },
+            {
+              "label": "find a substitute",
+              "next": "sub_path"
+            },
+            {
+              "label": "take turns",
+              "next": "turns_path"
+            }
+          ]
+        },
+        {
+          "id": "split_path",
+          "text": "They write down one rule from {friend} and one rule from {frenemy}, then another from {friend}, another from {frenemy}. The rule list mixes both kids.",
+          "action_slot": "pointing",
+          "next": "split_checkin"
+        },
+        {
+          "id": "split_checkin",
+          "text": "How do both kids feel? Proud. A mixed-rule game feels like THEIRS, not anyone else's.",
+          "action_slot": "cheering",
+          "next": "end"
+        },
+        {
+          "id": "sub_path",
+          "text": "{friend} suggests using a totally different rule neither of them came up with: 'every player gets two lives.' They both like it. They use that one.",
+          "action_slot": "thinking",
+          "next": "sub_checkin"
+        },
+        {
+          "id": "sub_checkin",
+          "text": "How does {friend} feel? Inventive. The compromise-rule is somehow the best one.",
+          "action_slot": "cheering",
+          "next": "end"
+        },
+        {
+          "id": "turns_path",
+          "text": "Round one uses {friend}'s rules. Round two uses {frenemy}'s rules. They see which feels better and keep the favorite for round three.",
+          "action_slot": "thinking",
+          "next": "turns_checkin"
+        },
+        {
+          "id": "turns_checkin",
+          "text": "How do both kids feel? Patient. Two rounds is really a fair test.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "Two kids, one new game, two co-inventors.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
+    },
+    {
+      "id": "conflict_what_to_draw",
+      "title": "What do we draw together?",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "intro",
+          "text": "{friend} and {frenemy} pull out one big piece of drawing paper. {friend} wants to draw a castle; {frenemy} wants to draw a rocket. They both have crayons in hand. What should they try?",
+          "action_slot": "thinking",
+          "choices": [
+            {
+              "label": "split it",
+              "next": "split_path"
+            },
+            {
+              "label": "find a substitute",
+              "next": "sub_path"
+            },
+            {
+              "label": "one offers, one accepts",
+              "next": "offer_path"
+            }
+          ]
+        },
+        {
+          "id": "split_path",
+          "text": "They draw a line down the middle. Castle on the left, rocket on the right. Two pictures on one page.",
+          "action_slot": "pointing",
+          "next": "split_checkin"
+        },
+        {
+          "id": "split_checkin",
+          "text": "How does {friend} feel? Proud. Two pictures side by side tell a bigger story.",
+          "action_slot": "cheering",
+          "next": "end"
+        },
+        {
+          "id": "sub_path",
+          "text": "They draw a CASTLE-ROCKET — a castle with rocket boosters on the bottom, blasting off into space. Both ideas in one picture.",
+          "action_slot": "cheering",
+          "next": "sub_checkin"
+        },
+        {
+          "id": "sub_checkin",
+          "text": "How do both kids feel? Inventive. The castle-rocket is better than either picture alone.",
+          "action_slot": "cheering",
+          "next": "end"
+        },
+        {
+          "id": "offer_path",
+          "text": "{frenemy} has been thinking about the rocket all morning. {friend} hands them the silver crayon first and says, 'rocket it is.'",
+          "action_slot": "waving",
+          "next": "offer_checkin"
+        },
+        {
+          "id": "offer_checkin",
+          "text": "How does {friend} feel? Generous. They can draw a tiny castle in the corner of the page.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "Two kids, one page, lots of crayon.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
+    },
+    {
+      "id": "conflict_who_first",
+      "title": "Who goes first?",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "intro",
+          "text": "{friend} and {frenemy} are about to start a board game. Both of them want to roll the dice first. What should they try?",
+          "action_slot": "thinking",
+          "choices": [
+            {
+              "label": "find a substitute",
+              "next": "sub_path"
+            },
+            {
+              "label": "take turns",
+              "next": "turns_path"
+            },
+            {
+              "label": "one offers, one accepts",
+              "next": "offer_path"
+            }
+          ]
+        },
+        {
+          "id": "sub_path",
+          "text": "They roll one die together. Highest number goes first. The dice decide, not the kids.",
+          "action_slot": "pointing",
+          "next": "sub_checkin"
+        },
+        {
+          "id": "sub_checkin",
+          "text": "How do both kids feel? Fair. Random feels honest.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "turns_path",
+          "text": "{friend} goes first this game. Next game, {frenemy} goes first. They flip the order each round.",
+          "action_slot": "thinking",
+          "next": "turns_checkin"
+        },
+        {
+          "id": "turns_checkin",
+          "text": "How does {frenemy} feel? Patient. Next game is soon.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "offer_path",
+          "text": "{friend} went first last time. They scoot the dice across and say, 'you start.'",
+          "action_slot": "waving",
+          "next": "offer_checkin"
+        },
+        {
+          "id": "offer_checkin",
+          "text": "How does {friend} feel? Fair. Going second has its own advantages.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "Two kids, one game, a fair start.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
+    },
+    {
+      "id": "conflict_bracelet_color",
+      "title": "What color is our friendship bracelet?",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "intro",
+          "text": "{friend} and {frenemy} are making one friendship bracelet together. {friend} wants purple thread; {frenemy} wants yellow thread. The bracelet only has room for one color at a time. What should they try?",
+          "action_slot": "thinking",
+          "choices": [
+            {
+              "label": "split it",
+              "next": "split_path"
+            },
+            {
+              "label": "find a substitute",
+              "next": "sub_path"
+            },
+            {
+              "label": "take turns",
+              "next": "turns_path"
+            },
+            {
+              "label": "one offers, one accepts",
+              "next": "offer_path"
+            }
+          ]
+        },
+        {
+          "id": "split_path",
+          "text": "They braid purple and yellow thread together. The bracelet has stripes of both colors going around it.",
+          "action_slot": "pointing",
+          "next": "split_checkin"
+        },
+        {
+          "id": "split_checkin",
+          "text": "How do both kids feel? Proud. The striped bracelet feels like both of them.",
+          "action_slot": "cheering",
+          "next": "end"
+        },
+        {
+          "id": "sub_path",
+          "text": "{frenemy} digs in the thread box and finds rainbow thread that has BOTH purple AND yellow in it. They use that.",
+          "action_slot": "looking",
+          "next": "sub_checkin"
+        },
+        {
+          "id": "sub_checkin",
+          "text": "How does {frenemy} feel? Clever. The rainbow thread covers both wishes.",
+          "action_slot": "cheering",
+          "next": "end"
+        },
+        {
+          "id": "turns_path",
+          "text": "They make TWO bracelets — one purple for {friend} and one yellow for {frenemy}. Then they swap, so each kid wears the other's color.",
+          "action_slot": "pointing",
+          "next": "turns_checkin"
+        },
+        {
+          "id": "turns_checkin",
+          "text": "How do both kids feel? Generous. Wearing each other's color feels like a real friendship trade.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "offer_path",
+          "text": "{friend} remembers {frenemy}'s favorite color is yellow. They put down the purple and pick up the yellow spool.",
+          "action_slot": "waving",
+          "next": "offer_checkin"
+        },
+        {
+          "id": "offer_checkin",
+          "text": "How does {friend} feel? Generous. Purple is still their favorite, but the yellow bracelet looks beautiful.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "Two kids, one bracelet, lots of friendship.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
+    },
+    {
+      "id": "conflict_bedtime_story",
+      "title": "Which bedtime story tonight?",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "intro",
+          "text": "{friend} and {frenemy} are picking their one bedtime story. {friend} wants the dragon story; {frenemy} wants the snail story. Lights are about to go out. What should they try?",
+          "action_slot": "thinking",
+          "choices": [
+            {
+              "label": "find a substitute",
+              "next": "sub_path"
+            },
+            {
+              "label": "take turns",
+              "next": "turns_path"
+            },
+            {
+              "label": "one offers, one accepts",
+              "next": "offer_path"
+            }
+          ]
+        },
+        {
+          "id": "sub_path",
+          "text": "{frenemy} suggests a story neither of them has heard before — the one with the dragon AND the snail as friends. They pick that one.",
+          "action_slot": "looking",
+          "next": "sub_checkin"
+        },
+        {
+          "id": "sub_checkin",
+          "text": "How does {frenemy} feel? Clever. A new story is an adventure for both.",
+          "action_slot": "cheering",
+          "next": "end"
+        },
+        {
+          "id": "turns_path",
+          "text": "Tonight: dragon story. Tomorrow night: snail story. Both stories make the rotation.",
+          "action_slot": "thinking",
+          "next": "turns_checkin"
+        },
+        {
+          "id": "turns_checkin",
+          "text": "How does {frenemy} feel? Patient. Tomorrow-night snail-story is now a thing to look forward to.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "offer_path",
+          "text": "{friend} got the dragon story last week. They hand the snail book over and curl up to listen.",
+          "action_slot": "waving",
+          "next": "offer_checkin"
+        },
+        {
+          "id": "offer_checkin",
+          "text": "How does {friend} feel? Generous. Snail-stories are actually kind of cozy.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "Two kids, one story, two sleepy yawns.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
+    },
+    {
+      "id": "conflict_routine_order",
+      "title": "What order do we do bedtime?",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "intro",
+          "text": "{friend} and {frenemy} are doing bedtime together. {friend} wants to brush teeth FIRST; {frenemy} wants pajamas FIRST. The grown-up says it's their choice. What should they try?",
+          "action_slot": "thinking",
+          "choices": [
+            {
+              "label": "split it",
+              "next": "split_path"
+            },
+            {
+              "label": "take turns",
+              "next": "turns_path"
+            },
+            {
+              "label": "one offers, one accepts",
+              "next": "offer_path"
+            }
+          ]
+        },
+        {
+          "id": "split_path",
+          "text": "{friend} brushes teeth while {frenemy} puts on pajamas. Both kids doing different things at the same time. Then they swap.",
+          "action_slot": "pointing",
+          "next": "split_checkin"
+        },
+        {
+          "id": "split_checkin",
+          "text": "How do both kids feel? Proud. Bedtime got faster because nobody had to wait.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "turns_path",
+          "text": "Tonight: teeth first, pajamas second. Tomorrow night: pajamas first, teeth second. They alternate the routine.",
+          "action_slot": "thinking",
+          "next": "turns_checkin"
+        },
+        {
+          "id": "turns_checkin",
+          "text": "How does {frenemy} feel? Patient. Tomorrow night they get their order.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "offer_path",
+          "text": "{friend} sees {frenemy} is super tired and just wants pajamas. They wave {frenemy} to the dresser and head to the sink alone.",
+          "action_slot": "waving",
+          "next": "offer_checkin"
+        },
+        {
+          "id": "offer_checkin",
+          "text": "How does {friend} feel? Helpful. A tired kid deserves pajamas first.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "Two kids, one bedtime, lights out.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
+    },
+    {
+      "id": "conflict_fort_location",
+      "title": "Where do we build the fort?",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "intro",
+          "text": "{friend} and {frenemy} both want to build a fort. {friend} wants it in the living room; {frenemy} wants it in the bedroom. They have one set of fort-blankets. What should they try?",
+          "action_slot": "thinking",
+          "choices": [
+            {
+              "label": "split it",
+              "next": "split_path"
+            },
+            {
+              "label": "find a substitute",
+              "next": "sub_path"
+            },
+            {
+              "label": "take turns",
+              "next": "turns_path"
+            }
+          ]
+        },
+        {
+          "id": "split_path",
+          "text": "They build a small fort in BOTH rooms — one in the living room and a smaller one in the bedroom. Connected by a pretend tunnel.",
+          "action_slot": "cheering",
+          "next": "split_checkin"
+        },
+        {
+          "id": "split_checkin",
+          "text": "How do both kids feel? Proud. Two forts is actually a fort empire.",
+          "action_slot": "cheering",
+          "next": "end"
+        },
+        {
+          "id": "sub_path",
+          "text": "They spot the hallway — neither living room nor bedroom — and build the fort there. Compromise location.",
+          "action_slot": "looking",
+          "next": "sub_checkin"
+        },
+        {
+          "id": "sub_checkin",
+          "text": "How does {frenemy} feel? Clever. The hallway-fort is actually the best spot.",
+          "action_slot": "cheering",
+          "next": "end"
+        },
+        {
+          "id": "turns_path",
+          "text": "Today's fort: living room. Tomorrow's fort: bedroom. They take down today's at bedtime and rebuild tomorrow.",
+          "action_slot": "thinking",
+          "next": "turns_checkin"
+        },
+        {
+          "id": "turns_checkin",
+          "text": "How do both kids feel? Patient. Two days of fort-building is twice as much fort.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "Two kids, one fort, big imagination.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
+    },
+    {
+      "id": "conflict_pick_puzzle",
+      "title": "Which puzzle do we do?",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "intro",
+          "text": "{friend} and {frenemy} both want to do a puzzle. {friend} wants the cat puzzle; {frenemy} wants the rainbow puzzle. They only have time for one. What should they try?",
+          "action_slot": "looking",
+          "choices": [
+            {
+              "label": "find a substitute",
+              "next": "sub_path"
+            },
+            {
+              "label": "take turns",
+              "next": "turns_path"
+            },
+            {
+              "label": "one offers, one accepts",
+              "next": "offer_path"
+            }
+          ]
+        },
+        {
+          "id": "sub_path",
+          "text": "{frenemy} pulls out a puzzle they both forgot about — the cat-in-a-rainbow puzzle. Both kids get their wish.",
+          "action_slot": "looking",
+          "next": "sub_checkin"
+        },
+        {
+          "id": "sub_checkin",
+          "text": "How does {frenemy} feel? Clever. The forgotten puzzle turned out perfect.",
+          "action_slot": "cheering",
+          "next": "end"
+        },
+        {
+          "id": "turns_path",
+          "text": "Today: cat puzzle. Next puzzle-time: rainbow puzzle. They put the rainbow one on top of the shelf as a reminder.",
+          "action_slot": "thinking",
+          "next": "turns_checkin"
+        },
+        {
+          "id": "turns_checkin",
+          "text": "How does {frenemy} feel? Patient. The rainbow puzzle is waiting.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "offer_path",
+          "text": "{friend} did the cat puzzle yesterday already. They slide the rainbow puzzle box to {frenemy} and say, 'this one today.'",
+          "action_slot": "pointing",
+          "next": "offer_checkin"
+        },
+        {
+          "id": "offer_checkin",
+          "text": "How does {friend} feel? Fair. Rainbows are good for puzzles too.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "Two kids, one puzzle, lots of clicking pieces.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
+    },
+    {
+      "id": "conflict_share_sticker",
+      "title": "Who gets the one sparkly sticker?",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "id": "intro",
+          "text": "{friend} and {frenemy} are passing a sticker sheet back and forth. There's only ONE sparkly star sticker left, and both kids want it. What should they try?",
+          "action_slot": "looking",
+          "choices": [
+            {
+              "label": "split it",
+              "next": "split_path"
+            },
+            {
+              "label": "find a substitute",
+              "next": "sub_path"
+            },
+            {
+              "label": "take turns",
+              "next": "turns_path"
+            },
+            {
+              "label": "one offers, one accepts",
+              "next": "offer_path"
+            }
+          ]
+        },
+        {
+          "id": "split_path",
+          "text": "{friend} carefully cuts the star sticker in half. {friend} keeps one half, {frenemy} keeps the other. Two half-stars instead of one whole.",
+          "action_slot": "pointing",
+          "next": "split_checkin"
+        },
+        {
+          "id": "split_checkin",
+          "text": "How do both kids feel? Proud. A half-star is still sparkly.",
+          "action_slot": "cheering",
+          "next": "end"
+        },
+        {
+          "id": "sub_path",
+          "text": "{frenemy} flips the page and finds a sparkly MOON sticker on the back. Just as good, brand new, no fight.",
+          "action_slot": "looking",
+          "next": "sub_checkin"
+        },
+        {
+          "id": "sub_checkin",
+          "text": "How does {frenemy} feel? Clever. The moon sticker might be even cooler.",
+          "action_slot": "cheering",
+          "next": "end"
+        },
+        {
+          "id": "turns_path",
+          "text": "{friend} sticks it on their notebook for today. Next sticker sheet they buy, {frenemy} gets first pick. They write it down so they remember.",
+          "action_slot": "pointing",
+          "next": "turns_checkin"
+        },
+        {
+          "id": "turns_checkin",
+          "text": "How does {frenemy} feel? Patient. The first-pick I.O.U. feels like a small treasure.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "offer_path",
+          "text": "{friend} sees {frenemy} has been collecting stars all week. They peel the sparkly star off and stick it on {frenemy}'s notebook.",
+          "action_slot": "waving",
+          "next": "offer_checkin"
+        },
+        {
+          "id": "offer_checkin",
+          "text": "How does {friend} feel? Generous, a little wistful, but proud of the gift.",
+          "action_slot": "thinking",
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "text": "Two kids, one sticker, lots of sparkle.",
+          "action_slot": "waving"
+        }
+      ],
+      "required_roles": [
+        "friend"
+      ],
+      "optional_roles": [
+        "frenemy"
+      ],
+      "recommended_themes": [
+        "friendship"
+      ],
+      "ending_step": {
+        "kind": "joke",
+        "auto": true
+      }
     }
   ]
 }
