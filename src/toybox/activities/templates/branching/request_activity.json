@@ -14372,6 +14372,4136 @@
       "recommended_themes": [
         "space"
       ]
+    },
+    {
+      "id": "meet_element_h_1",
+      "title": "Meet Hydrogen!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} pulls a shiny card from a pocket. \"This is Hydrogen!\"",
+          "action_slot": "pointing",
+          "element_id": "h-1"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Hydrogen is the lightest element and makes up most of the sun.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Hydrogen floats balloons up into the sky. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_he_2",
+      "title": "Meet Helium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} holds up a glowing card. \"Look at this — Helium! That's HEE-lee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "he-2"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Helium makes balloons float and makes voices sound funny when you breathe it in.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: Helium was first spotted in the sun before on Earth!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "music"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_li_3",
+      "title": "Meet Lithium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} turns the page in a sparkly notebook. \"Today we meet Lithium — try saying LITH-ee-um!\"",
+          "action_slot": "pointing",
+          "element_id": "li-3"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Lithium is the lightest metal and powers many phones, tablets, and electric cars.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — phones run on tiny bits of Lithium.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_be_4",
+      "title": "Meet Beryllium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} smiles and reveals a new card. \"Say hello to Beryllium! Sound it out: buh-RILL-ee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "be-4"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Beryllium is a strong, light metal that helps build airplanes and spaceships.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — Beryllium helps build fast jet planes! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_b_5",
+      "title": "Meet Boron!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} taps the clipboard with a glittery pen. \"Here's a special one — Boron!\"",
+          "action_slot": "pointing",
+          "element_id": "b-5"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Boron helps make strong glass that doesn't crack when it gets hot.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Boron keeps fireworks burning green. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_c_6",
+      "title": "Meet Carbon!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} pulls a shiny card from a pocket. \"This is Carbon!\"",
+          "action_slot": "pointing",
+          "element_id": "c-6"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Carbon is in every living thing on Earth, from trees to people to your pet dog.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: Carbon is the stuff of life!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_n_7",
+      "title": "Meet Nitrogen!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} holds up a glowing card. \"Look at this — Nitrogen! That's NYE-troh-jen.\"",
+          "action_slot": "pointing",
+          "element_id": "n-7"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Most of the air we breathe is nitrogen, even more than oxygen.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — Nitrogen makes up most of the air.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_o_8",
+      "title": "Meet Oxygen!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} turns the page in a sparkly notebook. \"Today we meet Oxygen!\"",
+          "action_slot": "pointing",
+          "element_id": "o-8"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Oxygen is the part of the air our lungs use to keep us alive.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — fish breathe Oxygen through their gills! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_f_9",
+      "title": "Meet Fluorine!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} smiles and reveals a new card. \"Say hello to Fluorine! Sound it out: FLOOR-een.\"",
+          "action_slot": "pointing",
+          "element_id": "f-9"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Fluorine helps make toothpaste that keeps your teeth strong.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — dentists use Fluorine to fight cavities. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_ne_10",
+      "title": "Meet Neon!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} taps the clipboard with a glittery pen. \"Here's a special one — Neon!\"",
+          "action_slot": "pointing",
+          "element_id": "ne-10"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Neon glows bright orange-red when electricity flows through it, making colorful signs.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: Neon signs glow orange in the dark!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_na_11",
+      "title": "Meet Sodium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} pulls a shiny card from a pocket. \"This is Sodium — say SOH-dee-um with me!\"",
+          "action_slot": "pointing",
+          "element_id": "na-11"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Sodium combines with chlorine to make the salt you sprinkle on food.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — Sodium burns with a bright yellow flame.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_mg_12",
+      "title": "Meet Magnesium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} holds up a glowing card. \"Look at this — Magnesium! That's mag-NEE-zee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "mg-12"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Magnesium burns with a super-bright white flame, which is why old camera flashes used it.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — old cameras flashed with Magnesium! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_al_13",
+      "title": "Meet Aluminum!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} turns the page in a sparkly notebook. \"Today we meet Aluminum — try saying uh-LOO-mih-num!\"",
+          "action_slot": "pointing",
+          "element_id": "al-13"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Aluminum is the light, shiny metal in soda cans and kitchen foil.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Aluminum is the metal in soda cans. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_si_14",
+      "title": "Meet Silicon!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} smiles and reveals a new card. \"Say hello to Silicon! Sound it out: SIL-ih-kon.\"",
+          "action_slot": "pointing",
+          "element_id": "si-14"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Silicon is the main ingredient in computer chips and most beach sand.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: beach sand is mostly Silicon!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_p_15",
+      "title": "Meet Phosphorus!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} taps the clipboard with a glittery pen. \"Here's a tricky name — Phosphorus, or FOSS-fer-us!\"",
+          "action_slot": "pointing",
+          "element_id": "p-15"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Phosphorus is in the tip of every match and helps your bones stay strong.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — Phosphorus glows when it touches air.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_s_16",
+      "title": "Meet Sulfur!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} pulls a shiny card from a pocket. \"This is Sulfur — say SUL-fer with me!\"",
+          "action_slot": "pointing",
+          "element_id": "s-16"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Sulfur is the bright yellow stuff near volcanoes, and it smells like rotten eggs.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — Sulfur is the yellow dust near volcanoes! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_cl_17",
+      "title": "Meet Chlorine!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} holds up a glowing card. \"Look at this — Chlorine! That's KLOR-een.\"",
+          "action_slot": "pointing",
+          "element_id": "cl-17"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Chlorine keeps swimming pools clean and is the other half of table salt.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Chlorine is half of every salt grain. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_ar_18",
+      "title": "Meet Argon!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} turns the page in a sparkly notebook. \"Today we meet Argon — try saying AR-gon!\"",
+          "action_slot": "pointing",
+          "element_id": "ar-18"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Argon is a quiet gas that fills old light bulbs to keep them from burning out.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: windows can be filled with Argon!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_k_19",
+      "title": "Meet Potassium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} smiles and reveals a new card. \"Say hello to Potassium! Sound it out: puh-TASS-ee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "k-19"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Bananas are full of potassium, which helps your muscles work properly.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — bananas are packed with Potassium.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_ca_20",
+      "title": "Meet Calcium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} taps the clipboard with a glittery pen. \"Here's a tricky name — Calcium, or KAL-see-um!\"",
+          "action_slot": "pointing",
+          "element_id": "ca-20"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Calcium builds strong bones and teeth and is in milk, cheese, and yogurt.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — milk is full of Calcium! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_sc_21",
+      "title": "Meet Scandium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} pulls a shiny card from a pocket. \"This is Scandium — say SKAN-dee-um with me!\"",
+          "action_slot": "pointing",
+          "element_id": "sc-21"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Scandium makes baseball bats and bicycle frames super light and strong.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Scandium is a tough, light metal. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_ti_22",
+      "title": "Meet Titanium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} holds up a glowing card. \"Look at this — Titanium! That's tye-TAY-nee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "ti-22"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Titanium is so strong and light that airplanes, ships, and even toothpaste use it.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: Titanium makes rockets sturdy!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_v_23",
+      "title": "Meet Vanadium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} turns the page in a sparkly notebook. \"Today we meet Vanadium — try saying vuh-NAY-dee-um!\"",
+          "action_slot": "pointing",
+          "element_id": "v-23"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Vanadium makes steel tools extra tough, like the wrenches in a car mechanic's shop.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — Vanadium was named after a Norse goddess.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_cr_24",
+      "title": "Meet Chromium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} smiles and reveals a new card. \"Say hello to Chromium! Sound it out: KROH-mee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "cr-24"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Chromium makes the shiny silver coating on car bumpers and bicycle bells.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — Chromium keeps steel from rusting! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "music"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_mn_25",
+      "title": "Meet Manganese!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} taps the clipboard with a glittery pen. \"Here's a tricky name — Manganese, or MANG-guh-neez!\"",
+          "action_slot": "pointing",
+          "element_id": "mn-25"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Manganese helps batteries work and gives some glass a pretty purple color.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Manganese powers tiny batteries. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_fe_26",
+      "title": "Meet Iron!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} pulls a shiny card from a pocket. \"This is Iron!\"",
+          "action_slot": "pointing",
+          "element_id": "fe-26"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Iron makes your blood red and is the metal inside skyscrapers and bridges.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: bridges and buildings stand tall with Iron!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_co_27",
+      "title": "Meet Cobalt!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} holds up a glowing card. \"Look at this — Cobalt! That's KOH-bawlt.\"",
+          "action_slot": "pointing",
+          "element_id": "co-27"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Cobalt makes the deep blue color in old pottery and stained-glass windows.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — Cobalt hides in batteries.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_ni_28",
+      "title": "Meet Nickel!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} turns the page in a sparkly notebook. \"Today we meet Nickel!\"",
+          "action_slot": "pointing",
+          "element_id": "ni-28"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Nickel is the shiny metal in the five-cent coin called a nickel.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — Nickel is in the five-cent coin! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_cu_29",
+      "title": "Meet Copper!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} smiles and reveals a new card. \"Say hello to Copper!\"",
+          "action_slot": "pointing",
+          "element_id": "cu-29"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Copper turns green when it's outside for a long time, like the Statue of Liberty.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — pennies are made with Copper. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_zn_30",
+      "title": "Meet Zinc!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} taps the clipboard with a glittery pen. \"Here's a special one — Zinc!\"",
+          "action_slot": "pointing",
+          "element_id": "zn-30"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Zinc keeps cuts and scrapes from getting sore and also makes pennies feel light.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: sunscreen sometimes has Zinc!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_ga_31",
+      "title": "Meet Gallium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} pulls a shiny card from a pocket. \"This is Gallium — say GAL-ee-um with me!\"",
+          "action_slot": "pointing",
+          "element_id": "ga-31"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Gallium melts in your hand because its melting point is below body temperature.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — Gallium melts in a warm hand.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_ge_32",
+      "title": "Meet Germanium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} holds up a glowing card. \"Look at this — Germanium! That's jer-MAY-nee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "ge-32"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Germanium was used in the very first transistors that started the computer age.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — Germanium shines in night-vision goggles! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_as_33",
+      "title": "Meet Arsenic!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} turns the page in a sparkly notebook. \"Today we meet Arsenic — try saying ARS-nik!\"",
+          "action_slot": "pointing",
+          "element_id": "as-33"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Arsenic is a metalloid that helps make computer chips and tiny LED lights.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Arsenic sparkles silver when polished. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_se_34",
+      "title": "Meet Selenium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} smiles and reveals a new card. \"Say hello to Selenium! Sound it out: suh-LEE-nee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "se-34"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Selenium helps photocopiers see and copy pictures on paper.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: Selenium helps photocopiers see!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_br_35",
+      "title": "Meet Bromine!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} taps the clipboard with a glittery pen. \"Here's a tricky name — Bromine, or BROH-meen!\"",
+          "action_slot": "pointing",
+          "element_id": "br-35"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Bromine is one of only two liquid elements at room temperature, the other is mercury.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — Bromine was first found near the sea.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_kr_36",
+      "title": "Meet Krypton!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} pulls a shiny card from a pocket. \"This is Krypton — say KRIP-ton with me!\"",
+          "action_slot": "pointing",
+          "element_id": "kr-36"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Krypton glows pale lavender in lights and shares its name with Superman's home planet.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — Krypton hides in flashlight bulbs! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "music"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_rb_37",
+      "title": "Meet Rubidium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} holds up a glowing card. \"Look at this — Rubidium! That's roo-BIH-dee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "rb-37"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Rubidium is named for its ruby-red color when it burns in a flame.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Rubidium burns with a ruby-red flame. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_sr_38",
+      "title": "Meet Strontium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} turns the page in a sparkly notebook. \"Today we meet Strontium — try saying STRON-shee-um!\"",
+          "action_slot": "pointing",
+          "element_id": "sr-38"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Strontium makes fireworks burn bright red, which is why holiday rockets are so colorful.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: Strontium was first found in Scotland!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_y_39",
+      "title": "Meet Yttrium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} smiles and reveals a new card. \"Say hello to Yttrium! Sound it out: IH-tree-um.\"",
+          "action_slot": "pointing",
+          "element_id": "y-39"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Yttrium helps make the bright red dots on old TV screens.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — Yttrium hides in laser beams.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_zr_40",
+      "title": "Meet Zirconium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} taps the clipboard with a glittery pen. \"Here's a tricky name — Zirconium, or zir-KOH-nee-um!\"",
+          "action_slot": "pointing",
+          "element_id": "zr-40"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Zirconium makes fake diamonds that sparkle just like real ones in jewelry.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — Zirconium sparkles like a fake diamond! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_nb_41",
+      "title": "Meet Niobium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} pulls a shiny card from a pocket. \"This is Niobium — say nye-OH-bee-um with me!\"",
+          "action_slot": "pointing",
+          "element_id": "nb-41"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Niobium helps make super-fast magnets that lift trains off the tracks.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Niobium is named after a Greek princess. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_mo_42",
+      "title": "Meet Molybdenum!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} holds up a glowing card. \"Look at this — Molybdenum! That's muh-LIB-duh-num.\"",
+          "action_slot": "pointing",
+          "element_id": "mo-42"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Molybdenum makes steel tools tough enough to cut through other metals.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: Molybdenum hides in jet engines!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_tc_43",
+      "title": "Meet Technetium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} turns the page in a sparkly notebook. \"Today we meet Technetium — try saying tek-NEE-shee-um!\"",
+          "action_slot": "pointing",
+          "element_id": "tc-43"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Technetium was the first element ever made by people, in a lab in 1937.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — Technetium was the first lab-made element.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_ru_44",
+      "title": "Meet Ruthenium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} smiles and reveals a new card. \"Say hello to Ruthenium! Sound it out: roo-THEE-nee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "ru-44"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Ruthenium makes the tiny gold tip on fancy fountain pens last extra long.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — Ruthenium is named after Russia! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_rh_45",
+      "title": "Meet Rhodium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} taps the clipboard with a glittery pen. \"Here's a tricky name — Rhodium, or ROH-dee-um!\"",
+          "action_slot": "pointing",
+          "element_id": "rh-45"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Rhodium is one of the rarest metals and gives jewelry its bright silvery shine.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Rhodium is one of the rarest metals on Earth. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "music"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_pd_46",
+      "title": "Meet Palladium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} pulls a shiny card from a pocket. \"This is Palladium — say puh-LAY-dee-um with me!\"",
+          "action_slot": "pointing",
+          "element_id": "pd-46"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Palladium cleans up car exhaust so the air stays cleaner to breathe.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: Palladium cleans up car exhaust!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_ag_47",
+      "title": "Meet Silver!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} holds up a glowing card. \"Look at this — Silver!\"",
+          "action_slot": "pointing",
+          "element_id": "ag-47"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Silver is the shiniest metal of all and turns black when it sits in the air too long.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — Silver forks turn black over time.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_cd_48",
+      "title": "Meet Cadmium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} turns the page in a sparkly notebook. \"Today we meet Cadmium — try saying KAD-mee-um!\"",
+          "action_slot": "pointing",
+          "element_id": "cd-48"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Cadmium paints used to make sunny yellow colors in old artists' paintings.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — Cadmium solders pieces of metal together! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_in_49",
+      "title": "Meet Indium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} smiles and reveals a new card. \"Say hello to Indium! Sound it out: IN-dee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "in-49"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Indium makes touchscreens work so you can tap your tablet and phone.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Indium makes touchscreens tappable. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_sn_50",
+      "title": "Meet Tin!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} taps the clipboard with a glittery pen. \"Here's a special one — Tin!\"",
+          "action_slot": "pointing",
+          "element_id": "sn-50"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Tin coats steel cans so the soup or beans inside don't rust the can.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: Tin soldiers stood in old toy boxes!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_sb_51",
+      "title": "Meet Antimony!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} pulls a shiny card from a pocket. \"This is Antimony — say AN-tih-moh-nee with me!\"",
+          "action_slot": "pointing",
+          "element_id": "sb-51"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Antimony helps make fire-resistant clothes that don't catch fire easily.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — Antimony was used as eye makeup long ago.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_te_52",
+      "title": "Meet Tellurium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} holds up a glowing card. \"Look at this — Tellurium! That's teh-LOOR-ee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "te-52"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Tellurium helps solar panels turn sunshine into power for homes.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — Tellurium helps solar panels catch sunshine! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_i_53",
+      "title": "Meet Iodine!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} turns the page in a sparkly notebook. \"Today we meet Iodine — try saying EYE-oh-deen!\"",
+          "action_slot": "pointing",
+          "element_id": "i-53"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Iodine is added to table salt to help your body grow strong.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Iodine turns purple when warmed. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_xe_54",
+      "title": "Meet Xenon!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} smiles and reveals a new card. \"Say hello to Xenon! Sound it out: ZEE-non.\"",
+          "action_slot": "pointing",
+          "element_id": "xe-54"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Xenon glows bright white in flash bulbs and powers ion engines on space probes.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: Xenon glows pure white when zapped!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_cs_55",
+      "title": "Meet Cesium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} taps the clipboard with a glittery pen. \"Here's a tricky name — Cesium, or SEE-zee-um!\"",
+          "action_slot": "pointing",
+          "element_id": "cs-55"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Cesium runs the most accurate clocks in the world, losing only a second every millions of years.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — Cesium runs the world's best clocks.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_ba_56",
+      "title": "Meet Barium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} pulls a shiny card from a pocket. \"This is Barium — say BAIR-ee-um with me!\"",
+          "action_slot": "pointing",
+          "element_id": "ba-56"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Barium makes fireworks burn bright green and helps doctors take pictures of stomachs.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — Barium helps doctors see stomachs! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_la_57",
+      "title": "Meet Lanthanum!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} holds up a glowing card. \"Look at this — Lanthanum! That's LAN-thuh-num.\"",
+          "action_slot": "pointing",
+          "element_id": "la-57"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Lanthanum makes camera lenses sharper so pictures look crisp and clear.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Lanthanum starts the lanthanide family. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_ce_58",
+      "title": "Meet Cerium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} turns the page in a sparkly notebook. \"Today we meet Cerium — try saying SEE-ree-um!\"",
+          "action_slot": "pointing",
+          "element_id": "ce-58"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Cerium polishes glass to a mirror finish and is the most common rare-earth metal.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: Cerium polishes glass perfectly smooth!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_pr_59",
+      "title": "Meet Praseodymium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} smiles and reveals a new card. \"Say hello to Praseodymium! Sound it out: pray-zee-oh-DIM-ee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "pr-59"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Praseodymium colors special goggles green so welders can see safely through bright sparks.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — Praseodymium sounds like a magic spell.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "music"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_nd_60",
+      "title": "Meet Neodymium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} taps the clipboard with a glittery pen. \"Here's a tricky name — Neodymium, or nee-oh-DIM-ee-um!\"",
+          "action_slot": "pointing",
+          "element_id": "nd-60"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Neodymium makes the strongest magnets on Earth, found in headphones and hard drives.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — Neodymium pulls toys across tables! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_pm_61",
+      "title": "Meet Promethium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} pulls a shiny card from a pocket. \"This is Promethium — say pro-MEE-thee-um with me!\"",
+          "action_slot": "pointing",
+          "element_id": "pm-61"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Promethium is named after a hero from Greek myths who gave fire to people.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Promethium glows in some old watch faces. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_sm_62",
+      "title": "Meet Samarium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} holds up a glowing card. \"Look at this — Samarium! That's suh-MAIR-ee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "sm-62"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Samarium makes powerful magnets that still work even when very hot.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: Samarium powers some headphones!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_eu_63",
+      "title": "Meet Europium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} turns the page in a sparkly notebook. \"Today we meet Europium — try saying yoo-ROH-pee-um!\"",
+          "action_slot": "pointing",
+          "element_id": "eu-63"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Europium makes the red color in TV screens and the glow in some banknotes.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — Europium is named after Europe.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "music"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_gd_64",
+      "title": "Meet Gadolinium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} smiles and reveals a new card. \"Say hello to Gadolinium! Sound it out: gad-uh-LIH-nee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "gd-64"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Gadolinium helps doctors take clearer pictures inside the body with MRI scans.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — Gadolinium helps doctors take MRI pictures! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_tb_65",
+      "title": "Meet Terbium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} taps the clipboard with a glittery pen. \"Here's a tricky name — Terbium, or TUR-bee-um!\"",
+          "action_slot": "pointing",
+          "element_id": "tb-65"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Terbium makes the bright green color you see on TV and tablet screens.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Terbium is named after a Swedish village. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "music"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_dy_66",
+      "title": "Meet Dysprosium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} pulls a shiny card from a pocket. \"This is Dysprosium — say dis-PROH-zee-um with me!\"",
+          "action_slot": "pointing",
+          "element_id": "dy-66"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Dysprosium makes magnets that don't lose their pull even when very hot.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: Dysprosium is hard to find on Earth!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_ho_67",
+      "title": "Meet Holmium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} holds up a glowing card. \"Look at this — Holmium! That's HOHL-mee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "ho-67"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Holmium creates the strongest magnetic fields of any natural element.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — Holmium pulls the strongest magnetic field.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_er_68",
+      "title": "Meet Erbium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} turns the page in a sparkly notebook. \"Today we meet Erbium — try saying UR-bee-um!\"",
+          "action_slot": "pointing",
+          "element_id": "er-68"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Erbium colors glass and ceramics a pretty pink and helps light travel through cables.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — Erbium carries light in fiber cables! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_tm_69",
+      "title": "Meet Thulium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} smiles and reveals a new card. \"Say hello to Thulium! Sound it out: THOO-lee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "tm-69"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Thulium glows blue in some special lasers and was once the rarest of the rare earths.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Thulium was found by a Swedish scientist. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_yb_70",
+      "title": "Meet Ytterbium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} taps the clipboard with a glittery pen. \"Here's a tricky name — Ytterbium, or ih-TUR-bee-um!\"",
+          "action_slot": "pointing",
+          "element_id": "yb-70"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Ytterbium helps make atomic clocks that keep time more precisely than ever before.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: Ytterbium runs new atomic clocks!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_lu_71",
+      "title": "Meet Lutetium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} pulls a shiny card from a pocket. \"This is Lutetium — say loo-TEE-shee-um with me!\"",
+          "action_slot": "pointing",
+          "element_id": "lu-71"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Lutetium is one of the rarest and most expensive metals to dig out of the ground.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — Lutetium is named after old Paris.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_hf_72",
+      "title": "Meet Hafnium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} holds up a glowing card. \"Look at this — Hafnium! That's HAF-nee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "hf-72"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Hafnium makes super-fast computer chips run cooler and use less power.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — Hafnium is named after Copenhagen! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_ta_73",
+      "title": "Meet Tantalum!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} turns the page in a sparkly notebook. \"Today we meet Tantalum — try saying TAN-tuh-lum!\"",
+          "action_slot": "pointing",
+          "element_id": "ta-73"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Tantalum stores power inside phones, tablets, and game consoles in tiny capacitors.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Tantalum stores power in phones. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_w_74",
+      "title": "Meet Tungsten!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} smiles and reveals a new card. \"Say hello to Tungsten! Sound it out: TUNG-sten.\"",
+          "action_slot": "pointing",
+          "element_id": "w-74"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Tungsten has the highest melting point of any metal, which is why it's in light-bulb wires.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: Tungsten survives the highest heat!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_re_75",
+      "title": "Meet Rhenium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} taps the clipboard with a glittery pen. \"Here's a tricky name — Rhenium, or REE-nee-um!\"",
+          "action_slot": "pointing",
+          "element_id": "re-75"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Rhenium helps jet engines spin hot and fast without melting.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — Rhenium is named after a German river.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_os_76",
+      "title": "Meet Osmium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} pulls a shiny card from a pocket. \"This is Osmium — say OZ-mee-um with me!\"",
+          "action_slot": "pointing",
+          "element_id": "os-76"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Osmium is the densest natural element, so a small chunk feels surprisingly heavy.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — Osmium is the heaviest natural element! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_ir_77",
+      "title": "Meet Iridium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} holds up a glowing card. \"Look at this — Iridium! That's ih-RID-ee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "ir-77"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Iridium is so tough that scientists use it to mark the original meter standard.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Iridium fell from space in old meteors. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_pt_78",
+      "title": "Meet Platinum!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} turns the page in a sparkly notebook. \"Today we meet Platinum — try saying PLAT-ih-num!\"",
+          "action_slot": "pointing",
+          "element_id": "pt-78"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Platinum is so rare that even less of it exists than gold, and it makes fancy wedding rings.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: Platinum is even rarer than gold!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "music"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_au_79",
+      "title": "Meet Gold!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} smiles and reveals a new card. \"Say hello to Gold!\"",
+          "action_slot": "pointing",
+          "element_id": "au-79"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Gold is so soft you can hammer it into sheets thin enough to see through.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — treasure chests are full of Gold.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_hg_80",
+      "title": "Meet Mercury!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} taps the clipboard with a glittery pen. \"Here's a special one — Mercury!\"",
+          "action_slot": "pointing",
+          "element_id": "hg-80"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Mercury is the only metal that's liquid at room temperature, like silver water.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — Mercury is the only liquid metal! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_tl_81",
+      "title": "Meet Thallium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} pulls a shiny card from a pocket. \"This is Thallium — say THAL-ee-um with me!\"",
+          "action_slot": "pointing",
+          "element_id": "tl-81"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Thallium is one of the few elements whose name comes from a Greek word for a green twig.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Thallium hides in some electronics. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_pb_82",
+      "title": "Meet Lead!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} holds up a glowing card. \"Look at this — Lead!\"",
+          "action_slot": "pointing",
+          "element_id": "pb-82"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Lead is one of the heaviest common metals and was used in pencils long ago.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: Lead is heavy and dull gray!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_bi_83",
+      "title": "Meet Bismuth!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} turns the page in a sparkly notebook. \"Today we meet Bismuth — try saying BIZ-muth!\"",
+          "action_slot": "pointing",
+          "element_id": "bi-83"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Bismuth grows into beautiful rainbow staircase crystals that look like tiny castles.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — Bismuth hides in stomach medicine.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_po_84",
+      "title": "Meet Polonium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} smiles and reveals a new card. \"Say hello to Polonium! Sound it out: puh-LOH-nee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "po-84"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Polonium was named after Poland by Marie Curie, who discovered it.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — Polonium glows softly in the dark! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_at_85",
+      "title": "Meet Astatine!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} taps the clipboard with a glittery pen. \"Here's a tricky name — Astatine, or ASS-tuh-teen!\"",
+          "action_slot": "pointing",
+          "element_id": "at-85"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Astatine is so rare that less than a teaspoonful exists on the whole planet.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Astatine barely exists anywhere on Earth. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_rn_86",
+      "title": "Meet Radon!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} pulls a shiny card from a pocket. \"This is Radon — say RAY-don with me!\"",
+          "action_slot": "pointing",
+          "element_id": "rn-86"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Radon is a gas that seeps up from the ground and is checked for in basements.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: Radon hides in some basements!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_fr_87",
+      "title": "Meet Francium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} holds up a glowing card. \"Look at this — Francium! That's FRAN-see-um.\"",
+          "action_slot": "pointing",
+          "element_id": "fr-87"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Francium is so rare that there are only a few atoms of it on Earth at any time.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — only tiny puffs of Francium are made at once.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_ra_88",
+      "title": "Meet Radium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} turns the page in a sparkly notebook. \"Today we meet Radium — try saying RAY-dee-um!\"",
+          "action_slot": "pointing",
+          "element_id": "ra-88"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Radium glows in the dark and was once painted on old watch dials to read the time.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — Radium glows softly in the dark! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_ac_89",
+      "title": "Meet Actinium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} smiles and reveals a new card. \"Say hello to Actinium! Sound it out: ak-TIN-ee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "ac-89"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Actinium glows a pretty pale blue in the dark and starts the actinide family of elements.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Actinium starts the actinide family. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_th_90",
+      "title": "Meet Thorium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} taps the clipboard with a glittery pen. \"Here's a tricky name — Thorium, or THOR-ee-um!\"",
+          "action_slot": "pointing",
+          "element_id": "th-90"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Thorium is named after Thor, the Norse god of thunder.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: Thorium hides in beach sands!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_pa_91",
+      "title": "Meet Protactinium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} pulls a shiny card from a pocket. \"This is Protactinium — say proh-tak-TIN-ee-um with me!\"",
+          "action_slot": "pointing",
+          "element_id": "pa-91"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Protactinium's name means it comes before actinium when it breaks down.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — Protactinium breaks down into actinium.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_u_92",
+      "title": "Meet Uranium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} holds up a glowing card. \"Look at this — Uranium! That's yoo-RAY-nee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "u-92"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Uranium is named after the planet Uranus and powers nuclear reactors that make electricity.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — Uranium powers some power plants! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_np_93",
+      "title": "Meet Neptunium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} turns the page in a sparkly notebook. \"Today we meet Neptunium — try saying nep-TOO-nee-um!\"",
+          "action_slot": "pointing",
+          "element_id": "np-93"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Neptunium is named after the planet Neptune, just past Uranus in our solar system.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Neptunium was the first synthetic element. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_pu_94",
+      "title": "Meet Plutonium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} smiles and reveals a new card. \"Say hello to Plutonium! Sound it out: ploo-TOH-nee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "pu-94"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Plutonium is named after the dwarf planet Pluto and powers some space probes.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: Plutonium is named after Pluto!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_am_95",
+      "title": "Meet Americium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} taps the clipboard with a glittery pen. \"Here's a tricky name — Americium, or am-uh-RIH-see-um!\"",
+          "action_slot": "pointing",
+          "element_id": "am-95"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Americium is in many home smoke detectors and helps keep families safe from fires.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — Americium keeps houses safe from fires.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_cm_96",
+      "title": "Meet Curium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} pulls a shiny card from a pocket. \"This is Curium — say KYOOR-ee-um with me!\"",
+          "action_slot": "pointing",
+          "element_id": "cm-96"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Curium is named after Marie and Pierre Curie, two famous element-discovering scientists.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — Curium glows softly in the dark! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "music"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_bk_97",
+      "title": "Meet Berkelium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} holds up a glowing card. \"Look at this — Berkelium! That's BURK-lee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "bk-97"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Berkelium is named after Berkeley, California, where scientists first made it.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Berkelium was made in Berkeley California. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_cf_98",
+      "title": "Meet Californium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} turns the page in a sparkly notebook. \"Today we meet Californium — try saying kal-ih-FOR-nee-um!\"",
+          "action_slot": "pointing",
+          "element_id": "cf-98"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Californium helps find gold deep underground and start some nuclear reactors.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: Californium is named after California!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_es_99",
+      "title": "Meet Einsteinium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} smiles and reveals a new card. \"Say hello to Einsteinium! Sound it out: ine-STINE-ee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "es-99"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Einsteinium is named after Albert Einstein, the famous scientist who imagined time bending.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — Einsteinium barely exists on Earth.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_fm_100",
+      "title": "Meet Fermium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} taps the clipboard with a glittery pen. \"Here's a tricky name — Fermium, or FUR-mee-um!\"",
+          "action_slot": "pointing",
+          "element_id": "fm-100"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Fermium is named after Enrico Fermi, a scientist who built the first nuclear reactor.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — Fermium is named after Enrico Fermi! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_md_101",
+      "title": "Meet Mendelevium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} pulls a shiny card from a pocket. \"This is Mendelevium — say men-duh-LEE-vee-um with me!\"",
+          "action_slot": "pointing",
+          "element_id": "md-101"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Mendelevium is named after the scientist who first organized the periodic table.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Mendelevium is made one atom at a time. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_no_102",
+      "title": "Meet Nobelium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} holds up a glowing card. \"Look at this — Nobelium! That's no-BELL-ee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "no-102"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Nobelium is named after Alfred Nobel, who started the Nobel Prizes.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: Nobelium barely exists on Earth!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_lr_103",
+      "title": "Meet Lawrencium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} turns the page in a sparkly notebook. \"Today we meet Lawrencium — try saying loh-REN-see-um!\"",
+          "action_slot": "pointing",
+          "element_id": "lr-103"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Lawrencium is named after Ernest Lawrence, who invented a machine called a cyclotron.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — Lawrencium is named after Ernest Lawrence.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_rf_104",
+      "title": "Meet Rutherfordium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} smiles and reveals a new card. \"Say hello to Rutherfordium! Sound it out: ruh-thur-FOR-dee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "rf-104"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Rutherfordium is named after Ernest Rutherford, who discovered the center of the atom.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — Rutherfordium is super-heavy and rare! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_db_105",
+      "title": "Meet Dubnium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} taps the clipboard with a glittery pen. \"Here's a tricky name — Dubnium, or DOOB-nee-um!\"",
+          "action_slot": "pointing",
+          "element_id": "db-105"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Dubnium is named after Dubna, a Russian town where scientists made it.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Dubnium barely exists on Earth. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_sg_106",
+      "title": "Meet Seaborgium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} pulls a shiny card from a pocket. \"This is Seaborgium — say see-BORG-ee-um with me!\"",
+          "action_slot": "pointing",
+          "element_id": "sg-106"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Seaborgium is named after Glenn Seaborg, who discovered many heavy elements.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: Seaborgium honors Glenn Seaborg!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_bh_107",
+      "title": "Meet Bohrium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} holds up a glowing card. \"Look at this — Bohrium! That's BOR-ee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "bh-107"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Bohrium is named after Niels Bohr, who imagined how electrons orbit atoms.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — Bohrium is super-heavy and rare.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_hs_108",
+      "title": "Meet Hassium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} turns the page in a sparkly notebook. \"Today we meet Hassium — try saying HAS-ee-um!\"",
+          "action_slot": "pointing",
+          "element_id": "hs-108"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Hassium is named after the German state of Hesse, where scientists made it.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — Hassium barely exists on Earth! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_mt_109",
+      "title": "Meet Meitnerium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} smiles and reveals a new card. \"Say hello to Meitnerium! Sound it out: mite-NEER-ee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "mt-109"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Meitnerium is named after Lise Meitner, a scientist who studied splitting atoms.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Meitnerium honors Lise Meitner. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_ds_110",
+      "title": "Meet Darmstadtium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} taps the clipboard with a glittery pen. \"Here's a tricky name — Darmstadtium, or darm-SHTAT-ee-um!\"",
+          "action_slot": "pointing",
+          "element_id": "ds-110"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Darmstadtium is named after Darmstadt, the German city where scientists made it.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: Darmstadtium is super-heavy and rare!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_rg_111",
+      "title": "Meet Roentgenium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} pulls a shiny card from a pocket. \"This is Roentgenium — say rent-GEN-ee-um with me!\"",
+          "action_slot": "pointing",
+          "element_id": "rg-111"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Roentgenium is named after Wilhelm Roentgen, who discovered X-rays.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — Roentgenium barely exists on Earth.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_cn_112",
+      "title": "Meet Copernicium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} holds up a glowing card. \"Look at this — Copernicium! That's koh-per-NIH-see-um.\"",
+          "action_slot": "pointing",
+          "element_id": "cn-112"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Copernicium is named after Nicolaus Copernicus, who taught that Earth circles the sun.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — Copernicium honors Copernicus! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_nh_113",
+      "title": "Meet Nihonium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} turns the page in a sparkly notebook. \"Today we meet Nihonium — try saying nih-HOH-nee-um!\"",
+          "action_slot": "pointing",
+          "element_id": "nh-113"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Nihonium is named after Nihon, which is the Japanese word for Japan.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Nihonium is super-heavy and rare. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_fl_114",
+      "title": "Meet Flerovium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} smiles and reveals a new card. \"Say hello to Flerovium! Sound it out: fleh-ROH-vee-um.\"",
+          "action_slot": "pointing",
+          "element_id": "fl-114"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Flerovium is named after Georgy Flyorov, a Russian scientist who studied atoms.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: Flerovium barely exists on Earth!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_mc_115",
+      "title": "Meet Moscovium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} taps the clipboard with a glittery pen. \"Here's a tricky name — Moscovium, or mos-KOH-vee-um!\"",
+          "action_slot": "pointing",
+          "element_id": "mc-115"
+        },
+        {
+          "text": "She wiggles her eyebrows. \"Listen to this: Moscovium is named after Moscow, the capital city of Russia.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She nods slowly. \"Here's a fun thought — Moscovium is named after Moscow.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_lv_116",
+      "title": "Meet Livermorium!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} pulls a shiny card from a pocket. \"This is Livermorium — say liv-er-MOR-ee-um with me!\"",
+          "action_slot": "pointing",
+          "element_id": "lv-116"
+        },
+        {
+          "text": "She tilts the card so it catches the light. \"Check this out — Livermorium is named after Livermore, a California lab where scientists studied it.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She spreads her hands wide. \"Wow — Livermorium is super-heavy and rare! Now let's sing about it.\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_ts_117",
+      "title": "Meet Tennessine!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} holds up a glowing card. \"Look at this — Tennessine! That's TEH-neh-seen.\"",
+          "action_slot": "pointing",
+          "element_id": "ts-117"
+        },
+        {
+          "text": "She leans in close. \"Did you know? Tennessine is named after the U.S. state of Tennessee, where some of the work happened.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She winks. \"Imagine — Tennessine barely exists on Earth. Fun, right?\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
+    },
+    {
+      "id": "meet_element_og_118",
+      "title": "Meet Oganesson!",
+      "buckets": [
+        "always"
+      ],
+      "steps": [
+        {
+          "text": "{guide_mentor} turns the page in a sparkly notebook. \"Today we meet Oganesson — try saying oh-guh-NESS-on!\"",
+          "action_slot": "pointing",
+          "element_id": "og-118"
+        },
+        {
+          "text": "She points at the card. \"Here's the cool part — Oganesson is the heaviest element ever made and is named after Yuri Oganessian.\"",
+          "action_slot": "thinking"
+        },
+        {
+          "text": "She giggles. \"Picture this: Oganesson honors Yuri Oganessian!\"",
+          "action_slot": "looking"
+        }
+      ],
+      "required_roles": [
+        "guide_mentor"
+      ],
+      "optional_roles": [
+        "friend"
+      ],
+      "recommended_themes": [
+        "silly"
+      ],
+      "ending_step": {
+        "kind": "song",
+        "auto": true
+      }
     }
   ]
 }
