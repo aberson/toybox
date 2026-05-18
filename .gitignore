@@ -59,6 +59,15 @@ data/models/lora/*/
 !data/songs/manifest.json
 !data/songs/_credits.md
 data/songs/audio/
+# Phase M M1: ship the bundled element corpus in git (same pattern as
+# songs/jokes). The 118-entry JSON + credits are operator-authored
+# content, no binaries — they belong in the repo so a fresh clone loads
+# Phase M templates correctly. Sprite images are handled separately
+# under data/images/elements/ by Phase M M2 (gitignored except a
+# 14-element canonical subset).
+!data/elements/
+!data/elements/elements.json
+!data/elements/_credits.md
 
 # Secrets / OAuth
 secrets.json

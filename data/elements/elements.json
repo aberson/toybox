@@ -1,0 +1,2244 @@
+[
+  {
+    "id": "h-1",
+    "symbol": "H",
+    "name": "Hydrogen",
+    "atomic_number": 1,
+    "atomic_mass": 1.0,
+    "family": "nonmetal",
+    "phase_at_room_temp": "gas",
+    "color_description": "colorless gas",
+    "discovered_era": "1766",
+    "fun_fact": "Hydrogen is the lightest element and makes up most of the sun.",
+    "story_seed_hooks": [
+      "{name} floats balloons up into the sky",
+      "stars are giant balls of glowing {name}",
+      "{name} is so light it tries to escape into space"
+    ],
+    "pronunciation_guide": null,
+    "age_band": "3-5"
+  },
+  {
+    "id": "he-2",
+    "symbol": "He",
+    "name": "Helium",
+    "atomic_number": 2,
+    "atomic_mass": 4.0,
+    "family": "noble_gas",
+    "phase_at_room_temp": "gas",
+    "color_description": "colorless gas",
+    "discovered_era": "1868",
+    "fun_fact": "Helium makes balloons float and makes voices sound funny when you breathe it in.",
+    "story_seed_hooks": [
+      "{name} makes party balloons fly up",
+      "{name} was first spotted in the sun before on Earth",
+      "breathing tiny bits of {name} makes voices squeaky"
+    ],
+    "pronunciation_guide": "HEE-lee-um",
+    "age_band": "3-5"
+  },
+  {
+    "id": "li-3",
+    "symbol": "Li",
+    "name": "Lithium",
+    "atomic_number": 3,
+    "atomic_mass": 6.9,
+    "family": "alkali_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1817",
+    "fun_fact": "Lithium is the lightest metal and powers many phones, tablets, and electric cars.",
+    "story_seed_hooks": [
+      "{name} powers your tablet's battery",
+      "{name} is so light it can float on water",
+      "phones run on tiny bits of {name}"
+    ],
+    "pronunciation_guide": "LITH-ee-um",
+    "age_band": "6-8"
+  },
+  {
+    "id": "be-4",
+    "symbol": "Be",
+    "name": "Beryllium",
+    "atomic_number": 4,
+    "atomic_mass": 9.0,
+    "family": "alkaline_earth",
+    "phase_at_room_temp": "solid",
+    "color_description": "steel gray",
+    "discovered_era": "1798",
+    "fun_fact": "Beryllium is a strong, light metal that helps build airplanes and spaceships.",
+    "story_seed_hooks": [
+      "{name} helps build fast jet planes",
+      "{name} is light and very strong",
+      "spaceships use {name} for tough parts"
+    ],
+    "pronunciation_guide": "buh-RILL-ee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "b-5",
+    "symbol": "B",
+    "name": "Boron",
+    "atomic_number": 5,
+    "atomic_mass": 10.8,
+    "family": "metalloid",
+    "phase_at_room_temp": "solid",
+    "color_description": "dark brown",
+    "discovered_era": "1808",
+    "fun_fact": "Boron helps make strong glass that doesn't crack when it gets hot.",
+    "story_seed_hooks": [
+      "{name} is in heat-proof kitchen glass",
+      "{name} keeps fireworks burning green",
+      "{name} helps glass survive boiling water"
+    ],
+    "pronunciation_guide": null,
+    "age_band": "9-12"
+  },
+  {
+    "id": "c-6",
+    "symbol": "C",
+    "name": "Carbon",
+    "atomic_number": 6,
+    "atomic_mass": 12.0,
+    "family": "nonmetal",
+    "phase_at_room_temp": "solid",
+    "color_description": "black",
+    "discovered_era": "ancient",
+    "fun_fact": "Carbon is in every living thing on Earth, from trees to people to your pet dog.",
+    "story_seed_hooks": [
+      "{name} is inside every plant and animal",
+      "diamonds and pencil tips are both made of {name}",
+      "{name} is the stuff of life"
+    ],
+    "pronunciation_guide": null,
+    "age_band": "3-5"
+  },
+  {
+    "id": "n-7",
+    "symbol": "N",
+    "name": "Nitrogen",
+    "atomic_number": 7,
+    "atomic_mass": 14.0,
+    "family": "nonmetal",
+    "phase_at_room_temp": "gas",
+    "color_description": "colorless gas",
+    "discovered_era": "1772",
+    "fun_fact": "Most of the air we breathe is nitrogen, even more than oxygen.",
+    "story_seed_hooks": [
+      "{name} makes up most of the air",
+      "{name} helps plants grow tall and green",
+      "tires are sometimes filled with {name}"
+    ],
+    "pronunciation_guide": "NYE-troh-jen",
+    "age_band": "6-8"
+  },
+  {
+    "id": "o-8",
+    "symbol": "O",
+    "name": "Oxygen",
+    "atomic_number": 8,
+    "atomic_mass": 16.0,
+    "family": "nonmetal",
+    "phase_at_room_temp": "gas",
+    "color_description": "colorless gas",
+    "discovered_era": "1774",
+    "fun_fact": "Oxygen is the part of the air our lungs use to keep us alive.",
+    "story_seed_hooks": [
+      "{name} is what our lungs love to breathe",
+      "fish breathe {name} through their gills",
+      "fire needs {name} to burn"
+    ],
+    "pronunciation_guide": null,
+    "age_band": "3-5"
+  },
+  {
+    "id": "f-9",
+    "symbol": "F",
+    "name": "Fluorine",
+    "atomic_number": 9,
+    "atomic_mass": 19.0,
+    "family": "halogen",
+    "phase_at_room_temp": "gas",
+    "color_description": "pale yellow gas",
+    "discovered_era": "1886",
+    "fun_fact": "Fluorine helps make toothpaste that keeps your teeth strong.",
+    "story_seed_hooks": [
+      "{name} is in toothpaste for strong teeth",
+      "{name} comes from special rocks underground",
+      "dentists use {name} to fight cavities"
+    ],
+    "pronunciation_guide": "FLOOR-een",
+    "age_band": "6-8"
+  },
+  {
+    "id": "ne-10",
+    "symbol": "Ne",
+    "name": "Neon",
+    "atomic_number": 10,
+    "atomic_mass": 20.2,
+    "family": "noble_gas",
+    "phase_at_room_temp": "gas",
+    "color_description": "orange-red glow",
+    "discovered_era": "1898",
+    "fun_fact": "Neon glows bright orange-red when electricity flows through it, making colorful signs.",
+    "story_seed_hooks": [
+      "{name} signs glow orange in the dark",
+      "{name} lights up city streets",
+      "{name} only glows when zapped with electricity"
+    ],
+    "pronunciation_guide": null,
+    "age_band": "3-5"
+  },
+  {
+    "id": "na-11",
+    "symbol": "Na",
+    "name": "Sodium",
+    "atomic_number": 11,
+    "atomic_mass": 23.0,
+    "family": "alkali_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1807",
+    "fun_fact": "Sodium combines with chlorine to make the salt you sprinkle on food.",
+    "story_seed_hooks": [
+      "{name} is half of table salt",
+      "{name} burns with a bright yellow flame",
+      "streetlamps glow yellow from {name}"
+    ],
+    "pronunciation_guide": "SOH-dee-um",
+    "age_band": "3-5"
+  },
+  {
+    "id": "mg-12",
+    "symbol": "Mg",
+    "name": "Magnesium",
+    "atomic_number": 12,
+    "atomic_mass": 24.3,
+    "family": "alkaline_earth",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1808",
+    "fun_fact": "Magnesium burns with a super-bright white flame, which is why old camera flashes used it.",
+    "story_seed_hooks": [
+      "{name} makes a blinding white spark",
+      "{name} is inside green leaves",
+      "old cameras flashed with {name}"
+    ],
+    "pronunciation_guide": "mag-NEE-zee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "al-13",
+    "symbol": "Al",
+    "name": "Aluminum",
+    "atomic_number": 13,
+    "atomic_mass": 27.0,
+    "family": "post_transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1825",
+    "fun_fact": "Aluminum is the light, shiny metal in soda cans and kitchen foil.",
+    "story_seed_hooks": [
+      "{name} is the metal in soda cans",
+      "kitchen foil is made of {name}",
+      "{name} is light enough to fly in airplanes"
+    ],
+    "pronunciation_guide": "uh-LOO-mih-num",
+    "age_band": "3-5"
+  },
+  {
+    "id": "si-14",
+    "symbol": "Si",
+    "name": "Silicon",
+    "atomic_number": 14,
+    "atomic_mass": 28.1,
+    "family": "metalloid",
+    "phase_at_room_temp": "solid",
+    "color_description": "shiny dark gray",
+    "discovered_era": "1824",
+    "fun_fact": "Silicon is the main ingredient in computer chips and most beach sand.",
+    "story_seed_hooks": [
+      "{name} chips run every computer",
+      "beach sand is mostly {name}",
+      "{name} turns into glass when melted"
+    ],
+    "pronunciation_guide": "SIL-ih-kon",
+    "age_band": "6-8"
+  },
+  {
+    "id": "p-15",
+    "symbol": "P",
+    "name": "Phosphorus",
+    "atomic_number": 15,
+    "atomic_mass": 31.0,
+    "family": "nonmetal",
+    "phase_at_room_temp": "solid",
+    "color_description": "waxy white-yellow",
+    "discovered_era": "1669",
+    "fun_fact": "Phosphorus is in the tip of every match and helps your bones stay strong.",
+    "story_seed_hooks": [
+      "{name} lights up matches",
+      "{name} helps bones grow strong",
+      "{name} glows when it touches air"
+    ],
+    "pronunciation_guide": "FOSS-fer-us",
+    "age_band": "9-12"
+  },
+  {
+    "id": "s-16",
+    "symbol": "S",
+    "name": "Sulfur",
+    "atomic_number": 16,
+    "atomic_mass": 32.1,
+    "family": "nonmetal",
+    "phase_at_room_temp": "solid",
+    "color_description": "bright yellow",
+    "discovered_era": "ancient",
+    "fun_fact": "Sulfur is the bright yellow stuff near volcanoes, and it smells like rotten eggs.",
+    "story_seed_hooks": [
+      "{name} is the yellow dust near volcanoes",
+      "{name} smells like old eggs",
+      "fireworks pop with {name}"
+    ],
+    "pronunciation_guide": "SUL-fer",
+    "age_band": "3-5"
+  },
+  {
+    "id": "cl-17",
+    "symbol": "Cl",
+    "name": "Chlorine",
+    "atomic_number": 17,
+    "atomic_mass": 35.5,
+    "family": "halogen",
+    "phase_at_room_temp": "gas",
+    "color_description": "yellow-green gas",
+    "discovered_era": "1774",
+    "fun_fact": "Chlorine keeps swimming pools clean and is the other half of table salt.",
+    "story_seed_hooks": [
+      "{name} keeps swimming pools sparkly",
+      "{name} is half of every salt grain",
+      "pools smell like {name}"
+    ],
+    "pronunciation_guide": "KLOR-een",
+    "age_band": "6-8"
+  },
+  {
+    "id": "ar-18",
+    "symbol": "Ar",
+    "name": "Argon",
+    "atomic_number": 18,
+    "atomic_mass": 39.9,
+    "family": "noble_gas",
+    "phase_at_room_temp": "gas",
+    "color_description": "colorless gas",
+    "discovered_era": "1894",
+    "fun_fact": "Argon is a quiet gas that fills old light bulbs to keep them from burning out.",
+    "story_seed_hooks": [
+      "{name} hides inside light bulbs",
+      "{name} never reacts with anything",
+      "windows can be filled with {name}"
+    ],
+    "pronunciation_guide": "AR-gon",
+    "age_band": "9-12"
+  },
+  {
+    "id": "k-19",
+    "symbol": "K",
+    "name": "Potassium",
+    "atomic_number": 19,
+    "atomic_mass": 39.1,
+    "family": "alkali_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1807",
+    "fun_fact": "Bananas are full of potassium, which helps your muscles work properly.",
+    "story_seed_hooks": [
+      "bananas are packed with {name}",
+      "{name} keeps muscles working",
+      "{name} burns with a purple flame"
+    ],
+    "pronunciation_guide": "puh-TASS-ee-um",
+    "age_band": "6-8"
+  },
+  {
+    "id": "ca-20",
+    "symbol": "Ca",
+    "name": "Calcium",
+    "atomic_number": 20,
+    "atomic_mass": 40.1,
+    "family": "alkaline_earth",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1808",
+    "fun_fact": "Calcium builds strong bones and teeth and is in milk, cheese, and yogurt.",
+    "story_seed_hooks": [
+      "{name} builds strong bones",
+      "milk is full of {name}",
+      "seashells are made of {name}"
+    ],
+    "pronunciation_guide": "KAL-see-um",
+    "age_band": "3-5"
+  },
+  {
+    "id": "sc-21",
+    "symbol": "Sc",
+    "name": "Scandium",
+    "atomic_number": 21,
+    "atomic_mass": 45.0,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1879",
+    "fun_fact": "Scandium makes baseball bats and bicycle frames super light and strong.",
+    "story_seed_hooks": [
+      "{name} makes bicycle frames light",
+      "{name} was hiding in Swedish rocks",
+      "{name} is a tough, light metal"
+    ],
+    "pronunciation_guide": "SKAN-dee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "ti-22",
+    "symbol": "Ti",
+    "name": "Titanium",
+    "atomic_number": 22,
+    "atomic_mass": 47.9,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery gray",
+    "discovered_era": "1791",
+    "fun_fact": "Titanium is so strong and light that airplanes, ships, and even toothpaste use it.",
+    "story_seed_hooks": [
+      "{name} makes rockets sturdy",
+      "{name} is light and super strong",
+      "doctors use {name} for new bones"
+    ],
+    "pronunciation_guide": "tye-TAY-nee-um",
+    "age_band": "6-8"
+  },
+  {
+    "id": "v-23",
+    "symbol": "V",
+    "name": "Vanadium",
+    "atomic_number": 23,
+    "atomic_mass": 50.9,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery blue-gray",
+    "discovered_era": "1801",
+    "fun_fact": "Vanadium makes steel tools extra tough, like the wrenches in a car mechanic's shop.",
+    "story_seed_hooks": [
+      "{name} makes tough tools",
+      "{name} was named after a Norse goddess",
+      "{name} can glow in five different colors"
+    ],
+    "pronunciation_guide": "vuh-NAY-dee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "cr-24",
+    "symbol": "Cr",
+    "name": "Chromium",
+    "atomic_number": 24,
+    "atomic_mass": 52.0,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "shiny silver",
+    "discovered_era": "1797",
+    "fun_fact": "Chromium makes the shiny silver coating on car bumpers and bicycle bells.",
+    "story_seed_hooks": [
+      "{name} shines on chrome bumpers",
+      "{name} makes rubies sparkle red",
+      "{name} keeps steel from rusting"
+    ],
+    "pronunciation_guide": "KROH-mee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "mn-25",
+    "symbol": "Mn",
+    "name": "Manganese",
+    "atomic_number": 25,
+    "atomic_mass": 54.9,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery gray",
+    "discovered_era": "1774",
+    "fun_fact": "Manganese helps batteries work and gives some glass a pretty purple color.",
+    "story_seed_hooks": [
+      "{name} powers tiny batteries",
+      "{name} turns glass purple",
+      "{name} hides in the deep ocean floor"
+    ],
+    "pronunciation_guide": "MANG-guh-neez",
+    "age_band": "9-12"
+  },
+  {
+    "id": "fe-26",
+    "symbol": "Fe",
+    "name": "Iron",
+    "atomic_number": 26,
+    "atomic_mass": 55.8,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery gray",
+    "discovered_era": "ancient",
+    "fun_fact": "Iron makes your blood red and is the metal inside skyscrapers and bridges.",
+    "story_seed_hooks": [
+      "{name} makes your blood red",
+      "bridges and buildings stand tall with {name}",
+      "magnets stick to {name}"
+    ],
+    "pronunciation_guide": null,
+    "age_band": "3-5"
+  },
+  {
+    "id": "co-27",
+    "symbol": "Co",
+    "name": "Cobalt",
+    "atomic_number": 27,
+    "atomic_mass": 58.9,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery blue",
+    "discovered_era": "1735",
+    "fun_fact": "Cobalt makes the deep blue color in old pottery and stained-glass windows.",
+    "story_seed_hooks": [
+      "{name} paints stained glass deep blue",
+      "{name} helps make strong magnets",
+      "{name} hides in batteries"
+    ],
+    "pronunciation_guide": "KOH-bawlt",
+    "age_band": "6-8"
+  },
+  {
+    "id": "ni-28",
+    "symbol": "Ni",
+    "name": "Nickel",
+    "atomic_number": 28,
+    "atomic_mass": 58.7,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1751",
+    "fun_fact": "Nickel is the shiny metal in the five-cent coin called a nickel.",
+    "story_seed_hooks": [
+      "{name} is in the five-cent coin",
+      "{name} sticks to magnets",
+      "{name} keeps coins from rusting"
+    ],
+    "pronunciation_guide": null,
+    "age_band": "3-5"
+  },
+  {
+    "id": "cu-29",
+    "symbol": "Cu",
+    "name": "Copper",
+    "atomic_number": 29,
+    "atomic_mass": 63.5,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "shiny orange-brown",
+    "discovered_era": "ancient",
+    "fun_fact": "Copper turns green when it's outside for a long time, like the Statue of Liberty.",
+    "story_seed_hooks": [
+      "{name} turned the Statue of Liberty green",
+      "pennies are made with {name}",
+      "wires carry power through {name}"
+    ],
+    "pronunciation_guide": null,
+    "age_band": "3-5"
+  },
+  {
+    "id": "zn-30",
+    "symbol": "Zn",
+    "name": "Zinc",
+    "atomic_number": 30,
+    "atomic_mass": 65.4,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "blue-gray",
+    "discovered_era": "ancient",
+    "fun_fact": "Zinc keeps cuts and scrapes from getting sore and also makes pennies feel light.",
+    "story_seed_hooks": [
+      "{name} hides inside every penny",
+      "{name} helps cuts heal",
+      "sunscreen sometimes has {name}"
+    ],
+    "pronunciation_guide": null,
+    "age_band": "6-8"
+  },
+  {
+    "id": "ga-31",
+    "symbol": "Ga",
+    "name": "Gallium",
+    "atomic_number": 31,
+    "atomic_mass": 69.7,
+    "family": "post_transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery blue",
+    "discovered_era": "1875",
+    "fun_fact": "Gallium melts in your hand because its melting point is below body temperature.",
+    "story_seed_hooks": [
+      "{name} melts in a warm hand",
+      "{name} hides inside LED lights",
+      "{name} pours like silver water"
+    ],
+    "pronunciation_guide": "GAL-ee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "ge-32",
+    "symbol": "Ge",
+    "name": "Germanium",
+    "atomic_number": 32,
+    "atomic_mass": 72.6,
+    "family": "metalloid",
+    "phase_at_room_temp": "solid",
+    "color_description": "shiny gray-white",
+    "discovered_era": "1886",
+    "fun_fact": "Germanium was used in the very first transistors that started the computer age.",
+    "story_seed_hooks": [
+      "{name} powered the first transistors",
+      "{name} shines in night-vision goggles",
+      "{name} hides in fiber-optic cables"
+    ],
+    "pronunciation_guide": "jer-MAY-nee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "as-33",
+    "symbol": "As",
+    "name": "Arsenic",
+    "atomic_number": 33,
+    "atomic_mass": 74.9,
+    "family": "metalloid",
+    "phase_at_room_temp": "solid",
+    "color_description": "metallic gray",
+    "discovered_era": "ancient",
+    "fun_fact": "Arsenic is a metalloid that helps make computer chips and tiny LED lights.",
+    "story_seed_hooks": [
+      "{name} helps power tiny LEDs",
+      "{name} hides in old detective stories",
+      "{name} sparkles silver when polished"
+    ],
+    "pronunciation_guide": "ARS-nik",
+    "age_band": "9-12"
+  },
+  {
+    "id": "se-34",
+    "symbol": "Se",
+    "name": "Selenium",
+    "atomic_number": 34,
+    "atomic_mass": 79.0,
+    "family": "nonmetal",
+    "phase_at_room_temp": "solid",
+    "color_description": "red-gray",
+    "discovered_era": "1817",
+    "fun_fact": "Selenium helps photocopiers see and copy pictures on paper.",
+    "story_seed_hooks": [
+      "{name} helps photocopiers see",
+      "{name} is in some glass to color it red",
+      "{name} was named after the moon"
+    ],
+    "pronunciation_guide": "suh-LEE-nee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "br-35",
+    "symbol": "Br",
+    "name": "Bromine",
+    "atomic_number": 35,
+    "atomic_mass": 79.9,
+    "family": "halogen",
+    "phase_at_room_temp": "liquid",
+    "color_description": "deep red liquid",
+    "discovered_era": "1826",
+    "fun_fact": "Bromine is one of only two liquid elements at room temperature, the other is mercury.",
+    "story_seed_hooks": [
+      "{name} is a red liquid at room temperature",
+      "{name} was first found near the sea",
+      "{name} is one of only two liquid elements"
+    ],
+    "pronunciation_guide": "BROH-meen",
+    "age_band": "6-8"
+  },
+  {
+    "id": "kr-36",
+    "symbol": "Kr",
+    "name": "Krypton",
+    "atomic_number": 36,
+    "atomic_mass": 83.8,
+    "family": "noble_gas",
+    "phase_at_room_temp": "gas",
+    "color_description": "colorless gas",
+    "discovered_era": "1898",
+    "fun_fact": "Krypton glows pale lavender in lights and shares its name with Superman's home planet.",
+    "story_seed_hooks": [
+      "{name} sounds like Superman's home",
+      "{name} glows pale purple in lamps",
+      "{name} hides in flashlight bulbs"
+    ],
+    "pronunciation_guide": "KRIP-ton",
+    "age_band": "6-8"
+  },
+  {
+    "id": "rb-37",
+    "symbol": "Rb",
+    "name": "Rubidium",
+    "atomic_number": 37,
+    "atomic_mass": 85.5,
+    "family": "alkali_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1861",
+    "fun_fact": "Rubidium is named for its ruby-red color when it burns in a flame.",
+    "story_seed_hooks": [
+      "{name} burns with a ruby-red flame",
+      "atomic clocks tick with {name}",
+      "{name} is soft enough to cut with a knife"
+    ],
+    "pronunciation_guide": "roo-BIH-dee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "sr-38",
+    "symbol": "Sr",
+    "name": "Strontium",
+    "atomic_number": 38,
+    "atomic_mass": 87.6,
+    "family": "alkaline_earth",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery yellow",
+    "discovered_era": "1790",
+    "fun_fact": "Strontium makes fireworks burn bright red, which is why holiday rockets are so colorful.",
+    "story_seed_hooks": [
+      "{name} makes fireworks burn red",
+      "{name} was first found in Scotland",
+      "{name} glows in some dim emergency signs"
+    ],
+    "pronunciation_guide": "STRON-shee-um",
+    "age_band": "6-8"
+  },
+  {
+    "id": "y-39",
+    "symbol": "Y",
+    "name": "Yttrium",
+    "atomic_number": 39,
+    "atomic_mass": 88.9,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1794",
+    "fun_fact": "Yttrium helps make the bright red dots on old TV screens.",
+    "story_seed_hooks": [
+      "{name} colored old TV screens red",
+      "{name} is named after a Swedish village",
+      "{name} hides in laser beams"
+    ],
+    "pronunciation_guide": "IH-tree-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "zr-40",
+    "symbol": "Zr",
+    "name": "Zirconium",
+    "atomic_number": 40,
+    "atomic_mass": 91.2,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1789",
+    "fun_fact": "Zirconium makes fake diamonds that sparkle just like real ones in jewelry.",
+    "story_seed_hooks": [
+      "{name} sparkles like a fake diamond",
+      "{name} resists heat in spaceships",
+      "{name} hides in some camera lenses"
+    ],
+    "pronunciation_guide": "zir-KOH-nee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "nb-41",
+    "symbol": "Nb",
+    "name": "Niobium",
+    "atomic_number": 41,
+    "atomic_mass": 92.9,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "shiny gray",
+    "discovered_era": "1801",
+    "fun_fact": "Niobium helps make super-fast magnets that lift trains off the tracks.",
+    "story_seed_hooks": [
+      "{name} lifts magnetic trains off the rails",
+      "{name} is named after a Greek princess",
+      "{name} shines in colorful jewelry"
+    ],
+    "pronunciation_guide": "nye-OH-bee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "mo-42",
+    "symbol": "Mo",
+    "name": "Molybdenum",
+    "atomic_number": 42,
+    "atomic_mass": 95.9,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery gray",
+    "discovered_era": "1781",
+    "fun_fact": "Molybdenum makes steel tools tough enough to cut through other metals.",
+    "story_seed_hooks": [
+      "{name} sharpens super-tough tools",
+      "{name} helps plants grow strong",
+      "{name} hides in jet engines"
+    ],
+    "pronunciation_guide": "muh-LIB-duh-num",
+    "age_band": "9-12"
+  },
+  {
+    "id": "tc-43",
+    "symbol": "Tc",
+    "name": "Technetium",
+    "atomic_number": 43,
+    "atomic_mass": 98.0,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery gray",
+    "discovered_era": "1937",
+    "fun_fact": "Technetium was the first element ever made by people, in a lab in 1937.",
+    "story_seed_hooks": [
+      "{name} was the first lab-made element",
+      "{name} helps doctors see inside bodies",
+      "{name} doesn't exist naturally on Earth"
+    ],
+    "pronunciation_guide": "tek-NEE-shee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "ru-44",
+    "symbol": "Ru",
+    "name": "Ruthenium",
+    "atomic_number": 44,
+    "atomic_mass": 101.1,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "shiny silvery white",
+    "discovered_era": "1844",
+    "fun_fact": "Ruthenium makes the tiny gold tip on fancy fountain pens last extra long.",
+    "story_seed_hooks": [
+      "{name} tips fancy fountain pens",
+      "{name} is named after Russia",
+      "{name} hides in solar panels"
+    ],
+    "pronunciation_guide": "roo-THEE-nee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "rh-45",
+    "symbol": "Rh",
+    "name": "Rhodium",
+    "atomic_number": 45,
+    "atomic_mass": 102.9,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "shiny silvery white",
+    "discovered_era": "1803",
+    "fun_fact": "Rhodium is one of the rarest metals and gives jewelry its bright silvery shine.",
+    "story_seed_hooks": [
+      "{name} shines bright on white-gold rings",
+      "{name} hides in car exhaust pipes",
+      "{name} is one of the rarest metals on Earth"
+    ],
+    "pronunciation_guide": "ROH-dee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "pd-46",
+    "symbol": "Pd",
+    "name": "Palladium",
+    "atomic_number": 46,
+    "atomic_mass": 106.4,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "shiny silvery white",
+    "discovered_era": "1803",
+    "fun_fact": "Palladium cleans up car exhaust so the air stays cleaner to breathe.",
+    "story_seed_hooks": [
+      "{name} cleans up car exhaust",
+      "{name} hides inside dental fillings",
+      "{name} can soak up lots of hydrogen"
+    ],
+    "pronunciation_guide": "puh-LAY-dee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "ag-47",
+    "symbol": "Ag",
+    "name": "Silver",
+    "atomic_number": 47,
+    "atomic_mass": 107.9,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "shiny silvery white",
+    "discovered_era": "ancient",
+    "fun_fact": "Silver is the shiniest metal of all and turns black when it sits in the air too long.",
+    "story_seed_hooks": [
+      "{name} shines brighter than any metal",
+      "{name} forks turn black over time",
+      "{name} medals go to second-place winners"
+    ],
+    "pronunciation_guide": null,
+    "age_band": "3-5"
+  },
+  {
+    "id": "cd-48",
+    "symbol": "Cd",
+    "name": "Cadmium",
+    "atomic_number": 48,
+    "atomic_mass": 112.4,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery bluish-white",
+    "discovered_era": "1817",
+    "fun_fact": "Cadmium paints used to make sunny yellow colors in old artists' paintings.",
+    "story_seed_hooks": [
+      "{name} painted sunny yellow flowers",
+      "{name} hides in some old batteries",
+      "{name} solders pieces of metal together"
+    ],
+    "pronunciation_guide": "KAD-mee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "in-49",
+    "symbol": "In",
+    "name": "Indium",
+    "atomic_number": 49,
+    "atomic_mass": 114.8,
+    "family": "post_transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1863",
+    "fun_fact": "Indium makes touchscreens work so you can tap your tablet and phone.",
+    "story_seed_hooks": [
+      "{name} makes touchscreens tappable",
+      "{name} is named after indigo blue",
+      "{name} squeaks like wood when bent"
+    ],
+    "pronunciation_guide": "IN-dee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "sn-50",
+    "symbol": "Sn",
+    "name": "Tin",
+    "atomic_number": 50,
+    "atomic_mass": 118.7,
+    "family": "post_transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "ancient",
+    "fun_fact": "Tin coats steel cans so the soup or beans inside don't rust the can.",
+    "story_seed_hooks": [
+      "{name} coats food cans on the inside",
+      "{name} soldiers stood in old toy boxes",
+      "{name} foil used to wrap chocolates"
+    ],
+    "pronunciation_guide": null,
+    "age_band": "3-5"
+  },
+  {
+    "id": "sb-51",
+    "symbol": "Sb",
+    "name": "Antimony",
+    "atomic_number": 51,
+    "atomic_mass": 121.8,
+    "family": "metalloid",
+    "phase_at_room_temp": "solid",
+    "color_description": "shiny silvery gray",
+    "discovered_era": "ancient",
+    "fun_fact": "Antimony helps make fire-resistant clothes that don't catch fire easily.",
+    "story_seed_hooks": [
+      "{name} makes clothes fire-resistant",
+      "{name} hides in old fire helmets",
+      "{name} was used as eye makeup long ago"
+    ],
+    "pronunciation_guide": "AN-tih-moh-nee",
+    "age_band": "9-12"
+  },
+  {
+    "id": "te-52",
+    "symbol": "Te",
+    "name": "Tellurium",
+    "atomic_number": 52,
+    "atomic_mass": 127.6,
+    "family": "metalloid",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1782",
+    "fun_fact": "Tellurium helps solar panels turn sunshine into power for homes.",
+    "story_seed_hooks": [
+      "{name} helps solar panels catch sunshine",
+      "{name} is named after Earth",
+      "{name} hides in some computer chips"
+    ],
+    "pronunciation_guide": "teh-LOOR-ee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "i-53",
+    "symbol": "I",
+    "name": "Iodine",
+    "atomic_number": 53,
+    "atomic_mass": 126.9,
+    "family": "halogen",
+    "phase_at_room_temp": "solid",
+    "color_description": "shiny purple-black",
+    "discovered_era": "1811",
+    "fun_fact": "Iodine is added to table salt to help your body grow strong.",
+    "story_seed_hooks": [
+      "{name} is added to table salt",
+      "{name} turns purple when warmed",
+      "{name} helps doctors see inside bodies"
+    ],
+    "pronunciation_guide": "EYE-oh-deen",
+    "age_band": "6-8"
+  },
+  {
+    "id": "xe-54",
+    "symbol": "Xe",
+    "name": "Xenon",
+    "atomic_number": 54,
+    "atomic_mass": 131.3,
+    "family": "noble_gas",
+    "phase_at_room_temp": "gas",
+    "color_description": "colorless gas",
+    "discovered_era": "1898",
+    "fun_fact": "Xenon glows bright white in flash bulbs and powers ion engines on space probes.",
+    "story_seed_hooks": [
+      "{name} flashes bright in camera lights",
+      "spaceships zoom with {name} engines",
+      "{name} glows pure white when zapped"
+    ],
+    "pronunciation_guide": "ZEE-non",
+    "age_band": "6-8"
+  },
+  {
+    "id": "cs-55",
+    "symbol": "Cs",
+    "name": "Cesium",
+    "atomic_number": 55,
+    "atomic_mass": 132.9,
+    "family": "alkali_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery gold",
+    "discovered_era": "1860",
+    "fun_fact": "Cesium runs the most accurate clocks in the world, losing only a second every millions of years.",
+    "story_seed_hooks": [
+      "{name} runs the world's best clocks",
+      "{name} melts in a warm hand like butter",
+      "{name} glows pale blue in flames"
+    ],
+    "pronunciation_guide": "SEE-zee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "ba-56",
+    "symbol": "Ba",
+    "name": "Barium",
+    "atomic_number": 56,
+    "atomic_mass": 137.3,
+    "family": "alkaline_earth",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1808",
+    "fun_fact": "Barium makes fireworks burn bright green and helps doctors take pictures of stomachs.",
+    "story_seed_hooks": [
+      "{name} makes fireworks burn green",
+      "{name} helps doctors see stomachs",
+      "{name} burns with a leaf-green flame"
+    ],
+    "pronunciation_guide": "BAIR-ee-um",
+    "age_band": "6-8"
+  },
+  {
+    "id": "la-57",
+    "symbol": "La",
+    "name": "Lanthanum",
+    "atomic_number": 57,
+    "atomic_mass": 138.9,
+    "family": "lanthanide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1839",
+    "fun_fact": "Lanthanum makes camera lenses sharper so pictures look crisp and clear.",
+    "story_seed_hooks": [
+      "{name} makes camera lenses sharp",
+      "{name} hides in studio lights",
+      "{name} starts the lanthanide family"
+    ],
+    "pronunciation_guide": "LAN-thuh-num",
+    "age_band": "9-12"
+  },
+  {
+    "id": "ce-58",
+    "symbol": "Ce",
+    "name": "Cerium",
+    "atomic_number": 58,
+    "atomic_mass": 140.1,
+    "family": "lanthanide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1803",
+    "fun_fact": "Cerium polishes glass to a mirror finish and is the most common rare-earth metal.",
+    "story_seed_hooks": [
+      "{name} polishes glass perfectly smooth",
+      "{name} is named after a tiny planet",
+      "{name} sparkles in lighter flints"
+    ],
+    "pronunciation_guide": "SEE-ree-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "pr-59",
+    "symbol": "Pr",
+    "name": "Praseodymium",
+    "atomic_number": 59,
+    "atomic_mass": 140.9,
+    "family": "lanthanide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery yellow",
+    "discovered_era": "1885",
+    "fun_fact": "Praseodymium colors special goggles green so welders can see safely through bright sparks.",
+    "story_seed_hooks": [
+      "{name} tints welder goggles green",
+      "{name} sounds like a magic spell",
+      "{name} shines in airplane engines"
+    ],
+    "pronunciation_guide": "pray-zee-oh-DIM-ee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "nd-60",
+    "symbol": "Nd",
+    "name": "Neodymium",
+    "atomic_number": 60,
+    "atomic_mass": 144.2,
+    "family": "lanthanide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1885",
+    "fun_fact": "Neodymium makes the strongest magnets on Earth, found in headphones and hard drives.",
+    "story_seed_hooks": [
+      "{name} makes the strongest magnets",
+      "{name} hides in headphones",
+      "{name} pulls toys across tables"
+    ],
+    "pronunciation_guide": "nee-oh-DIM-ee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "pm-61",
+    "symbol": "Pm",
+    "name": "Promethium",
+    "atomic_number": 61,
+    "atomic_mass": 145.0,
+    "family": "lanthanide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1945",
+    "fun_fact": "Promethium is named after a hero from Greek myths who gave fire to people.",
+    "story_seed_hooks": [
+      "{name} glows in some old watch faces",
+      "{name} is named after a Greek hero",
+      "{name} barely exists in nature"
+    ],
+    "pronunciation_guide": "pro-MEE-thee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "sm-62",
+    "symbol": "Sm",
+    "name": "Samarium",
+    "atomic_number": 62,
+    "atomic_mass": 150.4,
+    "family": "lanthanide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1879",
+    "fun_fact": "Samarium makes powerful magnets that still work even when very hot.",
+    "story_seed_hooks": [
+      "{name} makes magnets that survive heat",
+      "{name} powers some headphones",
+      "{name} hides in airplane motors"
+    ],
+    "pronunciation_guide": "suh-MAIR-ee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "eu-63",
+    "symbol": "Eu",
+    "name": "Europium",
+    "atomic_number": 63,
+    "atomic_mass": 152.0,
+    "family": "lanthanide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1901",
+    "fun_fact": "Europium makes the red color in TV screens and the glow in some banknotes.",
+    "story_seed_hooks": [
+      "{name} glows red on TV screens",
+      "{name} hides in euro banknotes",
+      "{name} is named after Europe"
+    ],
+    "pronunciation_guide": "yoo-ROH-pee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "gd-64",
+    "symbol": "Gd",
+    "name": "Gadolinium",
+    "atomic_number": 64,
+    "atomic_mass": 157.3,
+    "family": "lanthanide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1880",
+    "fun_fact": "Gadolinium helps doctors take clearer pictures inside the body with MRI scans.",
+    "story_seed_hooks": [
+      "{name} helps doctors take MRI pictures",
+      "{name} responds to magnets",
+      "{name} hides in microwave ovens"
+    ],
+    "pronunciation_guide": "gad-uh-LIH-nee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "tb-65",
+    "symbol": "Tb",
+    "name": "Terbium",
+    "atomic_number": 65,
+    "atomic_mass": 158.9,
+    "family": "lanthanide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1843",
+    "fun_fact": "Terbium makes the bright green color you see on TV and tablet screens.",
+    "story_seed_hooks": [
+      "{name} glows green on tablet screens",
+      "{name} is named after a Swedish village",
+      "{name} hums in tiny speakers"
+    ],
+    "pronunciation_guide": "TUR-bee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "dy-66",
+    "symbol": "Dy",
+    "name": "Dysprosium",
+    "atomic_number": 66,
+    "atomic_mass": 162.5,
+    "family": "lanthanide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1886",
+    "fun_fact": "Dysprosium makes magnets that don't lose their pull even when very hot.",
+    "story_seed_hooks": [
+      "{name} keeps magnets strong in heat",
+      "{name} hides in electric car motors",
+      "{name} is hard to find on Earth"
+    ],
+    "pronunciation_guide": "dis-PROH-zee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "ho-67",
+    "symbol": "Ho",
+    "name": "Holmium",
+    "atomic_number": 67,
+    "atomic_mass": 164.9,
+    "family": "lanthanide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1878",
+    "fun_fact": "Holmium creates the strongest magnetic fields of any natural element.",
+    "story_seed_hooks": [
+      "{name} pulls the strongest magnetic field",
+      "{name} colors lasers yellow",
+      "{name} is named after Stockholm"
+    ],
+    "pronunciation_guide": "HOHL-mee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "er-68",
+    "symbol": "Er",
+    "name": "Erbium",
+    "atomic_number": 68,
+    "atomic_mass": 167.3,
+    "family": "lanthanide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1843",
+    "fun_fact": "Erbium colors glass and ceramics a pretty pink and helps light travel through cables.",
+    "story_seed_hooks": [
+      "{name} tints glass pretty pink",
+      "{name} carries light in fiber cables",
+      "{name} is named after a Swedish village"
+    ],
+    "pronunciation_guide": "UR-bee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "tm-69",
+    "symbol": "Tm",
+    "name": "Thulium",
+    "atomic_number": 69,
+    "atomic_mass": 168.9,
+    "family": "lanthanide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1879",
+    "fun_fact": "Thulium glows blue in some special lasers and was once the rarest of the rare earths.",
+    "story_seed_hooks": [
+      "{name} glows blue in tiny lasers",
+      "{name} is one of the rarest rare-earths",
+      "{name} was found by a Swedish scientist"
+    ],
+    "pronunciation_guide": "THOO-lee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "yb-70",
+    "symbol": "Yb",
+    "name": "Ytterbium",
+    "atomic_number": 70,
+    "atomic_mass": 173.0,
+    "family": "lanthanide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1878",
+    "fun_fact": "Ytterbium helps make atomic clocks that keep time more precisely than ever before.",
+    "story_seed_hooks": [
+      "{name} runs new atomic clocks",
+      "{name} is named after a Swedish village",
+      "{name} powers tiny lasers"
+    ],
+    "pronunciation_guide": "ih-TUR-bee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "lu-71",
+    "symbol": "Lu",
+    "name": "Lutetium",
+    "atomic_number": 71,
+    "atomic_mass": 175.0,
+    "family": "lanthanide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1907",
+    "fun_fact": "Lutetium is one of the rarest and most expensive metals to dig out of the ground.",
+    "story_seed_hooks": [
+      "{name} is one of the rarest metals",
+      "{name} is named after old Paris",
+      "{name} helps refine oil"
+    ],
+    "pronunciation_guide": "loo-TEE-shee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "hf-72",
+    "symbol": "Hf",
+    "name": "Hafnium",
+    "atomic_number": 72,
+    "atomic_mass": 178.5,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery gray",
+    "discovered_era": "1923",
+    "fun_fact": "Hafnium makes super-fast computer chips run cooler and use less power.",
+    "story_seed_hooks": [
+      "{name} cools down computer chips",
+      "{name} hides in submarine reactors",
+      "{name} is named after Copenhagen"
+    ],
+    "pronunciation_guide": "HAF-nee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "ta-73",
+    "symbol": "Ta",
+    "name": "Tantalum",
+    "atomic_number": 73,
+    "atomic_mass": 180.9,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "blue-gray",
+    "discovered_era": "1802",
+    "fun_fact": "Tantalum stores power inside phones, tablets, and game consoles in tiny capacitors.",
+    "story_seed_hooks": [
+      "{name} stores power in phones",
+      "{name} is named after a Greek myth",
+      "{name} resists almost every acid"
+    ],
+    "pronunciation_guide": "TAN-tuh-lum",
+    "age_band": "9-12"
+  },
+  {
+    "id": "w-74",
+    "symbol": "W",
+    "name": "Tungsten",
+    "atomic_number": 74,
+    "atomic_mass": 183.8,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "shiny silvery white",
+    "discovered_era": "1783",
+    "fun_fact": "Tungsten has the highest melting point of any metal, which is why it's in light-bulb wires.",
+    "story_seed_hooks": [
+      "{name} glows in old light bulbs",
+      "{name} survives the highest heat",
+      "{name} tips strong drill bits"
+    ],
+    "pronunciation_guide": "TUNG-sten",
+    "age_band": "6-8"
+  },
+  {
+    "id": "re-75",
+    "symbol": "Re",
+    "name": "Rhenium",
+    "atomic_number": 75,
+    "atomic_mass": 186.2,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1925",
+    "fun_fact": "Rhenium helps jet engines spin hot and fast without melting.",
+    "story_seed_hooks": [
+      "{name} keeps jet engines spinning",
+      "{name} was the last natural element discovered",
+      "{name} is named after a German river"
+    ],
+    "pronunciation_guide": "REE-nee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "os-76",
+    "symbol": "Os",
+    "name": "Osmium",
+    "atomic_number": 76,
+    "atomic_mass": 190.2,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "blue-silver",
+    "discovered_era": "1803",
+    "fun_fact": "Osmium is the densest natural element, so a small chunk feels surprisingly heavy.",
+    "story_seed_hooks": [
+      "{name} is the heaviest natural element",
+      "{name} tips fancy fountain pens",
+      "{name} smells a little weird"
+    ],
+    "pronunciation_guide": "OZ-mee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "ir-77",
+    "symbol": "Ir",
+    "name": "Iridium",
+    "atomic_number": 77,
+    "atomic_mass": 192.2,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1803",
+    "fun_fact": "Iridium is so tough that scientists use it to mark the original meter standard.",
+    "story_seed_hooks": [
+      "{name} tips fancy fountain pens",
+      "{name} fell from space in old meteors",
+      "{name} is one of the rarest metals on Earth"
+    ],
+    "pronunciation_guide": "ih-RID-ee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "pt-78",
+    "symbol": "Pt",
+    "name": "Platinum",
+    "atomic_number": 78,
+    "atomic_mass": 195.1,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "shiny silvery white",
+    "discovered_era": "1735",
+    "fun_fact": "Platinum is so rare that even less of it exists than gold, and it makes fancy wedding rings.",
+    "story_seed_hooks": [
+      "{name} sparkles in fancy rings",
+      "{name} cleans up car exhaust",
+      "{name} is even rarer than gold"
+    ],
+    "pronunciation_guide": "PLAT-ih-num",
+    "age_band": "6-8"
+  },
+  {
+    "id": "au-79",
+    "symbol": "Au",
+    "name": "Gold",
+    "atomic_number": 79,
+    "atomic_mass": 197.0,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "shiny yellow",
+    "discovered_era": "ancient",
+    "fun_fact": "Gold is so soft you can hammer it into sheets thin enough to see through.",
+    "story_seed_hooks": [
+      "treasure chests are full of {name}",
+      "{name} doesn't rust, so old crowns still shine",
+      "tiny flecks of {name} hide in rivers"
+    ],
+    "pronunciation_guide": null,
+    "age_band": "3-5"
+  },
+  {
+    "id": "hg-80",
+    "symbol": "Hg",
+    "name": "Mercury",
+    "atomic_number": 80,
+    "atomic_mass": 200.6,
+    "family": "transition_metal",
+    "phase_at_room_temp": "liquid",
+    "color_description": "shiny silver liquid",
+    "discovered_era": "ancient",
+    "fun_fact": "Mercury is the only metal that's liquid at room temperature, like silver water.",
+    "story_seed_hooks": [
+      "{name} is silver liquid metal",
+      "{name} is the only liquid metal",
+      "old thermometers used {name}"
+    ],
+    "pronunciation_guide": null,
+    "age_band": "6-8"
+  },
+  {
+    "id": "tl-81",
+    "symbol": "Tl",
+    "name": "Thallium",
+    "atomic_number": 81,
+    "atomic_mass": 204.4,
+    "family": "post_transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1861",
+    "fun_fact": "Thallium is one of the few elements whose name comes from a Greek word for a green twig.",
+    "story_seed_hooks": [
+      "{name} is named after a green plant",
+      "{name} burns with a bright green flame",
+      "{name} hides in some electronics"
+    ],
+    "pronunciation_guide": "THAL-ee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "pb-82",
+    "symbol": "Pb",
+    "name": "Lead",
+    "atomic_number": 82,
+    "atomic_mass": 207.2,
+    "family": "post_transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "dull gray",
+    "discovered_era": "ancient",
+    "fun_fact": "Lead is one of the heaviest common metals and was used in pencils long ago.",
+    "story_seed_hooks": [
+      "{name} is heavy and dull gray",
+      "pencil tips used to have {name}",
+      "{name} blocks X-rays at the dentist"
+    ],
+    "pronunciation_guide": null,
+    "age_band": "6-8"
+  },
+  {
+    "id": "bi-83",
+    "symbol": "Bi",
+    "name": "Bismuth",
+    "atomic_number": 83,
+    "atomic_mass": 209.0,
+    "family": "post_transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "rainbow-shimmer",
+    "discovered_era": "ancient",
+    "fun_fact": "Bismuth grows into beautiful rainbow staircase crystals that look like tiny castles.",
+    "story_seed_hooks": [
+      "{name} crystals look like rainbow castles",
+      "{name} hides in stomach medicine",
+      "{name} shines pink and blue and gold"
+    ],
+    "pronunciation_guide": "BIZ-muth",
+    "age_band": "6-8"
+  },
+  {
+    "id": "po-84",
+    "symbol": "Po",
+    "name": "Polonium",
+    "atomic_number": 84,
+    "atomic_mass": 209.0,
+    "family": "post_transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery gray",
+    "discovered_era": "1898",
+    "fun_fact": "Polonium was named after Poland by Marie Curie, who discovered it.",
+    "story_seed_hooks": [
+      "{name} was discovered by Marie Curie",
+      "{name} is named after Poland",
+      "{name} glows softly in the dark"
+    ],
+    "pronunciation_guide": "puh-LOH-nee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "at-85",
+    "symbol": "At",
+    "name": "Astatine",
+    "atomic_number": 85,
+    "atomic_mass": 210.0,
+    "family": "halogen",
+    "phase_at_room_temp": "solid",
+    "color_description": "dark metallic",
+    "discovered_era": "1940",
+    "fun_fact": "Astatine is so rare that less than a teaspoonful exists on the whole planet.",
+    "story_seed_hooks": [
+      "{name} barely exists anywhere on Earth",
+      "{name} is the rarest natural element",
+      "{name} was made in a lab in California"
+    ],
+    "pronunciation_guide": "ASS-tuh-teen",
+    "age_band": "9-12"
+  },
+  {
+    "id": "rn-86",
+    "symbol": "Rn",
+    "name": "Radon",
+    "atomic_number": 86,
+    "atomic_mass": 222.0,
+    "family": "noble_gas",
+    "phase_at_room_temp": "gas",
+    "color_description": "colorless gas",
+    "discovered_era": "1900",
+    "fun_fact": "Radon is a gas that seeps up from the ground and is checked for in basements.",
+    "story_seed_hooks": [
+      "{name} slips up from rocks underground",
+      "{name} hides in some basements",
+      "{name} is the heaviest noble gas"
+    ],
+    "pronunciation_guide": "RAY-don",
+    "age_band": "9-12"
+  },
+  {
+    "id": "fr-87",
+    "symbol": "Fr",
+    "name": "Francium",
+    "atomic_number": 87,
+    "atomic_mass": 223.0,
+    "family": "alkali_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1939",
+    "fun_fact": "Francium is so rare that there are only a few atoms of it on Earth at any time.",
+    "story_seed_hooks": [
+      "{name} barely exists on Earth",
+      "{name} is named after France",
+      "only tiny puffs of {name} are made at once"
+    ],
+    "pronunciation_guide": "FRAN-see-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "ra-88",
+    "symbol": "Ra",
+    "name": "Radium",
+    "atomic_number": 88,
+    "atomic_mass": 226.0,
+    "family": "alkaline_earth",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1898",
+    "fun_fact": "Radium glows in the dark and was once painted on old watch dials to read the time.",
+    "story_seed_hooks": [
+      "{name} glows softly in the dark",
+      "old watch dials used {name}",
+      "Marie Curie discovered {name}"
+    ],
+    "pronunciation_guide": "RAY-dee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "ac-89",
+    "symbol": "Ac",
+    "name": "Actinium",
+    "atomic_number": 89,
+    "atomic_mass": 227.0,
+    "family": "actinide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1899",
+    "fun_fact": "Actinium glows a pretty pale blue in the dark and starts the actinide family of elements.",
+    "story_seed_hooks": [
+      "{name} glows pale blue in the dark",
+      "{name} starts the actinide family",
+      "{name} was found in pitchblende rocks"
+    ],
+    "pronunciation_guide": "ak-TIN-ee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "th-90",
+    "symbol": "Th",
+    "name": "Thorium",
+    "atomic_number": 90,
+    "atomic_mass": 232.0,
+    "family": "actinide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1828",
+    "fun_fact": "Thorium is named after Thor, the Norse god of thunder.",
+    "story_seed_hooks": [
+      "{name} is named after Thor",
+      "{name} once lit old camping lanterns",
+      "{name} hides in beach sands"
+    ],
+    "pronunciation_guide": "THOR-ee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "pa-91",
+    "symbol": "Pa",
+    "name": "Protactinium",
+    "atomic_number": 91,
+    "atomic_mass": 231.0,
+    "family": "actinide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1913",
+    "fun_fact": "Protactinium's name means it comes before actinium when it breaks down.",
+    "story_seed_hooks": [
+      "{name} breaks down into actinium",
+      "{name} was hard to find for many years",
+      "{name} hides in radioactive rocks"
+    ],
+    "pronunciation_guide": "proh-tak-TIN-ee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "u-92",
+    "symbol": "U",
+    "name": "Uranium",
+    "atomic_number": 92,
+    "atomic_mass": 238.0,
+    "family": "actinide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery gray",
+    "discovered_era": "1789",
+    "fun_fact": "Uranium is named after the planet Uranus and powers nuclear reactors that make electricity.",
+    "story_seed_hooks": [
+      "{name} is named after a planet",
+      "{name} powers some power plants",
+      "{name} glows green in old glassware"
+    ],
+    "pronunciation_guide": "yoo-RAY-nee-um",
+    "age_band": "6-8"
+  },
+  {
+    "id": "np-93",
+    "symbol": "Np",
+    "name": "Neptunium",
+    "atomic_number": 93,
+    "atomic_mass": 237.0,
+    "family": "actinide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery metallic",
+    "discovered_era": "1940",
+    "fun_fact": "Neptunium is named after the planet Neptune, just past Uranus in our solar system.",
+    "story_seed_hooks": [
+      "{name} is named after Neptune",
+      "{name} comes after uranium on the table",
+      "{name} was the first synthetic element"
+    ],
+    "pronunciation_guide": "nep-TOO-nee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "pu-94",
+    "symbol": "Pu",
+    "name": "Plutonium",
+    "atomic_number": 94,
+    "atomic_mass": 244.0,
+    "family": "actinide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1940",
+    "fun_fact": "Plutonium is named after the dwarf planet Pluto and powers some space probes.",
+    "story_seed_hooks": [
+      "{name} is named after Pluto",
+      "{name} powers spacecraft batteries",
+      "{name} keeps Voyager probes running"
+    ],
+    "pronunciation_guide": "ploo-TOH-nee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "am-95",
+    "symbol": "Am",
+    "name": "Americium",
+    "atomic_number": 95,
+    "atomic_mass": 243.0,
+    "family": "actinide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1944",
+    "fun_fact": "Americium is in many home smoke detectors and helps keep families safe from fires.",
+    "story_seed_hooks": [
+      "{name} hides in smoke detectors",
+      "{name} keeps houses safe from fires",
+      "{name} is named after America"
+    ],
+    "pronunciation_guide": "am-uh-RIH-see-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "cm-96",
+    "symbol": "Cm",
+    "name": "Curium",
+    "atomic_number": 96,
+    "atomic_mass": 247.0,
+    "family": "actinide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1944",
+    "fun_fact": "Curium is named after Marie and Pierre Curie, two famous element-discovering scientists.",
+    "story_seed_hooks": [
+      "{name} is named after the Curies",
+      "{name} powers some spacecraft",
+      "{name} glows softly in the dark"
+    ],
+    "pronunciation_guide": "KYOOR-ee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "bk-97",
+    "symbol": "Bk",
+    "name": "Berkelium",
+    "atomic_number": 97,
+    "atomic_mass": 247.0,
+    "family": "actinide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1949",
+    "fun_fact": "Berkelium is named after Berkeley, California, where scientists first made it.",
+    "story_seed_hooks": [
+      "{name} was made in Berkeley California",
+      "{name} barely exists on Earth",
+      "{name} is one of the heaviest synthetic elements"
+    ],
+    "pronunciation_guide": "BURK-lee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "cf-98",
+    "symbol": "Cf",
+    "name": "Californium",
+    "atomic_number": 98,
+    "atomic_mass": 251.0,
+    "family": "actinide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1950",
+    "fun_fact": "Californium helps find gold deep underground and start some nuclear reactors.",
+    "story_seed_hooks": [
+      "{name} helps find gold underground",
+      "{name} is named after California",
+      "{name} starts some reactors"
+    ],
+    "pronunciation_guide": "kal-ih-FOR-nee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "es-99",
+    "symbol": "Es",
+    "name": "Einsteinium",
+    "atomic_number": 99,
+    "atomic_mass": 252.0,
+    "family": "actinide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery white",
+    "discovered_era": "1952",
+    "fun_fact": "Einsteinium is named after Albert Einstein, the famous scientist who imagined time bending.",
+    "story_seed_hooks": [
+      "{name} is named after Einstein",
+      "{name} was found in a hydrogen-bomb cloud",
+      "{name} barely exists on Earth"
+    ],
+    "pronunciation_guide": "ine-STINE-ee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "fm-100",
+    "symbol": "Fm",
+    "name": "Fermium",
+    "atomic_number": 100,
+    "atomic_mass": 257.0,
+    "family": "actinide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery metallic",
+    "discovered_era": "1952",
+    "fun_fact": "Fermium is named after Enrico Fermi, a scientist who built the first nuclear reactor.",
+    "story_seed_hooks": [
+      "{name} is named after Enrico Fermi",
+      "{name} is made only in tiny puffs",
+      "{name} barely exists on Earth"
+    ],
+    "pronunciation_guide": "FUR-mee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "md-101",
+    "symbol": "Md",
+    "name": "Mendelevium",
+    "atomic_number": 101,
+    "atomic_mass": 258.0,
+    "family": "actinide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery metallic",
+    "discovered_era": "1955",
+    "fun_fact": "Mendelevium is named after the scientist who first organized the periodic table.",
+    "story_seed_hooks": [
+      "{name} honors the periodic-table maker",
+      "{name} is made one atom at a time",
+      "{name} barely exists on Earth"
+    ],
+    "pronunciation_guide": "men-duh-LEE-vee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "no-102",
+    "symbol": "No",
+    "name": "Nobelium",
+    "atomic_number": 102,
+    "atomic_mass": 259.0,
+    "family": "actinide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery metallic",
+    "discovered_era": "1966",
+    "fun_fact": "Nobelium is named after Alfred Nobel, who started the Nobel Prizes.",
+    "story_seed_hooks": [
+      "{name} honors Alfred Nobel",
+      "{name} is made one atom at a time",
+      "{name} barely exists on Earth"
+    ],
+    "pronunciation_guide": "no-BELL-ee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "lr-103",
+    "symbol": "Lr",
+    "name": "Lawrencium",
+    "atomic_number": 103,
+    "atomic_mass": 262.0,
+    "family": "actinide",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery metallic",
+    "discovered_era": "1961",
+    "fun_fact": "Lawrencium is named after Ernest Lawrence, who invented a machine called a cyclotron.",
+    "story_seed_hooks": [
+      "{name} is named after Ernest Lawrence",
+      "{name} ends the actinide family",
+      "{name} barely exists on Earth"
+    ],
+    "pronunciation_guide": "loh-REN-see-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "rf-104",
+    "symbol": "Rf",
+    "name": "Rutherfordium",
+    "atomic_number": 104,
+    "atomic_mass": 267.0,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery metallic",
+    "discovered_era": "1964",
+    "fun_fact": "Rutherfordium is named after Ernest Rutherford, who discovered the center of the atom.",
+    "story_seed_hooks": [
+      "{name} honors Ernest Rutherford",
+      "{name} is super-heavy and rare",
+      "{name} barely exists on Earth"
+    ],
+    "pronunciation_guide": "ruh-thur-FOR-dee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "db-105",
+    "symbol": "Db",
+    "name": "Dubnium",
+    "atomic_number": 105,
+    "atomic_mass": 268.0,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery metallic",
+    "discovered_era": "1968",
+    "fun_fact": "Dubnium is named after Dubna, a Russian town where scientists made it.",
+    "story_seed_hooks": [
+      "{name} is named after Dubna",
+      "{name} is super-heavy and rare",
+      "{name} barely exists on Earth"
+    ],
+    "pronunciation_guide": "DOOB-nee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "sg-106",
+    "symbol": "Sg",
+    "name": "Seaborgium",
+    "atomic_number": 106,
+    "atomic_mass": 269.0,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery metallic",
+    "discovered_era": "1974",
+    "fun_fact": "Seaborgium is named after Glenn Seaborg, who discovered many heavy elements.",
+    "story_seed_hooks": [
+      "{name} honors Glenn Seaborg",
+      "{name} is super-heavy and rare",
+      "{name} barely exists on Earth"
+    ],
+    "pronunciation_guide": "see-BORG-ee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "bh-107",
+    "symbol": "Bh",
+    "name": "Bohrium",
+    "atomic_number": 107,
+    "atomic_mass": 270.0,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery metallic",
+    "discovered_era": "1981",
+    "fun_fact": "Bohrium is named after Niels Bohr, who imagined how electrons orbit atoms.",
+    "story_seed_hooks": [
+      "{name} honors Niels Bohr",
+      "{name} is super-heavy and rare",
+      "{name} barely exists on Earth"
+    ],
+    "pronunciation_guide": "BOR-ee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "hs-108",
+    "symbol": "Hs",
+    "name": "Hassium",
+    "atomic_number": 108,
+    "atomic_mass": 269.0,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery metallic",
+    "discovered_era": "1984",
+    "fun_fact": "Hassium is named after the German state of Hesse, where scientists made it.",
+    "story_seed_hooks": [
+      "{name} is named after Hesse Germany",
+      "{name} is super-heavy and rare",
+      "{name} barely exists on Earth"
+    ],
+    "pronunciation_guide": "HAS-ee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "mt-109",
+    "symbol": "Mt",
+    "name": "Meitnerium",
+    "atomic_number": 109,
+    "atomic_mass": 278.0,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery metallic",
+    "discovered_era": "1982",
+    "fun_fact": "Meitnerium is named after Lise Meitner, a scientist who studied splitting atoms.",
+    "story_seed_hooks": [
+      "{name} honors Lise Meitner",
+      "{name} is super-heavy and rare",
+      "{name} barely exists on Earth"
+    ],
+    "pronunciation_guide": "mite-NEER-ee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "ds-110",
+    "symbol": "Ds",
+    "name": "Darmstadtium",
+    "atomic_number": 110,
+    "atomic_mass": 281.0,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery metallic",
+    "discovered_era": "1994",
+    "fun_fact": "Darmstadtium is named after Darmstadt, the German city where scientists made it.",
+    "story_seed_hooks": [
+      "{name} is named after Darmstadt",
+      "{name} is super-heavy and rare",
+      "{name} barely exists on Earth"
+    ],
+    "pronunciation_guide": "darm-SHTAT-ee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "rg-111",
+    "symbol": "Rg",
+    "name": "Roentgenium",
+    "atomic_number": 111,
+    "atomic_mass": 282.0,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery metallic",
+    "discovered_era": "1994",
+    "fun_fact": "Roentgenium is named after Wilhelm Roentgen, who discovered X-rays.",
+    "story_seed_hooks": [
+      "{name} honors the X-ray discoverer",
+      "{name} is super-heavy and rare",
+      "{name} barely exists on Earth"
+    ],
+    "pronunciation_guide": "rent-GEN-ee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "cn-112",
+    "symbol": "Cn",
+    "name": "Copernicium",
+    "atomic_number": 112,
+    "atomic_mass": 285.0,
+    "family": "transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery metallic",
+    "discovered_era": "1996",
+    "fun_fact": "Copernicium is named after Nicolaus Copernicus, who taught that Earth circles the sun.",
+    "story_seed_hooks": [
+      "{name} honors Copernicus",
+      "{name} is super-heavy and rare",
+      "{name} barely exists on Earth"
+    ],
+    "pronunciation_guide": "koh-per-NIH-see-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "nh-113",
+    "symbol": "Nh",
+    "name": "Nihonium",
+    "atomic_number": 113,
+    "atomic_mass": 286.0,
+    "family": "post_transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery metallic",
+    "discovered_era": "2004",
+    "fun_fact": "Nihonium is named after Nihon, which is the Japanese word for Japan.",
+    "story_seed_hooks": [
+      "{name} is named after Japan",
+      "{name} is super-heavy and rare",
+      "{name} barely exists on Earth"
+    ],
+    "pronunciation_guide": "nih-HOH-nee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "fl-114",
+    "symbol": "Fl",
+    "name": "Flerovium",
+    "atomic_number": 114,
+    "atomic_mass": 289.0,
+    "family": "post_transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery metallic",
+    "discovered_era": "1998",
+    "fun_fact": "Flerovium is named after Georgy Flyorov, a Russian scientist who studied atoms.",
+    "story_seed_hooks": [
+      "{name} is named after Georgy Flyorov",
+      "{name} is super-heavy and rare",
+      "{name} barely exists on Earth"
+    ],
+    "pronunciation_guide": "fleh-ROH-vee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "mc-115",
+    "symbol": "Mc",
+    "name": "Moscovium",
+    "atomic_number": 115,
+    "atomic_mass": 290.0,
+    "family": "post_transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery metallic",
+    "discovered_era": "2003",
+    "fun_fact": "Moscovium is named after Moscow, the capital city of Russia.",
+    "story_seed_hooks": [
+      "{name} is named after Moscow",
+      "{name} is super-heavy and rare",
+      "{name} barely exists on Earth"
+    ],
+    "pronunciation_guide": "mos-KOH-vee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "lv-116",
+    "symbol": "Lv",
+    "name": "Livermorium",
+    "atomic_number": 116,
+    "atomic_mass": 293.0,
+    "family": "post_transition_metal",
+    "phase_at_room_temp": "solid",
+    "color_description": "silvery metallic",
+    "discovered_era": "2000",
+    "fun_fact": "Livermorium is named after Livermore, a California lab where scientists studied it.",
+    "story_seed_hooks": [
+      "{name} is named after Livermore Lab",
+      "{name} is super-heavy and rare",
+      "{name} barely exists on Earth"
+    ],
+    "pronunciation_guide": "liv-er-MOR-ee-um",
+    "age_band": "9-12"
+  },
+  {
+    "id": "ts-117",
+    "symbol": "Ts",
+    "name": "Tennessine",
+    "atomic_number": 117,
+    "atomic_mass": 294.0,
+    "family": "halogen",
+    "phase_at_room_temp": "solid",
+    "color_description": "unknown",
+    "discovered_era": "2010",
+    "fun_fact": "Tennessine is named after the U.S. state of Tennessee, where some of the work happened.",
+    "story_seed_hooks": [
+      "{name} is named after Tennessee",
+      "{name} is the second-heaviest element",
+      "{name} barely exists on Earth"
+    ],
+    "pronunciation_guide": "TEH-neh-seen",
+    "age_band": "9-12"
+  },
+  {
+    "id": "og-118",
+    "symbol": "Og",
+    "name": "Oganesson",
+    "atomic_number": 118,
+    "atomic_mass": 294.0,
+    "family": "noble_gas",
+    "phase_at_room_temp": "gas",
+    "color_description": "unknown",
+    "discovered_era": "2002",
+    "fun_fact": "Oganesson is the heaviest element ever made and is named after Yuri Oganessian.",
+    "story_seed_hooks": [
+      "{name} honors Yuri Oganessian",
+      "{name} is the heaviest known element",
+      "{name} barely exists on Earth"
+    ],
+    "pronunciation_guide": "oh-guh-NESS-on",
+    "age_band": "9-12"
+  }
+]
