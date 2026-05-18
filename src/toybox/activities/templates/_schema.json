@@ -105,9 +105,10 @@
         "knights",
         "weather",
         "music",
-        "silly"
+        "silly",
+        "feelings"
       ],
-      "description": "Phase K K1 theme taxonomy. Source of truth: toybox.activities.themes.Theme. Enum values mirrored here so the jsonschema layer can reject typos before they reach the Pydantic layer."
+      "description": "Phase K K1 theme taxonomy + Phase M M8 ``feelings`` SEL addition. Source of truth: toybox.activities.themes.Theme. Enum values mirrored here so the jsonschema layer can reject typos before they reach the Pydantic layer."
     },
     "step": {
       "type": "object",

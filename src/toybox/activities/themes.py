@@ -18,11 +18,15 @@ from typing import Final
 
 
 class Theme(StrEnum):
-    """The 12 canonical themes from documentation/phase-k-plan.md §5.
+    """The canonical theme taxonomy.
 
     Member values are the lowercase strings stored in corpus JSON
     files (``data/jokes/jokes.json``, ``data/songs/manifest.json``)
     and in template ``recommended_themes`` arrays.
+
+    The original 12 themes are from documentation/phase-k-plan.md §5;
+    ``feelings`` was added in Phase M Step M8 to back the SEL
+    (social-emotional learning) templates introduced in M9-M12.
     """
 
     adventure = "adventure"
@@ -37,6 +41,7 @@ class Theme(StrEnum):
     weather = "weather"
     music = "music"
     silly = "silly"
+    feelings = "feelings"
 
 
 THEME_DISPLAY_NAMES: Final[dict[Theme, str]] = {
@@ -52,6 +57,7 @@ THEME_DISPLAY_NAMES: Final[dict[Theme, str]] = {
     Theme.weather: "Weather",
     Theme.music: "Music",
     Theme.silly: "Silly",
+    Theme.feelings: "Feelings",
 }
 
 

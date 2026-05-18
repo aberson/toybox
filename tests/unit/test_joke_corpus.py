@@ -85,11 +85,20 @@ def test_load_jokes_is_cached_on_second_call() -> None:
 
 
 def test_shipped_corpus_covers_all_twelve_themes() -> None:
-    """Every Theme has at least one joke — distribution check."""
+    """Every Theme except the deferred-content ones has at least one joke.
+
+    Phase M Step M8 added :class:`Theme.feelings` ahead of the SEL
+    content (M9-M12) that will populate it. Until that content lands,
+    ``feelings`` is allowed to have zero corpus entries; every OTHER
+    theme still has to be represented.
+    """
     jokes = load_jokes()
     themes_present = {j.theme for j in jokes}
-    assert themes_present == set(Theme), (
-        f"missing themes: {set(Theme) - themes_present}; extra: {themes_present - set(Theme)}"
+    deferred = {Theme.feelings}
+    expected = set(Theme) - deferred
+    assert themes_present == expected, (
+        f"missing themes: {expected - themes_present}; "
+        f"unexpected: {themes_present - expected}"
     )
 
 

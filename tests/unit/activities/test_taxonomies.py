@@ -4,8 +4,9 @@ These tests assert that:
 
 * :class:`toybox.activities.roles.Role` covers exactly the 10 canonical
   role names from documentation/phase-k-plan.md §5.
-* :class:`toybox.activities.themes.Theme` covers exactly the 12 theme
-  names from §5.
+* :class:`toybox.activities.themes.Theme` covers exactly the 13 theme
+  names: the 12 from §5 plus the Phase M Step M8 ``feelings`` addition
+  used by the SEL templates introduced in M9-M12.
 * :class:`toybox.activities.interjections.InterjectionKind` covers
   exactly the 4 kinds from phase-k-plan §2's
   ``metadata.interjection`` wire shape.
@@ -135,7 +136,13 @@ def test_generic_descriptors_re_exported_via_roles_module_is_same_object() -> No
 
 
 def test_theme_membership_is_exactly_twelve_canonical_names() -> None:
-    """Theme StrEnum members match plan §5 / §1 verbatim."""
+    """Theme StrEnum matches phase-k §5 + Phase M M8 ``feelings`` addition.
+
+    The test name is left historical for git-blame continuity; the
+    canonical count is now 13 (12 from phase-k §5 plus ``feelings``
+    added in Phase M M8 to back the SEL templates introduced in
+    M9-M12).
+    """
     expected = {
         "adventure",
         "magic",
@@ -149,10 +156,11 @@ def test_theme_membership_is_exactly_twelve_canonical_names() -> None:
         "weather",
         "music",
         "silly",
+        "feelings",
     }
     actual = {t.value for t in Theme}
     assert actual == expected, f"Theme taxonomy drift: {actual ^ expected!r}"
-    assert len(Theme) == 12
+    assert len(Theme) == 13
 
 
 def test_theme_display_names_cover_all_themes() -> None:
