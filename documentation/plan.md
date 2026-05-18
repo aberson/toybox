@@ -84,7 +84,9 @@ Each phase doc carries the per-step `**Problem:**/**Type:**/**Issue:**/**Flags:*
 
 | Doc | Status |
 |-----|--------|
-| [plan/phase-e.md](plan/phase-e.md) — local model + tool-loop | IN FLIGHT — Step 28 carve-out shipped 2026-05-05; remainder pending |
+| [phase-l-plan.md](phase-l-plan.md) — rewards system | ✅ COMPLETE 2026-05-17 — L1-L12 + 2 emergent fix rounds shipped at master `5aaf8ed`; UAT iter 3 all PASS |
+| [phase-m-plan.md](phase-m-plan.md) — Periodic Table Professor + SEL (content depth) | 🟡 AUTONOMOUS BLOCK COMPLETE 2026-05-18 at master `768ad1d` — M1, M2a, M3-M13 shipped. M2b sprite soak + M7b Coqui TTS render + M14 iPad UAT deferred to bundled operator session. Umbrella [#152](https://github.com/aberson/toybox/issues/152) stays open until the operator session closes. |
+| [plan/phase-e.md](plan/phase-e.md) — local model + tool-loop | IN FLIGHT — Step 28 carve-out shipped 2026-05-05; Step 27 (E3) carve-out shipped 2026-05-13; remainder gated on ≥50 SFT-filter rows |
 
 Completed phase docs (A, B, C, D, iPad-Kiosk, F.5, G, H, I) are in [`plan/archive/`](plan/archive/) — see the archive [README](plan/archive/README.md) for the per-doc index. The Status table above is the authoritative completion record.
 
@@ -117,4 +119,4 @@ Use `/build-phase --plan documentation/plan.md` per phase. Steps within a phase 
 
 **Prerequisite before the first `/build-phase` run:** run `/repo-init` to create the GitHub repo + per-step issues, then `/repo-sync` to populate the `**Issue:** #` lines in each step. `/build-phase` posts progress to those issues; missing issue numbers break the audit trail. Re-run `/repo-sync` after any plan-doc edits that change step shape or numbering.
 
-Build order: Phase A → B → C → D → iPad-Kiosk → F.5 → G → H → I ✅ (all shipped). Phase E (local model + tool-loop) is in flight — Step 28 carve-out shipped 2026-05-05; remainder ready to start when prioritized.
+Build order: Phase A → B → C → D → iPad-Kiosk → F.5 → G → H → I → J → K → L ✅ (all shipped). Phase M (content depth — Periodic Table + SEL) autonomous block shipped 2026-05-18 at `768ad1d`; M2b + M7b + M14 pending the bundled operator session. Phase E (local model + tool-loop) is in flight — Step 28 + Step 27 (E3) carve-outs shipped 2026-05-05 / 2026-05-13; full-ship remainder gated on ≥50 SFT-filter rows in `labeled_events`.
