@@ -6,7 +6,9 @@
     "duration_seconds": 12,
     "theme": "space",
     "age_band": "3-5",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Five, four, three, two, one! Rockets fly, see them run! Up so high into the sky, wave the moon a big goodbye!"
@@ -18,7 +20,9 @@
     "duration_seconds": 18,
     "theme": "space",
     "age_band": "3-5",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Soft moon, slow moon, bouncing on my toes, moon. Stardust in my hair, gravity is rare. Hop and float and twirl, in a silver swirl."
@@ -30,7 +34,9 @@
     "duration_seconds": 16,
     "theme": "space",
     "age_band": "6-8",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Mercury, Venus, Earth and Mars, Jupiter spins among the stars. Saturn rings and Neptune blue, Uranus tips and waves at you."
@@ -42,7 +48,9 @@
     "duration_seconds": 20,
     "theme": "space",
     "age_band": "9-12",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Trace the bear across the night, Orion's belt is shining bright. Cassiopeia sits in her chair, point to a star and make it a dare."
@@ -54,7 +62,9 @@
     "duration_seconds": 14,
     "theme": "magic",
     "age_band": "3-5",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Wave your wand and tap the floor, sparkles dance from door to door. Whisper soft a magic word, then a giggle can be heard."
@@ -66,7 +76,11 @@
     "duration_seconds": 13,
     "theme": "magic",
     "age_band": "3-5",
-    "persona_compat": ["princess", "wizard", "all"],
+    "persona_compat": [
+      "princess",
+      "wizard",
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Twirl, twirl, my cloak is wide, ribbons rippling at my side. Stars and stripes and rainbow seams, a cloak that's woven out of dreams."
@@ -78,7 +92,10 @@
     "duration_seconds": 17,
     "theme": "magic",
     "age_band": "6-8",
-    "persona_compat": ["wizard", "all"],
+    "persona_compat": [
+      "wizard",
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Bubble, bubble, simmer slow, stir the pot and watch it glow. Add a feather, add a leaf, brew a charm beyond belief."
@@ -90,7 +107,11 @@
     "duration_seconds": 21,
     "theme": "magic",
     "age_band": "9-12",
-    "persona_compat": ["wizard", "detective", "all"],
+    "persona_compat": [
+      "wizard",
+      "detective",
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Open the book, the pages hum, ancient runes begin to drum. Speak the words with steady tone, magic answers on its own."
@@ -102,7 +123,9 @@
     "duration_seconds": 12,
     "theme": "adventure",
     "age_band": "3-5",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Stomp, stomp, my boots are tall, ready for an adventure call. Over hill and under tree, follow me and follow me!"
@@ -114,7 +137,9 @@
     "duration_seconds": 14,
     "theme": "adventure",
     "age_band": "6-8",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Up we climb, the wind is cool, summit air is bright as jewel. Wave the flag and shout hooray, we reached the top of the day!"
@@ -126,7 +151,9 @@
     "duration_seconds": 18,
     "theme": "adventure",
     "age_band": "6-8",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Vines above and leaves below, parrots chatter as we go. Splash a puddle, hop a log, every step a brand new cog."
@@ -138,7 +165,10 @@
     "duration_seconds": 22,
     "theme": "adventure",
     "age_band": "9-12",
-    "persona_compat": ["detective", "all"],
+    "persona_compat": [
+      "detective",
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Ten steps north, then turn around, follow the path that hugs the ground. X marks the spot beneath the oak, dig with care, no time to joke."
@@ -150,7 +180,9 @@
     "duration_seconds": 10,
     "theme": "animals",
     "age_band": "3-5",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Wag, wag, tails so bright, puppies dancing in the light. Sniff a flower, chase a ball, friendly faces, one and all."
@@ -162,7 +194,9 @@
     "duration_seconds": 11,
     "theme": "animals",
     "age_band": "3-5",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Crouch and wiggle, tail a-twitch, kittens leap without a hitch. Pounce the yarn and roll around, soft as feathers, no sound."
@@ -174,7 +208,9 @@
     "duration_seconds": 15,
     "theme": "animals",
     "age_band": "6-8",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Big gray feet on the savanna floor, trunks that trumpet, ears that soar. Slow and steady, herd in line, elephants are friends of mine."
@@ -186,7 +222,9 @@
     "duration_seconds": 23,
     "theme": "animals",
     "age_band": "9-12",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Deep below where sunlight bends, the whale a wordless message sends. Long low notes through cold blue space, friends will find me by my trace."
@@ -198,7 +236,9 @@
     "duration_seconds": 11,
     "theme": "vehicles",
     "age_band": "3-5",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Red truck zoom and siren shout, hoses ready, helpers out. Climb the ladder, save the cat, the fire crew is where it's at."
@@ -210,7 +250,9 @@
     "duration_seconds": 13,
     "theme": "vehicles",
     "age_band": "3-5",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Putter, putter, tractor goes, plowing rows in tidy rows. Seeds will sleep beneath the dirt, soon a green leaf gives a flirt."
@@ -222,7 +264,9 @@
     "duration_seconds": 15,
     "theme": "vehicles",
     "age_band": "6-8",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Chug-a-chug, the train rolls past, mountain tunnels coming fast. Whistle hoots a friendly call, climb aboard, there's room for all."
@@ -234,7 +278,9 @@
     "duration_seconds": 19,
     "theme": "vehicles",
     "age_band": "9-12",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Engines warm and gauges green, smoothest launch I've ever seen. Push the throttle, hold the dream, ride the silver engine stream."
@@ -246,7 +292,9 @@
     "duration_seconds": 10,
     "theme": "food",
     "age_band": "3-5",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Crunchy apple, crackers too, cheese and grapes, a tasty crew. Wash it down with sips of juice, snack time is a sweet excuse."
@@ -258,7 +306,9 @@
     "duration_seconds": 12,
     "theme": "food",
     "age_band": "3-5",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Sizzle, sizzle, batter pour, golden circles on the floor. Flip the pancake, catch it neat, syrup makes it extra sweet."
@@ -270,7 +320,9 @@
     "duration_seconds": 14,
     "theme": "food",
     "age_band": "6-8",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Round and red, the pizza pie, cheese is stretching to the sky. Slice it up and share with friends, party fun that never ends."
@@ -282,7 +334,9 @@
     "duration_seconds": 18,
     "theme": "food",
     "age_band": "9-12",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Carrots, onions, celery dice, sprinkle in a pinch of spice. Stir the pot and let it hum, supper's almost ready, come."
@@ -294,7 +348,9 @@
     "duration_seconds": 11,
     "theme": "friendship",
     "age_band": "3-5",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Hop and jump and high-five too, best of friends are me and you. Side by side and hand in hand, we're the very best of band."
@@ -306,7 +362,9 @@
     "duration_seconds": 13,
     "theme": "friendship",
     "age_band": "3-5",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Pass a smile and pass it round, smiles can travel without a sound. Soft and warm and bright as gold, friendship never gets too old."
@@ -318,7 +376,9 @@
     "duration_seconds": 15,
     "theme": "friendship",
     "age_band": "6-8",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Pull together, push together, big or small, in any weather. Teamwork makes the heavy light, side by side and shoulder tight."
@@ -330,7 +390,9 @@
     "duration_seconds": 17,
     "theme": "friendship",
     "age_band": "9-12",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "When the road grows long and steep, friends are promises we keep. Reach across and offer aid, that's how lasting bonds are made."
@@ -342,7 +404,9 @@
     "duration_seconds": 11,
     "theme": "pirates",
     "age_band": "3-5",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Yo ho ho, stomp on the deck, parrot perched upon my neck. Hoist the sails and steer the ship, off we go on a salty trip."
@@ -354,7 +418,9 @@
     "duration_seconds": 16,
     "theme": "pirates",
     "age_band": "6-8",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Heave the chest, the lid is heavy, gold doubloons, a glinting bevy. Captain laughs and counts the gleam, crew sings out a sailor's dream."
@@ -366,7 +432,9 @@
     "duration_seconds": 14,
     "theme": "pirates",
     "age_band": "6-8",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Salty wind and ocean spray, sailors row the waves away. Watch the gull and chart the star, every harbor near or far."
@@ -378,7 +446,9 @@
     "duration_seconds": 24,
     "theme": "pirates",
     "age_band": "9-12",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Beneath the tide a shadow rolls, kraken counts the sailor's souls. Steady hand and steady eye, ride the wave and wave goodbye."
@@ -390,7 +460,9 @@
     "duration_seconds": 12,
     "theme": "knights",
     "age_band": "3-5",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Clang the shield and tap the floor, brave knight marches out the door. Up the hill and round the wall, kind and steady, standing tall."
@@ -402,7 +474,10 @@
     "duration_seconds": 14,
     "theme": "knights",
     "age_band": "6-8",
-    "persona_compat": ["princess", "all"],
+    "persona_compat": [
+      "princess",
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "High above the castle wall, banners wave for one and all. Bright with stripes of red and blue, every flag a friendly view."
@@ -414,7 +489,9 @@
     "duration_seconds": 18,
     "theme": "knights",
     "age_band": "6-8",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Once a dragon scared the town, knight rode in and put sword down. Shared a snack and shared a name, dragons need a friend the same."
@@ -426,7 +503,9 @@
     "duration_seconds": 22,
     "theme": "knights",
     "age_band": "9-12",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Take the oath beneath the oak, brave and true through any yoke. Honor lifts the heaviest load, courage lights the longest road."
@@ -438,7 +517,9 @@
     "duration_seconds": 11,
     "theme": "weather",
     "age_band": "3-5",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Splash, splash, puddles big and small, raindrops bounce and tap the wall. Boots on, hats on, here we go, splashing in a happy row."
@@ -450,7 +531,9 @@
     "duration_seconds": 12,
     "theme": "weather",
     "age_band": "3-5",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Sunshine warm upon my nose, skipping where the daisy grows. Buttercup and butter sky, summer makes the day go by."
@@ -462,7 +545,9 @@
     "duration_seconds": 15,
     "theme": "weather",
     "age_band": "6-8",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Snowflakes twirl on chilly air, lacy patterns everywhere. Catch one gently on your tongue, taste the winter, soft and young."
@@ -474,7 +559,9 @@
     "duration_seconds": 19,
     "theme": "weather",
     "age_band": "9-12",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Distant thunder rolls along, sky is humming a low song. Count the seconds, count the miles, lightning answers in bright styles."
@@ -486,7 +573,9 @@
     "duration_seconds": 10,
     "theme": "music",
     "age_band": "3-5",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Tap a tap on the tambourine, brightest sound I've ever seen. Jingle, jangle, shake and play, music makes a happy day."
@@ -498,7 +587,9 @@
     "duration_seconds": 13,
     "theme": "music",
     "age_band": "6-8",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Boom and pat and boom again, drums talk back like silver rain. Hands together, hands apart, every beat begins the heart."
@@ -510,7 +601,9 @@
     "duration_seconds": 15,
     "theme": "music",
     "age_band": "6-8",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Strum a little, strum a lot, ukulele on my cot. Four small strings and one big smile, play a song for just a while."
@@ -522,7 +615,9 @@
     "duration_seconds": 23,
     "theme": "music",
     "age_band": "9-12",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Strings begin and brass replies, woodwinds whisper through the skies. Cymbals crash and timpani roll, every instrument is whole."
@@ -534,7 +629,9 @@
     "duration_seconds": 9,
     "theme": "silly",
     "age_band": "3-5",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Wiggle like a noodle, flop like a fish, silly little dance is my favorite wish. Spaghetti arms and floppy knees, dance around just as you please."
@@ -546,7 +643,9 @@
     "duration_seconds": 11,
     "theme": "silly",
     "age_band": "3-5",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Wobble left and wiggle right, silly faces, what a sight. Shake your shoulders, stomp your feet, silly is a special treat."
@@ -558,7 +657,9 @@
     "duration_seconds": 14,
     "theme": "silly",
     "age_band": "6-8",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "I wore a banana on my head, marched right through the flower bed. Bees said hi and birds said why, but a banana hat reaches the sky."
@@ -570,7 +671,9 @@
     "duration_seconds": 16,
     "theme": "silly",
     "age_band": "9-12",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Sally sells silly silver slippers, swiftly swirling sleepy whippers. Try to say it three times fast, watch your tongue trip on the last."
@@ -582,7 +685,9 @@
     "duration_seconds": 25,
     "theme": "space",
     "age_band": "9-12",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Stars are quiet, stars are kind, lullabies for sleepy mind. Drift on currents soft and slow, where the gentle comets glow."
@@ -594,9 +699,386 @@
     "duration_seconds": 12,
     "theme": "music",
     "age_band": "3-5",
-    "persona_compat": ["all"],
+    "persona_compat": [
+      "all"
+    ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
     "lyrics": "Buzz a kazoo, march in a line, follow the leader, single file fine. Marching band of one or two, every parade begins with you."
+  },
+  {
+    "id": "noble-gases-drift-quiet",
+    "title": "Noble Gases Drift Quiet",
+    "audio_path": "audio/noble-gases-drift-quiet.mp3",
+    "duration_seconds": 16,
+    "theme": "music",
+    "age_band": "3-5",
+    "persona_compat": [
+      "periodic_table",
+      "all"
+    ],
+    "license": "CC-BY-4.0",
+    "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
+    "lyrics": "Noble gases drift so quiet,\nNever grab a buddy, never start a riot.\nHelium floats and neon glows,\nArgon hides where nobody knows!"
+  },
+  {
+    "id": "halogens-make-friends",
+    "title": "Halogens Make Friends",
+    "audio_path": "audio/halogens-make-friends.mp3",
+    "duration_seconds": 16,
+    "theme": "music",
+    "age_band": "3-5",
+    "persona_compat": [
+      "periodic_table",
+      "all"
+    ],
+    "license": "CC-BY-4.0",
+    "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
+    "lyrics": "Halogens love to make a friend,\nSticking close until the end.\nChlorine, fluorine, bromine too,\nGrab a buddy, that's what they do!"
+  },
+  {
+    "id": "alkali-metals-go-zoom",
+    "title": "Alkali Metals Go Zoom",
+    "audio_path": "audio/alkali-metals-go-zoom.mp3",
+    "duration_seconds": 16,
+    "theme": "silly",
+    "age_band": "3-5",
+    "persona_compat": [
+      "periodic_table",
+      "all"
+    ],
+    "license": "CC-BY-4.0",
+    "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
+    "lyrics": "Alkali metals zip and zoom,\nSoft as butter, fast as broom!\nSodium, potassium, lithium too,\nQuick to share what's inside of you!"
+  },
+  {
+    "id": "alkaline-earths-keep-strong",
+    "title": "Alkaline Earths Keep Strong",
+    "audio_path": "audio/alkaline-earths-keep-strong.mp3",
+    "duration_seconds": 18,
+    "theme": "music",
+    "age_band": "3-5",
+    "persona_compat": [
+      "periodic_table",
+      "all"
+    ],
+    "license": "CC-BY-4.0",
+    "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
+    "lyrics": "Alkaline earths are strong and sure,\nCalcium keeps your bones secure.\nMagnesium makes the green leaves bright,\nEarth metals helping day and night!"
+  },
+  {
+    "id": "transition-metals-shiny-song",
+    "title": "Transition Metals Shiny Song",
+    "audio_path": "audio/transition-metals-shiny-song.mp3",
+    "duration_seconds": 20,
+    "theme": "music",
+    "age_band": "3-5",
+    "persona_compat": [
+      "periodic_table",
+      "all"
+    ],
+    "license": "CC-BY-4.0",
+    "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
+    "lyrics": "Transition metals shine so bright,\nIron, copper, silver light.\nGold and zinc and nickel too,\nBendy, shiny, strong and true.\nCoins and crowns and bridges tall,\nTransition metals build them all!"
+  },
+  {
+    "id": "post-transition-metals-bendy",
+    "title": "Post-Transition Metals Bendy",
+    "audio_path": "audio/post-transition-metals-bendy.mp3",
+    "duration_seconds": 18,
+    "theme": "silly",
+    "age_band": "3-5",
+    "persona_compat": [
+      "periodic_table",
+      "all"
+    ],
+    "license": "CC-BY-4.0",
+    "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
+    "lyrics": "Post-transition metals bend and bow,\nSoft and shiny, take a bow!\nAluminum cans and tin foil bright,\nLead so heavy it sinks out of sight!"
+  },
+  {
+    "id": "metalloids-in-between",
+    "title": "Metalloids In Between",
+    "audio_path": "audio/metalloids-in-between.mp3",
+    "duration_seconds": 18,
+    "theme": "silly",
+    "age_band": "3-5",
+    "persona_compat": [
+      "periodic_table",
+      "all"
+    ],
+    "license": "CC-BY-4.0",
+    "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
+    "lyrics": "Metalloids are in between,\nHalf-and-half, the in-between scene!\nSilicon makes computer chips hum,\nBoron, arsenic — here they come!"
+  },
+  {
+    "id": "nonmetals-everywhere",
+    "title": "Nonmetals Everywhere",
+    "audio_path": "audio/nonmetals-everywhere.mp3",
+    "duration_seconds": 20,
+    "theme": "music",
+    "age_band": "3-5",
+    "persona_compat": [
+      "periodic_table",
+      "all"
+    ],
+    "license": "CC-BY-4.0",
+    "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
+    "lyrics": "Nonmetals are everywhere you breathe,\nOxygen, nitrogen, never leave!\nCarbon in the tree and in the bread,\nHydrogen sparkles overhead.\nSoft and squishy, gas or stone,\nNonmetals make a happy home!"
+  },
+  {
+    "id": "lanthanides-glow-soft",
+    "title": "Lanthanides Glow Soft",
+    "audio_path": "audio/lanthanides-glow-soft.mp3",
+    "duration_seconds": 18,
+    "theme": "music",
+    "age_band": "3-5",
+    "persona_compat": [
+      "periodic_table",
+      "all"
+    ],
+    "license": "CC-BY-4.0",
+    "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
+    "lyrics": "Lanthanides glow soft and slow,\nInside your phone they help things go!\nCerium, neodymium, names so long,\nTiny helpers, mighty strong!"
+  },
+  {
+    "id": "actinides-radiate-far",
+    "title": "Actinides Radiate Far",
+    "audio_path": "audio/actinides-radiate-far.mp3",
+    "duration_seconds": 18,
+    "theme": "music",
+    "age_band": "3-5",
+    "persona_compat": [
+      "periodic_table",
+      "all"
+    ],
+    "license": "CC-BY-4.0",
+    "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
+    "lyrics": "Actinides hum a sleepy tune,\nHidden away inside the room.\nUranium, thorium, deep and rare,\nScientists watch them way over there!"
+  },
+  {
+    "id": "gold-shiny-rhyme",
+    "title": "Gold is Shiny",
+    "audio_path": "audio/gold-shiny-rhyme.mp3",
+    "duration_seconds": 14,
+    "theme": "silly",
+    "age_band": "3-5",
+    "persona_compat": [
+      "periodic_table",
+      "all"
+    ],
+    "license": "CC-BY-4.0",
+    "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
+    "lyrics": "Gold is shiny, gold is bright,\nGold makes crowns that catch the light!\nGold won't rust, it won't turn green,\nPrettiest metal you've ever seen!"
+  },
+  {
+    "id": "silver-spoon-song",
+    "title": "Silver Spoon Song",
+    "audio_path": "audio/silver-spoon-song.mp3",
+    "duration_seconds": 14,
+    "theme": "music",
+    "age_band": "3-5",
+    "persona_compat": [
+      "periodic_table",
+      "all"
+    ],
+    "license": "CC-BY-4.0",
+    "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
+    "lyrics": "Silver, silver, soft and white,\nSpoons and forks that catch the light!\nPretty as the moon at night,\nSilver shines and feels just right!"
+  },
+  {
+    "id": "iron-strong-rhyme",
+    "title": "Iron is Strong",
+    "audio_path": "audio/iron-strong-rhyme.mp3",
+    "duration_seconds": 14,
+    "theme": "silly",
+    "age_band": "3-5",
+    "persona_compat": [
+      "periodic_table",
+      "all"
+    ],
+    "license": "CC-BY-4.0",
+    "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
+    "lyrics": "Iron is strong, iron is tough,\nBridges, nails, and stuff and stuff!\nInside your blood it helps you go,\nIron keeps you on the flow!"
+  },
+  {
+    "id": "helium-balloon-float",
+    "title": "Helium Balloon Float",
+    "audio_path": "audio/helium-balloon-float.mp3",
+    "duration_seconds": 12,
+    "theme": "silly",
+    "age_band": "3-5",
+    "persona_compat": [
+      "periodic_table",
+      "all"
+    ],
+    "license": "CC-BY-4.0",
+    "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
+    "lyrics": "Helium, helium, light as air,\nLifts a balloon up everywhere!\nHold the string and watch it rise,\nHelium soars into the skies!"
+  },
+  {
+    "id": "oxygen-breath-song",
+    "title": "Oxygen Breath Song",
+    "audio_path": "audio/oxygen-breath-song.mp3",
+    "duration_seconds": 14,
+    "theme": "music",
+    "age_band": "3-5",
+    "persona_compat": [
+      "periodic_table",
+      "all"
+    ],
+    "license": "CC-BY-4.0",
+    "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
+    "lyrics": "Breathe in, breathe out, oxygen-O,\nEverywhere we breathe it goes!\nIn the wind and in the trees,\nOxygen brings the gentle breeze."
+  },
+  {
+    "id": "hydrogen-tiny-cheer",
+    "title": "Hydrogen Tiny Cheer",
+    "audio_path": "audio/hydrogen-tiny-cheer.mp3",
+    "duration_seconds": 12,
+    "theme": "silly",
+    "age_band": "3-5",
+    "persona_compat": [
+      "periodic_table",
+      "all"
+    ],
+    "license": "CC-BY-4.0",
+    "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
+    "lyrics": "Hydrogen, hydrogen, smallest of all,\nTiniest atom, light and small!\nStars are made of hydrogen too,\nSparkle, sparkle, just like you!"
+  },
+  {
+    "id": "neon-glow-rhyme",
+    "title": "Neon Glow Rhyme",
+    "audio_path": "audio/neon-glow-rhyme.mp3",
+    "duration_seconds": 12,
+    "theme": "silly",
+    "age_band": "3-5",
+    "persona_compat": [
+      "periodic_table",
+      "all"
+    ],
+    "license": "CC-BY-4.0",
+    "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
+    "lyrics": "Neon, neon, orange and pink,\nGlowing signs that never blink!\nLight it up and watch it shine,\nNeon's a glow that feels just fine!"
+  },
+  {
+    "id": "mercury-silver-river",
+    "title": "Mercury Silver River",
+    "audio_path": "audio/mercury-silver-river.mp3",
+    "duration_seconds": 18,
+    "theme": "music",
+    "age_band": "3-5",
+    "persona_compat": [
+      "periodic_table",
+      "all"
+    ],
+    "license": "CC-BY-4.0",
+    "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
+    "lyrics": "Mercury, mercury, behind the glass,\nSilver river we watch as it flows past!\nNever to touch, just look from far,\nMercury shines like a silver star.\nPretty to see in the thermometer line,\nMercury sparkles, but it stays in time!"
+  },
+  {
+    "id": "copper-penny-shine",
+    "title": "Copper Penny Shine",
+    "audio_path": "audio/copper-penny-shine.mp3",
+    "duration_seconds": 14,
+    "theme": "silly",
+    "age_band": "3-5",
+    "persona_compat": [
+      "periodic_table",
+      "all"
+    ],
+    "license": "CC-BY-4.0",
+    "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
+    "lyrics": "Copper penny, copper bright,\nOrange-red and full of light!\nInside wires, inside pots,\nCopper helps connect the dots!"
+  },
+  {
+    "id": "uranium-glow-song",
+    "title": "Uranium Glow Song",
+    "audio_path": "audio/uranium-glow-song.mp3",
+    "duration_seconds": 16,
+    "theme": "music",
+    "age_band": "3-5",
+    "persona_compat": [
+      "periodic_table",
+      "all"
+    ],
+    "license": "CC-BY-4.0",
+    "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
+    "lyrics": "Uranium, uranium, sleepy and slow,\nLocked in a vault with a quiet glow.\nScientists keep it safe and sound,\nFar away from kids around!"
+  },
+  {
+    "id": "sodium-salt-sparkle",
+    "title": "Sodium Salt Sparkle",
+    "audio_path": "audio/sodium-salt-sparkle.mp3",
+    "duration_seconds": 14,
+    "theme": "silly",
+    "age_band": "3-5",
+    "persona_compat": [
+      "periodic_table",
+      "all"
+    ],
+    "license": "CC-BY-4.0",
+    "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
+    "lyrics": "Sodium hides inside the salt,\nSprinkled on bread is sodium's vault!\nTiny crystals, sparkly white,\nSodium makes the dinner right!"
+  },
+  {
+    "id": "calcium-bone-cheer",
+    "title": "Calcium Bone Cheer",
+    "audio_path": "audio/calcium-bone-cheer.mp3",
+    "duration_seconds": 14,
+    "theme": "music",
+    "age_band": "3-5",
+    "persona_compat": [
+      "periodic_table",
+      "all"
+    ],
+    "license": "CC-BY-4.0",
+    "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
+    "lyrics": "Calcium, calcium, strong and white,\nBuilds your bones up tall and tight!\nMilk and cheese and broccoli too,\nCalcium grows the bones of you!"
+  },
+  {
+    "id": "carbon-best-buddy",
+    "title": "Carbon Best Buddy",
+    "audio_path": "audio/carbon-best-buddy.mp3",
+    "duration_seconds": 16,
+    "theme": "music",
+    "age_band": "3-5",
+    "persona_compat": [
+      "periodic_table",
+      "all"
+    ],
+    "license": "CC-BY-4.0",
+    "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
+    "lyrics": "Carbon, carbon, friend to all,\nIn a tree and in a ball!\nDiamonds shine, the pencil writes,\nCarbon's busy day and night.\nBread and bug and bone and you,\nCarbon's in the whole world too!"
+  },
+  {
+    "id": "nitrogen-air-song",
+    "title": "Nitrogen Air Song",
+    "audio_path": "audio/nitrogen-air-song.mp3",
+    "duration_seconds": 14,
+    "theme": "music",
+    "age_band": "3-5",
+    "persona_compat": [
+      "periodic_table",
+      "all"
+    ],
+    "license": "CC-BY-4.0",
+    "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
+    "lyrics": "Nitrogen, nitrogen, most of the air,\nFloating gently everywhere!\nIn the breeze and in the sky,\nNitrogen is drifting by!"
+  },
+  {
+    "id": "chlorine-pool-rhyme",
+    "title": "Chlorine Pool Rhyme",
+    "audio_path": "audio/chlorine-pool-rhyme.mp3",
+    "duration_seconds": 14,
+    "theme": "silly",
+    "age_band": "3-5",
+    "persona_compat": [
+      "periodic_table",
+      "all"
+    ],
+    "license": "CC-BY-4.0",
+    "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
+    "lyrics": "Chlorine, chlorine, in the pool,\nKeeps the water bright and cool!\nSmells a bit, but does its job,\nChlorine scrubs each tiny glob!"
   }
 ]
