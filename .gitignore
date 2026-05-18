@@ -71,10 +71,28 @@ data/songs/audio/
 # Phase M M2: ship 14 canonical element sprites in git (one per
 # Family enum value + popular individuals). Other 104 sprites are
 # rendered locally by scripts/generate_element_sprites.py and stay
-# out of git to keep repo size sane. The wildcard ignore for data/*
-# (line 31) already excludes data/images/; we only need to un-ignore
-# the directory chain + the 14 specific PNGs we want to ship.
+# out of git to keep repo size sane.
+#
+# .gitignore-pattern surgery: data/* at line 31 is the root wildcard.
+# To selectively include data/images/elements/<14 files>.png we have
+# to (a) un-ignore the directory chain so git traverses into it, then
+# (b) re-ignore the *sibling* subdirs under data/images/ that ARE
+# runtime-generated and should stay out of git, then (c) re-ignore
+# everything under data/images/elements/, then (d) un-ignore the 14
+# specific PNGs. Without step (b), the un-ignore of data/images/ in
+# step (a) cascades to data/images/personas/*, data/images/rewards/*,
+# data/images/toy_actions/*, data/images/.staging/*, data/images/
+# rooms/*, data/images/toys/* — none of which belong in git.
 !data/images/
+# Step (b): explicitly re-ignore every runtime-image subdir.
+data/images/.staging/
+data/images/personas/
+data/images/rewards/
+data/images/rooms/
+data/images/toys/
+data/images/toy_actions/
+# Step (c) + (d): allow data/images/elements/ but only for the 14
+# canonical PNGs.
 !data/images/elements/
 data/images/elements/*
 !data/images/elements/h-1.png

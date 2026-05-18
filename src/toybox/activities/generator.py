@@ -140,6 +140,12 @@ class _StepTemplate:
     # always parses as ``None`` from production templates today.
     kind: str = "text"
     auto: bool | None = None
+    # Phase M Step M3: optional reference to an element corpus entry
+    # carried through verbatim from the template JSON. Cross-corpus
+    # resolution is gated by :func:`validate_template`. ``None`` for
+    # the overwhelming majority of templates that don't reference an
+    # element (pre-M3 templates parse unchanged).
+    element_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -254,6 +260,12 @@ def _parse_template(raw: dict[str, Any], *, source: str = "<inline>") -> _Templa
                 # today (Pydantic rejects ``auto=True`` on song/joke).
                 kind=step_model.kind,
                 auto=step_model.auto,
+                # Phase M Step M3: pass the optional element_id through
+                # so the runtime ActivityStep can echo it on the WS
+                # envelope. Pydantic + the M3 cross-corpus validator
+                # below have already gated the regex shape and resolved
+                # the id to a real entry.
+                element_id=step_model.element_id,
             )
         )
     # Phase G graph validation. Raises TemplateGraphError on any
@@ -562,9 +574,7 @@ def _apply_preferred_themes(
         return templates
     pref_set = {str(t) for t in preferred_themes}
     matchers = [
-        t
-        for t in templates
-        if any(str(theme) in pref_set for theme in t.recommended_themes)
+        t for t in templates if any(str(theme) in pref_set for theme in t.recommended_themes)
     ]
     return matchers if matchers else templates
 
@@ -1069,6 +1079,11 @@ def generate(
                 # needing the template back.
                 step_id=step_tpl.id,
                 choices_rendered=choices_rendered,
+                # Phase M Step M3: thread element_id through to the
+                # runtime row so the kiosk's ElementCard receives the
+                # id on the WS envelope. ``None`` for the overwhelming
+                # majority of steps (non-Periodic-Table content).
+                element_id=step_tpl.element_id,
             )
         )
 

@@ -16,6 +16,7 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from .activities.element_corpus import elements_root
 from .activities.song_corpus import songs_audio_root
 from .api.activities import router as activities_router
 from .api.audio import router as audio_router
@@ -119,6 +120,23 @@ def create_app() -> FastAPI:
         "/api/static/songs/audio",
         StaticFiles(directory=str(songs_audio_root()), check_dir=False),
         name="songs_audio",
+    )
+
+    # Phase M Step M3 — Static read-only mount for the bundled element
+    # sprites (one .png per corpus entry, e.g. ``au-79.png``). Mirrors
+    # the images + songs mounts above. The kiosk's ElementCard loads
+    # ``/api/static/elements/<element_id>.png`` directly via ``<img
+    # src=...>``; an HTTP 404 falls back to a Vite-bundled
+    # periodic-table avatar asset (``frontend/src/child/assets/
+    # periodic_table_fallback.png``) handled inline in the React
+    # component's onError. ``check_dir=False`` keeps the app bootable
+    # before M2b ships the sprite generator output — the deferred-
+    # sprite case is identical to the kiosk fallback path so the
+    # surface degrades gracefully.
+    app.mount(
+        "/api/static/elements",
+        StaticFiles(directory=str(elements_root()), check_dir=False),
+        name="elements",
     )
 
     # Phase F Step F3 — image-gen capability boot probe. Logs the

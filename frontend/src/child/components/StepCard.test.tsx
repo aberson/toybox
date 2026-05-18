@@ -915,3 +915,65 @@ describe("StepCard L10 — reward step dispatch", () => {
   });
 });
 
+// Phase M Step M3 — ElementCard wiring into StepCard.
+//
+// Coverage:
+//   - When step.element_id is non-null, ElementCard renders above the
+//     step body row (text and fork step kinds).
+//   - When step.element_id is null or absent, ElementCard does NOT
+//     render — the kiosk's body row layout is byte-identical to pre-M3.
+//   - Denormalized element fields (element_symbol / element_name /
+//     element_atomic_number) carried in step.metadata reach the
+//     rendered card.
+
+describe("StepCard ElementCard branch (Phase M M3)", () => {
+  it("renders the ElementCard above the body row when step.element_id is present", () => {
+    const activity = fakeActivity({
+      steps: [
+        fakeStep({
+          element_id: "au-79",
+          metadata: {
+            element_id: "au-79",
+            element_symbol: "Au",
+            element_name: "Gold",
+            element_atomic_number: 79,
+          },
+        }),
+      ],
+    });
+    render(<StepCard activity={activity} onAdvance={vi.fn()} />);
+    const card = screen.getByTestId("element-card");
+    expect(card.getAttribute("data-element-id")).toBe("au-79");
+    expect(screen.getByTestId("element-card-symbol").textContent).toBe("Au");
+    expect(screen.getByTestId("element-card-name").textContent).toBe("Gold");
+    expect(screen.getByTestId("element-card-atomic-number").textContent).toBe(
+      "#79",
+    );
+    // The body row also renders (existing text step content) — the
+    // element card sits ABOVE it, not in place of it.
+    expect(screen.getByTestId("step-body-row")).not.toBeNull();
+  });
+
+  it("does NOT render the ElementCard when step.element_id is null", () => {
+    const activity = fakeActivity({
+      steps: [fakeStep({ element_id: null })],
+    });
+    render(<StepCard activity={activity} onAdvance={vi.fn()} />);
+    expect(screen.queryByTestId("element-card")).toBeNull();
+    // Body row still renders the step text — the no-element_id path
+    // must be byte-identical to pre-M3 StepCard rendering.
+    expect(screen.getByTestId("step-body-row")).not.toBeNull();
+  });
+
+  it("does NOT render the ElementCard when step.element_id is absent from the wire", () => {
+    // Pre-M3 wire shape: backend response omits ``element_id`` entirely.
+    // The kiosk must treat that the same as null (graceful fallback to
+    // pre-M3 layout).
+    const activity = fakeActivity({
+      steps: [fakeStep()],
+    });
+    render(<StepCard activity={activity} onAdvance={vi.fn()} />);
+    expect(screen.queryByTestId("element-card")).toBeNull();
+  });
+});
+

@@ -272,7 +272,7 @@ def _build_pipeline(torch_mod: Any) -> Any:
     pipe = None
     try:
         if mode == CARTOON_MODE_CHECKPOINT:
-            pipe = StableDiffusionPipeline.from_pretrained(  # type: ignore[no-untyped-call]
+            pipe = StableDiffusionPipeline.from_pretrained(
                 _cartoon_path(),
                 torch_dtype=torch_mod.float16,
                 variant="fp16",
@@ -284,7 +284,7 @@ def _build_pipeline(torch_mod: Any) -> Any:
             pipe.load_lora_weights(_lcm_lora_path(), adapter_name="lcm")
             pipe.set_adapters(["lcm"], adapter_weights=[1.0])
         else:
-            pipe = StableDiffusionPipeline.from_pretrained(  # type: ignore[no-untyped-call]
+            pipe = StableDiffusionPipeline.from_pretrained(
                 _base_model_path(),
                 torch_dtype=torch_mod.float16,
                 variant="fp16",
@@ -297,7 +297,7 @@ def _build_pipeline(torch_mod: Any) -> Any:
             pipe.load_lora_weights(_lcm_lora_path(), adapter_name="lcm")
             pipe.set_adapters(["lcm", "cartoon"], adapter_weights=[1.0, 1.0])
 
-        pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)  # type: ignore[no-untyped-call]
+        pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
         pipe.to("cuda")
         pipe.vae.enable_slicing()
     except Exception:

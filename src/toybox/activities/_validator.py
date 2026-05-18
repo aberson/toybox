@@ -52,6 +52,7 @@ import re
 from collections import deque
 from typing import Final
 
+from .element_corpus import get_element
 from .models import Step, Template
 from .roles import Role
 from .slots import KNOWN_SLOTS
@@ -444,6 +445,30 @@ def validate_template(template: Template) -> None:
                     f"kind={step.kind!r} must set `corpus_id` "
                     f"(Phase L Step L5 removed the `auto=true` path)"
                 )
+
+    # ----- (M3) element_id cross-corpus resolution -------------------------
+    # Phase M Step M3 — when a step references an element_id, the id
+    # MUST resolve to a real entry in ``data/elements/elements.json``.
+    # Mirrors the cross-corpus pattern used elsewhere for song / joke
+    # corpus_id references (verified at activity-creation time in the
+    # propose path; for element ids we gate at template-load time
+    # since the value is authored statically per step). The Pydantic
+    # + jsonschema layers already enforce the ``^[a-z]{1,3}-[0-9]{1,3}$``
+    # regex; this loop catches the "syntactically valid but unknown"
+    # case (typo'd symbol, future element not yet in corpus).
+    #
+    # No persona-side gating per phase-m-plan.md §6.9 — every persona
+    # may render any element step.
+    for idx, step in enumerate(template.steps):
+        if step.element_id is None:
+            continue
+        label = step.id if step.id is not None else f"index {idx}"
+        if get_element(step.element_id) is None:
+            raise TemplateGraphError(
+                f"template {template_id!r}: step {label!r} references "
+                f"unknown element_id {step.element_id!r} "
+                f"(not in element corpus at data/elements/elements.json)"
+            )
 
 
 __all__ = [

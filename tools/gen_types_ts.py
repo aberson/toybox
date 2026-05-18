@@ -172,6 +172,7 @@ def _build_types_ts_content() -> str:
         "  id?: string | null;\n"
         "  next?: string | null;\n"
         "  choices?: Choice[] | null;\n"
+        "  element_id?: string | null;\n"
         "}\n"
     )
 

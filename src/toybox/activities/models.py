@@ -188,6 +188,18 @@ class Step(BaseModel):
     # picks a corpus entry from ``recommended_themes`` at creation
     # time. Mutually exclusive with ``corpus_id``.
     auto: bool | None = None
+    # Phase M Step M3: optional reference to an element corpus entry.
+    # Composite id ``<symbol-lower>-<atomic_number>`` (e.g. ``"au-79"``).
+    # When non-null, the kiosk renders an ElementCard above the step
+    # text. Cross-corpus resolution is gated by
+    # :func:`toybox.activities._validator.validate_template` (unknown
+    # ids raise :class:`TemplateGraphError` at template load time).
+    # No persona-side gating per phase-m-plan.md §6.9.
+    element_id: str | None = Field(
+        default=None,
+        pattern=r"^[a-z]{1,3}-[0-9]{1,3}$",
+        max_length=16,
+    )
 
     @model_validator(mode="after")
     def _check_next_xor_choices(self) -> Step:
@@ -302,6 +314,16 @@ class ActivityStep(BaseModel):
     # the activity's slot fills, so the runtime label is the EXACT
     # string the kid sees. ``None`` for steps that have no choices.
     choices_rendered: tuple[str, ...] | None = None
+    # Phase M Step M3: optional reference to an element corpus entry
+    # carried through from the template-time :attr:`Step.element_id`.
+    # When non-null, the kiosk's ElementCard renders the matching
+    # sprite + symbol + name + atomic number above the step text.
+    # Same pattern as :attr:`Step.element_id`.
+    element_id: str | None = Field(
+        default=None,
+        pattern=r"^[a-z]{1,3}-[0-9]{1,3}$",
+        max_length=16,
+    )
 
 
 class Activity(BaseModel):

@@ -43,6 +43,7 @@ from ..activities.content_resolver import (
     resolve_rooms,
     resolve_toys,
 )
+from ..activities.element_corpus import get_element
 from ..activities.feedback import (
     KIND_DIDNT_WORK,
     KIND_DISMISSED_PRE_APPROVAL,
@@ -276,6 +277,17 @@ class ActivityStepResponse(BaseModel):
     #
     # ``None`` on legacy rows / steps with no per-step metadata.
     metadata: dict[str, Any] | None = None
+    # Phase M Step M3: optional reference to a Periodic Table element
+    # corpus entry (``data/elements/elements.json``). When non-null, the
+    # kiosk's ElementCard renders the matching sprite + symbol + name +
+    # atomic number above the step text. The denormalized element fields
+    # (``element_symbol`` / ``element_name`` / ``element_atomic_number``)
+    # ride alongside in ``metadata`` so the kiosk doesn't need a
+    # separate /api/elements/<id> fetch — matches the song/joke
+    # ``metadata.audio_url`` / ``metadata.punchline`` denormalization
+    # pattern. ``None`` on the overwhelming majority of steps (non-
+    # Periodic-Table content).
+    element_id: str | None = None
 
 
 class RoleAssignment(BaseModel):
@@ -730,28 +742,108 @@ def _decode_step_metadata_json(raw: Any) -> dict[str, Any] | None:
     return {str(k): v for k, v in decoded.items()}
 
 
-def _fetch_steps(conn: sqlite3.Connection, activity_id: str) -> list[ActivityStepResponse]:
+def _enrich_element_metadata(
+    metadata: dict[str, Any] | None,
+    element_id: str | None,
+) -> dict[str, Any] | None:
+    """Phase M Step M3 — denormalize element corpus fields into step metadata.
+
+    When a step has a non-null ``element_id``, resolve it via the
+    element corpus and merge ``element_id`` / ``element_symbol`` /
+    ``element_name`` / ``element_atomic_number`` into the step's
+    metadata blob. The kiosk's ElementCard reads these fields from
+    ``step.metadata`` without needing a separate ``/api/elements/<id>``
+    fetch — same pattern as song step ``metadata.audio_url`` and joke
+    step ``metadata.punchline`` denormalization at K13.
+
+    Defensive on miss: if the corpus lookup returns ``None`` (corpus
+    drift between template-load gate and serialize time — unlikely,
+    but the kiosk falls back to the generic periodic-table avatar on
+    sprite 404, so a missing record degrades the same way).
+
+    Returns the (possibly new) metadata dict, or ``None`` when there
+    is no element_id AND the incoming metadata was empty.
+    """
+    if element_id is None:
+        return metadata
+    element = get_element(element_id)
+    if element is None:
+        # Corpus drift: the validator gate caught nothing at load
+        # time but the entry is now missing. Surface the element_id
+        # so the kiosk can render the fallback avatar; symbol/name
+        # are intentionally absent — ElementCard tolerates missing
+        # fields per phase-m-plan.md §5.3.
+        merged: dict[str, Any] = dict(metadata) if metadata else {}
+        merged["element_id"] = element_id
+        return merged
+    merged_meta: dict[str, Any] = dict(metadata) if metadata else {}
+    merged_meta["element_id"] = element.id
+    merged_meta["element_symbol"] = element.symbol
+    merged_meta["element_name"] = element.name
+    merged_meta["element_atomic_number"] = element.atomic_number
+    return merged_meta
+
+
+def _resolve_element_id_for_persisted_step(
+    template_id: str | None,
+    step_template_id: str | None,
+) -> str | None:
+    """Phase M Step M3 — look up the template step's ``element_id``.
+
+    The ``activity_steps`` table doesn't carry ``element_id`` as its
+    own column (kept additive to avoid a migration). The template
+    cache is already in process memory; we just resolve the step by
+    its ``step_template_id`` and read the field directly. Returns
+    ``None`` whenever the template / step can't be resolved or the
+    step has no element_id — graceful for legacy rows.
+    """
+    if template_id is None or step_template_id is None:
+        return None
+    template = find_template_by_id(template_id)
+    if template is None:
+        return None
+    for step in template.steps:
+        if step.id == step_template_id:
+            return step.element_id
+    return None
+
+
+def _fetch_steps(
+    conn: sqlite3.Connection,
+    activity_id: str,
+    *,
+    template_id: str | None = None,
+) -> list[ActivityStepResponse]:
     rows = conn.execute(
         "SELECT seq, body, sfx, expected_action, current, action_slot, "
-        " choices_json, chosen_label, kind, metadata_json "
+        " choices_json, chosen_label, kind, metadata_json, step_template_id "
         "FROM activity_steps WHERE activity_id = ? ORDER BY seq ASC",
         (activity_id,),
     ).fetchall()
-    return [
-        ActivityStepResponse(
-            seq=int(r["seq"]),
-            body=str(r["body"]),
-            sfx=r["sfx"],
-            expected_action=r["expected_action"],
-            current=bool(r["current"]),
-            action_slot=r["action_slot"],
-            choices=_decode_choices_json(r["choices_json"]),
-            chosen_label=r["chosen_label"],
-            kind=r["kind"],
-            metadata=_decode_step_metadata_json(r["metadata_json"]),
+    responses: list[ActivityStepResponse] = []
+    for r in rows:
+        # Phase M Step M3 — resolve element_id via the template lookup
+        # so the kiosk's ElementCard can render the sprite + denormalized
+        # element fields. Template lookup is process-cached; no DB hit.
+        element_id = _resolve_element_id_for_persisted_step(template_id, r["step_template_id"])
+        metadata = _decode_step_metadata_json(r["metadata_json"])
+        metadata = _enrich_element_metadata(metadata, element_id)
+        responses.append(
+            ActivityStepResponse(
+                seq=int(r["seq"]),
+                body=str(r["body"]),
+                sfx=r["sfx"],
+                expected_action=r["expected_action"],
+                current=bool(r["current"]),
+                action_slot=r["action_slot"],
+                choices=_decode_choices_json(r["choices_json"]),
+                chosen_label=r["chosen_label"],
+                kind=r["kind"],
+                metadata=metadata,
+                element_id=element_id,
+            )
         )
-        for r in rows
-    ]
+    return responses
 
 
 def _render_template_plan_steps(
@@ -805,6 +897,12 @@ def _render_template_plan_steps(
                 )
                 for ci, (label, _next) in enumerate(step.choices)
             ]
+        # Phase M Step M3 — surface the template-time element_id on the
+        # preview wire too (proposed / approved states use this path).
+        # The denormalized element fields ride in ``metadata`` so the
+        # kiosk's ElementCard renders identically on preview and at
+        # runtime.
+        preview_metadata = _enrich_element_metadata(None, step.element_id)
         rendered.append(
             ActivityStepResponse(
                 seq=idx + 1,
@@ -815,6 +913,8 @@ def _render_template_plan_steps(
                 action_slot=step.action_slot,
                 choices=choices,
                 chosen_label=None,
+                element_id=step.element_id,
+                metadata=preview_metadata,
             )
         )
     return rendered
@@ -941,24 +1041,45 @@ def _row_to_response(
     # to 1, breaking the parent's review UX. Once the activity is
     # running/completed, fall back to activity_steps (the kid's actually-
     # played path is the source of truth).
+    #
+    # Phase M Step M3 (iter-2 fix): resolve ``template_id`` from the
+    # summary envelope UNCONDITIONALLY — it's the input to TWO orthogonal
+    # decisions:
+    #
+    #   1. Whether to call ``_render_template_plan_steps`` (the full
+    #      preview) — gated on state ∈ {proposed, approved}.
+    #   2. Whether ``_fetch_steps`` can resolve per-step ``element_id``
+    #      via template lookup — needed at EVERY state where the kiosk
+    #      renders a step (running / paused / ended / completed /
+    #      did_not_work).
+    #
+    # Iter-1 conflated the two and only set ``template_id_for_plan`` for
+    # the preview states. Effect: ElementCard rendered on the parent
+    # dashboard preview, then evaporated on the kiosk as soon as the
+    # activity transitioned to ``running``. Wire-shape test:
+    # ``tests/integration/test_element_id_wire_shape.py``.
     state = str(row["state"])
-    template_id_for_plan: str | None = None
-    if summary_raw and state in (STATE_PROPOSED, STATE_APPROVED):
+    template_id: str | None = None
+    if summary_raw:
         try:
             payload = json.loads(summary_raw)
             if isinstance(payload, dict):
                 tid = payload.get("template_id")
                 if isinstance(tid, str) and tid:
-                    template_id_for_plan = tid
+                    template_id = tid
         except json.JSONDecodeError:
             pass
 
     steps: list[ActivityStepResponse] | None = None
-    if template_id_for_plan is not None:
+    if template_id is not None and state in (STATE_PROPOSED, STATE_APPROVED):
         slot_fills_raw = row["slot_fills_json"] if "slot_fills_json" in row.keys() else None
-        steps = _render_template_plan_steps(template_id_for_plan, slot_fills_raw)
+        steps = _render_template_plan_steps(template_id, slot_fills_raw)
     if steps is None:
-        steps = _fetch_steps(conn, activity_id)
+        # Phase M Step M3 — thread template_id so the runtime read can
+        # resolve per-step element_id via the template lookup. Falls
+        # back to None on legacy / template-less rows; _fetch_steps
+        # tolerates that.
+        steps = _fetch_steps(conn, activity_id, template_id=template_id)
 
     # Phase L Step L5: the K15 spontaneity advance-hook (the only path
     # that ever flipped ``interjection_pending`` to True) was removed.

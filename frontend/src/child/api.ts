@@ -92,7 +92,22 @@ export interface ActivityStep {
   // pydantic ``dict[str, Any]`` (invariant 9 leaves ``metadata``
   // un-codegenned). Consumers read defensively per K12's
   // "render even on a malformed envelope" contract.
+  //
+  // Phase M Step M3: when ``element_id`` is non-null, the backend
+  // serializer also denormalizes the corpus fields into ``metadata``
+  // so ElementCard can render without a separate fetch:
+  //   * ``element_id`` (string) — mirrored from the top-level field.
+  //   * ``element_symbol`` (string) — display-case symbol (e.g. ``Au``).
+  //   * ``element_name`` (string) — common name (e.g. ``Gold``).
+  //   * ``element_atomic_number`` (number) — atomic number (1-118).
   metadata?: Record<string, unknown> | null;
+  // Phase M Step M3: optional reference to a Periodic Table element
+  // corpus entry. When non-null, the kiosk's StepCard renders an
+  // ElementCard above the step body. Format ``<symbol-lower>-<atomic-
+  // number>`` (e.g. ``au-79``); the backend's _validator gates the
+  // shape and resolves to a real corpus entry at template load.
+  // Optional + nullable so pre-M3 wire payloads typecheck.
+  element_id?: string | null;
 }
 
 /**

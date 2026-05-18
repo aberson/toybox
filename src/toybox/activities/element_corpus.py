@@ -175,6 +175,28 @@ def _elements_path() -> Path:
     return _data_root() / _ELEMENTS_SUBDIR / _ELEMENTS_FILENAME
 
 
+def elements_root() -> Path:
+    """Public accessor for the element sprite directory (``<data_root>/images/elements``).
+
+    Phase M Step M3 — used by the FastAPI app factory to mount the
+    directory as a ``StaticFiles`` route serving
+    ``/api/static/elements/<element_id>.png``. Mirrors
+    :func:`toybox.storage.images.images_root` and
+    :func:`toybox.activities.song_corpus.songs_audio_root` so the
+    static-mount on-disk path has ONE source of truth (per
+    code-quality §2). Env-overrideable via ``TOYBOX_DATA_DIR`` like
+    the rest of the bundled data tree.
+
+    The sprite subdirectory lives under ``images/elements/`` (NOT
+    under ``elements/`` next to ``elements.json``) so the kiosk's
+    static mounts share a common parent (``data/images/``) and the
+    kiosk's ``<img src="/api/static/elements/...">`` references land
+    on real image bytes — the corpus JSON itself stays under
+    ``data/elements/``.
+    """
+    return _data_root() / "images" / "elements"
+
+
 # Cache: keyed on the resolved elements file path so a same-process
 # change of TOYBOX_DATA_DIR (test monkeypatch) produces a fresh load.
 _ELEMENT_CACHE: dict[Path, tuple[Element, ...]] = {}
@@ -474,6 +496,7 @@ __all__ = [
     "Family",
     "PhaseAtRoomTemp",
     "clear_element_cache",
+    "elements_root",
     "get_element",
     "load_elements",
     "pick_element",

@@ -5,6 +5,7 @@ import { getVoiceProfile, type PersonaMetadata } from "../persona-voice";
 import type { VoiceProfile } from "../tts";
 import { ChoiceButton, type ChoiceResult } from "./ChoiceButton";
 import { ClickableText } from "./ClickableText";
+import { ElementCard } from "./ElementCard";
 import { JokeStep, replayJoke } from "./JokeStep";
 import { NextStepButton } from "./NextStepButton";
 import { ReadMeButton } from "./ReadMeButton";
@@ -125,6 +126,48 @@ function readSongAudioUrl(step: ActivityStep | null): string {
     return `/api/static/songs/audio/${songId}.mp3`;
   }
   return "";
+}
+
+// Phase M Step M3: derive ElementCard props from a step's wire shape.
+// The backend denormalizes the corpus fields into ``step.metadata``
+// (``element_symbol`` / ``element_name`` / ``element_atomic_number``)
+// alongside the top-level ``element_id`` so the kiosk doesn't need a
+// separate ``/api/elements/<id>`` fetch — same idiom as song's
+// ``metadata.audio_url`` / joke's ``metadata.punchline``. Returns
+// ``null`` when ``element_id`` is absent / null, OR when the metadata
+// lacks the denormalized fields (defensive: a future serializer
+// regression that drops the enrichment shouldn't crash the kiosk;
+// ElementCard renders the fallback avatar in that case anyway via
+// onError, but we still need the four props to mount the component).
+interface ElementCardData {
+  elementId: string;
+  symbol: string;
+  name: string;
+  atomicNumber: number;
+}
+
+function readElementCardData(step: ActivityStep | null): ElementCardData | null {
+  if (step === null) return null;
+  const elementId = step.element_id;
+  if (typeof elementId !== "string" || elementId.length === 0) return null;
+  const meta = step.metadata;
+  // Pull the denormalized fields out of metadata defensively. Each
+  // field is read independently so a partial wire payload still
+  // surfaces what's available — ElementCard tolerates empty strings
+  // (renders the sprite + whatever text fields are populated).
+  let symbol = "";
+  let name = "";
+  let atomicNumber = 0;
+  if (typeof meta === "object" && meta !== null) {
+    const recMeta = meta as Record<string, unknown>;
+    const s = recMeta["element_symbol"];
+    if (typeof s === "string") symbol = s;
+    const n = recMeta["element_name"];
+    if (typeof n === "string") name = n;
+    const an = recMeta["element_atomic_number"];
+    if (typeof an === "number") atomicNumber = an;
+  }
+  return { elementId, symbol, name, atomicNumber };
 }
 
 // Phase K K12: derive a joke's punchline from a step's metadata. K13
@@ -424,6 +467,31 @@ export function StepCard(props: StepCardProps): JSX.Element {
           clickableWordsEnabled={clickableWordsEnabled}
         />
       )}
+      {/*
+        Phase M Step M3: Periodic Table element card. Renders inline
+        ABOVE the step body whenever ``step.element_id`` is non-null —
+        regardless of step kind. Iter-1 added a step-kind gate
+        (text/fork only) intended to prevent ElementCard from competing
+        with SongPlayer / JokeStep / RewardStep chrome; reviewers
+        flagged that as silent suppression (kiosk shows nothing,
+        template author expected a card to render). Per the iter-2
+        prompt and the M3 plan §5.3 which does NOT restrict ElementCard
+        to specific kinds, the gate is removed. If we later want to
+        forbid ``element_id`` on song/joke/reward steps, that's a
+        validator-side gate (out of scope for M3).
+      */}
+      {(() => {
+        const elementData = readElementCardData(previewStep);
+        if (elementData === null) return null;
+        return (
+          <ElementCard
+            elementId={elementData.elementId}
+            symbol={elementData.symbol}
+            name={elementData.name}
+            atomicNumber={elementData.atomicNumber}
+          />
+        );
+      })()}
       {stepKind !== "song" && stepKind !== "joke" && stepKind !== "reward" && (
         <div
           data-testid="step-body-row"
