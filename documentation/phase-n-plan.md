@@ -87,7 +87,7 @@ A song corpus entry (in `data/songs/songs.json` or the Phase K convention path �
 - `fun_fact` (one-sentence factoid)
 - `story_seed_hooks` (3+ narration scaffolds with `{name}` interpolation)
 - `pronunciation_guide` (optional phonetic respelling)
-- `age_band` ("3-5" for all 118)
+- `age_band` (mixed across 118 entries: 15 at "3-5", others at "6-8" or "9-12" — caught during N3 build; relevant for `peer_in_family` filter pool sizes. Two 3-5 elements (`na-11`, `ca-20`) are the SOLE entry in their family at 3-5, so `peer_in_family` raises on them by design — N4 generator must fall back to `story_seed_hooks` for the Step 2 fork on those two)
 
 Loader: [`src/toybox/activities/element_corpus.py`](../src/toybox/activities/element_corpus.py) (Phase M1). Adds family-grouped lookup + age-band filter.
 
