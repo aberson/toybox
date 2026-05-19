@@ -222,6 +222,113 @@ def test_missing_checkpoints_lora_mode_reports_cartoon_lora(
     assert "cartoon_lora" in detail
 
 
+_IPA_PATHS = (
+    "ip_adapter/models/ip-adapter-plus_sd15.bin",
+    "ip_adapter/models/image_encoder/model.safetensors",
+)
+
+
+def test_required_checkpoints_base_includes_ipa_paths(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """IPA + CLIP image encoder live in the base set (mode-independent).
+
+    Both ``checkpoint`` and ``lora`` modes load IPA for toy-image
+    conditioning, so every mode (including the unknown-mode fallthrough
+    that returns the base only) must include the two IPA paths.
+    """
+    for mode_value in ("checkpoint", "lora", "garbage"):
+        monkeypatch.setenv(CARTOON_MODE_ENV, mode_value)
+        required = _required_checkpoints()
+        for ipa_path in _IPA_PATHS:
+            assert ipa_path in required, (
+                f"mode={mode_value!r} missing IPA path {ipa_path!r}"
+            )
+
+
+def test_required_checkpoints_excludes_ipa_bin_image_encoder(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Only the .safetensors encoder is pinned; .bin format must not be.
+
+    diffusers prefers .safetensors when both formats are present in the
+    encoder dir; pinning both would force the operator to keep
+    duplicate weight files on disk. Codifies the choice so a future
+    refactor doesn't accidentally add ``pytorch_model.bin``.
+    """
+    monkeypatch.setenv(CARTOON_MODE_ENV, "checkpoint")
+    required = _required_checkpoints()
+    assert "ip_adapter/models/image_encoder/pytorch_model.bin" not in required
+    assert "ip_adapter/models/image_encoder/config.json" not in required
+
+
+def _seed_required_except_ipa(model_dir: Path) -> None:
+    """Seed everything the current mode requires *except* the IPA files.
+
+    Isolates IPA-absent as the sole cause of a missing-checkpoints
+    verdict — all other per-mode prerequisites are present.
+    """
+    for relative in _required_checkpoints():
+        if relative in _IPA_PATHS:
+            continue
+        target = model_dir / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"")
+
+
+@pytest.mark.parametrize("mode", ["checkpoint", "lora"])
+def test_missing_ipa_flips_capable_to_false(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, mode: str
+) -> None:
+    """When only the IPA files are absent, the gate reports missing_checkpoints.
+
+    Runs under both cartoon modes — IPA is required in both, so the
+    gate must flip False regardless of how the rest of the checkpoint
+    set is shaped.
+    """
+    monkeypatch.delenv(ENABLED_ENV, raising=False)
+    monkeypatch.setenv(CARTOON_MODE_ENV, mode)
+    monkeypatch.setattr(capability, "_probe_cuda_and_vram", lambda: (True, 99.0))
+    monkeypatch.setenv(MODEL_DIR_ENV, str(tmp_path))
+    _seed_required_except_ipa(tmp_path)
+
+    capable, reason_enum, detail = is_image_gen_capable()
+
+    assert capable is False
+    assert reason_enum is CapabilityReason.missing_checkpoints
+    # The detail string lists up to 3 missing relative paths; with
+    # exactly the two IPA files missing, both must appear verbatim.
+    for ipa_path in _IPA_PATHS:
+        assert ipa_path in detail, f"detail string missing {ipa_path!r}: {detail!r}"
+
+
+@pytest.mark.parametrize("mode", ["checkpoint", "lora"])
+def test_creating_ipa_files_flips_capable_to_true(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, mode: str
+) -> None:
+    """Seeding the IPA files alongside the rest of the set opens the gate.
+
+    Pairs with :func:`test_missing_ipa_flips_capable_to_false`: the only
+    delta between the two states is the IPA files' presence on disk, so
+    a True verdict here proves IPA is the gating factor.
+    """
+    monkeypatch.delenv(ENABLED_ENV, raising=False)
+    monkeypatch.setenv(CARTOON_MODE_ENV, mode)
+    monkeypatch.setattr(capability, "_probe_cuda_and_vram", lambda: (True, 99.0))
+    monkeypatch.setenv(MODEL_DIR_ENV, str(tmp_path))
+    _seed_required_except_ipa(tmp_path)
+    # Now add the IPA files.
+    for ipa_path in _IPA_PATHS:
+        target = tmp_path / ipa_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"")
+
+    capable, reason_enum, detail = is_image_gen_capable()
+
+    assert capable is True, f"detail={detail!r}"
+    assert reason_enum is CapabilityReason.capable
+
+
 def test_breaker_records_failures_and_opens(monkeypatch: pytest.MonkeyPatch) -> None:
     """3 consecutive failures → breaker open."""
     breaker = ImageGenBreaker(threshold=3, cooldown_sec=300.0)

@@ -244,6 +244,7 @@ The pipeline change alone produces no user-visible difference until parents trig
 - **Produces:** `capability.py` modified, `tests/unit/image_gen/test_capability.py` extended.
 - **Done when:** Tests pass. Boot-time capability log line (in [`src/toybox/app.py`](../src/toybox/app.py)) shows the new files in the missing-checkpoints detail string when they're absent. mypy + ruff clean.
 - **Depends on:** P1 (path layout pinned by the download script).
+- **Status:** DONE (2026-05-18). IPA paths (`ip_adapter/models/ip-adapter-plus_sd15.bin` + `ip_adapter/models/image_encoder/model.safetensors`) added to `_BASE_REQUIRED_CHECKPOINTS` (mode-independent — both `checkpoint` and `lora` cartoon modes load IPA). `pytorch_model.bin` and `config.json` intentionally excluded (with a regression-locking test). 6 new tests; 21/21 in test_capability.py PASS.
 
 ### Step P4: Rewrite pipeline.py — IP-Adapter integration, drop hex-tokens, 512² output, extended negative prompt
 - **Problem:** Modify [`src/toybox/image_gen/pipeline.py`](../src/toybox/image_gen/pipeline.py) end-to-end per the Design Decisions above:
@@ -394,7 +395,7 @@ The pipeline change alone produces no user-visible difference until parents trig
 |------|--------|
 | P1 — IP-Adapter Plus download script + manifest + runbook | DONE (2026-05-18) |
 | P2 — Operator: download + regression smoke | DONE (2026-05-18) |
-| P3 — capability.py checkpoint extension | not started |
+| P3 — capability.py checkpoint extension | DONE (2026-05-18) |
 | P4 — pipeline.py rewrite (IPA + 512² + extended negative + drop hex-tokens) | not started |
 | P5 — Frontend: drop `imageRendering: pixelated` | not started |
 | P6 — GLOBAL "Regenerate every toy" endpoint + parent UI button | not started |

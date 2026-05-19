@@ -20,7 +20,10 @@ The required checkpoint set is **mode-aware**: the
 ``TOYBOX_IMAGE_GEN_CARTOON_MODE`` env var selects between
 ``checkpoint`` (full cartoon checkpoint replaces SD 1.5 base) and
 ``lora`` (SD 1.5 base + cartoon LoRA), each requiring a different
-file shape under the configured model dir.
+file shape under the configured model dir. IP-Adapter Plus + its
+CLIP image encoder are always required (mode-independent — both
+modes load the adapter for toy-image conditioning) and so live in
+the base set, not the per-mode branches.
 """
 
 from __future__ import annotations
@@ -84,11 +87,24 @@ DEFAULT_BREAKER_THRESHOLD: Final[int] = 3
 
 # Common-to-all-modes checkpoints under ``MODEL_DIR_ENV``. The LCM
 # LoRA is always loaded; the rembg u2net is always needed for
-# subject-isolation. Per-mode additions live in
-# :func:`_required_checkpoints`.
+# subject-isolation; IP-Adapter Plus + its CLIP ViT-L image encoder
+# are always loaded for toy-image conditioning (mode-independent —
+# both ``checkpoint`` and ``lora`` modes use IPA). Per-mode additions
+# live in :func:`_required_checkpoints`.
+#
+# IPA path notes (P2 huggingface_hub download layout):
+# * ``ip_adapter/models/ip-adapter-plus_sd15.bin`` — the adapter
+#   weights; only published as .bin upstream (no .safetensors).
+# * ``ip_adapter/models/image_encoder/model.safetensors`` — the CLIP
+#   ViT-L image encoder; diffusers prefers .safetensors when both
+#   formats are present in the encoder dir, so the .safetensors is
+#   the canonical pin. ``pytorch_model.bin`` is the same weights in
+#   .bin format and is intentionally NOT required here.
 _BASE_REQUIRED_CHECKPOINTS: Final[tuple[str, ...]] = (
     "sd15/lcm_lora/pytorch_lora_weights.safetensors",
     "bg_remove/u2net.onnx",
+    "ip_adapter/models/ip-adapter-plus_sd15.bin",
+    "ip_adapter/models/image_encoder/model.safetensors",
 )
 
 
@@ -96,7 +112,15 @@ def _required_checkpoints() -> tuple[str, ...]:
     """Return the per-mode checkpoint set required for image-gen.
 
     Reads ``TOYBOX_IMAGE_GEN_CARTOON_MODE`` and returns the union of
-    the always-required base files plus the mode-specific extras:
+    the always-required base files plus the mode-specific extras.
+
+    The base set (mode-independent) includes the LCM LoRA, the rembg
+    u2net mask model, and the IP-Adapter Plus weights + CLIP ViT-L
+    image encoder. IPA is loaded by both ``checkpoint`` and ``lora``
+    modes for toy-image conditioning, so it sits in the base set
+    rather than each per-mode branch.
+
+    Mode-specific additions:
 
     * ``checkpoint`` — cartoon checkpoint replaces SD 1.5 base; needs
       ``cartoon_checkpoint/model_index.json`` + UNet weights.
