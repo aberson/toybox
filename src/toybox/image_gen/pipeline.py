@@ -75,14 +75,28 @@ STUB_MODE_ENV: Final[str] = "TOYBOX_IMAGE_GEN_STUB_MODE"
 STUB_DELAY_ENV: Final[str] = "TOYBOX_IMAGE_GEN_STUB_DELAY_SEC"
 
 DEFAULT_TIMEOUT_SEC: Final[float] = 120.0
-DEFAULT_OUTPUT_DIM: Final[int] = 128
+DEFAULT_OUTPUT_DIM: Final[int] = 512
 DEFAULT_MODEL_DIR: Final[str] = "data/models/image_gen"
 DEFAULT_BASE_MODEL_PATH: Final[str] = "data/models/image_gen/sd15/base"
 DEFAULT_CARTOON_MODE: Final[str] = "checkpoint"
 DEFAULT_CARTOON_PATH: Final[str] = "data/models/image_gen/cartoon_checkpoint"
 DEFAULT_LCM_LORA_PATH: Final[str] = "data/models/image_gen/sd15/lcm_lora"
+# Filesystem layout pinned by P2's huggingface_hub download (see
+# capability.py:_BASE_REQUIRED_CHECKPOINTS): the IP-Adapter Plus
+# weights sit at ``ip_adapter/models/ip-adapter-plus_sd15.bin`` and the
+# CLIP ViT-L image encoder at ``ip_adapter/models/image_encoder/``.
+# ``load_ip_adapter`` finds the encoder via ``image_encoder_folder``
+# (defaults to ``"image_encoder"`` relative to ``subfolder``).
+DEFAULT_IP_ADAPTER_PATH: Final[str] = "data/models/image_gen/ip_adapter"
+DEFAULT_IP_ADAPTER_SUBFOLDER: Final[str] = "models"
+DEFAULT_IP_ADAPTER_WEIGHT_NAME: Final[str] = "ip-adapter-plus_sd15.bin"
+# IPA conditioning strength applied to the toy reference cutout. Initial
+# 0.6 per Phase P plan; P7 operator UAT may tune up/down and P7b pins
+# the final value. Higher = identity tightens but pose can collapse.
+IP_ADAPTER_SCALE: Final[float] = 0.6
 DEFAULT_NEGATIVE_PROMPT: Final[str] = (
     "photorealistic, 3d, blurry, smooth shading, antialiased, gradient"
+    ", text, letters, numbers, writing, symbols, watermark"
 )
 
 CARTOON_MODE_CHECKPOINT: Final[str] = "checkpoint"
@@ -172,20 +186,22 @@ def _lcm_lora_path() -> str:
     return raw if raw else DEFAULT_LCM_LORA_PATH
 
 
-def _build_prompt(slot: str, ctx: GenerationContext, palette_hex: tuple[str, ...]) -> str:
-    """Compose the SD 1.5 positive prompt per plan §New components.
+def _build_prompt(slot: str, ctx: GenerationContext) -> str:
+    """Compose the SD 1.5 positive prompt for Phase P.
 
     Format:
 
-        "<intro>, <tags>, <palette tokens>, <ACTION_PROMPTS[slot]>,
+        "<intro>, <tags>, <ACTION_PROMPTS[slot]>,
          2D cartoon, simple shapes, clean lines, transparent background"
 
     where ``<intro>`` is ``f"{persona_display_name} the {toy_display_name}"``
     when persona is set, else ``f"a {toy_display_name}"``.
 
-    ``palette_hex`` holds top-N hex colours derived from the rembg
-    cutout (see :func:`_extract_palette_hex`); only the first three
-    are emitted as ``"primary color #RRGGBB"`` tokens.
+    Phase P dropped the per-call palette-hex tokens: the IP-Adapter
+    Plus reference image now carries identity/colour conditioning, and
+    public benchmarks showed hex tokens biased SD 1.5 tokenizers
+    toward rendering literal text glyphs of the codes. See
+    ``documentation/phase-p-plan.md`` §"Design Decisions".
 
     ``ctx.tags`` may be empty — the comma is unconditional but
     consecutive commas remain visible to the diffuser; that's fine
@@ -200,29 +216,10 @@ def _build_prompt(slot: str, ctx: GenerationContext, palette_hex: tuple[str, ...
         else f"a {ctx.toy_display_name}"
     )
     tags = ", ".join(ctx.tags) if ctx.tags else ""
-    palette = ", ".join(f"primary color {h}" for h in palette_hex[:3])
     return (
-        f"{intro}, {tags}, {palette}, "
+        f"{intro}, {tags}, "
         f"{ACTION_PROMPTS[slot]}, "
         f"2D cartoon, simple shapes, clean lines, transparent background"
-    )
-
-
-def _extract_palette_hex(cutout: Any, n: int = 3) -> tuple[str, ...]:
-    """Top-N dominant hex colours from the rembg cutout's pixels.
-
-    ``cutout`` is a ``PIL.Image.Image``; typed as ``Any`` so the
-    Pillow import stays lazy in the call site. Returns up to ``n``
-    ``"#RRGGBB"`` strings ordered by frequency (Pillow's MEDIANCUT
-    quantize emits the most-used colour first).
-    """
-    quantized = cutout.convert("RGBA").quantize(colors=8)
-    palette_bytes = quantized.getpalette()
-    if not palette_bytes:
-        return ()
-    return tuple(
-        f"#{palette_bytes[i * 3]:02x}{palette_bytes[i * 3 + 1]:02x}{palette_bytes[i * 3 + 2]:02x}"
-        for i in range(min(n, 256))
     )
 
 
@@ -265,6 +262,17 @@ def _build_pipeline(torch_mod: Any) -> Any:
     Imports diffusers lazily; expects an already-imported ``torch``
     module. Best-effort cleanup on partial-construction failure so a
     LoRA-load OOM doesn't leave half-loaded CUDA tensors pinned.
+
+    Phase P additions:
+
+    * After cartoon-mode adapters are loaded + activated, load the
+      IP-Adapter Plus weights (``ip-adapter-plus_sd15.bin``) and CLIP
+      ViT-L image encoder via ``pipe.load_ip_adapter(...)`` and set
+      the conditioning strength via
+      ``pipe.set_ip_adapter_scale(IP_ADAPTER_SCALE)``. Both branches
+      get IPA — toy-image conditioning is the same for ``checkpoint``
+      and ``lora`` cartoon modes. Wrapped in the same try/except so a
+      partial IPA load doesn't pin CUDA tensors.
     """
     from diffusers import LCMScheduler, StableDiffusionPipeline
 
@@ -272,7 +280,7 @@ def _build_pipeline(torch_mod: Any) -> Any:
     pipe = None
     try:
         if mode == CARTOON_MODE_CHECKPOINT:
-            pipe = StableDiffusionPipeline.from_pretrained(
+            pipe = StableDiffusionPipeline.from_pretrained(  # type: ignore[no-untyped-call]
                 _cartoon_path(),
                 torch_dtype=torch_mod.float16,
                 variant="fp16",
@@ -284,7 +292,7 @@ def _build_pipeline(torch_mod: Any) -> Any:
             pipe.load_lora_weights(_lcm_lora_path(), adapter_name="lcm")
             pipe.set_adapters(["lcm"], adapter_weights=[1.0])
         else:
-            pipe = StableDiffusionPipeline.from_pretrained(
+            pipe = StableDiffusionPipeline.from_pretrained(  # type: ignore[no-untyped-call]
                 _base_model_path(),
                 torch_dtype=torch_mod.float16,
                 variant="fp16",
@@ -297,7 +305,19 @@ def _build_pipeline(torch_mod: Any) -> Any:
             pipe.load_lora_weights(_lcm_lora_path(), adapter_name="lcm")
             pipe.set_adapters(["lcm", "cartoon"], adapter_weights=[1.0, 1.0])
 
-        pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
+        # IP-Adapter Plus: identical load shape in both cartoon modes.
+        # ``image_encoder_folder`` defaults to ``"image_encoder"`` and
+        # resolves relative to ``subfolder``, so the encoder is loaded
+        # from ``<ip_adapter>/models/image_encoder/`` matching the P2
+        # download layout (see capability.py:_BASE_REQUIRED_CHECKPOINTS).
+        pipe.load_ip_adapter(
+            DEFAULT_IP_ADAPTER_PATH,
+            subfolder=DEFAULT_IP_ADAPTER_SUBFOLDER,
+            weight_name=DEFAULT_IP_ADAPTER_WEIGHT_NAME,
+        )
+        pipe.set_ip_adapter_scale(IP_ADAPTER_SCALE)
+
+        pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)  # type: ignore[no-untyped-call]
         pipe.to("cuda")
         pipe.vae.enable_slicing()
     except Exception:
@@ -360,14 +380,16 @@ def _run_pipeline_sync(
         _cached_pipeline = _build_pipeline(torch)
     pipe = _cached_pipeline
 
-    # 3. Build prompt + run generation.
-    palette_hex = _extract_palette_hex(cutout_image)
-    prompt = _build_prompt(slot, ctx, palette_hex)
+    # 3. Build prompt + run generation. Phase P: the rembg cutout is
+    #    passed as ``ip_adapter_image`` so IPA Plus carries identity /
+    #    colour conditioning instead of the dropped palette-hex tokens.
+    prompt = _build_prompt(slot, ctx)
     generator = torch.Generator("cuda").manual_seed(seed)
     try:
         result = pipe(
             prompt=prompt,
             negative_prompt=DEFAULT_NEGATIVE_PROMPT,
+            ip_adapter_image=cutout_image,
             generator=generator,
             num_inference_steps=4,
             guidance_scale=1.0,
@@ -390,10 +412,15 @@ def _run_pipeline_sync(
     cleaned_image = Image.open(io.BytesIO(cleaned_bytes)).convert("RGBA")
 
     # 5. Resize to the configured output dim and return PNG bytes.
+    #    Phase P: ``DEFAULT_OUTPUT_DIM`` is now 512 (matches the
+    #    diffuser's native output), so this resize is a no-op in the
+    #    default path. The call stays so the ``TOYBOX_IMAGE_GEN_OUTPUT_DIM``
+    #    env override (operator-set to a non-512 value) still works.
+    #    LANCZOS for the high-quality downscale case the override picks.
     target_dim = _output_dim()
     output_image = cleaned_image.resize(
         (target_dim, target_dim),
-        Image.Resampling.BILINEAR,
+        Image.Resampling.LANCZOS,
     )
     buffer = io.BytesIO()
     output_image.save(buffer, format="PNG")
@@ -454,10 +481,14 @@ __all__ = [
     "DEFAULT_BASE_MODEL_PATH",
     "DEFAULT_CARTOON_MODE",
     "DEFAULT_CARTOON_PATH",
+    "DEFAULT_IP_ADAPTER_PATH",
+    "DEFAULT_IP_ADAPTER_SUBFOLDER",
+    "DEFAULT_IP_ADAPTER_WEIGHT_NAME",
     "DEFAULT_LCM_LORA_PATH",
     "DEFAULT_NEGATIVE_PROMPT",
     "DEFAULT_OUTPUT_DIM",
     "DEFAULT_TIMEOUT_SEC",
+    "IP_ADAPTER_SCALE",
     "LCM_LORA_PATH_ENV",
     "MODEL_DIR_ENV",
     "OUTPUT_DIM_ENV",

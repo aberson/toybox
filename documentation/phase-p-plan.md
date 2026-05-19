@@ -271,6 +271,7 @@ The pipeline change alone produces no user-visible difference until parents trig
 - **Produces:** `pipeline.py` modified, worker E2E test extended, stub-pipeline test audited.
 - **Done when:** All existing image-gen tests still green. New IPA-shape assertion in worker E2E green. mypy strict + ruff clean. Lazy-import test still green. Downstream-consumer grep checklist included in PR description with verdicts.
 - **Depends on:** P3.
+- **Status:** DONE (2026-05-18). Pipeline rewrite shipped: IPA load + scale (0.6 initial), `ip_adapter_image=cutout_image` kwarg, 512² output, extended negative prompt, palette-hex tokens dropped, `_extract_palette_hex` deleted. Worker E2E + new parametrized `_build_pipeline` unit tests (2 modes) lock both the setup path (`load_ip_adapter`/`set_ip_adapter_scale` args) and the consumption path (`pipe(ip_adapter_image=...)` wire shape). diffusers 0.37.1 `load_ip_adapter` signature verified; encoder resolves via default `image_encoder_folder="image_encoder"` relative to `subfolder="models"` → `data/models/image_gen/ip_adapter/models/image_encoder/` (matches P3's capability pin). mypy strict clean (3 pre-existing pipeline.py errors resolved via `# type: ignore[no-untyped-call]` on existing diffusers `from_pretrained`/`from_config` calls). Lazy-import test still green.
 
 ### Step P5: Frontend — drop `imageRendering: pixelated`; verify 512-source rendering
 - **Problem:** Modify [`frontend/src/child/components/ToyActionSprite.tsx`](../frontend/src/child/components/ToyActionSprite.tsx) line 67: remove `imageRendering: "pixelated"` from `baseStyle`. The element-style behavior collapses to the browser default (smooth resampling), which is correct for 512-source downscaled to 112-display. Update [`frontend/src/child/components/ToyActionSprite.test.tsx`](../frontend/src/child/components/ToyActionSprite.test.tsx) if it asserts the `pixelated` rule. Audit [`frontend/src/parent/components/ToyActionGrid.tsx`](../frontend/src/parent/components/ToyActionGrid.tsx) — if it uses `<ToyActionSprite>` it automatically inherits the change; if it renders sprites another way, audit that path too. Vitest snapshot updates as needed.
@@ -396,7 +397,7 @@ The pipeline change alone produces no user-visible difference until parents trig
 | P1 — IP-Adapter Plus download script + manifest + runbook | DONE (2026-05-18) |
 | P2 — Operator: download + regression smoke | DONE (2026-05-18) |
 | P3 — capability.py checkpoint extension | DONE (2026-05-18) |
-| P4 — pipeline.py rewrite (IPA + 512² + extended negative + drop hex-tokens) | not started |
+| P4 — pipeline.py rewrite (IPA + 512² + extended negative + drop hex-tokens) | DONE (2026-05-18) |
 | P5 — Frontend: drop `imageRendering: pixelated` | not started |
 | P6 — GLOBAL "Regenerate every toy" endpoint + parent UI button | not started |
 | P7 — Operator: smoke gate + UAT-tune IPA scale (run-doc only, no code edit) | not started |
