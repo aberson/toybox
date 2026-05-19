@@ -680,20 +680,21 @@ def test_shipped_scaffold_has_118_entries() -> None:
     assert len(payload) == 118
 
 
-def test_shipped_scaffold_rejected_without_env_flag(
+def test_shipped_scaffold_loads_without_env_flag(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``load_distractors`` against the shipped scaffold raises without the env opt-in.
+    """``load_distractors`` against the post-N1 shipped scaffold loads without the env opt-in.
 
-    Locks in the safety gate against the REAL shipped data (not just a tmp_path
-    fixture): every shipped row is currently ``source: llm`` until N1 operator
-    skim-review flips tags, so the loader must refuse without
-    ``TOYBOX_ALLOW_LLM_DISTRACTORS=1``.
+    After N1 operator skim-review flipped every shipped row's ``source`` from
+    ``llm`` to ``operator``, the loader's LLM-rejection gate no longer fires
+    on the shipped data. The env-flag gate is still tested against synthetic
+    LLM-tagged fixtures via the tmp_path tests above.
     """
     monkeypatch.delenv("TOYBOX_ALLOW_LLM_DISTRACTORS", raising=False)
     clear_distractor_cache()
-    with pytest.raises(DistractorCorpusError, match=r"(?i)llm|allow.*distractors"):
-        load_distractors()
+    entries = load_distractors()
+    assert len(entries) == 118
+    assert all(isinstance(e, Distractor) for e in entries)
 
 
 def test_shipped_scaffold_loads_118_with_env_flag(
