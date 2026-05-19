@@ -17,6 +17,7 @@ captured stub.
 
 from __future__ import annotations
 
+import asyncio
 import io
 import logging
 import uuid
@@ -31,7 +32,7 @@ from PIL import Image
 from toybox.ai import capability as capability_mod
 from toybox.ai.client import StubClient
 from toybox.api import toys as toys_router_mod
-from toybox.api.toys import get_vision_client
+from toybox.api.toys import _bg_tasks, get_vision_client
 from toybox.db.connection import connect
 from toybox.image_gen import worker as worker_module
 from toybox.image_gen.models import ACTION_SLOTS
@@ -446,6 +447,202 @@ def test_regenerate_all_503_when_worker_not_running(
 
 
 # ---------------------------------------------------------------------
+# POST /api/admin/regenerate-every-toy-action  (Phase P Step P6)
+# ---------------------------------------------------------------------
+
+
+# Second canonical toy id used by the bulk-regenerate happy path so we
+# can assert the SQL fan-out covers >1 toy.
+_SECOND_TOY_ID = "660e8400-e29b-41d4-a716-446655440111"
+
+
+def _drain_bulk_bg_tasks(client: TestClient) -> None:
+    """Deterministically wait for the bulk-regen bg task to finish.
+
+    Iter-2 HIGH fix moved the enqueue loop into a background task
+    spawned via :func:`asyncio.create_task`. The handler returns
+    before that task runs to completion, so a sync ``TestClient`` call
+    site that asserts on :attr:`_StubWorker.enqueued` races the bg
+    task. We drive the FastAPI portal's event loop from the test
+    thread to ``gather`` every entry in :data:`toybox.api.toys._bg_tasks`
+    before the test asserts. Idempotent — if the bg task already
+    finished by the time we get here, the set is empty and gather is
+    a no-op.
+    """
+
+    async def _drain() -> None:
+        if _bg_tasks:
+            await asyncio.gather(*list(_bg_tasks))
+
+    client.portal.call(_drain)
+
+
+def test_regenerate_every_toy_enqueues_all(
+    vc_client: TestClient,
+    parent_headers: dict[str, str],
+    db_path: Path,
+    force_capable: None,
+    stub_worker: _StubWorker,
+) -> None:
+    """Bulk endpoint fans out across every non-archived toy × every slot.
+
+    Seeds 2 active toys + 1 archived; expects 2 toys × 10 slots = 20
+    enqueued jobs and the archived row to be skipped. Response carries
+    ``toy_count=2`` + ``total_enqueued=20`` + ``mode=null``.
+
+    Iter-2 contract change: ``total_enqueued`` is now PROJECTED at
+    handler-return time, computed as
+    ``len(toy_ids) * len(ACTION_SLOTS)`` synchronously before the bg
+    task spawns. With a stub worker that never raises, the projected
+    and confirmed counts coincide — but they are no longer the same
+    quantity, and the docstring on :class:`BulkRegenerateResponse`
+    documents the gap. The post-call ``_drain_bulk_bg_tasks`` flushes
+    the bg task before we inspect ``stub_worker.enqueued``.
+    """
+    _seed_toy(db_path)
+    _seed_toy(db_path, toy_id=_SECOND_TOY_ID)
+    # An archived toy — must NOT be enqueued (SQL preamble filters).
+    archived_id = "770e8400-e29b-41d4-a716-446655440222"
+    conn = connect(db_path)
+    try:
+        with conn:
+            conn.execute(
+                "INSERT INTO toys (id, display_name, image_path, "
+                "image_hash, tags, archived, created_at) "
+                "VALUES (?, ?, ?, ?, ?, 1, ?)",
+                (
+                    archived_id,
+                    "Archived Bear",
+                    f"data/images/toys/{archived_id}.jpg",
+                    f"hash-{archived_id}",
+                    "",
+                    "2026-05-06T00:00:00Z",
+                ),
+            )
+    finally:
+        conn.close()
+
+    resp = vc_client.post(
+        "/api/admin/regenerate-every-toy-action",
+        headers=parent_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["toy_count"] == 2
+    assert body["total_enqueued"] == 2 * len(ACTION_SLOTS)
+    assert body.get("mode") is None
+
+    # Drain the iter-2 background task so the assertions below see a
+    # settled :attr:`_StubWorker.enqueued` list. Without this drain,
+    # the sync test thread can outrun the bg task and the length
+    # assertion flakes.
+    _drain_bulk_bg_tasks(vc_client)
+
+    # Every toy × every slot was enqueued. Order of toys is whatever
+    # SQLite hands back from the unordered SELECT; per toy the slot
+    # order matches ACTION_SLOTS.
+    assert len(stub_worker.enqueued) == 2 * len(ACTION_SLOTS)
+    by_toy: dict[str, list[str]] = {}
+    for toy_id, slot, _seed in stub_worker.enqueued:
+        by_toy.setdefault(toy_id, []).append(slot)
+    assert set(by_toy.keys()) == {_SEEDED_TOY_ID, _SECOND_TOY_ID}
+    assert archived_id not in by_toy
+    for slots in by_toy.values():
+        assert slots == list(ACTION_SLOTS)
+
+
+def test_regenerate_every_toy_409_when_disabled(
+    vc_client: TestClient,
+    parent_headers: dict[str, str],
+    db_path: Path,
+    force_disabled: None,
+    stub_worker: _StubWorker,
+) -> None:
+    """ENV_DISABLED → 409 with ``image_gen_disabled``; nothing enqueued."""
+    _seed_toy(db_path)
+    resp = vc_client.post(
+        "/api/admin/regenerate-every-toy-action",
+        headers=parent_headers,
+    )
+    assert resp.status_code == 409, resp.text
+    detail = resp.json()["detail"]
+    assert detail["code"] == "image_gen_disabled"
+    assert detail["reason"] == "test-disabled"
+    assert stub_worker.enqueued == []
+
+
+def test_regenerate_every_toy_200_with_composite_only_mode(
+    vc_client: TestClient,
+    parent_headers: dict[str, str],
+    db_path: Path,
+    force_composite_only: None,
+    stub_worker: _StubWorker,
+) -> None:
+    """Non-env-disabled False capability → 200 + ``mode=composite_only``.
+
+    Worker still receives all jobs (worker dispatches to Tier C
+    internally). The wire ``mode`` lets the parent UI render the
+    composite-only banner.
+    """
+    _seed_toy(db_path)
+    resp = vc_client.post(
+        "/api/admin/regenerate-every-toy-action",
+        headers=parent_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["toy_count"] == 1
+    assert body["total_enqueued"] == len(ACTION_SLOTS)
+    assert body["mode"] == "composite_only"
+    _drain_bulk_bg_tasks(vc_client)
+    assert len(stub_worker.enqueued) == len(ACTION_SLOTS)
+
+
+def test_regenerate_every_toy_zero_toys_returns_200(
+    vc_client: TestClient,
+    parent_headers: dict[str, str],
+    force_capable: None,
+    stub_worker: _StubWorker,
+) -> None:
+    """Empty toys table → 200 + zero counts + no enqueues.
+
+    Phase P Step P6 LOW review item. The handler must short-circuit
+    cleanly when the SQL preamble returns zero rows: no spawned bg
+    task ever calls ``worker.enqueue``, the response is the canonical
+    empty envelope, and the parent UI can render a "no toys yet"
+    toast rather than a misleading "queued 0 jobs".
+    """
+    # Deliberately do NOT seed any toy.
+    resp = vc_client.post(
+        "/api/admin/regenerate-every-toy-action",
+        headers=parent_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["toy_count"] == 0
+    assert body["total_enqueued"] == 0
+    assert body.get("mode") is None
+    _drain_bulk_bg_tasks(vc_client)
+    assert stub_worker.enqueued == []
+
+
+def test_regenerate_every_toy_503_when_worker_not_running(
+    vc_client: TestClient,
+    parent_headers: dict[str, str],
+    db_path: Path,
+    force_capable: None,
+    no_worker: None,
+) -> None:
+    _seed_toy(db_path)
+    resp = vc_client.post(
+        "/api/admin/regenerate-every-toy-action",
+        headers=parent_headers,
+    )
+    assert resp.status_code == 503
+    assert resp.json()["detail"]["code"] == "image_gen_worker_unavailable"
+
+
+# ---------------------------------------------------------------------
 # POST /api/toys/{id}/actions/{slot}/regenerate
 # ---------------------------------------------------------------------
 
@@ -713,6 +910,10 @@ _NEW_PROTECTED_ENDPOINTS: list[tuple[str, str]] = [
     ("GET", f"/api/toys/{_SEEDED_TOY_ID}/actions"),
     ("POST", f"/api/toys/{_SEEDED_TOY_ID}/actions/regenerate"),
     ("POST", f"/api/toys/{_SEEDED_TOY_ID}/actions/idle/regenerate"),
+    # Phase P Step P6 — the global bulk-regen endpoint inherits the
+    # same parent-only contract via the existing parametrized 401 +
+    # 403 sweep.
+    ("POST", "/api/admin/regenerate-every-toy-action"),
 ]
 
 

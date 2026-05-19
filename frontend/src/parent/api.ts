@@ -412,6 +412,20 @@ export interface ToyActionsRegenerateResponse {
   mode?: string | null;
 }
 
+// Phase P Step P6 — envelope for the global
+// ``POST /api/admin/regenerate-every-toy-action`` endpoint. Distinct
+// from :type:`ToyActionsRegenerateResponse` because the wire shape is
+// different (counts instead of a slot list): the parent UI shows a
+// single "queued N jobs across M toys" toast rather than the per-toy
+// per-slot grid surfaced by the existing per-toy regenerate flow.
+// ``mode`` mirrors the same composite-only contract as the per-toy
+// response.
+export interface BulkRegenerateResponse {
+  toy_count: number;
+  total_enqueued: number;
+  mode?: string | null;
+}
+
 // The 10 action slot keys, in canonical order. Mirrors
 // :data:`toybox.image_gen.models.ACTION_SLOTS`. The parent grid
 // renders cells in this order; consumers can iterate this constant
@@ -1422,6 +1436,23 @@ export class ApiClient {
   ): Promise<ToyActionsRegenerateResponse> {
     return this.request<ToyActionsRegenerateResponse>(
       `/api/toys/${encodeURIComponent(toyId)}/actions/${encodeURIComponent(slot)}/regenerate`,
+      { method: "POST", body: JSON.stringify({}), signal: opts.signal },
+    );
+  }
+
+  // Phase P Step P6: enqueue every ``ACTION_SLOTS`` job for every
+  // non-archived toy in one call. Distinct from
+  // ``regenerateAllActions`` which scopes to a single toy. Returns
+  // ``{toy_count, total_enqueued, mode}`` so the UI can render a
+  // single confirmation toast covering the fan-out instead of N
+  // per-toy banners. Per-slot status badges in each toy's grid pick
+  // up the queued state via existing WS subscriptions; this method
+  // does not block on completion.
+  async regenerateEveryToyAction(
+    opts: RequestOptions = {},
+  ): Promise<BulkRegenerateResponse> {
+    return this.request<BulkRegenerateResponse>(
+      "/api/admin/regenerate-every-toy-action",
       { method: "POST", body: JSON.stringify({}), signal: opts.signal },
     );
   }

@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../api";
 import type {
   ApiClient,
+  BulkRegenerateResponse,
   Toy,
   ToyConfirmRequest,
   ToyListResponse,
@@ -22,6 +23,7 @@ import type {
   ToyUploadResponse,
   ToyVisionSuggestion,
 } from "../api";
+import { useParentStore } from "../store";
 import { ToyIngest } from "./ToyIngest";
 
 // jsdom/happy-dom doesn't ship a real URL.createObjectURL — provide a
@@ -84,6 +86,7 @@ interface StubApi {
   uploadToyPhoto: Mock;
   confirmToy: Mock;
   updateToy: Mock;
+  regenerateEveryToyAction: Mock;
 }
 
 function buildStubApi(initial: Toy[]): StubApi {
@@ -123,6 +126,14 @@ function buildStubApi(initial: Toy[]): StubApi {
         currentList = currentList.map((t) => (t.id === id ? updated : t));
         return updated;
       },
+    ) as Mock,
+    regenerateEveryToyAction: vi.fn(
+      async (): Promise<BulkRegenerateResponse> => ({
+        toy_count: currentList.filter((t) => !t.archived).length,
+        total_enqueued:
+          currentList.filter((t) => !t.archived).length * 10,
+        mode: null,
+      }),
     ) as Mock,
   };
 }
@@ -606,5 +617,152 @@ describe("ToyIngest", () => {
       unknown,
     ];
     expect(args[1]).toEqual({ active: true });
+  });
+
+  // -----------------------------------------------------------------
+  // Phase P Step P6 — global "Regenerate sprites for every toy" button
+  // -----------------------------------------------------------------
+
+  describe("regenerate every toy", () => {
+    // Reset the singleton store's toast list between tests so a toast
+    // pushed by an earlier case doesn't leak into the "confirm shows
+    // count" assertion below. The store is a module-level singleton
+    // (see ``createParentStore`` in store.ts); plain ``cleanup`` only
+    // unmounts React.
+    afterEach(() => {
+      useParentStore.setState({ toasts: [], nextToastId: 1 });
+    });
+
+    it("renders the global regenerate button at the top of the toys list", async () => {
+      const stub = buildStubApi([
+        fakeToy({ id: "t-1" }),
+        fakeToy({ id: "t-2", display_name: "Bear" }),
+      ]);
+      const { container } = render(
+        <ToyIngest api={stub as unknown as ApiClient} />,
+      );
+      // Surfaces only once the list has loaded (gated on toys.length > 0).
+      const btn = await screen.findByTestId("regenerate-every-toy-button");
+      expect(btn).toBeTruthy();
+      expect(btn.textContent).toContain("Regenerate sprites for every toy");
+      // Iter-2 LOW review fix: actually assert position relative to
+      // the first ``toy-row``. ``compareDocumentPosition`` returns a
+      // bitmask; ``DOCUMENT_POSITION_FOLLOWING`` set on the result
+      // means the argument node appears AFTER the receiver in the
+      // document — i.e. the button precedes the first toy row.
+      const firstToyRow = container.querySelector('[data-testid="toy-row"]');
+      expect(firstToyRow).not.toBeNull();
+      expect(
+        btn.compareDocumentPosition(firstToyRow!) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it("clicking the button opens the confirmation dialog with the toy count", async () => {
+      const stub = buildStubApi([
+        fakeToy({ id: "t-1" }),
+        fakeToy({ id: "t-2", display_name: "Bear" }),
+      ]);
+      render(<ToyIngest api={stub as unknown as ApiClient} />);
+      const btn = await screen.findByTestId("regenerate-every-toy-button");
+      // Dialog not in the DOM yet.
+      expect(screen.queryByTestId("regenerate-every-toy-dialog")).toBeNull();
+      fireEvent.click(btn);
+      const dialog = await screen.findByTestId(
+        "regenerate-every-toy-dialog",
+      );
+      expect(dialog).toBeTruthy();
+      // The dialog's body quotes the toy count (×10 slots).
+      expect(dialog.textContent).toContain("2 toys");
+      expect(dialog.textContent).toContain("10 slots");
+    });
+
+    it("confirm calls regenerateEveryToyAction and shows the total_enqueued count via toast", async () => {
+      const stub = buildStubApi([
+        fakeToy({ id: "t-1" }),
+        fakeToy({ id: "t-2", display_name: "Bear" }),
+      ]);
+      // Pin a deterministic response shape so the assertion below
+      // doesn't depend on the buildStubApi default-derived count.
+      stub.regenerateEveryToyAction.mockResolvedValueOnce({
+        toy_count: 2,
+        total_enqueued: 20,
+        mode: null,
+      } satisfies BulkRegenerateResponse);
+      render(<ToyIngest api={stub as unknown as ApiClient} />);
+      const btn = await screen.findByTestId("regenerate-every-toy-button");
+      fireEvent.click(btn);
+      const confirm = await screen.findByTestId(
+        "regenerate-every-toy-confirm",
+      );
+      fireEvent.click(confirm);
+      await waitFor(() => {
+        expect(stub.regenerateEveryToyAction).toHaveBeenCalledTimes(1);
+      });
+      // Dialog closes on success.
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId("regenerate-every-toy-dialog"),
+        ).toBeNull();
+      });
+      // Toast carries the total_enqueued + toy_count counts.
+      const toasts = useParentStore.getState().toasts;
+      expect(toasts.length).toBeGreaterThanOrEqual(1);
+      const last = toasts[toasts.length - 1];
+      expect(last?.message).toContain("20");
+      expect(last?.message).toContain("2 toys");
+    });
+
+    it("mode=composite_only on the response renders the composite-only banner", async () => {
+      const stub = buildStubApi([fakeToy({ id: "t-1" })]);
+      stub.regenerateEveryToyAction.mockResolvedValueOnce({
+        toy_count: 1,
+        total_enqueued: 10,
+        mode: "composite_only",
+      } satisfies BulkRegenerateResponse);
+      render(<ToyIngest api={stub as unknown as ApiClient} />);
+      const btn = await screen.findByTestId("regenerate-every-toy-button");
+      fireEvent.click(btn);
+      const confirm = await screen.findByTestId(
+        "regenerate-every-toy-confirm",
+      );
+      fireEvent.click(confirm);
+      await waitFor(() => {
+        expect(stub.regenerateEveryToyAction).toHaveBeenCalledTimes(1);
+      });
+      const banner = await screen.findByTestId(
+        "regenerate-every-toy-composite-banner",
+      );
+      expect(banner.textContent).toContain("composite-only");
+    });
+
+    it("disables the regenerate button while the request is in flight", async () => {
+      // Iter-2 MEDIUM (test quality): the ``bulkBusy`` state must
+      // prevent a second concurrent click during the
+      // request-in-flight window. We pin the stub to a never-resolving
+      // promise so we can observe the button in its disabled state
+      // post-click without races on resolution timing.
+      const stub = buildStubApi([fakeToy({ id: "t-1" })]);
+      stub.regenerateEveryToyAction.mockImplementationOnce(
+        () => new Promise(() => {}),
+      );
+      render(<ToyIngest api={stub as unknown as ApiClient} />);
+      const btn = (await screen.findByTestId(
+        "regenerate-every-toy-button",
+      )) as HTMLButtonElement;
+      // Pre-click: enabled.
+      expect(btn.disabled).toBe(false);
+      fireEvent.click(btn);
+      const confirm = await screen.findByTestId(
+        "regenerate-every-toy-confirm",
+      );
+      fireEvent.click(confirm);
+      // Post-confirm, bulkBusy=true → the top-of-list button is
+      // disabled so a re-click can't fan out a second 200-enqueue
+      // wave on top of the first.
+      await waitFor(() => {
+        expect(btn.disabled).toBe(true);
+      });
+    });
   });
 });

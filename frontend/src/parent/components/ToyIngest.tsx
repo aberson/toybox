@@ -241,6 +241,19 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
   // ``"composite_only"`` → render the Tier C banner on the grid.
   const [toyModes, setToyModes] = useState<Record<string, string | null>>({});
 
+  // Phase P Step P6 — global "regenerate sprites for every toy" button
+  // state. Distinct from the per-toy ``handleRegenerateAll`` flow:
+  // this fires one POST to ``/api/admin/regenerate-every-toy-action``
+  // and surfaces a single toast on success. ``bulkDialogOpen`` gates
+  // the confirmation dialog (always shown before firing — the
+  // fan-out is irreversible for in-flight slots). ``bulkBusy``
+  // disables the button mid-request. ``bulkMode`` mirrors the
+  // composite-only contract from the per-toy flow so the global
+  // banner renders alongside the per-toy ones.
+  const [bulkDialogOpen, setBulkDialogOpen] = useState<boolean>(false);
+  const [bulkBusy, setBulkBusy] = useState<boolean>(false);
+  const [bulkMode, setBulkMode] = useState<string | null>(null);
+
   // Selector: pull the per-toy slot map out of the zustand store so
   // grid cells re-render as ws envelopes arrive. ``shallow``-style
   // equality isn't needed — zustand defaults to ===, and we replace
@@ -377,6 +390,39 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
     },
     [api],
   );
+
+  // Phase P Step P6 — fire the global "regenerate every toy" bulk
+  // endpoint. Called from the confirmation dialog's "Yes" button only;
+  // the button at the top of the toys-list view just opens the dialog
+  // so the operator gets one chance to back out before fanning out
+  // ~N×10 jobs. Per-slot status badges in each toy's grid pick up
+  // the queued state via existing WS subscriptions; we don't refetch
+  // here.
+  const handleRegenerateEveryToy = useCallback(async (): Promise<void> => {
+    setBulkBusy(true);
+    try {
+      const resp = await api.regenerateEveryToyAction({
+        signal: aborterRef.current?.signal,
+      });
+      setBulkMode(resp.mode ?? null);
+      setBulkDialogOpen(false);
+      useParentStore
+        .getState()
+        .pushToast(
+          "info",
+          `queued ${resp.total_enqueued} sprite jobs across ${resp.toy_count} toys`,
+        );
+    } catch (err) {
+      if (isAbortError(err)) return;
+      const message =
+        err instanceof Error ? err.message : "regenerate every toy failed";
+      useParentStore
+        .getState()
+        .pushToast("error", `regenerate every toy: ${message}`);
+    } finally {
+      setBulkBusy(false);
+    }
+  }, [api]);
 
   const handleFile = useCallback(
     async (file: File): Promise<void> => {
@@ -948,6 +994,84 @@ export function ToyIngest(props: ToyIngestProps): JSX.Element {
         <p data-testid="toys-empty" style={{ color: "#777", fontSize: 13 }}>
           No toys yet. Add one above.
         </p>
+      )}
+      {toys.length > 0 && (
+        <div
+          data-testid="regenerate-every-toy-row"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            margin: "4px 0 8px",
+          }}
+        >
+          <button
+            type="button"
+            data-testid="regenerate-every-toy-button"
+            onClick={() => setBulkDialogOpen(true)}
+            disabled={bulkBusy}
+            title="Re-render the 10 action sprites for every toy in the library"
+            style={{ fontSize: 12, padding: "4px 10px" }}
+          >
+            Regenerate sprites for every toy
+          </button>
+          {bulkMode === "composite_only" && (
+            <span
+              data-testid="regenerate-every-toy-composite-banner"
+              role="status"
+              style={{ fontSize: 12, color: "#8a6d3b" }}
+            >
+              running in composite-only mode (Tier C fallback)
+            </span>
+          )}
+        </div>
+      )}
+      {bulkDialogOpen && (
+        <div
+          data-testid="regenerate-every-toy-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="regenerate-every-toy-dialog-title"
+          style={{
+            border: "1px solid #999",
+            background: "#fafafa",
+            padding: 12,
+            margin: "4px 0 8px",
+            borderRadius: 4,
+            fontSize: 13,
+          }}
+        >
+          <p
+            id="regenerate-every-toy-dialog-title"
+            style={{ margin: "0 0 8px", fontWeight: 600 }}
+          >
+            Regenerate sprites for every toy?
+          </p>
+          <p style={{ margin: "0 0 8px" }}>
+            This will enqueue {toys.length} toys × 10 slots and run in
+            the background.
+          </p>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button
+              type="button"
+              data-testid="regenerate-every-toy-confirm"
+              onClick={() => {
+                void handleRegenerateEveryToy();
+              }}
+              disabled={bulkBusy}
+            >
+              {bulkBusy ? "queueing..." : "Yes, regenerate all"}
+            </button>
+            <button
+              type="button"
+              data-testid="regenerate-every-toy-cancel"
+              onClick={() => setBulkDialogOpen(false)}
+              disabled={bulkBusy}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
       {toys.length > 0 && (
         <div

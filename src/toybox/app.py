@@ -42,6 +42,7 @@ from .api.read_me_button_enabled_settings import (
 from .api.rewards import router as rewards_router
 from .api.rooms import router as rooms_router
 from .api.songs_enabled_settings import router as songs_enabled_settings_router
+from .api.toys import admin_router as toys_admin_router
 from .api.toys import router as toys_router
 from .api.transcript_retention_settings import router as transcript_retention_settings_router
 from .api.transcripts import router as transcripts_router
@@ -87,6 +88,12 @@ def create_app() -> FastAPI:
     app.include_router(activities_router)
     app.include_router(children_router)
     app.include_router(toys_router)
+    # Phase P Step P6 — admin actions that span every toy (e.g. global
+    # "regenerate every toy" sprite re-render). Mounted alongside the
+    # per-toy router so the helpers + Pydantic models stay in one file
+    # but the URL space (``/api/admin/...``) stays distinct from the
+    # per-toy verbs (``/api/toys/{id}/...``).
+    app.include_router(toys_admin_router)
     app.include_router(rewards_router)
     app.include_router(rooms_router)
     app.include_router(transcripts_router)

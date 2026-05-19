@@ -24,6 +24,7 @@ gets ``vision_skipped: true``.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import sqlite3
@@ -78,6 +79,25 @@ from .auth_dep import RequireScope
 _logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/toys", tags=["toys"])
+
+# Phase P Step P6 — Separate router for parent-PIN-scoped admin
+# actions that span every toy (e.g. "regenerate sprites for every
+# toy"). Kept on the same module so the helpers + Pydantic models are
+# right next door, but mounted under ``/api/admin`` so the URL space
+# stays distinct from the per-toy ``/api/toys/...`` REST surface — the
+# global action is NOT a per-toy verb and must not collide with the
+# existing ``POST /api/toys/{toy_id}/actions/regenerate``.
+admin_router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+# Phase P Step P6 — strong-reference set for fire-and-forget background
+# tasks spawned by admin handlers (e.g. the global "regenerate every
+# toy" enqueue loop). ``asyncio.create_task`` only keeps a weak
+# reference to the returned task; without a strong reference somewhere
+# the GC can collect the task mid-flight and the coroutine simply
+# stops. Each spawned task adds itself here, and a ``done_callback``
+# discards itself on completion. Module-level so tests can ``await``
+# the set to deterministically drain in-flight bulk enqueues.
+_bg_tasks: set[asyncio.Task[None]] = set()
 
 # Module-singleton breaker for the toy-vision call site. Mirrors the
 # pattern used by the activities/judge call: one in-process breaker
@@ -414,6 +434,45 @@ class RegenerateResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     queued: list[str]
+    mode: str | None = None
+
+
+class BulkRegenerateResponse(BaseModel):
+    """Envelope for the Phase P Step P6 global regenerate endpoint.
+
+    ``toy_count`` is the number of non-archived toys the bulk fan-out
+    iterated over (read synchronously inside the handler before it
+    returns).
+
+    ``total_enqueued`` is the PROJECTED job count, computed as
+    ``toy_count * len(ACTION_SLOTS)`` at handler-return time. The
+    actual enqueue happens in a background task — see
+    :func:`regenerate_every_toy_action` — because holding the HTTP
+    request open across ~200 sequential SQLite write transactions
+    starves other writers (PATCH toy, activities, transcript sweep).
+    After the worker's per-call supersede semantics resolve, the
+    eventual queue depth MAY be less than this projected count (if
+    re-clicks land mid-fan-out and one job supersedes a same-slot
+    predecessor). The wire field is the operator-facing toast number
+    ("queued 110 jobs across 11 toys"), not a confirmed-on-queue
+    count — the parent UI watches per-slot WS envelopes for
+    confirmed state.
+
+    ``mode`` mirrors :class:`RegenerateResponse.mode` —
+    ``"composite_only"`` when the capability gate returned False for
+    a non-env-disabled reason (Tier C fallback active), otherwise
+    ``None``.
+
+    Distinct from :class:`RegenerateResponse` so the parent UI can
+    distinguish per-toy regenerate (one toy, list of slots) from the
+    global "regenerate every toy" action (N toys × 10 slots, surfaced
+    as a single banner).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    toy_count: int
+    total_enqueued: int
     mode: str | None = None
 
 
@@ -1343,7 +1402,80 @@ async def regenerate_one_action(
     )
 
 
+@admin_router.post(
+    "/regenerate-every-toy-action",
+    response_model=BulkRegenerateResponse,
+)
+async def regenerate_every_toy_action(
+    conn: Annotated[sqlite3.Connection, Depends(get_toys_db)],
+    _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
+) -> BulkRegenerateResponse:
+    """Enqueue ``ACTION_SLOTS`` jobs for every non-archived toy.
+
+    Phase P Step P6: the parent UI's global "regenerate sprites for
+    every toy" button calls this once. Mirrors the auth + capability +
+    worker-presence pattern of :func:`regenerate_all_actions` exactly
+    — only difference is the SQL preamble that fans out across the
+    ``toys`` table instead of accepting a path-param toy_id.
+
+    **Concurrency contract** (iter-2 fix). The handler does the auth
+    + capability + worker check + the single SELECT synchronously,
+    then spawns a background task to run the enqueue loop and
+    returns 200 immediately. Each ``worker.enqueue`` call runs
+    ``_supersede_and_enqueue`` via ``asyncio.to_thread`` and takes
+    ``BEGIN IMMEDIATE`` on the writer-serialized SQLite connection;
+    holding the HTTP request open across N×10 sequential writer-lock
+    acquisitions would starve other writers (PATCH toy, activities,
+    transcript sweep) for the duration. The background task addresses
+    the lock-hold issue — individual enqueues still serialize on the
+    writer lock, but the HTTP response is no longer gated on them.
+
+    Returns 200 with the toy count + the PROJECTED total-enqueued
+    count so the parent UI can render a toast (e.g. "queued 110 jobs
+    across 11 toys"). The supersede semantics in the worker may
+    reduce the actual queue depth below the projected count;
+    per-slot WS envelopes are the source of truth for confirmed
+    state. Reuses the existing worker's enqueue-time supersede
+    semantics — re-clicks during an in-flight bulk run no-op safely.
+    """
+    capable, reason_enum, _reason = _check_capability_or_409()
+    worker = _require_worker_or_503()
+    cursor = conn.execute("SELECT id FROM toys WHERE archived = 0")
+    toy_ids = [row[0] for row in cursor.fetchall()]
+    total_to_enqueue = len(toy_ids) * len(ACTION_SLOTS)
+
+    async def _bg_enqueue() -> None:
+        for toy_id in toy_ids:
+            for slot in ACTION_SLOTS:
+                try:
+                    await worker.enqueue(toy_id, slot)
+                except Exception:
+                    _logger.exception(
+                        "bulk regen: enqueue failed for toy=%s slot=%s",
+                        toy_id,
+                        slot,
+                    )
+
+    task = asyncio.create_task(
+        _bg_enqueue(),
+        name="bulk-regenerate-every-toy",
+    )
+    # Keep a strong reference so Python's GC can't collect the task
+    # mid-flight (asyncio.create_task only weak-refs the returned
+    # Task). The done-callback removes the entry on completion so the
+    # set doesn't leak.
+    _bg_tasks.add(task)
+    task.add_done_callback(_bg_tasks.discard)
+
+    return BulkRegenerateResponse(
+        toy_count=len(toy_ids),
+        total_enqueued=total_to_enqueue,
+        mode=_mode_for_reason(capable, reason_enum),
+    )
+
+
 __all__ = [
+    "BulkRegenerateResponse",
     "CapabilityInfo",
     "DeleteResponse",
     "RegenerateResponse",
@@ -1355,6 +1487,7 @@ __all__ = [
     "ToyUpdateRequest",
     "ToyVisionSuggestionWire",
     "UploadResponse",
+    "admin_router",
     "get_toys_db",
     "get_vision_breaker",
     "get_vision_client",

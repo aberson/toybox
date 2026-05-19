@@ -297,6 +297,7 @@ The pipeline change alone produces no user-visible difference until parents trig
 - **Produces:** `toys.py` modified (new endpoint + new `BulkRegenerateResponse` model), `api.ts` modified, parent toys-list component modified, integration tests added, vitest coverage added.
 - **Done when:** Backend + frontend tests green following the existing `test_regenerate_all_*` pattern at [test_toys_api_actions.py:351-432](../tests/integration/test_toys_api_actions.py#L351-L432). mypy + ruff clean. Endpoint returns 401 without parent PIN; 200 with parent PIN + capability=True; 409 when capability is hard-off; 503 when worker is absent. Composite-only signal flows through `mode` field correctly.
 - **Depends on:** P4 (new pipeline live), P5 (kiosk renders new sprites correctly).
+- **Status:** DONE (2026-05-18). Endpoint `POST /api/admin/regenerate-every-toy-action` + `BulkRegenerateResponse` model + parent button + confirmation dialog + composite-only banner. Iter-2 refactored the handler to spawn a fire-and-forget bg task (`_bg_tasks` set + `asyncio.create_task` with done-callback) — fixes a HIGH finding where the handler held HTTP + SQLite writer lock for ~200 sequential transactions. `total_enqueued` semantics are now PROJECTED (toy_count × len(ACTION_SLOTS)) — the field's docstring documents that supersede semantics may reduce the eventual queue depth. 5 backend integration tests + 4 frontend vitest tests + 2 auth-sweep parametrize entries cover happy path, 409 disabled, 200 composite-only, 503 worker-unavailable, empty-table, position pin, concurrent-click protection.
 
 ### Step P7: Operator smoke gate — 1 toy × 10 sprites + UAT-tune the IPA scale value
 - **Problem:** On the F.5-capable host with P1-P6 deployed (initial `IP_ADAPTER_SCALE = 0.6` from P4): pick one existing ingested toy with a clear reference photo (Plush Unicorn `2e6931e0…` from the existing fixtures is a good candidate per the F.5 smoke history). Generate all 10 action sprites via the existing per-toy endpoint `POST /api/toys/{toy_id}/actions/regenerate`. Operator inspects each sprite at `data/images/toy_actions/<toy_id>/<slot>.png`:
@@ -400,7 +401,7 @@ The pipeline change alone produces no user-visible difference until parents trig
 | P3 — capability.py checkpoint extension | DONE (2026-05-18) |
 | P4 — pipeline.py rewrite (IPA + 512² + extended negative + drop hex-tokens) | DONE (2026-05-18) |
 | P5 — Frontend: drop `imageRendering: pixelated` | DONE (2026-05-18) |
-| P6 — GLOBAL "Regenerate every toy" endpoint + parent UI button | not started |
+| P6 — GLOBAL "Regenerate every toy" endpoint + parent UI button | DONE (2026-05-18) |
 | P7 — Operator: smoke gate + UAT-tune IPA scale (run-doc only, no code edit) | not started |
 | P7b — Code: apply UAT-chosen IP_ADAPTER_SCALE to pipeline.py + pin test | not started |
 | P8 — Operator: iPad UAT (global regenerate + real activity) | not started |
