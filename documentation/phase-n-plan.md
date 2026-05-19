@@ -116,7 +116,7 @@ Verified via grep at plan-review: `persona_reasoning` is a caller-supplied passt
 - **One new optional template field** `template_type: "element_microgame"`. **Zero JSON-schema change** (existing `additionalProperties: true` on templates accepts the field). Structural rules (4 steps; fork on 2+3; no fork on 1+4) live in the Python validator [`toybox/activities/_validator.py`](../src/toybox/activities/_validator.py).
 - **`template_type` on existing M4 `meet_element_*` templates:** stays absent (no backfill). Phase O `categorize()` already prefers `element_id` as the "Elements" signal — backfilling 118 M4 templates adds churn without changing categorization behavior.
 - **One new corpus helper** in `element_corpus.py`: `peer_in_family(element_id, rng) -> Element` + `peer_out_of_family(element_id, rng) -> Element` (deterministic by element_id, returns one in-family neighbor + one cross-family distractor).
-- **Per-element distractor data** in `data/elements/distractors.json` (NEW): for each element, one operator-authored `{fact_a_true, fact_b_false}` pair for Step 3. ~118 entries, ~80 KB. **Provenance:** sibling `data/elements/_distractors_credits.md` documents authorship per entry (matches existing `_credits.md` pattern). Loader rejects entries whose credits-file row claims `source: llm` unless explicitly opted-in via a build-time flag (guards against silent LLM-pass drift).
+- **Per-element distractor data** in `data/elements/distractors.json` (NEW): for each element, one `{fact_a_true, fact_b_false}` pair for Step 3. ~118 entries, ~80 KB. Authoring flow (resolved 2026-05-18 mid-Phase-N): **N1.5 deterministically generates** all 118 entries from corpus rotations (no LLM — algorithmic), then **N1 operator skim-review** flips per-entry `source: llm` → `source: operator` after a ~10-min editor pass. **Provenance:** sibling `data/elements/_distractors_credits.md` documents authorship per entry (matches existing `_credits.md` pattern). Loader rejects entries whose credits-file row claims `source: llm` unless explicitly opted-in via `TOYBOX_ALLOW_LLM_DISTRACTORS=1` (guards against silent unreviewed-machine-gen drift).
 - **One generator script** at `scripts/generate_element_microgames.py` (analogous to M4): reads corpus + distractors, **appends** 118 templates to `src/toybox/activities/templates/branching/request_activity.json` (sharing intent + idempotence pattern with M4). One file, not 118.
 - **Intent:** `request_activity` (matches M4 — element microgames are directed kid-engagement, not stories or play).
 - **Each generated template carries:** `required_roles: ["guide_mentor"]` (Iridia bias, matches M4), `template_type: "element_microgame"`, `element_id` on every step so ElementCard renders consistently, `ending_step: {"kind": "song", "auto": true, "element_id": <id>}` so Phase L's reward matcher picks the element-themed song.
@@ -169,13 +169,22 @@ No new engine code. No frontend component changes (ElementCard already renders o
 - **Done when:** unit tests cover injection guard + missing-element rejection + round-trip + LLM-source-rejection-without-env-flag + empty-corpus-is-valid; CLI works on the empty scaffold (prints "0 entries, 0 credits rows, OK").
 - **Depends on:** Phase M1 (element corpus).
 
-### Step N1: Operator authors 118 distractor entries
-- **Problem:** Fill `data/elements/distractors.json` and `data/elements/_distractors_credits.md` with 118 entries each. Per element: pick a `fact_a_true` paraphrased from the corpus's `story_seed_hooks` or `fun_fact`; pick a `fact_b_false` that's plausible-but-wrong (e.g. for Gold, `fact_b_false: "Gold floats in water"` — false; for Helium, `fact_a_true: "Helium floats balloons up to the sky"` — true). Each credits row tags `source: operator` plus a one-sentence reasoning for the false-fact pick. **Why operator-authored:** accuracy matters for a 4yo — LLM-hallucinated false facts can quietly teach wrong science. Plan-Review §1 risk and §7 risk both pin this. Estimated effort: ~118 × 20-30s = ~40-60 min.
+### Step N1.5: Generator script — 118 distractor entries (deterministic, from corpus)
+- **Problem:** Author `scripts/generate_distractor_corpus.py` (analog to M4's `generate_meet_element_templates.py`). For each of 118 elements, deterministically generate a `{fact_a_true, fact_b_false}` pair using corpus-only logic (no LLM). `fact_a_true` paraphrases the element's own `fun_fact` or first `story_seed_hook`. `fact_b_false` is a plausible-but-wrong claim derived from a deterministic transformation of corpus data — strategy options (dev agent picks the cleanest): (a) rotate-and-attribute — take a true fact about ANOTHER element (target's `atomic_number` seeds the other-element pick) and re-attribute as if true of the target; (b) property inversion — flip a known corpus property (e.g. claim a metal is a gas, claim a noble gas reacts violently); (c) cross-family swap — claim a property typical of a different family. Re-runs produce byte-identical output (modulo formatting normalization). Writes 118 entries to `data/elements/distractors.json` (sorted by `atomic_number`) AND 118 rows to `_distractors_credits.md` with `source: llm` + per-row reasoning of the form "fact_b_false strategy: <a|b|c>, derived from <source>". Source-tag `llm` is the agreed shorthand for "machine-generated, awaiting operator review" — loader-gated until N1 flips tags.
+- **Type:** code
+- **Issue:** #192 (umbrella #167)
+- **Flags:** `--reviewers code --tdd`
+- **Produces:** `scripts/generate_distractor_corpus.py` + `data/elements/distractors.json` (118 entries) + `data/elements/_distractors_credits.md` (118 rows, all `source: llm`) + generator unit tests.
+- **Done when:** generator is deterministic (same input → byte-identical JSON + markdown across runs); snapshot test pins output for 5 known elements (Gold, Hydrogen, Helium, Iron, Oxygen); `uv run python -m toybox.activities.distractor_corpus --validate` reports `118 entries, 118 credits rows, all source: llm`; loader rejects load without `TOYBOX_ALLOW_LLM_DISTRACTORS=1` (validates N1-prep gate from real data).
+- **Depends on:** N1-prep (loader contract + empty scaffold).
+
+### Step N1: Operator skim-review — flip source tags after ~10-min editor pass
+- **Problem:** Open `data/elements/distractors.json` + `_distractors_credits.md` in the editor (or paged via CLI). Per element entry: read the generated `fact_a_true` (corpus paraphrase) and `fact_b_false` (algorithmic distractor). For acceptable entries (read naturally to a 4yo, false-fact is plausible-but-clearly-wrong), flip the credits row's `source: llm` → `source: operator`. For unacceptable entries (awkward phrasing from cross-element rotation, factually ambiguous, too-subtly-wrong), either edit in-place OR delete that element's entry (engine gracefully degrades when an element has no distractor — Step 3 fork falls back to `story_seed_hooks` per N4's generator). Quality bar: would Child B (4yo) hear this `fact_b_false` and could it become a mislearned belief? If yes, reject. **Why operator-driven:** N1.5 is algorithmic so failure modes are awkward phrasing and rotations that don't translate (e.g. Helium's "makes voices squeaky" doesn't read naturally as a Gold fact). Operator scan catches these without the 40-60min full-auth tax. Estimated effort: ~10 min skim + ~5-10 min for edits to the ~10% of entries needing them.
 - **Type:** operator
 - **Issue:** #171 (umbrella #167)
-- **Produces:** `data/elements/distractors.json` filled with 118 entries (sorted by `atomic_number` for git-friendly diffs) + `data/elements/_distractors_credits.md` filled with 118 rows.
-- **Done when:** `uv run python -m toybox.activities.distractor_corpus --validate` reports `118 entries, 118 credits rows, OK`; no entry tagged `source: llm`.
-- **Depends on:** N1-prep.
+- **Produces:** edited `_distractors_credits.md` with `source: operator` on accepted rows + in-place edits or deletions for rejects. `distractors.json` updated to match any deletions.
+- **Done when:** `uv run python -m toybox.activities.distractor_corpus --validate` reports `N entries, N credits rows, OK` with all rows tagged `source: operator`; no row still tagged `source: llm` in final commit.
+- **Depends on:** N1.5.
 
 ### Step N2: Structural validator for `template_type: "element_microgame"`
 - **Problem:** Extend the **Python** validator at `src/toybox/activities/_validator.py` (not the JSON schema — `_schema.json` already accepts arbitrary additional fields per `additionalProperties: true`). When a template carries `template_type === "element_microgame"`, enforce: exactly 4 steps; `steps[1].kind === "fork"` with `choices.length === 2`; `steps[2].kind === "fork"` with `choices.length === 2`; `steps[0]` and `steps[3]` are `kind === "text"`; `element_id` non-null on every step; `required_roles` includes `"guide_mentor"`; `ending_step.kind === "song"`. Then refresh `frontend/src/shared/types.ts` via the pydantic→TS hook so `template_type` is a typed field downstream.
@@ -222,7 +231,7 @@ No new engine code. No frontend component changes (ElementCard already renders o
 
 ## 6. Acceptance
 
-Phase N closes when N0 + N0b + N1-prep + N1 + N2 + N3 + N4 + N5 ship + N6 UAT passes the quality bar. N0 also unblocks the deferred Phase M UAT row #4 (`shrink_into_helium_balloon_voyage`) — retested in the N6 session. Total scope estimate: **7 code build-steps + 2 operator steps** (was 5+1 before D1/D2 fold-in and the plan-wrap N1/N4 splits).
+Phase N closes when N0 + N0b + N1-prep + N1.5 + N1 + N2 + N3 + N4 + N5 ship + N6 UAT passes the quality bar. N0 also unblocks the deferred Phase M UAT row #4 (`shrink_into_helium_balloon_voyage`) — retested in the N6 session. Total scope estimate: **8 code build-steps + 2 operator steps** (was 7+2 before the 2026-05-18 N1.5 insertion that moved distractor authoring from operator-full-auth to generator-then-skim).
 
 Step shape table for `/build-phase` dispatch:
 
@@ -231,7 +240,8 @@ Step shape table for `/build-phase` dispatch:
 | N0 | code | `--reviewers code` | — |
 | N0b | code | `--reviewers code` | — |
 | N1-prep | code | `--reviewers code --tdd` | M1 corpus |
-| N1 | operator | — | N1-prep |
+| N1.5 | code | `--reviewers code --tdd` | N1-prep |
+| N1 | operator | — | N1.5 |
 | N2 | code | `--reviewers code --tdd` | N1-prep (loader) |
 | N3 | code | `--reviewers code --tdd` | M1 corpus |
 | N4 | code | `--reviewers code` | N1 + N2 + N3 |
@@ -242,7 +252,7 @@ Step shape table for `/build-phase` dispatch:
 
 | Item | Risk | Mitigation |
 |---|---|---|
-| Distractor accuracy (N1) | A wrong-but-plausible distractor confuses 4yo or mis-teaches. | Each distractor authored as a paraphrase of a real fact about ANOTHER element (e.g. for Gold, "Gold floats in water" — false; "Helium floats" — true for Helium). Provenance gated: `_distractors_credits.md` per-entry row + loader rejection of `source: llm` without explicit env opt-in. Spot-check pass during N6 UAT. |
+| Distractor accuracy (N1.5 + N1) | A wrong-but-plausible distractor confuses 4yo or mis-teaches. | Two-stage authoring: N1.5 deterministically generates entries from corpus rotations (no LLM hallucination surface); N1 operator skim-review flips source-tags per entry, edits or deletes rejects. Provenance gated: `_distractors_credits.md` per-entry row + loader rejection of `source: llm` without explicit env opt-in. Spot-check pass during N6 UAT. |
 | Producer-of-`persona_reasoning` may be template-frozen (N0b) | If the wrong-name text is baked into 118 M4 template entries (not LLM-generated at runtime), N0b fix needs an idempotent regenerate of M4 — additional scope. | N0b's grep-first protocol surfaces this at build-step start (option iii). If template-frozen, N0b widens to include an M4 regenerate; cross-link noted in step problem statement so reviewer doesn't reject scope creep. |
 | Frontend `types.ts` regeneration drift (N2) | Skipping the pydantic→TS codegen leaves `template_type` as untyped in `categorize()` (Phase O), forcing a string-literal compare instead of a union match. | N2's done-when explicitly requires `types.ts` regeneration + commit. CI already gates against stale codegen (per Phase L pattern). |
 | Peer-in-family for sparse families (N3) | Halogens have 5 entries; lanthanides have 15; both small enough that the picker collides on small RNG seeds. | Picker explicitly excludes self; raises if family has <2 members at corpus-load time (caught by N3 test). Lanthanide/actinide families' age_band may exclude them entirely for 3-5 — fall back to nearest-family. |
@@ -282,6 +292,7 @@ Resolved during `/plan-review` on 2026-05-18 (operator delegated defaults to ass
 2. **`template_type` backfill on M4 templates** — none. M4 stays untyped. Phase O `categorize()` uses `element_id` as the Elements signal, so backfill adds churn without behavior change.
 3. **N0b investigation protocol** — grep first then patch autonomously; build-step halts only if producer site cannot be located across the three candidate surfaces (frontend / ai-tools / template fields).
 4. **Distractor provenance** — `_distractors_credits.md` sibling file (matches existing `_credits.md` pattern); loader gates `source: llm` rows behind `TOYBOX_ALLOW_LLM_DISTRACTORS=1` env var (default off).
+5. **Distractor authoring flow** (resolved 2026-05-18 mid-Phase-N, after Phase M UAT close-out): split into N1.5 (deterministic generator, code) + N1 (operator skim-review, ~10-15 min). Replaces original "operator authors 118 by hand" (~40-60 min). Kid-safety property preserved via the review-pass; the env-var loader gate from §9.4 enforces that final-shipped data is operator-reviewed (`source: operator`) unless the env opt-in is set.
 
 Still-open question (deferred to N6 UAT signal):
 
@@ -294,3 +305,5 @@ Still-open question (deferred to N6 UAT signal):
 - `/plan-wrap` edits — split N1 into N1-prep (code) + N1 (operator) per §11 blocker; moved N4's kiosk spot-check into N6 per §11 symmetric blocker; added Fresh-Reader Pointers + Acronyms + Element shape + element_id format + M7 corpus shape + codegen command to §2; added step-shape dispatch table to §6; cleaned up duplicate §2 subsections.
 
 Ready for `/repo-sync` → mint umbrella + 9 step issues (N0, N0b, N1-prep, N1, N2, N3, N4, N5, N6). Phase M UAT close-out (11/12 PASS, 1 DEFERRED) runs in parallel; row #4 (`shrink_into_helium_balloon_voyage`) retest folded into N6.
+
+**2026-05-18 — mid-Phase-N redirect** (operator paused at /build-phase Step 0 to ask "why am I authoring N1?"). Resolved by inserting **N1.5 (code, deterministic generator)** between N1-prep and N1; **reshaped N1** from full 118-entry authoring (~40-60 min) to skim-review pass (~10-15 min). §3, §6 table, §6 acceptance count (7→8 code steps), §7 risk row, §9 resolved decisions (#5 added) all updated. New GH issue to be minted for N1.5; #171 N1 body to be revised. Phase N orchestration resumes from N0 dispatch after these issue updates land.
