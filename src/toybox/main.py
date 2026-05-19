@@ -921,10 +921,40 @@ def _persist_dispatcher_activity(
     if trigger_phrase is not None and trigger_phrase.strip():
         metadata["trigger_phrase"] = trigger_phrase.strip()
     if "persona_reasoning" not in metadata:
-        metadata["persona_reasoning"] = (
-            f"matched on intent {intent.name}"
-            if activity.persona_id is None
-            else f"persona {activity.persona_id} picked for {intent.name}"
+        # Phase N D1 fix: synthesize from the persona's ``display_name``
+        # (parent-facing) rather than the raw ``persona_id`` slug. Pre-fix
+        # output read e.g. ``"persona periodic_table picked for boredom"``
+        # which leaked the snake_case slug into the parent UI's "Why
+        # this?" panel — a less-noticed flavour of the same UAT D1 bug
+        # the propose path was fixed for. Production callers always have
+        # the personas table seeded by the lifespan loader, so the
+        # display-name lookup hits in practice; tests that construct an
+        # Activity with a persona_id that isn't in the DB fall through
+        # to the intent-only sentinel via the ``_build_persona_reasoning``
+        # priority list (caller_supplied → display_name → "matched on
+        # intent"). Reusing :func:`_build_persona_reasoning` here keeps
+        # the two writers (propose path + dispatcher path) byte-identical
+        # in shape; future edits to the synthesis format land in one
+        # place.
+        from .api.activities import _build_persona_reasoning  # noqa: PLC0415
+
+        persona_meta: dict[str, Any] | None = None
+        if activity.persona_id is not None:
+            try:
+                row = conn.execute(
+                    "SELECT display_name FROM personas WHERE id = ?",
+                    (activity.persona_id,),
+                ).fetchone()
+            except sqlite3.Error:
+                row = None
+            if row is not None:
+                display_name_raw = row["display_name"]
+                if isinstance(display_name_raw, str) and display_name_raw:
+                    persona_meta = {"display_name": display_name_raw}
+        metadata["persona_reasoning"] = _build_persona_reasoning(
+            caller_supplied=None,
+            intent=intent.name,
+            persona_meta=persona_meta,
         )
 
     summary_payload = {

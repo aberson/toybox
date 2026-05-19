@@ -2729,19 +2729,34 @@ def post_regenerate(
     context = dict(body.context) if body.context is not None else {}
     context.setdefault("regen_source", activity_id)
     context.setdefault("regen_source_version", current_version)
-    # Step 23: inherit the "why this?" telemetry from the source row
-    # when the caller doesn't override. This keeps the suggestion card's
-    # panel coherent across "skip & try another" — the trigger phrase
-    # that started the original suggestion is still the why for the
-    # follow-up, and re-using it avoids a sudden empty panel.
+    # Step 23: inherit the "why this?" trigger phrase from the source
+    # row when the caller doesn't override. The trigger phrase represents
+    # what the kid actually said that prompted the original suggestion —
+    # carrying it forward keeps the suggestion card's "Why this?" panel
+    # coherent across "skip & try another" and avoids a sudden empty
+    # panel.
+    #
+    # Phase N D1 fix: do NOT inherit ``persona_reasoning``. Regenerate
+    # explicitly DOES NOT inherit the source's ``persona_id`` (a fresh
+    # library persona is picked downstream in ``_do_propose`` — see the
+    # ``persona_id = body.persona_id`` comment above). Pre-fix, this
+    # block STILL copied the source's ``persona_reasoning`` text into the
+    # regenerate's ProposeRequest as ``caller_supplied``, where
+    # ``_build_persona_reasoning`` then preferred it verbatim over the
+    # newly-bound persona's display name. Result: the regen card's
+    # rationale named the source's persona while the activity's
+    # ``persona_id`` (and the kiosk's resolved ``display_name``) was the
+    # new one — the exact "Inspector Pip picked for X" → "Professor
+    # Iridia on kiosk" mismatch the Phase M UAT (defect D1) caught.
+    # Leaving ``inherited_reasoning`` as ``body.persona_reasoning`` means
+    # an explicit caller-supplied value still wins (preserving the
+    # documented caller-wins priority in ``_build_persona_reasoning``);
+    # the implicit-from-source path is the only one that's gone.
     inherited_trigger = body.trigger_phrase
     inherited_reasoning = body.persona_reasoning
-    if inherited_trigger is None or inherited_reasoning is None:
+    if inherited_trigger is None:
         source_response = _row_to_response(conn, row)
-        if inherited_trigger is None:
-            inherited_trigger = source_response.trigger_phrase
-        if inherited_reasoning is None:
-            inherited_reasoning = source_response.persona_reasoning
+        inherited_trigger = source_response.trigger_phrase
     return _do_propose(
         ProposeRequest(
             intent=intent,

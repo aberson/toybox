@@ -520,7 +520,11 @@ def test_regenerate_inherits_trigger_phrase(
     assert response.status_code == 200
     new = response.json()
     assert new["trigger_phrase"] == "let's play unicorns"
-    # The regenerate inherits the source's reasoning by default too.
+    # Phase N D1 fix: regenerate no longer inherits source's reasoning text
+    # (different persona binding made the inherited text stale). Instead,
+    # _do_propose's synthesizer fills persona_reasoning fresh against the
+    # newly-bound persona, so the field is still non-empty — just generated,
+    # not inherited. Full coverage in test_persona_reasoning_binding.py.
     assert new["persona_reasoning"]
 
 
