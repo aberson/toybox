@@ -322,3 +322,16 @@ def test_build_pipeline_loads_ip_adapter_with_pinned_args(
         f"{fake_pipe.set_ip_adapter_scale.call_args_list!r}"
     )
     fake_pipe.set_ip_adapter_scale.assert_called_once_with(IP_ADAPTER_SCALE)
+
+
+def test_ip_adapter_scale_value_pinned() -> None:
+    """``IP_ADAPTER_SCALE`` is the data-shape constant the IPA pipeline
+    is calibrated against; pin its scalar value so any change is
+    deliberate (review-gated) rather than a silent edit.
+
+    Per workspace ``code-quality.md`` § "One source of truth for
+    data-shape constants": tuning passes (Phase P7 operator UAT and
+    future re-tuning) must update this test alongside the constant,
+    which surfaces the change in code review.
+    """
+    assert IP_ADAPTER_SCALE == 0.6
