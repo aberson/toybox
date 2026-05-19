@@ -156,9 +156,7 @@ def test_validate_corpus_empty_scaffold_summary(
     assert result.credits_count == 0
 
 
-def test_load_distractors_is_cached(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_load_distractors_is_cached(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Second call returns the same tuple object (identity, not just equality)."""
     _write_scaffold(tmp_path)
     monkeypatch.setenv("TOYBOX_DATA_DIR", str(tmp_path))
@@ -195,9 +193,7 @@ def test_load_distractors_round_trip_preserves_entries(
 
     # Round-trip: serialize via model_dump → write → reload.
     dumped = [e.model_dump() for e in loaded]
-    (tmp_path / "elements" / "distractors.json").write_text(
-        json.dumps(dumped), encoding="utf-8"
-    )
+    (tmp_path / "elements" / "distractors.json").write_text(json.dumps(dumped), encoding="utf-8")
     clear_distractor_cache()
     reloaded = load_distractors()
     assert reloaded == loaded
@@ -669,17 +665,43 @@ def test_shipped_scaffold_files_exist() -> None:
     assert (repo_root / "data" / "elements" / "_distractors_credits.md").exists()
 
 
-def test_shipped_scaffold_is_empty_json_list() -> None:
-    """The shipped distractors.json is exactly the empty list ``[]``."""
+def test_shipped_scaffold_has_118_entries() -> None:
+    """The shipped distractors.json carries 118 entries (one per element).
+
+    N1.5 generator filled the scaffold with deterministic distractor pairs,
+    all tagged ``source: llm`` in ``_distractors_credits.md``. N1 operator
+    skim-review subsequently flips per-row tags to ``operator``.
+    """
     repo_root = Path(__file__).resolve().parents[2]
     payload = json.loads(
         (repo_root / "data" / "elements" / "distractors.json").read_text(encoding="utf-8")
     )
-    assert payload == []
+    assert isinstance(payload, list)
+    assert len(payload) == 118
 
 
-def test_shipped_scaffold_loads_clean() -> None:
-    """``load_distractors`` against the shipped scaffold returns an empty tuple."""
+def test_shipped_scaffold_rejected_without_env_flag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``load_distractors`` against the shipped scaffold raises without the env opt-in.
+
+    Locks in the safety gate against the REAL shipped data (not just a tmp_path
+    fixture): every shipped row is currently ``source: llm`` until N1 operator
+    skim-review flips tags, so the loader must refuse without
+    ``TOYBOX_ALLOW_LLM_DISTRACTORS=1``.
+    """
+    monkeypatch.delenv("TOYBOX_ALLOW_LLM_DISTRACTORS", raising=False)
+    clear_distractor_cache()
+    with pytest.raises(DistractorCorpusError, match=r"(?i)llm|allow.*distractors"):
+        load_distractors()
+
+
+def test_shipped_scaffold_loads_118_with_env_flag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With the env opt-in, ``load_distractors`` returns all 118 shipped entries."""
+    monkeypatch.setenv("TOYBOX_ALLOW_LLM_DISTRACTORS", "1")
     clear_distractor_cache()
     entries = load_distractors()
-    assert entries == ()
+    assert len(entries) == 118
+    assert all(isinstance(e, Distractor) for e in entries)

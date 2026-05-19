@@ -1,1 +1,592 @@
-[]
+[
+  {
+    "element_id": "h-1",
+    "fact_a_true": "Hydrogen is the lightest element and makes up most of the sun.",
+    "fact_b_false": "Hydrogen makes balloons float and makes voices sound funny when you breathe it in."
+  },
+  {
+    "element_id": "he-2",
+    "fact_a_true": "Helium makes balloons float and makes voices sound funny when you breathe it in.",
+    "fact_b_false": "Helium makes fireworks burn bright red, which is why holiday rockets are so colorful."
+  },
+  {
+    "element_id": "li-3",
+    "fact_a_true": "Lithium is the lightest metal and powers many phones, tablets, and electric cars.",
+    "fact_b_false": "Lithium helps jet engines spin hot and fast without melting."
+  },
+  {
+    "element_id": "be-4",
+    "fact_a_true": "Beryllium is a strong, light metal that helps build airplanes and spaceships.",
+    "fact_b_false": "Beryllium is named after Nicolaus Copernicus, who taught that Earth circles the sun."
+  },
+  {
+    "element_id": "b-5",
+    "fact_a_true": "Boron helps make strong glass that doesn't crack when it gets hot.",
+    "fact_b_false": "Boron melts in your hand because its melting point is below body temperature."
+  },
+  {
+    "element_id": "c-6",
+    "fact_a_true": "Carbon is in every living thing on Earth, from trees to people to your pet dog.",
+    "fact_b_false": "Carbon colors glass and ceramics a pretty pink and helps light travel through cables."
+  },
+  {
+    "element_id": "n-7",
+    "fact_a_true": "Most of the air we breathe is nitrogen, even more than oxygen.",
+    "fact_b_false": "Nitrogen is named after Dubna, a Russian town where scientists made it."
+  },
+  {
+    "element_id": "o-8",
+    "fact_a_true": "Oxygen is the part of the air our lungs use to keep us alive.",
+    "fact_b_false": "Oxygen makes the shiny silver coating on car bumpers and bicycle bells."
+  },
+  {
+    "element_id": "f-9",
+    "fact_a_true": "Fluorine helps make toothpaste that keeps your teeth strong.",
+    "fact_b_false": "Fluorine is named after a hero from Greek myths who gave fire to people."
+  },
+  {
+    "element_id": "ne-10",
+    "fact_a_true": "Neon glows bright orange-red when electricity flows through it, making colorful signs.",
+    "fact_b_false": "Neon helps find gold deep underground and start some nuclear reactors."
+  },
+  {
+    "element_id": "na-11",
+    "fact_a_true": "Sodium combines with chlorine to make the salt you sprinkle on food.",
+    "fact_b_false": "Sodium keeps swimming pools clean and is the other half of table salt."
+  },
+  {
+    "element_id": "mg-12",
+    "fact_a_true": "Magnesium burns with a super-bright white flame, which is why old camera flashes used it.",
+    "fact_b_false": "Magnesium glows bright white in flash bulbs and powers ion engines on space probes."
+  },
+  {
+    "element_id": "al-13",
+    "fact_a_true": "Aluminum is the light, shiny metal in soda cans and kitchen foil.",
+    "fact_b_false": "Aluminum's name means it comes before actinium when it breaks down."
+  },
+  {
+    "element_id": "si-14",
+    "fact_a_true": "Silicon is the main ingredient in computer chips and most beach sand.",
+    "fact_b_false": "Silicon glows bright orange-red when electricity flows through it, making colorful signs."
+  },
+  {
+    "element_id": "p-15",
+    "fact_a_true": "Phosphorus is in the tip of every match and helps your bones stay strong.",
+    "fact_b_false": "Phosphorus is the shiniest metal of all and turns black when it sits in the air too long."
+  },
+  {
+    "element_id": "s-16",
+    "fact_a_true": "Sulfur is the bright yellow stuff near volcanoes, and it smells like rotten eggs.",
+    "fact_b_false": "Sulfur was named after Poland by Marie Curie, who discovered it."
+  },
+  {
+    "element_id": "cl-17",
+    "fact_a_true": "Chlorine keeps swimming pools clean and is the other half of table salt.",
+    "fact_b_false": "Chlorine is the lightest metal and powers many phones, tablets, and electric cars."
+  },
+  {
+    "element_id": "ar-18",
+    "fact_a_true": "Argon is a quiet gas that fills old light bulbs to keep them from burning out.",
+    "fact_b_false": "Argon makes fake diamonds that sparkle just like real ones in jewelry."
+  },
+  {
+    "element_id": "k-19",
+    "fact_a_true": "Bananas are full of potassium, which helps your muscles work properly.",
+    "fact_b_false": "Potassium is so tough that scientists use it to mark the original meter standard."
+  },
+  {
+    "element_id": "ca-20",
+    "fact_a_true": "Calcium builds strong bones and teeth and is in milk, cheese, and yogurt.",
+    "fact_b_false": "Calcium is named after Georgy Flyorov, a Russian scientist who studied atoms."
+  },
+  {
+    "element_id": "sc-21",
+    "fact_a_true": "Scandium makes baseball bats and bicycle frames super light and strong.",
+    "fact_b_false": "Scandium is a metalloid that helps make computer chips and tiny LED lights."
+  },
+  {
+    "element_id": "ti-22",
+    "fact_a_true": "Titanium is so strong and light that airplanes, ships, and even toothpaste use it.",
+    "fact_b_false": "Titanium helps make atomic clocks that keep time more precisely than ever before."
+  },
+  {
+    "element_id": "v-23",
+    "fact_a_true": "Vanadium makes steel tools extra tough, like the wrenches in a car mechanic's shop.",
+    "fact_b_false": "Vanadium is named after Niels Bohr, who imagined how electrons orbit atoms."
+  },
+  {
+    "element_id": "cr-24",
+    "fact_a_true": "Chromium makes the shiny silver coating on car bumpers and bicycle bells.",
+    "fact_b_false": "Chromium makes your blood red and is the metal inside skyscrapers and bridges."
+  },
+  {
+    "element_id": "mn-25",
+    "fact_a_true": "Manganese helps batteries work and gives some glass a pretty purple color.",
+    "fact_b_false": "Manganese makes the red color in TV screens and the glow in some banknotes."
+  },
+  {
+    "element_id": "fe-26",
+    "fact_a_true": "Iron makes your blood red and is the metal inside skyscrapers and bridges.",
+    "fact_b_false": "Iron is named after Enrico Fermi, a scientist who built the first nuclear reactor."
+  },
+  {
+    "element_id": "co-27",
+    "fact_a_true": "Cobalt makes the deep blue color in old pottery and stained-glass windows.",
+    "fact_b_false": "Bananas are full of Cobalt, which helps your muscles work properly."
+  },
+  {
+    "element_id": "ni-28",
+    "fact_a_true": "Nickel is the shiny metal in the five-cent coin called a nickel.",
+    "fact_b_false": "Nickel makes fireworks burn bright green and helps doctors take pictures of stomachs."
+  },
+  {
+    "element_id": "cu-29",
+    "fact_a_true": "Copper turns green when it's outside for a long time, like the Statue of Liberty.",
+    "fact_b_false": "Copper is named after the planet Neptune, just past Uranus in our solar system."
+  },
+  {
+    "element_id": "zn-30",
+    "fact_a_true": "Zinc keeps cuts and scrapes from getting sore and also makes pennies feel light.",
+    "fact_b_false": "Zinc burns with a super-bright white flame, which is why old camera flashes used it."
+  },
+  {
+    "element_id": "ga-31",
+    "fact_a_true": "Gallium melts in your hand because its melting point is below body temperature.",
+    "fact_b_false": "Gallium makes touchscreens work so you can tap your tablet and phone."
+  },
+  {
+    "element_id": "ge-32",
+    "fact_a_true": "Germanium was used in the very first transistors that started the computer age.",
+    "fact_b_false": "Germanium is a gas that seeps up from the ground and is checked for in basements."
+  },
+  {
+    "element_id": "as-33",
+    "fact_a_true": "Arsenic is a metalloid that helps make computer chips and tiny LED lights.",
+    "fact_b_false": "Arsenic helps make strong glass that doesn't crack when it gets hot."
+  },
+  {
+    "element_id": "se-34",
+    "fact_a_true": "Selenium helps photocopiers see and copy pictures on paper.",
+    "fact_b_false": "Selenium makes steel tools tough enough to cut through other metals."
+  },
+  {
+    "element_id": "br-35",
+    "fact_a_true": "Bromine is one of only two liquid elements at room temperature, the other is mercury.",
+    "fact_b_false": "Bromine is so soft you can hammer it into sheets thin enough to see through."
+  },
+  {
+    "element_id": "kr-36",
+    "fact_a_true": "Krypton glows pale lavender in lights and shares its name with Superman's home planet.",
+    "fact_b_false": "Krypton is named after Livermore, a California lab where scientists studied it."
+  },
+  {
+    "element_id": "rb-37",
+    "fact_a_true": "Rubidium is named for its ruby-red color when it burns in a flame.",
+    "fact_b_false": "Rubidium is one of only two liquid elements at room temperature, the other is mercury."
+  },
+  {
+    "element_id": "sr-38",
+    "fact_a_true": "Strontium makes fireworks burn bright red, which is why holiday rockets are so colorful.",
+    "fact_b_false": "Strontium makes super-fast computer chips run cooler and use less power."
+  },
+  {
+    "element_id": "y-39",
+    "fact_a_true": "Yttrium helps make the bright red dots on old TV screens.",
+    "fact_b_false": "Yttrium is named after Lise Meitner, a scientist who studied splitting atoms."
+  },
+  {
+    "element_id": "zr-40",
+    "fact_a_true": "Zirconium makes fake diamonds that sparkle just like real ones in jewelry.",
+    "fact_b_false": "Zirconium is the shiny metal in the five-cent coin called a Zirconium."
+  },
+  {
+    "element_id": "nb-41",
+    "fact_a_true": "Niobium helps make super-fast magnets that lift trains off the tracks.",
+    "fact_b_false": "Niobium makes the bright green color you see on TV and tablet screens."
+  },
+  {
+    "element_id": "mo-42",
+    "fact_a_true": "Molybdenum makes steel tools tough enough to cut through other metals.",
+    "fact_b_false": "Molybdenum is named after Alfred Nobel, who started the Nobel Prizes."
+  },
+  {
+    "element_id": "tc-43",
+    "fact_a_true": "Technetium was the first element ever made by people, in a lab in 1937.",
+    "fact_b_false": "Technetium makes baseball bats and bicycle frames super light and strong."
+  },
+  {
+    "element_id": "ru-44",
+    "fact_a_true": "Ruthenium makes the tiny gold tip on fancy fountain pens last extra long.",
+    "fact_b_false": "Ruthenium polishes glass to a mirror finish and is the most common rare-earth metal."
+  },
+  {
+    "element_id": "rh-45",
+    "fact_a_true": "Rhodium is one of the rarest metals and gives jewelry its bright silvery shine.",
+    "fact_b_false": "Rhodium is in many home smoke detectors and helps keep families safe from fires."
+  },
+  {
+    "element_id": "pd-46",
+    "fact_a_true": "Palladium cleans up car exhaust so the air stays cleaner to breathe.",
+    "fact_b_false": "Palladium is the main ingredient in computer chips and most beach sand."
+  },
+  {
+    "element_id": "ag-47",
+    "fact_a_true": "Silver is the shiniest metal of all and turns black when it sits in the air too long.",
+    "fact_b_false": "Silver helps make fire-resistant clothes that don't catch fire easily."
+  },
+  {
+    "element_id": "cd-48",
+    "fact_a_true": "Cadmium paints used to make sunny yellow colors in old artists' paintings.",
+    "fact_b_false": "Cadmium glows in the dark and was once painted on old watch dials to read the time."
+  },
+  {
+    "element_id": "in-49",
+    "fact_a_true": "Indium makes touchscreens work so you can tap your tablet and phone.",
+    "fact_b_false": "Most of the air we breathe is Indium, even more than oxygen."
+  },
+  {
+    "element_id": "sn-50",
+    "fact_a_true": "Tin coats steel cans so the soup or beans inside don't rust the can.",
+    "fact_b_false": "Tin makes the tiny gold tip on fancy fountain pens last extra long."
+  },
+  {
+    "element_id": "sb-51",
+    "fact_a_true": "Antimony helps make fire-resistant clothes that don't catch fire easily.",
+    "fact_b_false": "Antimony is one of the few elements whose name comes from a Greek word for a green twig."
+  },
+  {
+    "element_id": "te-52",
+    "fact_a_true": "Tellurium helps solar panels turn sunshine into power for homes.",
+    "fact_b_false": "Tellurium is the heaviest element ever made and is named after Yuri Oganessian."
+  },
+  {
+    "element_id": "i-53",
+    "fact_a_true": "Iodine is added to table salt to help your body grow strong.",
+    "fact_b_false": "Iodine is named for its ruby-red color when it burns in a flame."
+  },
+  {
+    "element_id": "xe-54",
+    "fact_a_true": "Xenon glows bright white in flash bulbs and powers ion engines on space probes.",
+    "fact_b_false": "Xenon has the highest melting point of any metal, which is why it's in light-bulb wires."
+  },
+  {
+    "element_id": "cs-55",
+    "fact_a_true": "Cesium runs the most accurate clocks in the world, losing only a second every millions of years.",
+    "fact_b_false": "Cesium is named after Wilhelm Roentgen, who discovered X-rays."
+  },
+  {
+    "element_id": "ba-56",
+    "fact_a_true": "Barium makes fireworks burn bright green and helps doctors take pictures of stomachs.",
+    "fact_b_false": "Barium keeps cuts and scrapes from getting sore and also makes pennies feel light."
+  },
+  {
+    "element_id": "la-57",
+    "fact_a_true": "Lanthanum makes camera lenses sharper so pictures look crisp and clear.",
+    "fact_b_false": "Lanthanum creates the strongest magnetic fields of any natural element."
+  },
+  {
+    "element_id": "ce-58",
+    "fact_a_true": "Cerium polishes glass to a mirror finish and is the most common rare-earth metal.",
+    "fact_b_false": "Cerium is named after Ernest Rutherford, who discovered the center of the atom."
+  },
+  {
+    "element_id": "pr-59",
+    "fact_a_true": "Praseodymium colors special goggles green so welders can see safely through bright sparks.",
+    "fact_b_false": "Praseodymium makes steel tools extra tough, like the wrenches in a car mechanic's shop."
+  },
+  {
+    "element_id": "nd-60",
+    "fact_a_true": "Neodymium makes the strongest magnets on Earth, found in headphones and hard drives.",
+    "fact_b_false": "Neodymium is named after a hero from Greek myths who gave fire to people."
+  },
+  {
+    "element_id": "pm-61",
+    "fact_a_true": "Promethium is named after a hero from Greek myths who gave fire to people.",
+    "fact_b_false": "Promethium is named after Berkeley, California, where scientists first made it."
+  },
+  {
+    "element_id": "sm-62",
+    "fact_a_true": "Samarium makes powerful magnets that still work even when very hot.",
+    "fact_b_false": "Samarium is the bright yellow stuff near volcanoes, and it smells like rotten eggs."
+  },
+  {
+    "element_id": "eu-63",
+    "fact_a_true": "Europium makes the red color in TV screens and the glow in some banknotes.",
+    "fact_b_false": "Europium is added to table salt to help your body grow strong."
+  },
+  {
+    "element_id": "gd-64",
+    "fact_a_true": "Gadolinium helps doctors take clearer pictures inside the body with MRI scans.",
+    "fact_b_false": "Gadolinium is named after Thor, the Norse god of thunder."
+  },
+  {
+    "element_id": "tb-65",
+    "fact_a_true": "Terbium makes the bright green color you see on TV and tablet screens.",
+    "fact_b_false": "Terbium helps make toothpaste that keeps your teeth strong."
+  },
+  {
+    "element_id": "dy-66",
+    "fact_a_true": "Dysprosium makes magnets that don't lose their pull even when very hot.",
+    "fact_b_false": "Dysprosium cleans up car exhaust so the air stays cleaner to breathe."
+  },
+  {
+    "element_id": "ho-67",
+    "fact_a_true": "Holmium creates the strongest magnetic fields of any natural element.",
+    "fact_b_false": "Holmium grows into beautiful rainbow staircase crystals that look like tiny castles."
+  },
+  {
+    "element_id": "er-68",
+    "fact_a_true": "Erbium colors glass and ceramics a pretty pink and helps light travel through cables.",
+    "fact_b_false": "Erbium makes balloons float and makes voices sound funny when you breathe it in."
+  },
+  {
+    "element_id": "tm-69",
+    "fact_a_true": "Thulium glows blue in some special lasers and was once the rarest of the rare earths.",
+    "fact_b_false": "Thulium helps make the bright red dots on old TV screens."
+  },
+  {
+    "element_id": "yb-70",
+    "fact_a_true": "Ytterbium helps make atomic clocks that keep time more precisely than ever before.",
+    "fact_b_false": "Ytterbium is the densest natural element, so a small chunk feels surprisingly heavy."
+  },
+  {
+    "element_id": "lu-71",
+    "fact_a_true": "Lutetium is one of the rarest and most expensive metals to dig out of the ground.",
+    "fact_b_false": "Lutetium is named after Nihon, which is the Japanese word for Japan."
+  },
+  {
+    "element_id": "hf-72",
+    "fact_a_true": "Hafnium makes super-fast computer chips run cooler and use less power.",
+    "fact_b_false": "Hafnium was used in the very first transistors that started the computer age."
+  },
+  {
+    "element_id": "ta-73",
+    "fact_a_true": "Tantalum stores power inside phones, tablets, and game consoles in tiny capacitors.",
+    "fact_b_false": "Tantalum glows blue in some special lasers and was once the rarest of the rare earths."
+  },
+  {
+    "element_id": "w-74",
+    "fact_a_true": "Tungsten has the highest melting point of any metal, which is why it's in light-bulb wires.",
+    "fact_b_false": "Tungsten is named after Glenn Seaborg, who discovered many heavy elements."
+  },
+  {
+    "element_id": "re-75",
+    "fact_a_true": "Rhenium helps jet engines spin hot and fast without melting.",
+    "fact_b_false": "Rhenium helps batteries work and gives some glass a pretty purple color."
+  },
+  {
+    "element_id": "os-76",
+    "fact_a_true": "Osmium is the densest natural element, so a small chunk feels surprisingly heavy.",
+    "fact_b_false": "Osmium makes powerful magnets that still work even when very hot."
+  },
+  {
+    "element_id": "ir-77",
+    "fact_a_true": "Iridium is so tough that scientists use it to mark the original meter standard.",
+    "fact_b_false": "Iridium is named after Albert Einstein, the famous scientist who imagined time bending."
+  },
+  {
+    "element_id": "pt-78",
+    "fact_a_true": "Platinum is so rare that even less of it exists than gold, and it makes fancy wedding rings.",
+    "fact_b_false": "Platinum is a quiet gas that fills old light bulbs to keep them from burning out."
+  },
+  {
+    "element_id": "au-79",
+    "fact_a_true": "Gold is so soft you can hammer it into sheets thin enough to see through.",
+    "fact_b_false": "Gold runs the most accurate clocks in the world, losing only a second every millions of years."
+  },
+  {
+    "element_id": "hg-80",
+    "fact_a_true": "Mercury is the only metal that's liquid at room temperature, like silver water.",
+    "fact_b_false": "Mercury is named after the planet Uranus and powers nuclear reactors that make electricity."
+  },
+  {
+    "element_id": "tl-81",
+    "fact_a_true": "Thallium is one of the few elements whose name comes from a Greek word for a green twig.",
+    "fact_b_false": "Thallium combines with chlorine to make the salt you sprinkle on food."
+  },
+  {
+    "element_id": "pb-82",
+    "fact_a_true": "Lead is one of the heaviest common metals and was used in pencils long ago.",
+    "fact_b_false": "Lead paints used to make sunny yellow colors in old artists' paintings."
+  },
+  {
+    "element_id": "bi-83",
+    "fact_a_true": "Bismuth grows into beautiful rainbow staircase crystals that look like tiny castles.",
+    "fact_b_false": "Bismuth is so rare that less than a teaspoonful exists on the whole planet."
+  },
+  {
+    "element_id": "po-84",
+    "fact_a_true": "Polonium was named after Poland by Marie Curie, who discovered it.",
+    "fact_b_false": "Polonium is a strong, light metal that helps build airplanes and spaceships."
+  },
+  {
+    "element_id": "at-85",
+    "fact_a_true": "Astatine is so rare that less than a teaspoonful exists on the whole planet.",
+    "fact_b_false": "Astatine helps make super-fast magnets that lift trains off the tracks."
+  },
+  {
+    "element_id": "rn-86",
+    "fact_a_true": "Radon is a gas that seeps up from the ground and is checked for in basements.",
+    "fact_b_false": "Radon is so rare that even less of it exists than gold, and it makes fancy wedding rings."
+  },
+  {
+    "element_id": "fr-87",
+    "fact_a_true": "Francium is so rare that there are only a few atoms of it on Earth at any time.",
+    "fact_b_false": "Francium is named after Moscow, the capital city of Russia."
+  },
+  {
+    "element_id": "ra-88",
+    "fact_a_true": "Radium glows in the dark and was once painted on old watch dials to read the time.",
+    "fact_b_false": "Radium helps photocopiers see and copy pictures on paper."
+  },
+  {
+    "element_id": "ac-89",
+    "fact_a_true": "Actinium glows a pretty pale blue in the dark and starts the actinide family of elements.",
+    "fact_b_false": "Actinium is one of the rarest and most expensive metals to dig out of the ground."
+  },
+  {
+    "element_id": "th-90",
+    "fact_a_true": "Thorium is named after Thor, the Norse god of thunder.",
+    "fact_b_false": "Thorium is named after the German state of Hesse, where scientists made it."
+  },
+  {
+    "element_id": "pa-91",
+    "fact_a_true": "Protactinium's name means it comes before actinium when it breaks down.",
+    "fact_b_false": "Protactinium makes the deep blue color in old pottery and stained-glass windows."
+  },
+  {
+    "element_id": "u-92",
+    "fact_a_true": "Uranium is named after the planet Uranus and powers nuclear reactors that make electricity.",
+    "fact_b_false": "Uranium helps doctors take clearer pictures inside the body with MRI scans."
+  },
+  {
+    "element_id": "np-93",
+    "fact_a_true": "Neptunium is named after the planet Neptune, just past Uranus in our solar system.",
+    "fact_b_false": "Neptunium is named after the scientist who first organized the periodic table."
+  },
+  {
+    "element_id": "pu-94",
+    "fact_a_true": "Plutonium is named after the dwarf planet Pluto and powers some space probes.",
+    "fact_b_false": "Plutonium builds strong bones and teeth and is in milk, cheese, and yogurt."
+  },
+  {
+    "element_id": "am-95",
+    "fact_a_true": "Americium is in many home smoke detectors and helps keep families safe from fires.",
+    "fact_b_false": "Americium makes camera lenses sharper so pictures look crisp and clear."
+  },
+  {
+    "element_id": "cm-96",
+    "fact_a_true": "Curium is named after Marie and Pierre Curie, two famous element-discovering scientists.",
+    "fact_b_false": "Curium is named after the dwarf planet Pluto and powers some space probes."
+  },
+  {
+    "element_id": "bk-97",
+    "fact_a_true": "Berkelium is named after Berkeley, California, where scientists first made it.",
+    "fact_b_false": "Berkelium is the light, shiny metal in soda cans and kitchen foil."
+  },
+  {
+    "element_id": "cf-98",
+    "fact_a_true": "Californium helps find gold deep underground and start some nuclear reactors.",
+    "fact_b_false": "Californium coats steel cans so the soup or beans inside don't rust the can."
+  },
+  {
+    "element_id": "es-99",
+    "fact_a_true": "Einsteinium is named after Albert Einstein, the famous scientist who imagined time bending.",
+    "fact_b_false": "Einsteinium is so rare that there are only a few atoms of it on Earth at any time."
+  },
+  {
+    "element_id": "fm-100",
+    "fact_a_true": "Fermium is named after Enrico Fermi, a scientist who built the first nuclear reactor.",
+    "fact_b_false": "Fermium is in every living thing on Earth, from trees to people to your pet dog."
+  },
+  {
+    "element_id": "md-101",
+    "fact_a_true": "Mendelevium is named after the scientist who first organized the periodic table.",
+    "fact_b_false": "Mendelevium was the first element ever made by people, in a lab in 1937."
+  },
+  {
+    "element_id": "no-102",
+    "fact_a_true": "Nobelium is named after Alfred Nobel, who started the Nobel Prizes.",
+    "fact_b_false": "Nobelium is the only metal that's liquid at room temperature, like silver water."
+  },
+  {
+    "element_id": "lr-103",
+    "fact_a_true": "Lawrencium is named after Ernest Lawrence, who invented a machine called a cyclotron.",
+    "fact_b_false": "Lawrencium is named after the U.S. state of Tennessee, where some of the work happened."
+  },
+  {
+    "element_id": "rf-104",
+    "fact_a_true": "Rutherfordium is named after Ernest Rutherford, who discovered the center of the atom.",
+    "fact_b_false": "Rutherfordium glows pale lavender in lights and shares its name with Superman's home planet."
+  },
+  {
+    "element_id": "db-105",
+    "fact_a_true": "Dubnium is named after Dubna, a Russian town where scientists made it.",
+    "fact_b_false": "Dubnium stores power inside phones, tablets, and game consoles in tiny capacitors."
+  },
+  {
+    "element_id": "sg-106",
+    "fact_a_true": "Seaborgium is named after Glenn Seaborg, who discovered many heavy elements.",
+    "fact_b_false": "Seaborgium is named after Darmstadt, the German city where scientists made it."
+  },
+  {
+    "element_id": "bh-107",
+    "fact_a_true": "Bohrium is named after Niels Bohr, who imagined how electrons orbit atoms.",
+    "fact_b_false": "Bohrium turns green when it's outside for a long time, like the Statue of Liberty."
+  },
+  {
+    "element_id": "hs-108",
+    "fact_a_true": "Hassium is named after the German state of Hesse, where scientists made it.",
+    "fact_b_false": "Hassium makes magnets that don't lose their pull even when very hot."
+  },
+  {
+    "element_id": "mt-109",
+    "fact_a_true": "Meitnerium is named after Lise Meitner, a scientist who studied splitting atoms.",
+    "fact_b_false": "Meitnerium is named after Ernest Lawrence, who invented a machine called a cyclotron."
+  },
+  {
+    "element_id": "ds-110",
+    "fact_a_true": "Darmstadtium is named after Darmstadt, the German city where scientists made it.",
+    "fact_b_false": "Darmstadtium is so strong and light that airplanes, ships, and even toothpaste use it."
+  },
+  {
+    "element_id": "rg-111",
+    "fact_a_true": "Roentgenium is named after Wilhelm Roentgen, who discovered X-rays.",
+    "fact_b_false": "Roentgenium colors special goggles green so welders can see safely through bright sparks."
+  },
+  {
+    "element_id": "cn-112",
+    "fact_a_true": "Copernicium is named after Nicolaus Copernicus, who taught that Earth circles the sun.",
+    "fact_b_false": "Copernicium is named after Marie and Pierre Curie, two famous element-discovering scientists."
+  },
+  {
+    "element_id": "nh-113",
+    "fact_a_true": "Nihonium is named after Nihon, which is the Japanese word for Japan.",
+    "fact_b_false": "Nihonium is in the tip of every match and helps your bones stay strong."
+  },
+  {
+    "element_id": "fl-114",
+    "fact_a_true": "Flerovium is named after Georgy Flyorov, a Russian scientist who studied atoms.",
+    "fact_b_false": "Flerovium helps solar panels turn sunshine into power for homes."
+  },
+  {
+    "element_id": "mc-115",
+    "fact_a_true": "Moscovium is named after Moscow, the capital city of Russia.",
+    "fact_b_false": "Moscovium glows a pretty pale blue in the dark and starts the actinide family of elements."
+  },
+  {
+    "element_id": "lv-116",
+    "fact_a_true": "Livermorium is named after Livermore, a California lab where scientists studied it.",
+    "fact_b_false": "Livermorium is the part of the air our lungs use to keep us alive."
+  },
+  {
+    "element_id": "ts-117",
+    "fact_a_true": "Tennessine is named after the U.S. state of Tennessee, where some of the work happened.",
+    "fact_b_false": "Tennessine is one of the rarest metals and gives jewelry its bright silvery shine."
+  },
+  {
+    "element_id": "og-118",
+    "fact_a_true": "Oganesson is the heaviest element ever made and is named after Yuri Oganessian.",
+    "fact_b_false": "Oganesson is one of the heaviest common metals and was used in pencils long ago."
+  }
+]
