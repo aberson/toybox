@@ -219,7 +219,7 @@ The pipeline change alone produces no user-visible difference until parents trig
 ### Step P1: IP-Adapter Plus download script + manifest extension + runbook update
 - **Problem:** Create `scripts/f5_download_ip_adapter.py` **mirroring [`scripts/f5_download_sd15.py`](../scripts/f5_download_sd15.py)'s shape verbatim** — single `huggingface_hub.snapshot_download` call with `allow_patterns` filtering plus two `print` statements; NO argparse, NO `--help`, NO try/except. The existing F.5 download scripts deliberately ship as 30-line one-shots; do not introduce a divergent pattern. It downloads `h94/IP-Adapter` filtered to `ip-adapter-plus_sd15.bin` plus the `models/image_encoder/` subdirectory (CLIP ViT-L). Writes to `data/models/image_gen/ip_adapter/ip-adapter-plus_sd15.bin` and `data/models/image_gen/ip_adapter/image_encoder/`. Also: extend `scripts/f5_compute_manifest.py` to pick up the new IPA file for sha256+size recording. Also: update [`documentation/operator/image-gen-runtime.md`](operator/image-gen-runtime.md) — add a new "IP-Adapter Plus" row to the Checkpoint install table, add the script invocation under "Run the per-component download scripts", and add a troubleshooting entry "IP-Adapter weights missing → run `f5_download_ip_adapter.py`". Remove the existing "Sprite quality is poor / doesn't resemble the toy" relaxation paragraph (Phase P reverses its premise). Update the deferred-future-work note at [image-gen-runtime.md:306](operator/image-gen-runtime.md) about "per-toy DreamBooth-lite" to reference that IP-Adapter is now the in-pipeline answer to the identity problem.
 - **Type:** code
-- **Issue:** TBD
+- **Issue:** #183
 - **Flags:** `--reviewers code`
 - **Produces:** `scripts/f5_download_ip_adapter.py` (new, ~30 lines matching the existing pattern), `scripts/f5_compute_manifest.py` (modified), `documentation/operator/image-gen-runtime.md` (modified).
 - **Done when:** Script matches the structure of `f5_download_sd15.py` (no argparse, no try/except, no logging). Runbook diff reads cleanly. Manifest computer picks up the new file path even when it doesn't exist yet (returns "missing" rather than crashing). ruff + mypy strict clean on touched Python.
@@ -228,7 +228,7 @@ The pipeline change alone produces no user-visible difference until parents trig
 ### Step P2: Operator — download IP-Adapter weights + regression smoke on EXISTING pipeline
 - **Problem:** On the F.5-capable host, run `uv run python scripts/f5_download_ip_adapter.py` and verify `data/models/image_gen/ip_adapter/ip-adapter-plus_sd15.bin` exists (~100 MB) and `data/models/image_gen/ip_adapter/image_encoder/` contains the CLIP ViT-L files (~700 MB). Then run the existing F.5 smoke probe — `uv run --extra image_gen python -m toybox.image_gen --probe <existing-toy-id> --slot idle` — and verify it still produces a non-empty 128×128 PNG at `data/images/toy_actions/<toy_id>/idle.png` with no `c10.dll` crashes. **This is the regression smoke gate before any pipeline code change touches the live system.** If the existing pipeline is broken on the host BEFORE Phase P starts, do not proceed.
 - **Type:** operator
-- **Issue:** TBD
+- **Issue:** #184
 - **Flags:** n/a (operator step)
 - **Produces:** Confirmed IPA weights on disk + green run of the existing pipeline as a baseline. Capture wall-clock + peak VRAM via `nvidia-smi` for reference.
 - **Done when:** Both checkpoints present on disk, regression smoke produces a sprite without a crash, baseline numbers captured (informally — no formal artifact required).
@@ -237,7 +237,7 @@ The pipeline change alone produces no user-visible difference until parents trig
 ### Step P3: Extend capability.py `_required_checkpoints()` for IP-Adapter
 - **Problem:** Modify [`src/toybox/image_gen/capability.py`](../src/toybox/image_gen/capability.py) `_required_checkpoints()` to add IP-Adapter Plus to the required-checkpoints set. Both `checkpoint` and `lora` cartoon modes require IPA + image encoder (the IPA is loaded regardless of which cartoon-base is used). Files: `ip_adapter/ip-adapter-plus_sd15.bin` + the image-encoder's `model.safetensors` or `pytorch_model.bin` (verify the actual filename `huggingface_hub` writes during the P2 download and pin that exact relative path). Capability gate must return `False` with `CapabilityReason.missing_checkpoints` when either file is absent. Unit test: pin `TOYBOX_IMAGE_GEN_MODEL_DIR` to a tmp_path, assert capable=False before the IPA files exist, True after.
 - **Type:** code
-- **Issue:** TBD
+- **Issue:** #185
 - **Flags:** `--reviewers code`
 - **Produces:** `capability.py` modified, `tests/unit/image_gen/test_capability.py` extended.
 - **Done when:** Tests pass. Boot-time capability log line (in [`src/toybox/app.py`](../src/toybox/app.py)) shows the new files in the missing-checkpoints detail string when they're absent. mypy + ruff clean.
@@ -263,7 +263,7 @@ The pipeline change alone produces no user-visible difference until parents trig
      P4 still runs the full grep at implementation time to catch anything missed; this list is a prepop, not the final answer.
   10. Update [`tests/fixtures/image_gen/stub_pipeline.py`](../tests/fixtures/image_gen/stub_pipeline.py) only if it asserts a specific output dim; otherwise leave its 16×16 placeholder alone (orchestration test).
 - **Type:** code
-- **Issue:** TBD
+- **Issue:** #186
 - **Flags:** `--reviewers code`
 - **Produces:** `pipeline.py` modified, worker E2E test extended, stub-pipeline test audited.
 - **Done when:** All existing image-gen tests still green. New IPA-shape assertion in worker E2E green. mypy strict + ruff clean. Lazy-import test still green. Downstream-consumer grep checklist included in PR description with verdicts.
@@ -272,7 +272,7 @@ The pipeline change alone produces no user-visible difference until parents trig
 ### Step P5: Frontend — drop `imageRendering: pixelated`; verify 512-source rendering
 - **Problem:** Modify [`frontend/src/child/components/ToyActionSprite.tsx`](../frontend/src/child/components/ToyActionSprite.tsx) line 67: remove `imageRendering: "pixelated"` from `baseStyle`. The element-style behavior collapses to the browser default (smooth resampling), which is correct for 512-source downscaled to 112-display. Update [`frontend/src/child/components/ToyActionSprite.test.tsx`](../frontend/src/child/components/ToyActionSprite.test.tsx) if it asserts the `pixelated` rule. Audit [`frontend/src/parent/components/ToyActionGrid.tsx`](../frontend/src/parent/components/ToyActionGrid.tsx) — if it uses `<ToyActionSprite>` it automatically inherits the change; if it renders sprites another way, audit that path too. Vitest snapshot updates as needed.
 - **Type:** code
-- **Issue:** TBD
+- **Issue:** #187
 - **Flags:** `--reviewers code`
 - **Produces:** `ToyActionSprite.tsx` modified, related vitest snapshots updated.
 - **Done when:** `npm run test` green. `npm run typecheck` + `npm run lint` clean.
@@ -287,7 +287,7 @@ The pipeline change alone produces no user-visible difference until parents trig
   
   Integration test in [`tests/integration/test_toys_api_actions.py`](../tests/integration/test_toys_api_actions.py): mirror the existing `test_regenerate_all_*` test pattern at lines 351-432 — cover `test_regenerate_every_toy_enqueues_all`, `test_regenerate_every_toy_409_when_disabled`, `test_regenerate_every_toy_200_with_composite_only_mode`, `test_regenerate_every_toy_503_when_worker_not_running`. No 404 variant (no `{toy_id}` in the URL). Vitest coverage for the new button + confirm dialog + composite-mode banner.
 - **Type:** code
-- **Issue:** TBD
+- **Issue:** #188
 - **Flags:** `--reviewers code`
 - **Produces:** `toys.py` modified (new endpoint + new `BulkRegenerateResponse` model), `api.ts` modified, parent toys-list component modified, integration tests added, vitest coverage added.
 - **Done when:** Backend + frontend tests green following the existing `test_regenerate_all_*` pattern at [test_toys_api_actions.py:351-432](../tests/integration/test_toys_api_actions.py#L351-L432). mypy + ruff clean. Endpoint returns 401 without parent PIN; 200 with parent PIN + capability=True; 409 when capability is hard-off; 503 when worker is absent. Composite-only signal flows through `mode` field correctly.
@@ -305,7 +305,7 @@ The pipeline change alone produces no user-visible difference until parents trig
   
   Document chosen value + eyeballed per-slot quality + per-sprite wall-clock + peak VRAM in `documentation/runs/2026-MM-DD-phase-p-smoke.md`. State the chosen value verbatim and visibly (e.g. a line reading `"P7b should set IP_ADAPTER_SCALE = 0.7"`) so P7b can ingest it unambiguously.
 - **Type:** operator
-- **Issue:** TBD
+- **Issue:** #189
 - **Flags:** n/a (operator step)
 - **Produces:** Run-doc at `documentation/runs/2026-MM-DD-phase-p-smoke.md` naming the chosen `IP_ADAPTER_SCALE` value. No code changes — operator's working tree is clean at step end.
 - **Done when:** 10/10 sprites generate without crash. Operator judgment: identity AND pose are visibly improved over the pre-P state on at least 7 of 10 sprites. Scale value pinned in the run-doc. Per-sprite wall-clock < 5s warm. Peak VRAM < 7 GB on the 8 GB host. Run-doc committed. **Working tree is clean (no IP_ADAPTER_SCALE edit lingering).**
@@ -314,7 +314,7 @@ The pipeline change alone produces no user-visible difference until parents trig
 ### Step P7b: Apply UAT-tuned IP_ADAPTER_SCALE value to pipeline.py
 - **Problem:** Read the chosen `IP_ADAPTER_SCALE` value from P7's run-doc (`documentation/runs/2026-MM-DD-phase-p-smoke.md`). Edit [`src/toybox/image_gen/pipeline.py`](../src/toybox/image_gen/pipeline.py) to set the `IP_ADAPTER_SCALE: Final[float]` constant to that value. Add or update a unit test that pins the constant value (so a silent future change goes through review): assert `pipeline.IP_ADAPTER_SCALE == <value>` in [`tests/unit/image_gen/test_pipeline_stub.py`](../tests/unit/image_gen/test_pipeline_stub.py) or a sibling module-level test. If P7 picks 0.6 (matches P4's initial value), still ship P7b — the test is the load-bearing artifact and confirms a deliberate choice rather than a no-op default.
 - **Type:** code
-- **Issue:** TBD
+- **Issue:** #190
 - **Flags:** `--reviewers code`
 - **Produces:** `pipeline.py` patched, unit test pinning the chosen scale value.
 - **Done when:** Pinned test green. ruff + mypy strict clean. PR description references the P7 run-doc by path.
@@ -330,7 +330,7 @@ The pipeline change alone produces no user-visible difference until parents trig
   6. Both kids weigh in: does Child A recognize her LOL doll in the cheering sprite? Does Child B recognize the toy in the looking sprite?
   Document at `documentation/runs/2026-MM-DD-phase-p-uat.md`. Defects: file as follow-up GitHub issues (don't block Phase P close on cosmetic per-toy quality misses; the recourse is per-slot regenerate or operator scale-tune).
 - **Type:** operator
-- **Issue:** TBD
+- **Issue:** #191
 - **Flags:** n/a (operator step)
 - **Produces:** Run-doc at `documentation/runs/2026-MM-DD-phase-p-uat.md` with operator judgment + kid-feedback + screenshots. Possibly follow-up issues for cosmetic defects.
 - **Done when:** Identity + pose pass for ≥ 70% of the slots generated. New global regenerate flow works end-to-end on iPad. No crashes. Run-doc committed.
