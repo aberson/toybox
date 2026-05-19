@@ -40,6 +40,7 @@ F.5 uses three checkpoint families plus the rembg model from F1:
 | LCM-LoRA SD 1.5 | `latent-consistency/lcm-lora-sdv1-5` | ~70 MB | `data/models/image_gen/sd15/lcm_lora/` |
 | Cartoon checkpoint candidate | `Lykon/dreamshaper-7` (HF, OpenRAIL-M) OR ToonYou Beta 6 from civitai | ~3-4 GB | `data/models/image_gen/cartoon_checkpoint/` |
 | Cartoon LoRA candidate (optional, A/B alternative) | civitai search "pixar cartoon lora SD 1.5"; any LoRA <500 MB | ~150-300 MB | `data/models/image_gen/cartoon_lora/` |
+| IP-Adapter Plus (SD 1.5) | `h94/IP-Adapter` | ~800 MB | `data/models/image_gen/ip_adapter/` |
 | rembg `u2net.onnx` (UNCHANGED from F1) | already on disk if F1 ran | ~170 MB | `data/models/image_gen/bg_remove/` |
 
 **Note on the runwayml delisting:** `runwayml/stable-diffusion-v1-5` was delisted from HF in late 2024 by Runway. The official mirror that took over is `stable-diffusion-v1-5/stable-diffusion-v1-5`. Use that repo ID; older docs and tutorials referencing the runwayml path will 404.
@@ -56,9 +57,12 @@ uv run scripts/f5_download_lcm.py
 
 # Cartoon checkpoint (Lykon/dreamshaper-7 default; ~3-4 GB fp16)
 uv run scripts/f5_download_cartoon_checkpoint.py
+
+# IP-Adapter Plus + CLIP ViT-L image encoder (~800 MB; required from Phase P onward)
+uv run scripts/f5_download_ip_adapter.py
 ```
 
-Each script uses `huggingface_hub.snapshot_download` with `allow_patterns` filtering so only fp16 variants land. Total disk: ~7 GB (plus ~9 GB of obsolete SDXL/IPA/pixel-art-lora checkpoints from F1 that are NOT auto-deleted — see "Cleaning up obsolete F1 checkpoints" below).
+Each script uses `huggingface_hub.snapshot_download` with `allow_patterns` filtering so only fp16 variants land. Total disk: ~7.8 GB (plus ~9 GB of obsolete SDXL/IPA/pixel-art-lora checkpoints from F1 that are NOT auto-deleted — see "Cleaning up obsolete F1 checkpoints" below).
 
 ### Cartoon LoRA (optional, A/B alternative)
 
@@ -86,7 +90,7 @@ Remove-Item -Recurse -Force data/models/image_gen/ip_adapter
 Remove-Item -Recurse -Force data/models/image_gen/pixel_art_lora
 ```
 
-Do NOT run this until F.5-5 passes. If F.5-5 fails native-crash check, the rollback is `git checkout pre-f5-cutover` (the tag F.5-1 sets) AND the old checkpoints must still be on disk.
+Do NOT run this until F.5-5 passes. If F.5-5 fails native-crash check, the rollback is `git checkout pre-f5-cutover` (the tag F.5-1 sets) AND the old checkpoints must still be on disk. (Phase P resurrects `ip_adapter/` as a live SD 1.5 checkpoint dir; do NOT delete after running `f5_download_ip_adapter.py`.)
 
 ## Canonical pipeline config
 
@@ -246,19 +250,28 @@ Use `pipe.vae.enable_slicing()` instead. F1 gotcha #3.
 
 Re-run the per-component download scripts. If files keep going missing, check `Get-PSDrive C` (Windows) for free disk and verify the install dir isn't on a quota-limited mount.
 
-### First generation is suspiciously slow (>10 s)
+### IP-Adapter weights missing from manifest
 
-The first generation per backend boot includes lazy module import (torch, diffusers) + first CUDA kernel compile + LoRA fusion. Subsequent generations should be ~2 s on 8 GB hosts. If steady-state is also >10 s, check that LCM-LoRA is actually loaded and `pipe.scheduler` is `LCMScheduler` — without LCM, the default DPM scheduler runs 25+ steps and is ~6× slower.
+If the manifest shows `ip_adapter/models/ip-adapter-plus_sd15.bin` with `"status": "missing"`, or the capability gate reports IPA checkpoints absent, run:
+
+```powershell
+uv run scripts/f5_download_ip_adapter.py
+```
+
+This pulls the IP-Adapter Plus weights plus the CLIP ViT-L image encoder from `h94/IP-Adapter` (~800 MB total).
 
 ### Sprite quality is poor / doesn't resemble the toy
 
-This is content quality, not runtime. F.5 explicitly relaxed the subject-identity requirement (the user said "more important that the toy be doing the action than be detailed"). The DB `tags` field + Pillow palette extraction + the cartoon LoRA carry the recognition floor.
+Phase P's IP-Adapter Plus conditioning carries most identity preservation, but if a particular toy still produces unrecognizable output:
 
-If a particular toy reliably produces unrecognizable output:
-1. Check the `tags` are populated (`SELECT tags FROM toys WHERE id = ?`). With Claude vision available at ingest, tags should be a JSON array. Without, operator-typed tags or empty.
-2. Verify the source toy photo isn't poorly lit / has a busy background; rembg may struggle and palette extraction picks up noise.
-3. The "regenerate" button is the parent's recourse for individual bad outputs.
-4. The Tier C composite path is the fallback — if Tier B output isn't recognizable enough, the operator can flip a slot's `error_msg` to force composite for that toy. (Mechanism for this is a F.5+ enhancement; not in scope for F.5-1 itself.)
+1. Check `toys.tags` — empty tags strip the prompt of identifying detail. Re-tag from the parent UI.
+2. Verify the source photo at `data/images/toys/<toy_id>.jpg` is well-lit, centered, and shows the toy from a useful angle. IPA can't recover identity from a poorly-lit or occluded reference.
+3. Regenerate via the per-slot or "regenerate all" button on the parent UI.
+4. If a specific toy refuses to render usable sprites after re-tag + re-photo + regenerate, fall back to Tier C by deleting `data/images/toy_actions/<toy_id>/` — the kiosk will use the composite template instead.
+
+### First generation is suspiciously slow (>10 s)
+
+The first generation per backend boot includes lazy module import (torch, diffusers) + first CUDA kernel compile + LoRA fusion. Subsequent generations should be ~2 s on 8 GB hosts. If steady-state is also >10 s, check that LCM-LoRA is actually loaded and `pipe.scheduler` is `LCMScheduler` — without LCM, the default DPM scheduler runs 25+ steps and is ~6× slower.
 
 ### "running in composite-only mode" banner appears on the parent UI
 
@@ -303,7 +316,7 @@ uv run python scripts/generate_element_sprites.py --ids pr-59 --force
 
 ## What this does NOT cover
 
-- Custom LoRA training per toy. Out of scope for v1.5; if subject identity drifts consistently, follow-up phase adds a per-toy DreamBooth-lite step.
+- Custom LoRA training per toy. Phase P adds **IP-Adapter Plus** as the in-pipeline answer to subject identity — the toy's reference photo conditions every generation without any per-toy training step. Per-toy DreamBooth-lite remains out of scope; IP-Adapter is the v1.5 identity mechanism.
 - Animated sprites. Out of scope; v1.5 is static PNGs only.
 - Online image-gen fallback when the local GPU is unavailable. Plan-level decision: hosts without a GPU degrade to Tier C composite; without Tier C templates, sprites are absent (kiosk shows persona-only).
 - Sprite editing UI. Operator's only tools are the per-slot and "regenerate all" buttons.
@@ -315,7 +328,7 @@ uv run python scripts/generate_element_sprites.py --ids pr-59 --force
 - Original Phase F plan (the now-superseded SDXL pipeline, archived 2026-05-09): [`documentation/plan/archive/phase-f-toy-action-sprites.md`](../plan/archive/phase-f-toy-action-sprites.md)
 - F9 fail report (the motivation for F.5): [`documentation/runs/2026-05-07-toy-action-sprites-smoke.md`](../runs/2026-05-07-toy-action-sprites-smoke.md)
 - Investigation that produced the F.5 design: [`documentation/runs/2026-05-08-sprite-pipeline-alternatives.md`](../runs/2026-05-08-sprite-pipeline-alternatives.md)
-- Per-component download scripts: [`scripts/f5_download_sd15.py`](../../scripts/f5_download_sd15.py), [`scripts/f5_download_lcm.py`](../../scripts/f5_download_lcm.py), [`scripts/f5_download_cartoon_checkpoint.py`](../../scripts/f5_download_cartoon_checkpoint.py)
+- Per-component download scripts: [`scripts/f5_download_sd15.py`](../../scripts/f5_download_sd15.py), [`scripts/f5_download_lcm.py`](../../scripts/f5_download_lcm.py), [`scripts/f5_download_cartoon_checkpoint.py`](../../scripts/f5_download_cartoon_checkpoint.py), [`scripts/f5_download_ip_adapter.py`](../../scripts/f5_download_ip_adapter.py)
 - Template generator for F.5-3b placeholders: [`scripts/f5_generate_templates.py`](../../scripts/f5_generate_templates.py)
 - Manifest computer (regenerates `manifest.json` from on-disk files): [`scripts/f5_compute_manifest.py`](../../scripts/f5_compute_manifest.py)
 - Generated manifest (after first run): `data/models/image_gen/manifest.json` (gitignored)

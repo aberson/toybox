@@ -224,6 +224,7 @@ The pipeline change alone produces no user-visible difference until parents trig
 - **Produces:** `scripts/f5_download_ip_adapter.py` (new, ~30 lines matching the existing pattern), `scripts/f5_compute_manifest.py` (modified), `documentation/operator/image-gen-runtime.md` (modified).
 - **Done when:** Script matches the structure of `f5_download_sd15.py` (no argparse, no try/except, no logging). Runbook diff reads cleanly. Manifest computer picks up the new file path even when it doesn't exist yet (returns "missing" rather than crashing). ruff + mypy strict clean on touched Python.
 - **Depends on:** none.
+- **Status:** DONE (2026-05-18)
 
 ### Step P2: Operator — download IP-Adapter weights + regression smoke on EXISTING pipeline
 - **Problem:** On the F.5-capable host, run `uv run python scripts/f5_download_ip_adapter.py` and verify `data/models/image_gen/ip_adapter/ip-adapter-plus_sd15.bin` exists (~100 MB) and `data/models/image_gen/ip_adapter/image_encoder/` contains the CLIP ViT-L files (~700 MB). Then run the existing F.5 smoke probe — `uv run --extra image_gen python -m toybox.image_gen --probe <existing-toy-id> --slot idle` — and verify it still produces a non-empty 128×128 PNG at `data/images/toy_actions/<toy_id>/idle.png` with no `c10.dll` crashes. **This is the regression smoke gate before any pipeline code change touches the live system.** If the existing pipeline is broken on the host BEFORE Phase P starts, do not proceed.
@@ -390,7 +391,7 @@ The pipeline change alone produces no user-visible difference until parents trig
 
 | Step | Status |
 |------|--------|
-| P1 — IP-Adapter Plus download script + manifest + runbook | not started |
+| P1 — IP-Adapter Plus download script + manifest + runbook | DONE (2026-05-18) |
 | P2 — Operator: download + regression smoke | not started |
 | P3 — capability.py checkpoint extension | not started |
 | P4 — pipeline.py rewrite (IPA + 512² + extended negative + drop hex-tokens) | not started |
