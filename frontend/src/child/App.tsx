@@ -167,6 +167,25 @@ function avatarImage(activity: Activity | null): string | null {
   return null;
 }
 
+// Phase N Step N0 — D2 fix. The kiosk hides the persona avatar on
+// element-bearing steps so the ElementCard sprite (which itself
+// encodes the periodic-table persona identity) doesn't compete for
+// vertical real estate with the avatar above and the NextStepButton
+// below. UAT defect D2 from Phase M (row #4,
+// ``shrink_into_helium_balloon_voyage``): the persona-letter avatar
+// + ElementCard + body row + NextStepButton stacked taller than the
+// iPad viewport and the avatar overlapped the Next button's hit zone,
+// blocking operator advance. With the avatar suppressed on these
+// steps the ElementCard becomes the sole persona surface — redundant
+// with the avatar, and the only one that's actually informative on a
+// periodic-table activity.
+export function currentStepHasElement(activity: Activity | null): boolean {
+  if (activity === null) return false;
+  const current = activity.steps.find((s) => s.current);
+  if (current === undefined) return false;
+  return typeof current.element_id === "string" && current.element_id.length > 0;
+}
+
 export function App(): JSX.Element {
   const state = useChildStore();
   const apiRef = useRef<ApiClient | null>(null);
@@ -689,11 +708,13 @@ export function App(): JSX.Element {
         )}
         {showActive && activity !== null && (
           <>
-            <PersonaAvatar
-              imagePath={avatarImage(activity)}
-              letter={avatarLetter(activity)}
-              size={240}
-            />
+            {!currentStepHasElement(activity) && (
+              <PersonaAvatar
+                imagePath={avatarImage(activity)}
+                letter={avatarLetter(activity)}
+                size={240}
+              />
+            )}
             <StepCard
               activity={activity}
               onAdvance={handleAdvance}

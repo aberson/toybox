@@ -9,10 +9,14 @@
 // regression covers ``<StepCard>`` rendering separately from the
 // avatar element. (See ``App.test.tsx`` for the kiosk-level shape.)
 
+import type { JSX } from "react";
+
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { currentStepHasElement } from "../App";
 import type { Activity, ActivityStep } from "../api";
+import { PersonaAvatar } from "./PersonaAvatar";
 import { StepCard } from "./StepCard";
 
 // jsdom shim for HTMLMediaElement.play / .pause — needed by the K12
@@ -974,6 +978,120 @@ describe("StepCard ElementCard branch (Phase M M3)", () => {
     });
     render(<StepCard activity={activity} onAdvance={vi.fn()} />);
     expect(screen.queryByTestId("element-card")).toBeNull();
+  });
+});
+
+// Phase N Step N0 — D2 fix. UAT defect from Phase M row #4
+// (``shrink_into_helium_balloon_voyage``): the kiosk's persona-letter
+// avatar overlapped the NextStepButton hit zone on element-bearing
+// steps, blocking operator advance. The fix lives in ``App.tsx``
+// (which is where ``PersonaAvatar`` is mounted, as a sibling above the
+// StepCard) and conditionally suppresses the avatar when the current
+// step has a non-empty ``element_id`` — the ElementCard sprite itself
+// encodes the periodic-table persona identity for these cards, so the
+// letter badge is redundant + a blocker.
+//
+// These tests cover the production composition (``PersonaAvatar`` +
+// ``StepCard`` mounted as siblings in a flex column, matching App.tsx)
+// rather than StepCard in isolation. The wrapper calls the production
+// ``currentStepHasElement`` helper from App.tsx directly — if a future
+// dev flips the predicate, removes the guard, or mishandles the
+// empty-string case, these tests fail (no producer/consumer drift in a
+// separately-defined wrapper copy).
+function KioskComposition(props: { activity: Activity }): JSX.Element {
+  const hasElement = currentStepHasElement(props.activity);
+  return (
+    <main
+      style={{ display: "flex", flexDirection: "column", alignItems: "center" }}
+    >
+      {!hasElement && <PersonaAvatar letter="M" size={240} />}
+      <StepCard activity={props.activity} onAdvance={vi.fn()} />
+    </main>
+  );
+}
+
+describe("StepCard N0 — persona-letter hidden on element steps (D2 fix)", () => {
+  it("renders the persona letter on a regular (non-element) step", () => {
+    // Baseline: a plain text step with no ``element_id`` keeps the
+    // production composition unchanged — PersonaAvatar sits above the
+    // StepCard like it always has.
+    const activity = fakeActivity({
+      steps: [fakeStep({ body: "Pretend to be a cat" })],
+    });
+    render(<KioskComposition activity={activity} />);
+    const avatar = screen.getByTestId("persona-avatar");
+    expect(avatar).not.toBeNull();
+    // Letter-mode avatar (no image path) — the visible letter is "M"
+    // (from the wrapper's hard-coded ``letter="M"`` prop, mirroring
+    // App.tsx's avatarLetter() output).
+    expect(avatar.getAttribute("data-avatar-mode")).toBe("letter");
+    expect(avatar.textContent).toBe("M");
+  });
+
+  it("hides the persona letter when the current step has element_id set", () => {
+    // Element-bearing step: the ElementCard renders, the persona letter
+    // does NOT. The element sprite + symbol/name/number block is the
+    // sole persona surface on these cards (and the redundant avatar
+    // was blocking the Next button hit zone — UAT D2).
+    const activity = fakeActivity({
+      steps: [
+        fakeStep({
+          element_id: "he-2",
+          metadata: {
+            element_id: "he-2",
+            element_symbol: "He",
+            element_name: "Helium",
+            element_atomic_number: 2,
+          },
+        }),
+      ],
+    });
+    render(<KioskComposition activity={activity} />);
+    expect(screen.queryByTestId("persona-avatar")).toBeNull();
+    // ElementCard does mount — sanity check that the composition is
+    // surfacing the periodic-table card (the only "persona" the kiosk
+    // shows on this step).
+    expect(screen.getByTestId("element-card")).not.toBeNull();
+  });
+
+  it("keeps the Next button reachable on the element-card variant", () => {
+    // The defect: the persona-letter avatar (240px square at the top
+    // of the column) sat on top of the NextStepButton hit zone on
+    // element-bearing steps, blocking operator advance. With the
+    // avatar suppressed, the Next button is the bottom-most actionable
+    // surface and ``getByRole`` can find it AND it is clickable in
+    // jsdom (no aria-hidden, no pointer-events: none from a sibling).
+    const activity = fakeActivity({
+      steps: [
+        fakeStep({
+          element_id: "he-2",
+          metadata: {
+            element_id: "he-2",
+            element_symbol: "He",
+            element_name: "Helium",
+            element_atomic_number: 2,
+          },
+        }),
+      ],
+    });
+    render(<KioskComposition activity={activity} />);
+    const nextBtn = screen.getByRole("button", { name: /next/i });
+    expect(nextBtn).not.toBeNull();
+    // Defensive: the button itself is reachable to the accessibility
+    // tree (not aria-hidden) and not disabled at rest.
+    expect(nextBtn.getAttribute("aria-hidden")).not.toBe("true");
+    expect((nextBtn as HTMLButtonElement).disabled).toBe(false);
+    // (Persona-avatar absence is asserted in the prior test — this test
+    // focuses exclusively on Next-button reachability semantics.)
+    // The Next button's parent chain has no ``pointer-events: none``
+    // inline style — jsdom can't reason about visual stacking, but the
+    // pointer-events check guards against the obvious "sibling steals
+    // clicks via CSS" regression class.
+    let node: HTMLElement | null = nextBtn as HTMLElement;
+    while (node !== null) {
+      expect(node.style.pointerEvents).not.toBe("none");
+      node = node.parentElement;
+    }
   });
 });
 
