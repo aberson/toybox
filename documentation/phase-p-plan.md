@@ -234,6 +234,7 @@ The pipeline change alone produces no user-visible difference until parents trig
 - **Produces:** Confirmed IPA weights on disk + green run of the existing pipeline as a baseline. Capture wall-clock + peak VRAM via `nvidia-smi` for reference.
 - **Done when:** Both checkpoints present on disk, regression smoke produces a sprite without a crash, baseline numbers captured (informally — no formal artifact required).
 - **Depends on:** P1.
+- **Status:** DONE (2026-05-18). Baseline: cold probe 48.3 s wall clock, peak VRAM ~1.17 GB (delta +354 MiB over 819 MiB backend baseline), output 7.5 KB PNG, `{"ok": true}` marker. Empirical on-disk layout: `ip_adapter/models/ip-adapter-plus_sd15.bin` (158 MB) + `ip_adapter/models/image_encoder/` containing `config.json` (560 B) + `model.safetensors` (2.53 GB) + `pytorch_model.bin` (2.53 GB) — BOTH encoder formats download because `allow_patterns="models/image_encoder/*"` matches both.
 
 ### Step P3: Extend capability.py `_required_checkpoints()` for IP-Adapter
 - **Problem:** Modify [`src/toybox/image_gen/capability.py`](../src/toybox/image_gen/capability.py) `_required_checkpoints()` to add IP-Adapter Plus to the required-checkpoints set. Both `checkpoint` and `lora` cartoon modes require IPA + image encoder (the IPA is loaded regardless of which cartoon-base is used). Files: `ip_adapter/ip-adapter-plus_sd15.bin` + the image-encoder's `model.safetensors` or `pytorch_model.bin` (verify the actual filename `huggingface_hub` writes during the P2 download and pin that exact relative path). Capability gate must return `False` with `CapabilityReason.missing_checkpoints` when either file is absent. Unit test: pin `TOYBOX_IMAGE_GEN_MODEL_DIR` to a tmp_path, assert capable=False before the IPA files exist, True after.
@@ -392,7 +393,7 @@ The pipeline change alone produces no user-visible difference until parents trig
 | Step | Status |
 |------|--------|
 | P1 — IP-Adapter Plus download script + manifest + runbook | DONE (2026-05-18) |
-| P2 — Operator: download + regression smoke | not started |
+| P2 — Operator: download + regression smoke | DONE (2026-05-18) |
 | P3 — capability.py checkpoint extension | not started |
 | P4 — pipeline.py rewrite (IPA + 512² + extended negative + drop hex-tokens) | not started |
 | P5 — Frontend: drop `imageRendering: pixelated` | not started |
