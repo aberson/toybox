@@ -21,6 +21,7 @@ in ``name | fun_fact | story_seed_hooks`` are rejected at load time.
 from __future__ import annotations
 
 import json
+import random
 import re
 from collections.abc import Iterator
 from pathlib import Path
@@ -34,6 +35,8 @@ from toybox.activities.element_corpus import (
     clear_element_cache,
     get_element,
     load_elements,
+    peer_in_family,
+    peer_out_of_family,
     pick_element,
 )
 
@@ -502,3 +505,315 @@ def test_element_model_is_frozen(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     with pytest.raises((TypeError, ValueError)):
         # Frozen pydantic models raise on attribute mutation.
         element.name = "NotGold"
+
+
+# ---------------------------------------------------------------------
+# Phase N Step N3 — peer_in_family / peer_out_of_family
+# ---------------------------------------------------------------------
+#
+# These helpers feed the Phase N "element microgame" template generator
+# (N4). Two adjacent forks per template need one same-family peer
+# ("which is the same family?") and one cross-family distractor
+# ("which is NOT in this family?"). Both picks must:
+#
+#   * be deterministic when ``rng`` is a fresh ``random.Random(seed)``
+#   * filter to the requesting element's ``age_band`` (per plan §5 N3 —
+#     don't suggest Plutonium as a peer for Gold to a 4yo)
+#   * never return the requesting element itself
+#   * raise ``ValueError`` on an unknown ``element_id`` (stricter than
+#     ``get_element`` which returns None — done-when explicitly says
+#     "raise on unknown element_id")
+#   * raise ``ValueError`` when the filtered candidate pool is empty —
+#     never loop, never silently return self, never return None
+#
+# Corpus realities relevant to these tests (see ``data/elements/elements.json``):
+#   * 6 halogens, all age_band 6-8 or 9-12 — no halogens at 3-5
+#   * 15 lanthanides, all age_band 9-12
+#   * 15 actinides, 14 at 9-12 + 1 at 6-8
+#   * At age_band=3-5: alkali_metal has only na-11; alkaline_earth has
+#     only ca-20 — those two elements have NO same-band same-family
+#     peer. Tests cover this explicitly: peer_in_family must raise.
+#   * Transition metals at age_band=3-5: fe-26, ni-28, cu-29, ag-47, au-79
+#     — Gold (au-79) has 4 same-band peers, ample room for determinism
+#     assertions.
+
+
+def test_peer_in_family_returns_same_family_element() -> None:
+    """A Gold peer is in transition_metal family (identity, not ==)."""
+    rng = random.Random(0)
+    peer = peer_in_family("au-79", rng)
+    assert peer.family is Family.transition_metal
+
+
+def test_peer_in_family_excludes_self() -> None:
+    """The requesting element is never returned even if it would otherwise match."""
+    # Use a wide net of seeds — if self-exclusion is buggy, at least one
+    # seed will hit it.
+    for seed in range(20):
+        rng = random.Random(seed)
+        peer = peer_in_family("au-79", rng)
+        assert peer.id != "au-79", (
+            f"peer_in_family returned the requesting element itself at seed={seed}"
+        )
+
+
+def test_peer_in_family_filters_by_age_band() -> None:
+    """A Gold (3-5) peer is also age_band=3-5 — no 9-12 transition metals leak in."""
+    # The transition_metal family has 38 entries spanning multiple age bands.
+    # Sample 50 seeds to flush out a leak.
+    for seed in range(50):
+        rng = random.Random(seed)
+        peer = peer_in_family("au-79", rng)
+        assert peer.age_band == "3-5", (
+            f"peer_in_family for au-79 (3-5) returned {peer.id} at age_band={peer.age_band!r} "
+            f"(seed={seed}); age-band filter is leaking"
+        )
+
+
+def test_peer_in_family_deterministic_for_same_seed() -> None:
+    """Two fresh ``random.Random(42)`` instances yield identical peers."""
+    rng_a = random.Random(42)
+    rng_b = random.Random(42)
+    assert peer_in_family("au-79", rng_a).id == peer_in_family("au-79", rng_b).id
+
+
+def test_peer_in_family_varies_across_seeds() -> None:
+    """Across 20 seeds, Gold's peer spans more than one element.
+
+    Gold has 4 same-family same-band peers (fe-26, ni-28, cu-29, ag-47),
+    so 20 seeds should hit at least 2 of them.
+    """
+    seen = {peer_in_family("au-79", random.Random(s)).id for s in range(20)}
+    assert len(seen) > 1, f"all 20 seeds picked the same peer for au-79: {seen!r}"
+
+
+def test_peer_in_family_raises_on_unknown_id() -> None:
+    """Per N3 done-when: both functions raise on unknown element_id."""
+    with pytest.raises(ValueError, match="(?i)unknown|not found|xx-999"):
+        peer_in_family("xx-999", random.Random(0))
+
+
+def test_peer_in_family_raises_when_no_same_band_same_family_peer() -> None:
+    """``na-11`` is the only alkali_metal at age_band=3-5 — no peer exists.
+
+    Per N3 design (plan §7 risks): "If family is age-band-filtered down
+    to ZERO peers, raise — don't loop, don't return the requesting
+    element itself, don't return None."
+    """
+    with pytest.raises(ValueError, match="(?i)no peer|empty|exhausted|family"):
+        peer_in_family("na-11", random.Random(0))
+
+
+def test_peer_out_of_family_returns_different_family() -> None:
+    """A Gold cross-family pick is NOT in transition_metal."""
+    rng = random.Random(0)
+    peer = peer_out_of_family("au-79", rng)
+    assert peer.family is not Family.transition_metal
+
+
+def test_peer_out_of_family_filters_by_age_band() -> None:
+    """The cross-family distractor for au-79 (3-5) must itself be age_band=3-5."""
+    for seed in range(50):
+        rng = random.Random(seed)
+        peer = peer_out_of_family("au-79", rng)
+        assert peer.age_band == "3-5", (
+            f"peer_out_of_family for au-79 (3-5) returned {peer.id} at "
+            f"age_band={peer.age_band!r} (seed={seed}); age-band filter is leaking"
+        )
+        assert peer.family is not Family.transition_metal
+
+
+def test_peer_out_of_family_deterministic_for_same_seed() -> None:
+    """Two fresh ``random.Random(42)`` instances yield identical cross-family peers."""
+    rng_a = random.Random(42)
+    rng_b = random.Random(42)
+    assert peer_out_of_family("au-79", rng_a).id == peer_out_of_family("au-79", rng_b).id
+
+
+def test_peer_out_of_family_varies_across_seeds() -> None:
+    """For au-79 (3-5), cross-family peers should span >1 element across 20 seeds.
+
+    The non-transition_metal pool at age_band=3-5 has 10 candidates
+    (alkali_metal:1 + alkaline_earth:1 + noble_gas:2 + nonmetal:4 +
+    post_transition_metal:2), so 20 seeds should hit at least 2 distinct
+    elements.
+    """
+    seen = {peer_out_of_family("au-79", random.Random(s)).id for s in range(20)}
+    assert len(seen) > 1, (
+        f"all 20 seeds picked the same cross-family distractor for au-79: {seen!r}"
+    )
+
+
+def test_peer_out_of_family_raises_on_unknown_id() -> None:
+    """Per N3 done-when: both functions raise on unknown element_id."""
+    with pytest.raises(ValueError, match="(?i)unknown|not found|xx-999"):
+        peer_out_of_family("xx-999", random.Random(0))
+
+
+def test_peer_in_family_age_band_filter_excludes_other_bands(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Synthetic corpus: same family, mixed age bands — only 3-5 peers eligible.
+
+    Production corpus has all age_band=3-5 elements in distinct family
+    slots so this test directly exercises the filter with a fixture
+    that mixes bands within one family. Per N3 risks §7: "Test by
+    adding a synthetic entry to a tmp corpus with age_band='5-7' and
+    confirming it's excluded." We use the canonical 6-8 / 9-12 bands.
+    """
+    _write_corpus(
+        tmp_path,
+        [
+            # Requesting element: age 3-5, family transition_metal
+            _good_entry(
+                id="au-79",
+                symbol="Au",
+                name="Gold",
+                atomic_number=79,
+                atomic_mass=197.0,
+                family="transition_metal",
+                phase_at_room_temp="solid",
+                age_band="3-5",
+            ),
+            # Same family, same band — eligible peer
+            _good_entry(
+                id="ag-47",
+                symbol="Ag",
+                name="Silver",
+                atomic_number=47,
+                atomic_mass=107.9,
+                family="transition_metal",
+                phase_at_room_temp="solid",
+                age_band="3-5",
+            ),
+            # Same family, WRONG band — must be excluded
+            _good_entry(
+                id="pt-78",
+                symbol="Pt",
+                name="Platinum",
+                atomic_number=78,
+                atomic_mass=195.1,
+                family="transition_metal",
+                phase_at_room_temp="solid",
+                age_band="9-12",
+            ),
+            # Same family, WRONG band — must be excluded
+            _good_entry(
+                id="hg-80",
+                symbol="Hg",
+                name="Mercury",
+                atomic_number=80,
+                atomic_mass=200.6,
+                family="transition_metal",
+                phase_at_room_temp="liquid",
+                age_band="6-8",
+            ),
+        ],
+    )
+    monkeypatch.setenv("TOYBOX_DATA_DIR", str(tmp_path))
+    # Sample 30 seeds; every pick must be ag-47 (the only eligible peer).
+    for seed in range(30):
+        peer = peer_in_family("au-79", random.Random(seed))
+        assert peer.id == "ag-47", (
+            f"peer_in_family for au-79 (3-5) returned {peer.id} at age_band={peer.age_band!r} "
+            f"(seed={seed}); expected ag-47 (only same-band same-family peer)"
+        )
+
+
+def test_peer_out_of_family_age_band_filter_excludes_other_bands(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Synthetic corpus: cross-family pool restricted to same age_band."""
+    _write_corpus(
+        tmp_path,
+        [
+            # Requesting element: age 3-5, family transition_metal
+            _good_entry(
+                id="au-79",
+                symbol="Au",
+                name="Gold",
+                atomic_number=79,
+                atomic_mass=197.0,
+                family="transition_metal",
+                phase_at_room_temp="solid",
+                age_band="3-5",
+            ),
+            # Cross-family, same band — eligible
+            _good_entry(
+                id="he-2",
+                symbol="He",
+                name="Helium",
+                atomic_number=2,
+                atomic_mass=4.0,
+                family="noble_gas",
+                phase_at_room_temp="gas",
+                age_band="3-5",
+            ),
+            # Cross-family, WRONG band — must be excluded
+            _good_entry(
+                id="kr-36",
+                symbol="Kr",
+                name="Krypton",
+                atomic_number=36,
+                atomic_mass=83.8,
+                family="noble_gas",
+                phase_at_room_temp="gas",
+                age_band="9-12",
+            ),
+        ],
+    )
+    monkeypatch.setenv("TOYBOX_DATA_DIR", str(tmp_path))
+    for seed in range(30):
+        peer = peer_out_of_family("au-79", random.Random(seed))
+        assert peer.id == "he-2", (
+            f"peer_out_of_family for au-79 (3-5) returned {peer.id} at age_band={peer.age_band!r} "
+            f"(seed={seed}); expected he-2 (only same-band cross-family candidate)"
+        )
+
+
+def test_peer_out_of_family_raises_when_no_cross_family_peer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """If the only same-band entries are all in the requesting family, raise.
+
+    Per N3 design: empty pool -> raise, don't loop, don't return None.
+    """
+    _write_corpus(
+        tmp_path,
+        [
+            _good_entry(
+                id="au-79",
+                symbol="Au",
+                name="Gold",
+                atomic_number=79,
+                atomic_mass=197.0,
+                family="transition_metal",
+                phase_at_room_temp="solid",
+                age_band="3-5",
+            ),
+            _good_entry(
+                id="ag-47",
+                symbol="Ag",
+                name="Silver",
+                atomic_number=47,
+                atomic_mass=107.9,
+                family="transition_metal",
+                phase_at_room_temp="solid",
+                age_band="3-5",
+            ),
+            # Cross-family entry in a different age band — filtered out
+            _good_entry(
+                id="kr-36",
+                symbol="Kr",
+                name="Krypton",
+                atomic_number=36,
+                atomic_mass=83.8,
+                family="noble_gas",
+                phase_at_room_temp="gas",
+                age_band="9-12",
+            ),
+        ],
+    )
+    monkeypatch.setenv("TOYBOX_DATA_DIR", str(tmp_path))
+    with pytest.raises(ValueError, match="(?i)no peer|empty|exhausted|cross|family"):
+        peer_out_of_family("au-79", random.Random(0))

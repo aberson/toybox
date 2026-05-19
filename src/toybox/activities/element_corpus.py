@@ -50,6 +50,7 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import re
 from enum import StrEnum
 from pathlib import Path
@@ -489,6 +490,132 @@ def get_element(element_id: str) -> Element | None:
     return None
 
 
+# ---------------------------------------------------------------------
+# Phase N Step N3 — peer-picker helpers
+# ---------------------------------------------------------------------
+#
+# Feed the Phase N "element microgame" template generator (N4). Two
+# adjacent forks per template each need one same-family peer and one
+# cross-family distractor. Both helpers are age-band-aware so a 3-5
+# Gold activity never offers Plutonium (9-12) as a candidate.
+#
+# Design contract (per documentation/phase-n-plan.md §5 Step N3 and §7
+# risks):
+#
+#   * RNG: caller passes a seeded ``random.Random`` instance. Matches
+#     the project-wide convention (``content_resolver``, ``slots``,
+#     ``feedback``, ``generator`` all type ``rng: random.Random``).
+#     ``random.Random(seed)`` -> deterministic call sequence.
+#
+#   * Filter: candidates restricted to same ``age_band`` as the
+#     requesting element. peer_in_family additionally requires same
+#     ``family`` and excludes the requesting element itself.
+#     peer_out_of_family requires a different ``family`` (which already
+#     excludes self).
+#
+#   * Determinism: candidates are sorted by ``id`` (lexicographic)
+#     before the seeded pick, so corpus file order does NOT leak into
+#     the picker output. Same ``(element_id, seed)`` ALWAYS yields the
+#     same peer regardless of how ``elements.json`` is ordered. Mirrors
+#     the ``pick_element`` sort-then-pick pattern.
+#
+#   * Error contract (stricter than ``get_element`` which returns None):
+#     - Unknown ``element_id`` -> ``ValueError`` per N3 done-when
+#       ("both raise on unknown element_id").
+#     - Empty candidate pool after filtering -> ``ValueError``. We
+#       NEVER loop, NEVER return None, NEVER return the requesting
+#       element itself. Callers (N4 generator) handle this by picking
+#       elements with adequate peer coverage.
+#
+# Corpus shape gotcha (verified against shipped data/elements/elements.json):
+# 15 entries are age_band="3-5" (NOT all 118 as the plan §2 narrative
+# implies). Two of those 15 have NO same-band same-family peer:
+# ``na-11`` (only alkali_metal at 3-5) and ``ca-20`` (only
+# alkaline_earth at 3-5). The N4 generator must skip element_ids where
+# peer_in_family raises — confirmed at plan-time.
+
+
+def peer_in_family(element_id: str, rng: random.Random) -> Element:
+    """Pick a same-family same-age-band peer of ``element_id``, excluding self.
+
+    Args:
+        element_id: Composite id (``<symbol-lower>-<atomic_number>``)
+            of the requesting element.
+        rng: Pre-seeded :class:`random.Random` instance. Determinism
+            contract: ``random.Random(seed)`` produces identical output
+            across calls with the same seed.
+
+    Returns:
+        An :class:`Element` with the same ``family`` and ``age_band``
+        as the requesting element, but a different ``id``.
+
+    Raises:
+        ValueError: If ``element_id`` is not in the corpus, or if no
+            other element in the corpus shares both the requesting
+            element's ``family`` AND ``age_band``. Per N3 §7 risks we
+            NEVER loop, return None, or return self on an empty pool.
+    """
+    target = get_element(element_id)
+    if target is None:
+        raise ValueError(
+            f"peer_in_family: unknown element_id {element_id!r} (not in corpus)"
+        )
+    candidates = [
+        e
+        for e in load_elements()
+        if e.family is target.family
+        and e.age_band == target.age_band
+        and e.id != target.id
+    ]
+    if not candidates:
+        raise ValueError(
+            f"peer_in_family: no same-family same-age-band peer for {element_id!r} "
+            f"(family={target.family.value!r}, age_band={target.age_band!r}); "
+            f"corpus exhausted after filtering"
+        )
+    # Sort by id so the same (element_id, seed) is stable regardless of
+    # corpus file order — matches the pick_element tie-break.
+    candidates.sort(key=lambda e: e.id)
+    return rng.choice(candidates)
+
+
+def peer_out_of_family(element_id: str, rng: random.Random) -> Element:
+    """Pick a cross-family same-age-band distractor for ``element_id``.
+
+    Args:
+        element_id: Composite id of the requesting element.
+        rng: Pre-seeded :class:`random.Random` instance.
+
+    Returns:
+        An :class:`Element` with a DIFFERENT ``family`` from the
+        requesting element but the SAME ``age_band``. (Different family
+        already excludes the requesting element itself.)
+
+    Raises:
+        ValueError: If ``element_id`` is not in the corpus, or if no
+            other-family element in the corpus shares the requesting
+            element's ``age_band``.
+    """
+    target = get_element(element_id)
+    if target is None:
+        raise ValueError(
+            f"peer_out_of_family: unknown element_id {element_id!r} (not in corpus)"
+        )
+    candidates = [
+        e
+        for e in load_elements()
+        if e.family is not target.family and e.age_band == target.age_band
+    ]
+    if not candidates:
+        raise ValueError(
+            f"peer_out_of_family: no cross-family same-age-band peer for {element_id!r} "
+            f"(target family={target.family.value!r}, age_band={target.age_band!r}); "
+            f"corpus exhausted after filtering"
+        )
+    candidates.sort(key=lambda e: e.id)
+    return rng.choice(candidates)
+
+
 __all__ = [
     "AGE_BANDS",
     "AgeBand",
@@ -499,5 +626,7 @@ __all__ = [
     "elements_root",
     "get_element",
     "load_elements",
+    "peer_in_family",
+    "peer_out_of_family",
     "pick_element",
 ]
