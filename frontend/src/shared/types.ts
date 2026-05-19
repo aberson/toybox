@@ -75,6 +75,19 @@ export const ROLE_DISPLAY_NAMES: Record<RoleName, string> = {
 };
 
 /**
+ * Phase N N2 template-type taxonomy — derived at codegen
+ * time from the ``TemplateType`` Literal alias in
+ * ``src/toybox/activities/models.py``. Templates that omit
+ * the field round-trip as ``null``; templates that set it
+ * activate the matching structural validator gate in
+ * ``src/toybox/activities/_validator.py``. The frontend
+ * (Phase O) reads this typed field rather than a freeform
+ * string so ``categorize()`` cannot drift from the Python
+ * source.
+ */
+export type TemplateType = "element_microgame";
+
+/**
  * Phase L L1 picture-reward animation taxonomy — derived at
  * codegen time from the ``Animation`` StrEnum in
  * ``src/toybox/activities/models.py``. Order is member-

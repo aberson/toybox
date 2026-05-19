@@ -1,0 +1,39 @@
+{
+  "intent": "request_activity",
+  "templates": [
+    {
+      "id": "fixture_em_bad_step_count",
+      "title": "Bad step count",
+      "buckets": ["always"],
+      "template_type": "element_microgame",
+      "required_roles": ["guide_mentor"],
+      "optional_roles": [],
+      "recommended_themes": ["silly"],
+      "ending_step": { "kind": "song", "auto": true, "element_id": "au-79" },
+      "steps": [
+        {
+          "id": "intro",
+          "text": "{guide_mentor} shows the Gold card.",
+          "kind": "text",
+          "element_id": "au-79"
+        },
+        {
+          "id": "fork_a",
+          "text": "Which one is also a metal?",
+          "kind": "fork",
+          "element_id": "au-79",
+          "choices": [
+            { "label": "Silver", "next": "end" },
+            { "label": "Helium", "next": "end" }
+          ]
+        },
+        {
+          "id": "end",
+          "text": "Nice work!",
+          "kind": "text",
+          "element_id": "au-79"
+        }
+      ]
+    }
+  ]
+}

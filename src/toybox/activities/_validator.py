@@ -343,6 +343,88 @@ def _distinct_toy_ceiling(template: Template) -> int:
     return len(_collect_role_placeholders(template))
 
 
+def _validate_element_microgame(template: Template) -> None:
+    """Phase N N2: enforce the 7-rule structural shape for templates
+    carrying ``template_type === "element_microgame"``.
+
+    Rules (numbered to match documentation/phase-n-plan.md §2):
+
+    1. Exactly 4 steps.
+    2. ``steps[1].kind == "fork"`` with ``len(choices) == 2``.
+    3. ``steps[2].kind == "fork"`` with ``len(choices) == 2``.
+    4. ``steps[0]`` and ``steps[3]`` have ``kind == "text"``.
+    5. ``element_id`` non-null on every step.
+    6. ``required_roles`` includes ``"guide_mentor"``.
+    7. ``ending_step.kind == "song"``.
+
+    Each violation raises :class:`TemplateGraphError` with a message
+    naming the rule + the offending field / index so operators can
+    locate the row in the template JSON quickly.
+    """
+    template_id = template.id
+
+    # Rule 1: exactly 4 steps.
+    if len(template.steps) != 4:
+        raise TemplateGraphError(
+            f"template {template_id!r}: element_microgame requires "
+            f"exactly 4 steps, got {len(template.steps)}"
+        )
+
+    # Rule 2 + 3: steps[1] and steps[2] are forks with exactly 2 choices.
+    for fork_idx in (1, 2):
+        step = template.steps[fork_idx]
+        if step.kind != "fork":
+            raise TemplateGraphError(
+                f"template {template_id!r}: element_microgame step "
+                f"{fork_idx} (index {fork_idx}) must be kind='fork', "
+                f"got kind={step.kind!r}"
+            )
+        choices = step.choices or []
+        if len(choices) != 2:
+            raise TemplateGraphError(
+                f"template {template_id!r}: element_microgame step "
+                f"{fork_idx} (index {fork_idx}) must have exactly 2 "
+                f"choices, got {len(choices)}"
+            )
+
+    # Rule 4: steps[0] and steps[3] are text.
+    for text_idx in (0, 3):
+        step = template.steps[text_idx]
+        if step.kind != "text":
+            raise TemplateGraphError(
+                f"template {template_id!r}: element_microgame step "
+                f"{text_idx} (index {text_idx}) must be kind='text', "
+                f"got kind={step.kind!r}"
+            )
+
+    # Rule 5: element_id non-null on every step.
+    for idx, step in enumerate(template.steps):
+        if step.element_id is None:
+            raise TemplateGraphError(
+                f"template {template_id!r}: element_microgame step "
+                f"{idx} (index {idx}) must set `element_id` "
+                f"(every step in an element_microgame references "
+                f"the same element)"
+            )
+
+    # Rule 6: required_roles includes "guide_mentor".
+    if Role.guide_mentor not in template.required_roles:
+        declared = sorted(r.value for r in template.required_roles)
+        raise TemplateGraphError(
+            f"template {template_id!r}: element_microgame "
+            f"`required_roles` must include 'guide_mentor'; "
+            f"declared required_roles={declared!r}"
+        )
+
+    # Rule 7: ending_step.kind == "song".
+    if template.ending_step is None or template.ending_step.kind != "song":
+        actual = template.ending_step.kind if template.ending_step is not None else None
+        raise TemplateGraphError(
+            f"template {template_id!r}: element_microgame "
+            f"`ending_step.kind` must equal 'song', got {actual!r}"
+        )
+
+
 def validate_template(template: Template) -> None:
     """Phase K K3: enforce the role + theme + step-kind + ending-step
     shape invariants on a parsed :class:`Template`.
@@ -373,6 +455,16 @@ def validate_template(template: Template) -> None:
     which orchestrates both.
     """
     template_id = template.id
+
+    # ----- (N2) element_microgame structural gate --------------------------
+    # Phase N N2 — when ``template_type === "element_microgame"`` the
+    # template MUST conform to the 7-rule shape documented in
+    # documentation/phase-n-plan.md §2. Runs BEFORE the K3 placeholder /
+    # ceiling gates so a misshapen element_microgame template fails with
+    # the rule-specific message instead of a less-helpful K3 ceiling
+    # diagnostic (the K3 checks assume the legacy role-only shape).
+    if template.template_type == "element_microgame":
+        _validate_element_microgame(template)
 
     # ----- (K3.1) placeholder set ⊆ declared roles ∪ known non-role slots
     placeholder_names = _collect_placeholder_names(template)

@@ -49,6 +49,7 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 from toybox.activities.models import (  # noqa: E402
     Animation,
     RewardType,
+    TemplateType,
 )
 from toybox.activities.roles import (  # noqa: E402
     ROLE_DISPLAY_NAMES,
@@ -109,6 +110,19 @@ def _emit_reward_type_union() -> str:
     """
     parts = " | ".join(f'"{value}"' for value in get_args(RewardType))
     return f"export type RewardType = {parts};"
+
+
+def _emit_template_type_union() -> str:
+    """Emit the ``TemplateType`` string-literal union from the Literal alias.
+
+    Phase N N2: derives the wire vocabulary for ``Template.template_type``
+    from the source-of-truth :data:`TemplateType` alias in
+    ``activities/models.py``. Phase O reads this typed value in the
+    frontend to drive ``categorize()`` — a freeform string would have
+    forced a hand-mirrored magic-string list per code-quality.md §2.
+    """
+    parts = " | ".join(f'"{value}"' for value in get_args(TemplateType))
+    return f"export type TemplateType = {parts};"
 
 
 def _build_types_ts_content() -> str:
@@ -192,6 +206,21 @@ def _build_types_ts_content() -> str:
         f"{_emit_role_display_names_const()}\n"
     )
 
+    template_type_block = (
+        "\n/**\n"
+        " * Phase N N2 template-type taxonomy — derived at codegen\n"
+        " * time from the ``TemplateType`` Literal alias in\n"
+        " * ``src/toybox/activities/models.py``. Templates that omit\n"
+        " * the field round-trip as ``null``; templates that set it\n"
+        " * activate the matching structural validator gate in\n"
+        " * ``src/toybox/activities/_validator.py``. The frontend\n"
+        " * (Phase O) reads this typed field rather than a freeform\n"
+        " * string so ``categorize()`` cannot drift from the Python\n"
+        " * source.\n"
+        " */\n"
+        f"{_emit_template_type_union()}\n"
+    )
+
     reward_block = (
         "\n/**\n"
         " * Phase L L1 picture-reward animation taxonomy — derived at\n"
@@ -213,7 +242,7 @@ def _build_types_ts_content() -> str:
         f"{_emit_reward_type_union()}\n"
     )
 
-    return header + choice_step + role_block + reward_block
+    return header + choice_step + role_block + template_type_block + reward_block
 
 
 def run_error_codes_fallback() -> int:

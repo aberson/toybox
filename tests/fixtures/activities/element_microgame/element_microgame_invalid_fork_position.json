@@ -1,0 +1,49 @@
+{
+  "intent": "request_activity",
+  "templates": [
+    {
+      "id": "fixture_em_bad_fork_position",
+      "title": "Bad fork position",
+      "buckets": ["always"],
+      "template_type": "element_microgame",
+      "required_roles": ["guide_mentor"],
+      "optional_roles": [],
+      "recommended_themes": ["silly"],
+      "ending_step": { "kind": "song", "auto": true, "element_id": "au-79" },
+      "steps": [
+        {
+          "id": "intro_fork",
+          "text": "Pick one!",
+          "kind": "fork",
+          "element_id": "au-79",
+          "choices": [
+            { "label": "A", "next": "middle" },
+            { "label": "B", "next": "middle" }
+          ]
+        },
+        {
+          "id": "middle",
+          "text": "A plain text step where a fork should be.",
+          "kind": "text",
+          "element_id": "au-79"
+        },
+        {
+          "id": "second_fork",
+          "text": "Now a fork at index 2.",
+          "kind": "fork",
+          "element_id": "au-79",
+          "choices": [
+            { "label": "C", "next": "end" },
+            { "label": "D", "next": "end" }
+          ]
+        },
+        {
+          "id": "end",
+          "text": "Done.",
+          "kind": "text",
+          "element_id": "au-79"
+        }
+      ]
+    }
+  ]
+}

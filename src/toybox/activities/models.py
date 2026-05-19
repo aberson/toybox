@@ -127,6 +127,16 @@ def _validate_choice_count(v: list[Choice] | None) -> list[Choice] | None:
 StepKind = Literal["text", "fork", "song", "joke"]
 
 
+# Phase N N2: typed template_type literal. Only one value today
+# (``"element_microgame"``); the validator's structural gate in
+# :mod:`toybox.activities._validator` fires when a template carries
+# this value. Backward-compat: every existing template omits the field
+# and parses as ``template_type=None``. Declared as ``Literal`` so it
+# auto-propagates to the frontend via ``tools/gen_types_ts.py`` (Phase O
+# reads ``template_type`` as a typed field in ``types.ts``).
+TemplateType = Literal["element_microgame"]
+
+
 class Step(BaseModel):
     """Template-time step definition (Phase G).
 
@@ -373,6 +383,29 @@ class Activity(BaseModel):
     toy_ids: tuple[str, ...] = Field(default_factory=tuple)
 
 
+class EndingStep(BaseModel):
+    """Phase N N2: typed ``ending_step`` payload.
+
+    Phase L Step L5 deleted the original ``EndingStep`` model because
+    the runtime no longer consumed the field. Phase N re-introduces a
+    minimal typed shape so the :func:`toybox.activities._validator.validate_template`
+    structural gate for ``template_type === "element_microgame"`` can
+    enforce rule 7 (``ending_step.kind === "song"``).
+
+    ``kind`` is intentionally typed as a free-form string (NOT
+    :data:`StepKind`) so a template authored with the wrong value
+    (e.g. ``"joke"``) parses through Pydantic and reaches the
+    validator, which raises a :class:`TemplateGraphError` naming the
+    rule. Pydantic-level rejection would surface as a generic
+    ``ValidationError`` instead, losing the rule-level context the
+    test suite asserts on.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="ignore")
+
+    kind: str = Field(min_length=1)
+
+
 class Template(BaseModel):
     """Phase K K3: template-time Pydantic shape.
 
@@ -419,6 +452,18 @@ class Template(BaseModel):
     # existing templates parse unchanged and a future surface can
     # reintroduce theme-driven selection.
     recommended_themes: list[Theme] = Field(default_factory=list)
+    # Phase N N2: opt-in template-type marker. ``None`` for every
+    # legacy template; ``"element_microgame"`` activates the 7-rule
+    # structural gate in :func:`toybox.activities._validator.validate_template`.
+    # Pydantic-level :data:`TemplateType` literal restricts the wire
+    # vocabulary; the validator enforces the structural shape.
+    template_type: TemplateType | None = None
+    # Phase N N2: typed ``ending_step`` payload re-introduced (Phase L
+    # Step L5 deleted it). Only consumed by the element_microgame
+    # validator gate today; runtime ignores it. ``extra="ignore"`` on
+    # ``Template`` previously dropped this field on the floor, which
+    # blocked the validator from seeing it.
+    ending_step: EndingStep | None = None
 
     @model_validator(mode="after")
     def _check_role_uniqueness(self) -> Template:
@@ -447,8 +492,10 @@ __all__ = [
     "ActivityStep",
     "Animation",
     "Choice",
+    "EndingStep",
     "RewardType",
     "Step",
     "StepKind",
     "Template",
+    "TemplateType",
 ]

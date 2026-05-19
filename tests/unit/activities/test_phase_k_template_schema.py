@@ -276,10 +276,13 @@ def test_template_round_trip_with_k3_fields() -> None:
     assert template.recommended_themes == [Theme.adventure, Theme.magic]
 
 
-def test_template_ignores_legacy_ending_step_field() -> None:
-    """Phase L Step L5: the ``ending_step`` template field was removed.
-    Existing template JSONs still carry the key — the Pydantic model's
-    ``extra="ignore"`` config silently drops it instead of raising.
+def test_template_parses_legacy_ending_step_field() -> None:
+    """Phase N N2 re-introduced the ``ending_step`` field on ``Template``
+    (Phase L Step L5 had dropped it) so the element_microgame
+    structural validator can gate ``ending_step.kind == "song"``. This
+    test pins the new behavior: the field parses cleanly onto the
+    model for any template that carries it, with a minimal typed
+    ``EndingStep`` shape that exposes ``kind``.
     """
     template = Template.model_validate(
         {
@@ -290,8 +293,8 @@ def test_template_ignores_legacy_ending_step_field() -> None:
             "ending_step": {"kind": "song", "auto": True},
         }
     )
-    # No attribute leaks onto the model; reading would raise AttributeError.
-    assert not hasattr(template, "ending_step")
+    assert template.ending_step is not None
+    assert template.ending_step.kind == "song"
 
 
 def test_template_rejects_duplicate_required_roles() -> None:
