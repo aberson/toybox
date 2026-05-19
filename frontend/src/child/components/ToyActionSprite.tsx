@@ -60,11 +60,12 @@ export function ToyActionSprite(props: ToyActionSpriteProps): JSX.Element | null
     width: size,
     height: size,
     flexShrink: 0,
-    // Critical for pixel-art: don't smooth-resample on upscale. Both
-    // ``pixelated`` (modern browsers) and ``crisp-edges`` (Firefox
-    // legacy) are kept so the kiosk renders sharp regardless of the
-    // browser version on the family device.
-    imageRendering: "pixelated",
+    // Phase P4 ships 512² source PNGs (was 128²); the browser's
+    // default smooth resampling on downscale to 112 px display is
+    // correct. No ``imageRendering: pixelated`` override here —
+    // pixelated was a pixel-art crispness hint for upscaling the
+    // old 128² source and would now make the 512→112 downscale
+    // jagged.
     objectFit: "contain",
     // Transparent background — sprite PNGs have an alpha channel and
     // we want the kiosk's gradient to show through.

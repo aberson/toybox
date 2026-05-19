@@ -281,6 +281,7 @@ The pipeline change alone produces no user-visible difference until parents trig
 - **Produces:** `ToyActionSprite.tsx` modified, related vitest snapshots updated.
 - **Done when:** `npm run test` green. `npm run typecheck` + `npm run lint` clean.
 - **Depends on:** P4 (so the new 512 sprites are what the modified frontend will render against; reverse order means existing 128 sprites render smoothly-blurry rather than pixelated, which is correct but transitional).
+- **Status:** DONE (2026-05-18). One-line removal in `ToyActionSprite.tsx` + comment refresh. No test changes (existing tests don't assert on `imageRendering`). ToyActionGrid.tsx inherits cleanly via `<ToyActionSprite>` reuse. `RewardStep.tsx:253` kept its own `pixelated` rule (different image surface — reward pictures, not toy_action sprites; out of P5 scope).
 
 ### Step P6: Global "Regenerate every toy" backend endpoint + parent UI button
 - **Problem:** **Disambiguation up front:** a per-toy regenerate-all already ships at `POST /api/toys/{toy_id}/actions/regenerate` ([toys.py:1287](../src/toybox/api/toys.py#L1287)) returning `RegenerateResponse(queued=list[str], mode=...)`, and `ToyActionGrid` already exposes an `onRegenerateAll` prop ([ToyActionGrid.tsx:47](../frontend/src/parent/components/ToyActionGrid.tsx#L47)) wired up per-toy in `ToyIngest.tsx:905,1352`. **Phase P adds a separate GLOBAL endpoint + button that enqueues every (toy × slot) across the whole library**, distinct from the existing per-toy flow. Do not collide names.
@@ -398,7 +399,7 @@ The pipeline change alone produces no user-visible difference until parents trig
 | P2 — Operator: download + regression smoke | DONE (2026-05-18) |
 | P3 — capability.py checkpoint extension | DONE (2026-05-18) |
 | P4 — pipeline.py rewrite (IPA + 512² + extended negative + drop hex-tokens) | DONE (2026-05-18) |
-| P5 — Frontend: drop `imageRendering: pixelated` | not started |
+| P5 — Frontend: drop `imageRendering: pixelated` | DONE (2026-05-18) |
 | P6 — GLOBAL "Regenerate every toy" endpoint + parent UI button | not started |
 | P7 — Operator: smoke gate + UAT-tune IPA scale (run-doc only, no code edit) | not started |
 | P7b — Code: apply UAT-chosen IP_ADAPTER_SCALE to pipeline.py + pin test | not started |
