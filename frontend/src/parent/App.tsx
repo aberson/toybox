@@ -63,12 +63,61 @@ type AuthMode = "bootstrap" | "setup" | "login" | "ready" | "error";
 // the plan's Vocabulary section. Kept as string-literal unions (not
 // enums) so the values themselves double as ``data-testid`` suffixes.
 type TopTab = "play" | "kids-toyboxes" | "settings";
-type PlaySubTab = "play-ideas" | "transcription";
+// Phase O Step O1: widened from the legacy ("play-ideas" | "transcription")
+// pair to five sub-tabs. A pre-mount migration in localStorage rewrites the
+// legacy values onto the new union so a parent returning from H/I/J/K/L/M/N
+// lands on the equivalent new tab instead of falling back to the default.
+type PlaySubTab =
+  | "all"
+  | "adventures"
+  | "elements"
+  | "feelings-friends"
+  | "transcriptions";
 type KidsSubTab = "toys" | "children" | "rooms" | "rewards";
 type SettingsSubTab = "settings" | "stats";
 
 const TOP_TAB_VALUES: readonly TopTab[] = ["play", "kids-toyboxes", "settings"];
-const PLAY_SUBTAB_VALUES: readonly PlaySubTab[] = ["play-ideas", "transcription"];
+const PLAY_SUBTAB_VALUES: readonly PlaySubTab[] = [
+  "all",
+  "adventures",
+  "elements",
+  "feelings-friends",
+  "transcriptions",
+];
+const PLAY_TAB_STORAGE_KEY = "toybox.parent.tabs.play";
+
+// Phase O Step O1: one-shot pre-mount migration for the PlaySubTab
+// localStorage key. Runs once at module-load (and is idempotent — repeat
+// calls with a stored value already in the new union are a no-op). The
+// rewrite happens BEFORE ``useTabState`` reads the key during its lazy
+// initializer so the hook sees the post-migration value on first mount.
+//
+// Migration table:
+//   stored "play-ideas"    → write "all"
+//   stored "transcription" → write "transcriptions"
+//   stored anything else   → write "all" (the new default)
+//   no stored value        → write "all" so the next reload short-circuits
+//   stored value in union  → no-op (idempotent)
+function migratePlaySubTabStorage(): void {
+  try {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem(PLAY_TAB_STORAGE_KEY);
+    if (stored !== null && PLAY_SUBTAB_VALUES.includes(stored as PlaySubTab)) {
+      return; // already valid → no-op
+    }
+    let next: PlaySubTab;
+    if (stored === "play-ideas") {
+      next = "all";
+    } else if (stored === "transcription") {
+      next = "transcriptions";
+    } else {
+      next = "all";
+    }
+    window.localStorage.setItem(PLAY_TAB_STORAGE_KEY, next);
+  } catch {
+    // Best-effort: locked-down browsers / SSR shouldn't crash the app.
+  }
+}
 const KIDS_SUBTAB_VALUES: readonly KidsSubTab[] = [
   "toys",
   "children",
@@ -78,6 +127,13 @@ const KIDS_SUBTAB_VALUES: readonly KidsSubTab[] = [
 const SETTINGS_SUBTAB_VALUES: readonly SettingsSubTab[] = ["settings", "stats"];
 
 export function App(): JSX.Element {
+  // Phase O Step O1: run the localStorage migration BEFORE the first
+  // ``useTabState`` call so the hook's lazy initializer reads the
+  // post-migration value. The migration itself is idempotent — a stored
+  // value already in the new union is a no-op — so calling it on every
+  // render is cheap (one read + at most one write) and avoids needing a
+  // module-scoped one-shot guard that would interfere with test re-mounts.
+  migratePlaySubTabStorage();
   const state = useParentStore();
   // Live audio block from the metrics topic. Seeded by a one-shot
   // ``GET /api/metrics`` during bootstrap and refreshed by every
@@ -166,8 +222,8 @@ export function App(): JSX.Element {
     TOP_TAB_VALUES,
   );
   const playTab = useTabState<PlaySubTab>(
-    "toybox.parent.tabs.play",
-    "play-ideas",
+    PLAY_TAB_STORAGE_KEY,
+    "all",
     PLAY_SUBTAB_VALUES,
   );
   const kidsTab = useTabState<KidsSubTab>(
@@ -1064,31 +1120,32 @@ export function App(): JSX.Element {
         <div role="tabpanel" style={{ marginTop: 16 }}>
           {topTab.value === "play" && (
             <>
+              {/* Phase O Step O1: widened to five sub-tabs. The All
+                  / Adventures / Elements / Feelings & Friends sub-tabs
+                  all mount PlayQueueList with a (currently no-op)
+                  filterCategory prop; Transcriptions continues to mount
+                  TranscriptsManager. O2 will activate the filter. */}
               <SubTabs<PlaySubTab>
                 items={[
-                  { key: "play-ideas", label: "Play Ideas" },
-                  { key: "transcription", label: "Transcription" },
+                  { key: "all", label: "All" },
+                  { key: "adventures", label: "Adventures" },
+                  { key: "elements", label: "Elements" },
+                  { key: "feelings-friends", label: "Feelings & Friends" },
+                  { key: "transcriptions", label: "Transcriptions" },
                 ]}
                 value={playTab.value}
                 onChange={playTab.setValue}
               />
               <div role="tabpanel" style={{ marginTop: 12 }}>
-                {playTab.value === "play-ideas" && (
+                {playTab.value !== "transcriptions" && (
                   <>
-                    {/* Phase J step J8: PlayQueueList owns the
-                        pinned-active vs. proposed-queue layout
-                        internally. State for both slots lives in the
-                        store and threads in via props; the component
-                        also owns the TTL fade machinery + per-row
-                        busy keys. Pre-J8 the showSuggestion /
-                        showPanel gates rendered either SuggestionCard
-                        OR ActivityPanel — now they coexist when both
-                        slots are populated (an active card pinned
-                        with proposed cards queued underneath). */}
                     <PlayQueueList
                       active={state.active}
                       proposedList={state.proposedList}
                       cadenceSeconds={playCadenceSeconds}
+                      filterCategory={
+                        playTab.value === "all" ? undefined : playTab.value
+                      }
                       onApprove={handleApprove}
                       onDismiss={handleDismiss}
                       onRegenerate={handleRegenerate}
@@ -1105,18 +1162,12 @@ export function App(): JSX.Element {
                       activeRewardsCount={activeRewardsCount}
                       activeRewards={activeRewards}
                     />
-                    {/* Phase J step J8: TriggerButton restyled and
-                        repositioned below the queue. Pre-J8 it was the
-                        prominent top-of-tab CTA; with the autonomous
-                        cadence loop seeding proposals, the manual
-                        trigger becomes a fallback affordance. J10
-                        will tighten the link-style polish. */}
                     <div style={{ marginTop: 12, textAlign: "right" }}>
                       <TriggerButton onTrigger={handleTrigger} />
                     </div>
                   </>
                 )}
-                {playTab.value === "transcription" && (
+                {playTab.value === "transcriptions" && (
                   <TranscriptsManager
                     api={api}
                     subscribeToTranscripts={subscribeToTranscripts}

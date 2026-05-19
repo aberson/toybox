@@ -307,3 +307,107 @@ describe("PlayQueueList TTL fade machinery", () => {
     expect(button.textContent).toContain("try a different one");
   });
 });
+
+// Phase O Step O1: PlayQueueList accepts a new optional
+// ``filterCategory`` prop (``"adventures" | "elements" |
+// "feelings-friends"`` or undefined). In O1 the prop is plumbed
+// through the type signature but is a runtime no-op — the list still
+// renders every row regardless of which value is passed. O2 will
+// activate the filter; this suite pins the "prop accepted but no-op"
+// contract so O2 has something to flip green.
+//
+// The type-level expectations are enforced by ``tsc`` (the test file
+// passes ``filterCategory="adventures"`` etc. to the component; if the
+// prop is missing from the public interface, the test file fails to
+// compile under ``npm run typecheck`` which the project's CI gate
+// runs alongside vitest). Runtime expectations are pinned by the
+// counts below.
+describe("PlayQueueList filterCategory prop (Phase O Step O1)", () => {
+  it("accepts filterCategory='adventures' without crashing", () => {
+    const handlers = buildHandlers();
+    render(
+      <PlayQueueList
+        active={null}
+        proposedList={[fakeActivity({ id: "p-adv" })]}
+        cadenceSeconds={30}
+        filterCategory="adventures"
+        {...handlers}
+      />,
+    );
+    expect(screen.getByTestId("play-queue-list")).toBeTruthy();
+    // Row still renders — filter is a no-op in O1.
+    expect(screen.queryAllByTestId("play-queue-row")).toHaveLength(1);
+  });
+
+  it("accepts filterCategory='elements' without crashing", () => {
+    const handlers = buildHandlers();
+    render(
+      <PlayQueueList
+        active={null}
+        proposedList={[fakeActivity({ id: "p-elem" })]}
+        cadenceSeconds={30}
+        filterCategory="elements"
+        {...handlers}
+      />,
+    );
+    expect(screen.getByTestId("play-queue-list")).toBeTruthy();
+    expect(screen.queryAllByTestId("play-queue-row")).toHaveLength(1);
+  });
+
+  it("accepts filterCategory='feelings-friends' without crashing", () => {
+    const handlers = buildHandlers();
+    render(
+      <PlayQueueList
+        active={null}
+        proposedList={[fakeActivity({ id: "p-ff" })]}
+        cadenceSeconds={30}
+        filterCategory="feelings-friends"
+        {...handlers}
+      />,
+    );
+    expect(screen.getByTestId("play-queue-list")).toBeTruthy();
+    expect(screen.queryAllByTestId("play-queue-row")).toHaveLength(1);
+  });
+
+  it("with 4 mixed-category rows + filterCategory='adventures', still renders all 4 (O1 no-op contract)", () => {
+    const handlers = buildHandlers();
+    const rows = [
+      fakeActivity({ id: "p-adv-1", title: "Castle escape" }),
+      fakeActivity({ id: "p-elem-1", title: "Cardboard rocket" }),
+      fakeActivity({ id: "p-ff-1", title: "Talk it out" }),
+      fakeActivity({ id: "p-adv-2", title: "Treasure map" }),
+    ];
+    render(
+      <PlayQueueList
+        active={null}
+        proposedList={rows}
+        cadenceSeconds={30}
+        filterCategory="adventures"
+        {...handlers}
+      />,
+    );
+    // In O1 the prop is a no-op — all 4 rows render regardless of the
+    // filterCategory value. O2 flips this to "only adventures-category
+    // rows render," but that's an O2 contract.
+    expect(screen.queryAllByTestId("play-queue-row")).toHaveLength(4);
+    expect(screen.queryAllByTestId("suggestion-card")).toHaveLength(4);
+  });
+
+  it("with filterCategory undefined, behaviour matches the legacy unfiltered call site", () => {
+    const handlers = buildHandlers();
+    const rows = [
+      fakeActivity({ id: "p-1" }),
+      fakeActivity({ id: "p-2" }),
+      fakeActivity({ id: "p-3" }),
+    ];
+    render(
+      <PlayQueueList
+        active={null}
+        proposedList={rows}
+        cadenceSeconds={30}
+        {...handlers}
+      />,
+    );
+    expect(screen.queryAllByTestId("play-queue-row")).toHaveLength(3);
+  });
+});

@@ -340,9 +340,13 @@ describe("App tab shell (post-PIN, H2)", () => {
     expect(screen.getByTestId("tab-play")).toBeTruthy();
     expect(screen.getByTestId("tab-kids-toyboxes")).toBeTruthy();
     expect(screen.getByTestId("tab-settings")).toBeTruthy();
-    // Play is the default top tab; its sub-tabs are visible.
-    expect(screen.getByTestId("subtab-play-ideas")).toBeTruthy();
-    expect(screen.getByTestId("subtab-transcription")).toBeTruthy();
+    // Play is the default top tab; its sub-tabs are visible. Phase O
+    // Step O1 widened the Play sub-tabs from the (play-ideas |
+    // transcription) pair to the five-value union; assert the new
+    // testids — the legacy keys are migrated by App's localStorage
+    // pre-mount migration.
+    expect(screen.getByTestId("subtab-all")).toBeTruthy();
+    expect(screen.getByTestId("subtab-transcriptions")).toBeTruthy();
     // Kids & Toyboxes placeholder is NOT rendered while Play is active.
     expect(screen.queryByTestId("kids-toyboxes-placeholder")).toBeNull();
   });
@@ -360,7 +364,7 @@ describe("App tab shell (post-PIN, H2)", () => {
     // H3: the placeholder is gone; ToyIngest is the default sub-tab.
     expect(screen.queryByTestId("kids-toyboxes-placeholder")).toBeNull();
     // Play-tab content is no longer in the DOM.
-    expect(screen.queryByTestId("subtab-play-ideas")).toBeNull();
+    expect(screen.queryByTestId("subtab-all")).toBeNull();
   });
 
   it("switching to Settings shows its sub-tabs and mounts SettingsPanel by default", async () => {
@@ -401,19 +405,21 @@ describe("App tab shell (post-PIN, H2)", () => {
     expect(screen.queryByTestId("settings-panel")).toBeNull();
   });
 
-  it("Play sub-tab persists in localStorage on Transcription select", async () => {
+  it("Play sub-tab persists in localStorage on Transcriptions select", async () => {
     stubFullAuthFetch({ pin_set: true });
     render(<App />);
     await driveLoginToTabShell();
     act(() => {
-      fireEvent.click(screen.getByTestId("subtab-transcription"));
+      // Phase O Step O1 rename: ``transcription`` → ``transcriptions``.
+      fireEvent.click(screen.getByTestId("subtab-transcriptions"));
     });
     // Persisted under the documented storage key — the H6 UAT relies
     // on this so a hard refresh comes back on the last-selected tab.
     expect(window.localStorage.getItem("toybox.parent.tabs.play")).toBe(
-      "transcription",
+      "transcriptions",
     );
-    // The TriggerButton (Play Ideas content) is no longer mounted.
+    // The TriggerButton (Play content) is no longer mounted under the
+    // Transcriptions sub-tab.
     expect(screen.queryByTestId("trigger-button")).toBeNull();
   });
 

@@ -235,8 +235,9 @@ describe("App transcript retention (I3)", () => {
     stubFullAuthFetch({ retentionSeconds: 900 });
     render(<App />);
     await driveLoginToTabShell();
-    // Switch to Play → Transcription so TranscriptsManager mounts.
-    fireEvent.click(screen.getByTestId("subtab-transcription"));
+    // Switch to Play → Transcriptions so TranscriptsManager mounts.
+    // Phase O Step O1 rename: ``transcription`` → ``transcriptions``.
+    fireEvent.click(screen.getByTestId("subtab-transcriptions"));
     await waitFor(() => {
       expect(screen.queryByTestId("transcripts-manager")).toBeTruthy();
     });

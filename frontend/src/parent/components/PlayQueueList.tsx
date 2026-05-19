@@ -91,7 +91,31 @@ export interface PlayQueueListProps {
   // Threaded App-side from the same bootstrap ``listRewards`` GET as
   // ``activeRewardsCount``.
   activeRewards?: ReadonlyArray<{ id: string; display_name: string }>;
+  // Phase O Step O1: optional category filter for the four content
+  // sub-tabs. In O1 the prop is plumbed through the type signature
+  // (so App.tsx can route the four PlayQueueList instances) but the
+  // runtime is a no-op — every row still renders regardless of the
+  // value. The only O1 behaviour wired to the prop is the empty-state
+  // copy, which differentiates "no play ideas at all" from
+  // "no adventures suggested yet" etc. O2 will activate the row filter.
+  filterCategory?: "adventures" | "elements" | "feelings-friends";
 }
+
+// Phase O Step O1: empty-state copy keyed by the new ``filterCategory``
+// prop. Undefined (the "all" sub-tab default) shows the generic copy.
+// O2 will reuse the same map when the filter activates so the
+// undefined/no-rows-after-filter branches stay distinguishable.
+const EMPTY_STATE_COPY: {
+  all: string;
+  adventures: string;
+  elements: string;
+  "feelings-friends": string;
+} = {
+  all: "No play ideas yet. Approve one when a suggestion appears.",
+  adventures: "No adventures suggested yet.",
+  elements: "No element activities suggested yet.",
+  "feelings-friends": "No feelings & friends activities suggested yet.",
+};
 
 // Keyed busy map: (action, id) → in-flight flag. A nested record keeps
 // the typing simple while still letting two rows have different actions
@@ -147,6 +171,7 @@ export function PlayQueueList(props: PlayQueueListProps): JSX.Element {
     songsEnabled,
     activeRewardsCount,
     activeRewards,
+    filterCategory,
   } = props;
 
   const [busy, setBusy] = useState<BusyMap>(() => emptyBusy());
@@ -320,6 +345,20 @@ export function PlayQueueList(props: PlayQueueListProps): JSX.Element {
   const visibleProposed = proposedList.filter(
     (row) => !locallyDismissed.has(row.id),
   );
+  // Phase O Step O1: render the per-tab empty-state copy when the
+  // proposed list is empty AND no active activity is pinned. The
+  // SuggestionCard layout has no inline empty affordance — pre-O1 the
+  // empty queue simply showed an empty ``<section>`` and the user had
+  // no copy explaining what was supposed to happen next. The copy is
+  // keyed by ``filterCategory`` so each of the four content sub-tabs
+  // can distinguish "no play ideas at all" from "no adventures
+  // suggested yet" etc. The "transcriptions" sub-tab mounts
+  // TranscriptsManager directly (not PlayQueueList), so it never reaches
+  // this branch.
+  const emptyStateCopy =
+    EMPTY_STATE_COPY[filterCategory ?? "all"];
+  const showEmptyState =
+    active === null && visibleProposed.length === 0;
 
   return (
     <section data-testid="play-queue-list">
@@ -416,6 +455,11 @@ export function PlayQueueList(props: PlayQueueListProps): JSX.Element {
           </div>
         );
       })}
+      {showEmptyState && (
+        <p data-testid="play-queue-empty" style={{ color: "#6b7280" }}>
+          {emptyStateCopy}
+        </p>
+      )}
     </section>
   );
 }
