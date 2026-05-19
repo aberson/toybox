@@ -369,36 +369,23 @@ describe("PlayQueueList filterCategory prop (Phase O Step O1)", () => {
     expect(screen.queryAllByTestId("play-queue-row")).toHaveLength(1);
   });
 
-  it("with 4 mixed-category rows + filterCategory='adventures', still renders all 4 (O1 no-op contract)", () => {
+  // O1 no-op tests for type-signature-acceptance retained above
+  // (filterCategory='adventures', 'elements', 'feelings-friends'
+  // accept-without-crash). The O1-era "4 mixed rows still render all
+  // 4" test was SUPERSEDED by the O2 activation suite below — see
+  // "PlayQueueList filterCategory prop (Phase O Step O2 — filter
+  // activation)".
+
+  it("with filterCategory undefined and 3 mixed rows, all 3 still render (pass-through)", () => {
+    // Pass-through pin: when the prop is undefined the helper must
+    // bypass categorize() entirely and render the full ``proposedList``
+    // unchanged. The same 3 mixed-category rows the O2 activation
+    // suite uses below — but with no filter, all 3 must render.
     const handlers = buildHandlers();
     const rows = [
       fakeActivity({ id: "p-adv-1", title: "Castle escape" }),
       fakeActivity({ id: "p-elem-1", title: "Cardboard rocket" }),
       fakeActivity({ id: "p-ff-1", title: "Talk it out" }),
-      fakeActivity({ id: "p-adv-2", title: "Treasure map" }),
-    ];
-    render(
-      <PlayQueueList
-        active={null}
-        proposedList={rows}
-        cadenceSeconds={30}
-        filterCategory="adventures"
-        {...handlers}
-      />,
-    );
-    // In O1 the prop is a no-op — all 4 rows render regardless of the
-    // filterCategory value. O2 flips this to "only adventures-category
-    // rows render," but that's an O2 contract.
-    expect(screen.queryAllByTestId("play-queue-row")).toHaveLength(4);
-    expect(screen.queryAllByTestId("suggestion-card")).toHaveLength(4);
-  });
-
-  it("with filterCategory undefined, behaviour matches the legacy unfiltered call site", () => {
-    const handlers = buildHandlers();
-    const rows = [
-      fakeActivity({ id: "p-1" }),
-      fakeActivity({ id: "p-2" }),
-      fakeActivity({ id: "p-3" }),
     ];
     render(
       <PlayQueueList
@@ -409,5 +396,203 @@ describe("PlayQueueList filterCategory prop (Phase O Step O1)", () => {
       />,
     );
     expect(screen.queryAllByTestId("play-queue-row")).toHaveLength(3);
+  });
+});
+
+// Phase O Step O2 — filter activation. The ``filterCategory`` prop
+// (plumbed by O1, no-op until now) MUST filter ``proposedList`` via
+// ``categorize()`` before rendering. The O1 "with 4 mixed-category
+// rows + filterCategory='adventures', still renders all 4" no-op
+// assertion was SUPERSEDED by this suite — that test was rewritten
+// above as the pass-through (undefined) check and is no longer a
+// no-op assertion.
+//
+// The fixture helper below constructs three activities — one per
+// content category (Adventures, Elements, Feelings & Friends) — using
+// the Phase O typed wire-shape additions (``recommended_themes`` on
+// the activity, ``element_id`` on steps). Each test passes
+// ``filterCategory`` and asserts exactly one row renders, identified
+// by ``data-activity-id`` on the suggestion-card.
+//
+// Type-shape note: the fake activities below set
+// ``recommended_themes`` directly + steps with ``element_id`` —
+// fields the Phase O O2 wire-shape widening adds to Activity /
+// ActivityStep. If the dev hasn't yet widened the parent ``Activity``
+// + ``ActivityStep`` types (via the codegen or by hand), this file
+// fails to typecheck before any assertion fires. That is the desired
+// red for the TDD red→green cycle.
+
+interface ActivityStepWithElement {
+  seq: number;
+  body: string;
+  sfx: string | null;
+  expected_action: string | null;
+  current: boolean;
+  element_id: string | null;
+}
+
+function makeAdventureActivity(id: string, title: string): Activity {
+  // No element_id on any step, no feelings theme → categorize() returns
+  // "adventures".
+  const step: ActivityStepWithElement = {
+    seq: 1,
+    body: "Build a fort",
+    sfx: null,
+    expected_action: null,
+    current: false,
+    element_id: null,
+  };
+  return fakeActivity({
+    id,
+    title,
+    steps: [step] as unknown as Activity["steps"],
+    recommended_themes: [],
+  } as unknown as Partial<Activity>);
+}
+
+function makeElementActivity(id: string, title: string): Activity {
+  // element_id non-null on at least one step → categorize() returns
+  // "elements" (regardless of recommended_themes).
+  const step: ActivityStepWithElement = {
+    seq: 1,
+    body: "Look at the Hydrogen card",
+    sfx: null,
+    expected_action: null,
+    current: false,
+    element_id: "h-1",
+  };
+  return fakeActivity({
+    id,
+    title,
+    steps: [step] as unknown as Activity["steps"],
+    recommended_themes: [],
+  } as unknown as Partial<Activity>);
+}
+
+function makeFeelingsFriendsActivity(id: string, title: string): Activity {
+  // No element_id, but recommended_themes includes "feelings" →
+  // categorize() returns "feelings-friends".
+  const step: ActivityStepWithElement = {
+    seq: 1,
+    body: "Talk about a big feeling",
+    sfx: null,
+    expected_action: null,
+    current: false,
+    element_id: null,
+  };
+  return fakeActivity({
+    id,
+    title,
+    steps: [step] as unknown as Activity["steps"],
+    recommended_themes: ["feelings"],
+  } as unknown as Partial<Activity>);
+}
+
+describe("PlayQueueList filterCategory prop (Phase O Step O2 — filter activation)", () => {
+  it("filterCategory='elements' renders only the element activity", () => {
+    const handlers = buildHandlers();
+    const rows = [
+      makeAdventureActivity("p-adv-1", "Castle escape"),
+      makeElementActivity("p-elem-1", "Hydrogen"),
+      makeFeelingsFriendsActivity("p-ff-1", "Big feelings"),
+    ];
+    render(
+      <PlayQueueList
+        active={null}
+        proposedList={rows}
+        cadenceSeconds={30}
+        filterCategory="elements"
+        {...handlers}
+      />,
+    );
+    const visibleRows = screen.queryAllByTestId("play-queue-row");
+    expect(visibleRows).toHaveLength(1);
+    expect(visibleRows[0]?.getAttribute("data-activity-id")).toBe("p-elem-1");
+  });
+
+  it("filterCategory='adventures' renders only the adventure activity", () => {
+    const handlers = buildHandlers();
+    const rows = [
+      makeAdventureActivity("p-adv-1", "Castle escape"),
+      makeElementActivity("p-elem-1", "Hydrogen"),
+      makeFeelingsFriendsActivity("p-ff-1", "Big feelings"),
+    ];
+    render(
+      <PlayQueueList
+        active={null}
+        proposedList={rows}
+        cadenceSeconds={30}
+        filterCategory="adventures"
+        {...handlers}
+      />,
+    );
+    const visibleRows = screen.queryAllByTestId("play-queue-row");
+    expect(visibleRows).toHaveLength(1);
+    expect(visibleRows[0]?.getAttribute("data-activity-id")).toBe("p-adv-1");
+  });
+
+  it("filterCategory='feelings-friends' renders only the SEL activity", () => {
+    const handlers = buildHandlers();
+    const rows = [
+      makeAdventureActivity("p-adv-1", "Castle escape"),
+      makeElementActivity("p-elem-1", "Hydrogen"),
+      makeFeelingsFriendsActivity("p-ff-1", "Big feelings"),
+    ];
+    render(
+      <PlayQueueList
+        active={null}
+        proposedList={rows}
+        cadenceSeconds={30}
+        filterCategory="feelings-friends"
+        {...handlers}
+      />,
+    );
+    const visibleRows = screen.queryAllByTestId("play-queue-row");
+    expect(visibleRows).toHaveLength(1);
+    expect(visibleRows[0]?.getAttribute("data-activity-id")).toBe("p-ff-1");
+  });
+
+  it("filterCategory=undefined renders all 3 mixed rows (pass-through)", () => {
+    const handlers = buildHandlers();
+    const rows = [
+      makeAdventureActivity("p-adv-1", "Castle escape"),
+      makeElementActivity("p-elem-1", "Hydrogen"),
+      makeFeelingsFriendsActivity("p-ff-1", "Big feelings"),
+    ];
+    render(
+      <PlayQueueList
+        active={null}
+        proposedList={rows}
+        cadenceSeconds={30}
+        {...handlers}
+      />,
+    );
+    expect(screen.queryAllByTestId("play-queue-row")).toHaveLength(3);
+  });
+
+  it("filterCategory='elements' with no element activities shows the Elements empty-state copy", () => {
+    // Per plan §3: empty-state copy per tab. When the filter eliminates
+    // every row, PlayQueueList must surface the per-category empty-state
+    // string (NOT the generic "no play ideas yet" string).
+    const handlers = buildHandlers();
+    const rows = [
+      makeAdventureActivity("p-adv-1", "Castle escape"),
+      makeFeelingsFriendsActivity("p-ff-1", "Big feelings"),
+    ];
+    render(
+      <PlayQueueList
+        active={null}
+        proposedList={rows}
+        cadenceSeconds={30}
+        filterCategory="elements"
+        {...handlers}
+      />,
+    );
+    // All visible rows filtered out — empty-state surfaces.
+    expect(screen.queryAllByTestId("play-queue-row")).toHaveLength(0);
+    const emptyState = screen.getByTestId("play-queue-empty");
+    expect(emptyState.textContent).toContain(
+      "No element activities suggested yet.",
+    );
   });
 });

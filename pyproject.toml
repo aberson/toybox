@@ -77,6 +77,16 @@ extend-exclude = ["frontend", "data"]
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]
 
+[tool.ruff.lint.per-file-ignores]
+# Phase O Step O2 codegen test surfaces a diagnostic excerpt of
+# ``types.ts`` content around the searched-for field name. The f-string
+# carrying the excerpt expression exceeds the 100-char line cap; the
+# expression is the assertion's diagnostic value (load-bearing for the
+# error message a future regression would emit) and isn't a natural
+# breakpoint. The lint allowance is scoped per-file so the rest of the
+# codebase still enforces E501.
+"tests/unit/activities/test_phase_o_types_ts_codegen.py" = ["E501"]
+
 [tool.mypy]
 strict = true
 python_version = "3.12"

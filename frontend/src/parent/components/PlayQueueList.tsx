@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { Activity, RewardType } from "../api";
 import { ActivityPanel } from "./ActivityPanel";
+import { categorize } from "./categorize";
 import { SuggestionCard } from "./SuggestionCard";
 
 // Phase J step J8: scrolling play-queue list. Renders the pinned active
@@ -342,9 +343,40 @@ export function PlayQueueList(props: PlayQueueListProps): JSX.Element {
 
   // Renders nothing when both slots are empty so an empty queue
   // doesn't leave a stray empty container on screen.
-  const visibleProposed = proposedList.filter(
-    (row) => !locallyDismissed.has(row.id),
-  );
+  //
+  // Phase O Step O2: when ``filterCategory`` is defined, narrow the
+  // visible list to only the rows whose ``categorize(activity)`` ===
+  // the requested bucket. ``undefined`` (the "all" sub-tab default) is
+  // pass-through — every row that survives the locally-dismissed sweep
+  // is rendered. The per-category empty-state copy below already
+  // distinguishes "no play ideas at all" (all tab) from "no adventures
+  // suggested yet" etc. so a fully-filtered-out list still surfaces
+  // the right empty affordance.
+  //
+  // Edge case: rows that arrive WITHOUT categorization signals (neither
+  // ``recommended_themes`` nor any step ``element_id`` — both fields
+  // ``undefined``, not just empty/null) are pre-O2 wire-shape envelopes
+  // that the backend may still emit for legacy / not-yet-template-aware
+  // rows. These rows pass through every filter so a fresh-bootstrap
+  // dashboard doesn't render an empty queue before the codegen-widened
+  // wire shape settles. The new O2 fixture helpers always set both
+  // fields explicitly (``recommended_themes: []`` + ``element_id: null``)
+  // so this edge case only triggers for envelopes that pre-date the
+  // Phase O wire-shape widening.
+  const visibleProposed = proposedList
+    .filter((row) => !locallyDismissed.has(row.id))
+    .filter((row) => {
+      if (filterCategory === undefined) {
+        return true;
+      }
+      const hasCategorizationSignals =
+        row.recommended_themes !== undefined ||
+        row.steps.some((step) => step.element_id !== undefined);
+      if (!hasCategorizationSignals) {
+        return true;
+      }
+      return categorize(row) === filterCategory;
+    });
   // Phase O Step O1: render the per-tab empty-state copy when the
   // proposed list is empty AND no active activity is pinned. The
   // SuggestionCard layout has no inline empty affordance — pre-O1 the

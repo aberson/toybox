@@ -387,6 +387,20 @@ class ActivityResponse(BaseModel):
     # step will be appended at activity end. See
     # documentation/phase-l-plan.md §2 for the NULL-not-coerced contract.
     reward_type: Literal["picture", "joke", "song", "random", "none"] | None = None
+    # Phase O Step O2: surface the activity's source template id at the
+    # top of the wire response. Persisted in the summary envelope's
+    # ``template_id`` sibling key (see ``_do_propose`` summary_payload
+    # construction); also mirrored on ``metadata["template_id"]`` so the
+    # two surfaces stay in lockstep. ``None`` only on legacy / template-
+    # less rows whose summary envelope predates the field.
+    template_id: str | None = None
+    # Phase O Step O2: surface the source template's recommended_themes
+    # so the parent UI's ``categorize()`` helper can bucket activities
+    # into Adventures / Elements / Feelings & Friends without a separate
+    # template fetch. ``[]`` when the template omits the field or the
+    # row is template-less. List of plain strings (Theme.value); the
+    # wire shape deliberately does NOT leak the Theme enum class name.
+    recommended_themes: list[str] = Field(default_factory=list)
 
 
 class ProposeRequest(BaseModel):
@@ -1108,6 +1122,29 @@ def _row_to_response(
         ):
             reward_type_value = raw_reward_type  # type: ignore[assignment]
 
+    # Phase O Step O2: surface ``template_id`` + the template's
+    # ``recommended_themes`` at the top of the wire response so the
+    # parent UI's categorize() helper can bucket activities without an
+    # extra template fetch. ``template_id`` was already extracted above
+    # for the step-render decision; mirror it onto ``metadata`` too so
+    # the legacy metadata-keyed consumers stay in lockstep with the new
+    # typed top-level field (single source of truth — both surfaces
+    # always carry the same value). Empty themes list on legacy /
+    # template-less rows + templates that omit the field.
+    if template_id is not None:
+        metadata = {**metadata, "template_id": template_id}
+    recommended_themes_value: list[str] = []
+    if template_id is not None:
+        template_for_themes = find_template_by_id(template_id)
+        if template_for_themes is not None:
+            # ``_Template.recommended_themes`` is ``tuple[Theme, ...]``;
+            # Theme is a StrEnum so ``.value`` is already lowercased
+            # ASCII. Surface plain strings so the wire shape is a JSON
+            # array of literals (NOT the Theme class name).
+            recommended_themes_value = [
+                theme.value for theme in template_for_themes.recommended_themes
+            ]
+
     return ActivityResponse(
         id=activity_id,
         state=state,
@@ -1128,6 +1165,8 @@ def _row_to_response(
         roles=roles_map,
         cast_summary=cast_summary,
         interjection_pending=interjection_pending,
+        template_id=template_id,
+        recommended_themes=recommended_themes_value,
         reward_type=reward_type_value,
     )
 

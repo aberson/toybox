@@ -105,3 +105,53 @@ export type Animation = "shine" | "jump" | "spin" | "pulse" | "wobble" | "float"
  * on these four wire strings.
  */
 export type RewardType = "picture" | "joke" | "song" | "random" | "none";
+
+/**
+ * Phase O Step O2 — runtime activity wire shape. Mirrors
+ * :class:`toybox.api.activities.ActivityStepResponse` (one
+ * row in ``activity_steps``, the shape the kiosk + parent UI
+ * consume over REST / WS). Distinct from the template-time
+ * ``Step`` interface above — that one models template JSON
+ * authored by the generator; this one models the runtime row
+ * the parent dashboard renders.
+ *
+ * ``element_id`` was added in Phase M Step M3; the field is
+ * re-emitted here on the runtime shape so the parent UI's
+ * categorize() helper can branch on it without an extra
+ * template fetch.
+ */
+export interface ActivityStep {
+  seq: number;
+  body: string;
+  sfx: string | null;
+  expected_action: string | null;
+  current: boolean;
+  element_id: string | null;
+}
+
+/**
+ * Phase O Step O2 — runtime activity wire shape. Mirrors
+ * :class:`toybox.api.activities.ActivityResponse`. The two
+ * Phase O additions — ``template_id`` and
+ * ``recommended_themes`` — are surfaced at the top of the
+ * envelope so the parent UI's categorize() helper can bucket
+ * activities into Adventures / Elements / Feelings & Friends
+ * without a separate template fetch.
+ *
+ * The hand-rolled ``Activity`` interface in
+ * ``frontend/src/parent/api.ts`` is the historical surface the
+ * parent UI consumes; this codegen-emitted shape sits
+ * alongside it as the typed contract categorize.ts imports.
+ * Carries only the load-bearing fields categorize() reads
+ * plus the original Activity identity fields — a fuller mirror
+ * lands once the api.ts hand-roll is collapsed onto this one.
+ */
+export interface Activity {
+  id: string;
+  state: string;
+  version: number;
+  title: string | null;
+  steps: ActivityStep[];
+  template_id: string | null;
+  recommended_themes: string[];
+}

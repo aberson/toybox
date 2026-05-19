@@ -21,6 +21,14 @@ export interface ActivityStep {
   sfx: string | null;
   expected_action: string | null;
   current: boolean;
+  // Phase M Step M3: optional reference to a Periodic Table element
+  // corpus entry. When non-null, the kiosk's ElementCard renders the
+  // sprite + symbol + name + atomic number above the step text. The
+  // parent UI's Phase O ``categorize()`` helper reads this field to
+  // bucket activities into the "Elements" content tab. Defaults to
+  // ``null`` on non-element steps (the wire shape always emits the
+  // key — never missing — per the M3 contract).
+  element_id?: string | null;
 }
 
 /**
@@ -79,6 +87,17 @@ export interface Activity {
   // parent build; new callers should not read it. Removal scheduled
   // for a future phase once stragglers update.
   interjection_pending?: boolean;
+  // Phase O Step O2: source template id, surfaced at the top of the
+  // wire envelope so the parent UI's ``categorize()`` helper can read
+  // template attribution without dipping into ``metadata``. ``null``
+  // on legacy / template-less rows.
+  template_id?: string | null;
+  // Phase O Step O2: theme tags pulled off the source template's
+  // ``recommended_themes`` field. Drives the categorize() helper's
+  // "Feelings & Friends" branch (matches on the literal "feelings").
+  // ``[]`` when the template omits the field or the row is template-
+  // less. Optional + defaulted so pre-O2 callers compile.
+  recommended_themes?: string[];
 }
 
 export interface VersionConflictBody {
