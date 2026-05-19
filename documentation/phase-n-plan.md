@@ -139,6 +139,7 @@ No new engine code. No frontend component changes (ElementCard already renders o
 - **Type:** code
 - **Issue:** #168 (umbrella #167)
 - **Flags:** `--reviewers code`
+- **Status:** DONE (2026-05-18) — fix landed in App.tsx (preserves "avatar OUTSIDE StepCard" invariant); `currentStepHasElement` exported helper; 3 vitest tests via KioskComposition wrapper. Iter 2/3 PASS at edc3cc9.
 - **Produces:** patch to `frontend/src/child/components/StepCard.tsx` + vitest coverage in `StepCard.test.tsx` + manual visual spot-check via dev server.
 - **Done when:** vitest passes; on iPad, element activity cards show Next button unobstructed; non-element cards (SEL, branching, etc.) still show persona letter as before.
 - **Depends on:** none (UI-only fix).
