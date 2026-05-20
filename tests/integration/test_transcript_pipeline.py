@@ -863,3 +863,97 @@ async def test_confidence_at_floor_fires_trigger(
     assert _count_transcripts(db_path) == 1
     assert len(fired) == 1
     assert fired[0].name == "floor"
+
+
+async def test_muted_mic_short_circuits_before_transcribe(
+    db_path: Path,
+    session_id: str,
+) -> None:
+    """When the mic is muted, the pipeline must NOT call the transcriber.
+
+    Whisper inference is the most expensive step in the chunk handler;
+    muting must skip it (not just the persistence + emit). Counts the
+    transcriber's ``calls`` to prove inference never ran.
+    """
+    transcript = Transcript(
+        text="should never be returned",
+        confidence=0.9,
+        language="en",
+        duration_ms=300,
+    )
+    transcriber = _ScriptedTranscriber([transcript])
+    captured: list[Envelope] = []
+
+    pipeline = TranscriptPipeline(
+        capture=_ScriptedCapture([_silent_chunk()]),
+        transcriber=transcriber,
+        session_id=session_id,
+        publisher=captured.append,
+        db_path=db_path,
+        confidence_floor=0.55,
+        trigger_matcher=lambda _t, _d: [],
+        mic_enabled_check=lambda: False,
+    )
+    await pipeline.start()
+    try:
+        # Drain whatever the scripted capture has to offer.
+        for _ in range(50):
+            await asyncio.sleep(0.01)
+    finally:
+        await pipeline.stop()
+
+    assert transcriber.calls == 0
+    assert _count_transcripts(db_path) == 0
+    assert captured == []
+
+
+async def test_mute_toggle_resumes_transcribe(
+    db_path: Path,
+    session_id: str,
+) -> None:
+    """Toggling mute back on must let the next chunk reach the transcriber.
+
+    The mute check is read fresh per-chunk; this test pins that a
+    mid-stream un-mute resumes Whisper inference on the very next
+    speech segment.
+    """
+    transcript = Transcript(
+        text="i am back",
+        confidence=0.9,
+        language="en",
+        duration_ms=300,
+    )
+    transcriber = _ScriptedTranscriber([transcript])
+    captured: list[Envelope] = []
+
+    # Mic toggle: muted for the first chunk, on for the second.
+    mic_states = iter([False, True])
+
+    def _check() -> bool:
+        return next(mic_states, True)
+
+    pipeline = TranscriptPipeline(
+        capture=_ScriptedCapture([_silent_chunk(), _silent_chunk()]),
+        transcriber=transcriber,
+        session_id=session_id,
+        publisher=captured.append,
+        db_path=db_path,
+        confidence_floor=0.55,
+        trigger_matcher=lambda _t, _d: [],
+        mic_enabled_check=_check,
+    )
+    await pipeline.start()
+    try:
+        for _ in range(200):
+            if transcriber.calls >= 1 and captured:
+                break
+            await asyncio.sleep(0.01)
+    finally:
+        await pipeline.stop()
+
+    # Exactly one transcribe call -- the first (muted) chunk was skipped,
+    # the second (unmuted) chunk ran through Whisper and landed in the DB.
+    assert transcriber.calls == 1
+    assert _count_transcripts(db_path) == 1
+    assert len(captured) == 1
+    assert captured[0].payload["text"] == "i am back"

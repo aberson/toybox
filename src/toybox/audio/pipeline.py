@@ -290,6 +290,26 @@ class TranscriptPipeline:
             raise
 
     async def _handle_chunk(self, chunk: NDArray[int16]) -> None:
+        # Mute gate runs BEFORE transcription so faster-whisper never
+        # sees muted audio. The capture loop keeps draining the speech
+        # queue (so PortAudio doesn't back up), and we still skip
+        # persistence, ws emit, and trigger dispatch. Read fresh
+        # per-utterance so a mid-conversation toggle takes effect on
+        # the next chunk. As a side effect, a session that starts muted
+        # never lazy-loads the Whisper model -- first-unmute pays that
+        # one-time cost.
+        try:
+            mic_on = self._mic_enabled_check()
+        except Exception as exc:  # noqa: BLE001 -- defensive: gate fails open
+            _logger.warning(
+                "mic_enabled_check raised; treating mic as on (exc=%s: %s)",
+                type(exc).__name__,
+                exc,
+            )
+            mic_on = True
+        if not mic_on:
+            return
+
         try:
             transcript = await self._transcriber.transcribe(chunk)
         except Exception as exc:  # noqa: BLE001 -- log + skip per spec
@@ -310,23 +330,6 @@ class TranscriptPipeline:
         # so a row like ``" "`` or ``"\n"`` doesn't sneak through the
         # plain ``not text`` falsiness check.
         if not transcript.text.strip():
-            return
-
-        # Mute gate: when the parent has muted the mic via the operator
-        # tab, we keep the capture loop draining (so PortAudio doesn't
-        # back up) but skip persistence, ws emit, and the trigger pass.
-        # Read fresh per-utterance so a mid-conversation toggle takes
-        # effect on the next chunk.
-        try:
-            mic_on = self._mic_enabled_check()
-        except Exception as exc:  # noqa: BLE001 -- defensive: gate fails open
-            _logger.warning(
-                "mic_enabled_check raised; treating mic as on (exc=%s: %s)",
-                type(exc).__name__,
-                exc,
-            )
-            mic_on = True
-        if not mic_on:
             return
 
         ended_at = datetime.now(UTC)
