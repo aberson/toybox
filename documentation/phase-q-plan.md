@@ -126,6 +126,7 @@ Per [code-quality.md "Audit wire shape when storage representation changes"](../
 <!-- autofix-applied: 2026-05-19 -->
 ### Step Q2: Backfill M7a — element_id on 15 popular-element songs + family on 10 family songs
 - **Problem:** Two backfills in one step. (a) Add `element_id` to each of M7a's 15 popular-element entries (gold→au-79, silver→ag-47, iron→fe-26, helium→he-2, oxygen→o-8, hydrogen→h-1, neon→ne-10, mercury→hg-80, copper→cu-29, uranium→u-92, sodium→na-11, calcium→ca-20, carbon→c-6, nitrogen→n-7, chlorine→cl-17). (b) Add `family` (singular enum slug) to each of M7a's 10 family entries: `noble_gases_drift_quiet → noble_gas`, `halogens_make_friends → halogen`, `alkali_metals_go_zoom → alkali_metal`, `alkaline_earths_keep_strong → alkaline_earth`, `transition_metals_shiny_song → transition_metal`, `post_transition_metals_bendy → post_transition_metal`, `metalloids_in_between → metalloid`, `nonmetals_everywhere → nonmetal`, `lanthanides_glow_soft → lanthanide`, `actinides_radiate_far → actinide`. Add tests asserting all 15 popular ids + all 10 family slugs round-trip through `load_songs()`.
+- **Status:** DONE (2026-05-20)
 - **Issue:** #197
 - **Flags:** --reviewers code
 - **Produces:** modified `data/songs/manifest.json`, new assertions in `tests/unit/activities/test_song_corpus.py`
@@ -144,6 +145,7 @@ Per [code-quality.md "Audit wire shape when storage representation changes"](../
 <!-- autofix-applied: 2026-05-19 -->
 ### Step Q4: Element-joke generator script
 - **Problem:** Author `scripts/generate_element_joke_corpus.py` — same shape as Q3 but for jokes. Iterates all 118 elements (no M7a backfill exists for jokes), prompts Claude via `AnthropicClient` for setup+punchline per element, writes entries with: `id: element-joke-<sym>-<n>`, `element_id: <element.id>`, `family: <element.family>`, `persona_compat: ["periodic_table", "all"]`, `theme: silly`, `age_band: 3-5`, `optional_toy_slot: false`. Idempotent strip+append on the `element-joke-*` prefix.
+- **Status:** DONE (2026-05-20)
 - **Issue:** #199
 - **Flags:** --reviewers code
 - **Produces:** new `scripts/generate_element_joke_corpus.py`
@@ -157,6 +159,7 @@ Per [code-quality.md "Audit wire shape when storage representation changes"](../
   - **(b)** Add `family_for(element_id: str) -> Family | None` helper to `src/toybox/activities/element_corpus.py`. Builds a cached `dict[str, Family]` on first call by iterating the loaded element corpus; returns `dict.get(element_id)`. Cache invalidates with the existing element-corpus cache hook.
   - **(c)** Extend `pick_song` and `pick_joke` with two new kwargs: `element_id: str | None = None` and `family_hint: Family | None = None`. When `element_id` is provided, only candidates with `Song.element_id == element_id` qualify. When `family_hint` is provided (and `element_id` is not), only candidates with `Song.family is family_hint` qualify. Both kwargs ANDed with existing `persona_compat` + `theme` + `age_band` + `require_audio` filters. Performance: build `_BY_ELEMENT_ID: dict[str, list[Song]]` and `_BY_FAMILY: dict[Family, list[Song]]` caches at corpus-load time so per-pick is O(1) lookup.
   - **(d)** Modify `_try_pick_song` and `_try_pick_joke` to implement the chain: element_id pick → if None and ctx.element_id is set, resolve `family_hint = family_for(ctx.element_id)` and pick by family → if still None, fall through to existing theme-then-untheme. Update `src/toybox/api/activities.py`'s reward-step caller to extract the activity's "primary" element_id (first persisted step with non-null element_id) and pass it into `RewardActivityContext`.
+- **Status:** DONE (2026-05-20)
 - **Issue:** #200
 - **Flags:** --reviewers code
 - **Produces:** modified `src/toybox/activities/content_resolver.py`, `src/toybox/activities/song_corpus.py`, `src/toybox/activities/joke_corpus.py`, `src/toybox/activities/element_corpus.py`, `src/toybox/api/activities.py`; new unit tests asserting picker contract (element match wins; family-tier fallback fires for an element whose family has a song but no element-specific entry; theme fallback fires when neither; untheme fallback fires when no theme matches); test that `family_for()` returns the right Family for all 118 elements and None for an unknown id.
