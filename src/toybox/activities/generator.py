@@ -549,6 +549,53 @@ def _safe_default_to_template() -> _Template:
     )
 
 
+def _apply_category_filter(
+    templates: list[_Template],
+    category: str | None,
+) -> list[_Template]:
+    """Filter templates to the parent's selected Play sub-tab category.
+
+    Categories mirror the frontend ``categorize()`` helper's precedence
+    rules (Elements > Feelings & Friends > Adventures) so a "Trigger now"
+    invoked from a category sub-tab generates an activity that lands in
+    that same sub-tab post-categorization.
+
+    * ``None`` → no filter (current behavior; "All" sub-tab semantics).
+    * ``"elements"`` → templates where ANY step has ``element_id`` set.
+    * ``"feelings-friends"`` → templates whose ``recommended_themes``
+      contains the ``feelings`` Theme.
+    * ``"adventures"`` → templates that are NEITHER (no step.element_id
+      AND no ``feelings`` in recommended_themes).
+    * Unknown category strings → no filter (degrade gracefully — a
+      typo'd category shouldn't starve the picker).
+
+    Soft-fallback semantics match :func:`_apply_preferred_themes`: when
+    NO template matches the category, return ``templates`` unchanged
+    rather than starve the picker. This preserves the existing trigger
+    behavior when a category has no eligible offline templates.
+    """
+    if category is None:
+        return templates
+    if category == "elements":
+        matchers = [
+            t for t in templates if any(step.element_id is not None for step in t.steps)
+        ]
+    elif category == "feelings-friends":
+        matchers = [
+            t for t in templates if any(str(theme) == "feelings" for theme in t.recommended_themes)
+        ]
+    elif category == "adventures":
+        matchers = [
+            t
+            for t in templates
+            if not any(step.element_id is not None for step in t.steps)
+            and not any(str(theme) == "feelings" for theme in t.recommended_themes)
+        ]
+    else:
+        return templates
+    return matchers if matchers else templates
+
+
 def _apply_preferred_themes(
     templates: list[_Template],
     preferred_themes: Sequence[str],
@@ -616,6 +663,7 @@ def _select_template(
     conn: sqlite3.Connection | None,
     banned_themes: Sequence[str] = (),
     preferred_themes: Sequence[str] = (),
+    category: str | None = None,
 ) -> tuple[_Template, str]:
     """Pick one template. Returns ``(template, source_intent)``.
 
@@ -637,7 +685,10 @@ def _select_template(
     """
     primary = _load_intent_templates(intent)
     eligible = _apply_preferred_themes(
-        _apply_banned_themes(_filter_eligible(primary, hour), banned_themes),
+        _apply_category_filter(
+            _apply_banned_themes(_filter_eligible(primary, hour), banned_themes),
+            category,
+        ),
         preferred_themes,
     )
     if eligible:
@@ -649,7 +700,10 @@ def _select_template(
 
     # Fallback 1: any "always" template within the requested intent.
     always_primary = _apply_preferred_themes(
-        _apply_banned_themes(_filter_always(primary), banned_themes),
+        _apply_category_filter(
+            _apply_banned_themes(_filter_always(primary), banned_themes),
+            category,
+        ),
         preferred_themes,
     )
     if always_primary:
@@ -668,7 +722,10 @@ def _select_template(
     if intent != FALLBACK_INTENT:
         boredom = _load_intent_templates(FALLBACK_INTENT)
         always_boredom = _apply_preferred_themes(
-            _apply_banned_themes(_filter_always(boredom), banned_themes),
+            _apply_category_filter(
+                _apply_banned_themes(_filter_always(boredom), banned_themes),
+                category,
+            ),
             preferred_themes,
         )
         if always_boredom:
@@ -925,6 +982,7 @@ def generate(
     available_rooms: Sequence[ResolvedRoom] = (),
     resolved_children: ResolvedChildren | None = None,
     preferred_themes: Sequence[str] = (),
+    category: str | None = None,
 ) -> Activity:
     """Generate a deterministic :class:`Activity`.
 
@@ -1023,6 +1081,7 @@ def generate(
         conn=conn,
         banned_themes=banned_themes,
         preferred_themes=preferred_themes,
+        category=category,
     )
 
     # Resolve every parametric slot (``{room}``, ``{action_verb}``,

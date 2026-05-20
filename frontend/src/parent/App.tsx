@@ -684,12 +684,25 @@ export function App(): JSX.Element {
       // template picker toward what the kid was just talking about.
       // No-op when there's no recent transcript matching the taxonomy —
       // falls back to the current "request_play / freeplay" pool.
+      //
+      // Phase O follow-up: when the parent triggers from a category
+      // sub-tab (Adventures / Elements / Feelings & Friends), pass the
+      // category through so the backend restricts the template pool.
+      // "all" and "transcriptions" pass undefined (current behavior).
+      const playTabValue = playTab.value;
+      const category: "adventures" | "elements" | "feelings-friends" | undefined =
+        playTabValue === "adventures" ||
+        playTabValue === "elements" ||
+        playTabValue === "feelings-friends"
+          ? playTabValue
+          : undefined;
       const activity = await api.propose({
         intent: "request_play",
         slot: "freeplay",
         hour: now.getHours(),
         seed,
         use_recent_transcripts: true,
+        category,
       });
       // Version-guarded set so a same-id ws envelope can't be regressed
       // by a slow propose response landing late.
@@ -698,7 +711,7 @@ export function App(): JSX.Element {
       const message = err instanceof Error ? err.message : "trigger failed";
       useParentStore.getState().pushToast("error", `trigger: ${message}`);
     }
-  }, [api]);
+  }, [api, playTab.value]);
 
   // Phase J step J8: per-row action handlers. Each takes the target
   // ``Activity`` directly so ``PlayQueueList`` can route per-row

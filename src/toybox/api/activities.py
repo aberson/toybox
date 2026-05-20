@@ -436,6 +436,16 @@ class ProposeRequest(BaseModel):
     # :data:`Intent.phrase`). Frontend "Trigger now" + "New activity"
     # set this to ``True`` so manual buttons inherit recent context.
     use_recent_transcripts: bool = False
+    # Phase O follow-up: parent Play sub-tab category filter. When set,
+    # restricts the template pool to ones that would categorize() to the
+    # same bucket on the frontend — so "Trigger now" from the Elements
+    # sub-tab produces an element activity, etc. Maps directly to the
+    # frontend ``categorize()`` precedence: Elements > Feelings & Friends
+    # > Adventures. None (the "All" sub-tab / no-tab / mic-driven path)
+    # preserves the existing behavior. Soft-fallback semantics in
+    # :func:`_apply_category_filter`: when no templates match, the
+    # filter degrades to no-op rather than starve the picker.
+    category: Literal["adventures", "elements", "feelings-friends"] | None = None
 
 
 class ApproveRequest(BaseModel):
@@ -2189,6 +2199,7 @@ def _do_propose(
                 available_rooms=resolved_rooms,
                 resolved_children=resolved_children,
                 preferred_themes=preferred_themes,
+                category=body.category,
             )
             loop_tool_calls = None
     else:
@@ -2210,6 +2221,7 @@ def _do_propose(
             available_rooms=resolved_rooms,
             resolved_children=resolved_children,
             preferred_themes=preferred_themes,
+            category=body.category,
         )
     # Phase K K5: role-slot resolution. When the picked template
     # declared ``required_roles`` or ``optional_roles`` at K3 schema

@@ -172,6 +172,14 @@ export interface ProposePayload {
   // inherits whatever the kid was just talking about. No-op when no
   // recent transcript matches the theme taxonomy.
   use_recent_transcripts?: boolean;
+  // Phase O follow-up: Play sub-tab category filter. When set, the
+  // backend restricts the template pool to ones that categorize() to
+  // the same bucket so a "Trigger now" from the Elements sub-tab
+  // produces an element activity. Mirrors the categorize() precedence:
+  // Elements > Feelings & Friends > Adventures. Omitted (or null) is
+  // the "All" sub-tab semantics. Backend soft-fallback if no template
+  // matches the category.
+  category?: "adventures" | "elements" | "feelings-friends" | null;
 }
 
 // Step 18: child-profile editor wire shapes. Mirror the Pydantic
