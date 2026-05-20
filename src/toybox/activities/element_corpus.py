@@ -75,7 +75,18 @@ _VALID_PHASES: Final[frozenset[str]] = frozenset({"solid", "liquid", "gas"})
 # Composite id format ``<symbol-lower>-<atomic_number>`` per phase-m-plan.md §5.1.
 # Symbol is 1-3 chars (Uut/Uuo style three-letter placeholders historically),
 # atomic_number is 1-3 digits.
-_ID_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z]{1,3}-[0-9]{1,3}$")
+#
+# Phase Q Step Q5: the SAME regex shape is referenced by
+# :class:`toybox.activities.song_corpus.Song.element_id` and
+# :class:`toybox.activities.joke_corpus.Joke.element_id`. Per
+# code-quality.md §2 "one source of truth for data-shape constants"
+# the pattern STRING (not the compiled Pattern object — Pydantic's
+# ``Field(pattern=...)`` takes a str, not a Pattern) is exported as
+# :data:`ELEMENT_ID_REGEX` and imported by both corpus modules. Tests
+# assert ``Song.model_fields["element_id"].metadata`` references the
+# same string so a future re-duplication fails CI loudly.
+ELEMENT_ID_REGEX: Final[str] = r"^[a-z]{1,3}-[0-9]{1,3}$"
+_ID_PATTERN: Final[re.Pattern[str]] = re.compile(ELEMENT_ID_REGEX)
 
 # Path resolution mirrors storage.images._data_root and song_corpus._data_root:
 # env override for test fixtures, default ``Path("data")`` relative to the
@@ -209,8 +220,49 @@ def clear_element_cache() -> None:
     Production callers do not need to call this — the cache is keyed
     on the resolved path so an env change automatically forces a
     re-read.
+
+    Phase Q Step Q5: also invalidates the per-path
+    :data:`_FAMILY_BY_ID_CACHE` so a test monkeypatching
+    ``TOYBOX_DATA_DIR`` sees the rebuilt id → Family mapping the next
+    time :func:`family_for` is called.
     """
     _ELEMENT_CACHE.clear()
+    _FAMILY_BY_ID_CACHE.clear()
+
+
+# Phase Q Step Q5: id → Family lookup. Keyed on the resolved elements
+# file path so a same-process change of TOYBOX_DATA_DIR (test
+# monkeypatch) produces a fresh build alongside the underlying corpus
+# cache. Per code-quality.md §1 "audit wire shape when storage
+# representation changes" the cache is rebuilt eagerly on first call
+# rather than mutated incrementally — keeps the producer-consumer
+# coupling explicit and trivially inspectable.
+_FAMILY_BY_ID_CACHE: dict[Path, dict[str, Family]] = {}
+
+
+def family_for(element_id: str) -> Family | None:
+    """Return the :class:`Family` for ``element_id``, or ``None`` if unknown.
+
+    Phase Q Step Q5: the reward picker chain calls this once per
+    activity-advance when the activity carries an ``element_id``. The
+    answer feeds the family-tier fallback inside :func:`_try_pick_song`
+    / :func:`_try_pick_joke` when the element-tier pick returns nothing.
+
+    Cached: the underlying ``dict[str, Family]`` is built on first
+    call by iterating the loaded corpus and stored against the
+    resolved corpus path (mirrors :data:`_ELEMENT_CACHE`). The cache
+    is invalidated alongside :func:`clear_element_cache`.
+
+    Identity contract: the returned :class:`Family` IS a member of
+    the canonical enum (the loader already coerces via ``Family(...)``)
+    so callers can ``family_for(element_id) is Family.noble_gas``.
+    """
+    path = _elements_path()
+    cached = _FAMILY_BY_ID_CACHE.get(path)
+    if cached is None:
+        cached = {e.id: e.family for e in load_elements()}
+        _FAMILY_BY_ID_CACHE[path] = cached
+    return cached.get(element_id)
 
 
 # ---------------------------------------------------------------------
@@ -557,15 +609,11 @@ def peer_in_family(element_id: str, rng: random.Random) -> Element:
     """
     target = get_element(element_id)
     if target is None:
-        raise ValueError(
-            f"peer_in_family: unknown element_id {element_id!r} (not in corpus)"
-        )
+        raise ValueError(f"peer_in_family: unknown element_id {element_id!r} (not in corpus)")
     candidates = [
         e
         for e in load_elements()
-        if e.family is target.family
-        and e.age_band == target.age_band
-        and e.id != target.id
+        if e.family is target.family and e.age_band == target.age_band and e.id != target.id
     ]
     if not candidates:
         raise ValueError(
@@ -598,9 +646,7 @@ def peer_out_of_family(element_id: str, rng: random.Random) -> Element:
     """
     target = get_element(element_id)
     if target is None:
-        raise ValueError(
-            f"peer_out_of_family: unknown element_id {element_id!r} (not in corpus)"
-        )
+        raise ValueError(f"peer_out_of_family: unknown element_id {element_id!r} (not in corpus)")
     candidates = [
         e
         for e in load_elements()
@@ -618,12 +664,14 @@ def peer_out_of_family(element_id: str, rng: random.Random) -> Element:
 
 __all__ = [
     "AGE_BANDS",
+    "ELEMENT_ID_REGEX",
     "AgeBand",
     "Element",
     "Family",
     "PhaseAtRoomTemp",
     "clear_element_cache",
     "elements_root",
+    "family_for",
     "get_element",
     "load_elements",
     "peer_in_family",

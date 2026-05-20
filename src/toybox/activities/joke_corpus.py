@@ -55,7 +55,7 @@ from typing import Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .element_corpus import Family
+from .element_corpus import ELEMENT_ID_REGEX, Family
 from .themes import Theme
 
 # ---------------------------------------------------------------------
@@ -123,7 +123,7 @@ class Joke(BaseModel):
     optional_toy_slot: bool
     age_band: AgeBand
     persona_compat: tuple[str, ...] = Field(min_length=1)
-    element_id: str | None = Field(default=None, pattern=r"^[a-z]{1,3}-[0-9]{1,3}$")
+    element_id: str | None = Field(default=None, pattern=ELEMENT_ID_REGEX)
     family: Family | None = None
 
 
@@ -147,6 +147,13 @@ def _jokes_path() -> Path:
 # Matches generator._TEMPLATE_CACHE's (TEMPLATES_DIR, intent) keying.
 _JOKE_CACHE: dict[Path, tuple[Joke, ...]] = {}
 
+# Phase Q Step Q5: bucket caches for the element-tier and family-tier
+# reward picks. Built once per corpus-load (same path key as
+# :data:`_JOKE_CACHE` so test monkeypatch reuses the same lifecycle).
+# See :mod:`toybox.activities.song_corpus` for the mirror caches.
+_JOKES_BY_ELEMENT_ID: dict[Path, dict[str, list[Joke]]] = {}
+_JOKES_BY_FAMILY: dict[Path, dict[Family, list[Joke]]] = {}
+
 
 def clear_joke_cache() -> None:
     """Drop the in-process joke cache (test hook).
@@ -154,8 +161,16 @@ def clear_joke_cache() -> None:
     Production callers do not need to call this — the cache is keyed
     on the resolved path so an env change automatically forces a
     re-read.
+
+    Phase Q Step Q5: also invalidates the per-element_id and
+    per-family bucket caches so a same-process change of
+    ``TOYBOX_DATA_DIR`` produces freshly-rebuilt buckets the next
+    time :func:`pick_joke` is called with ``element_id`` /
+    ``family_hint``.
     """
     _JOKE_CACHE.clear()
+    _JOKES_BY_ELEMENT_ID.clear()
+    _JOKES_BY_FAMILY.clear()
 
 
 # ---------------------------------------------------------------------
@@ -304,6 +319,21 @@ def load_jokes() -> tuple[Joke, ...]:
 
     result = tuple(jokes)
     _JOKE_CACHE[path] = result
+
+    # Phase Q Step Q5: build the bucket caches once per corpus load so
+    # per-pick element-tier / family-tier lookups stay O(1) bucket +
+    # O(small) filter. Buckets reference the same :class:`Joke`
+    # instances as the tuple — identity is preserved.
+    by_element: dict[str, list[Joke]] = {}
+    by_family: dict[Family, list[Joke]] = {}
+    for joke in jokes:
+        if joke.element_id is not None:
+            by_element.setdefault(joke.element_id, []).append(joke)
+        if joke.family is not None:
+            by_family.setdefault(joke.family, []).append(joke)
+    _JOKES_BY_ELEMENT_ID[path] = by_element
+    _JOKES_BY_FAMILY[path] = by_family
+
     return result
 
 
@@ -318,6 +348,8 @@ def pick_joke(
     age_band: str | None = None,
     persona_id: str | None = None,
     theme: Theme | None = None,
+    element_id: str | None = None,
+    family_hint: Family | None = None,
 ) -> Joke | None:
     """Deterministic seeded pick from the joke corpus.
 
@@ -327,6 +359,19 @@ def pick_joke(
     * ``persona_id`` — entry's ``persona_compat`` must contain
       ``"all"`` or the given id.
     * ``theme`` — entry's ``theme`` must be the given :class:`Theme`.
+    * ``element_id`` — Phase Q Step Q5: when set, only entries whose
+      :attr:`Joke.element_id` equals this value qualify. The bucket
+      cache (:data:`_JOKES_BY_ELEMENT_ID`) is consulted for O(1)
+      lookup before the per-pick filter.
+    * ``family_hint`` — Phase Q Step Q5: when set, only entries whose
+      :attr:`Joke.family` IS this :class:`Family` member (identity,
+      not equality — per code-quality.md §2) qualify. Consulted via
+      :data:`_JOKES_BY_FAMILY`.
+
+    When ``element_id`` is set, ``family_hint`` is ignored (element
+    tier wins). When ``element_id`` is unset and ``family_hint`` is
+    set, the family bucket is the candidate pool. When both are
+    unset the picker walks the full corpus (legacy behaviour).
 
     Tie-break: candidates sorted by ``id`` ASC before the seeded pick,
     so the same ``(seed, filters)`` always produces the same joke
@@ -345,9 +390,26 @@ def pick_joke(
             return True
         return PERSONA_COMPAT_ALL in entry.persona_compat or persona_id in entry.persona_compat
 
+    # Force corpus load so the bucket caches are populated. Bucket
+    # caches are keyed on the same resolved path as :data:`_JOKE_CACHE`.
+    load_jokes()
+    path = _jokes_path()
+
+    # Phase Q Step Q5: pick the candidate pool based on element_id /
+    # family_hint. Element tier wins when both are passed — the caller
+    # in :mod:`toybox.activities.content_resolver` already encodes the
+    # element → family → theme fallback by issuing successive picks.
+    pool: list[Joke]
+    if element_id is not None:
+        pool = list(_JOKES_BY_ELEMENT_ID.get(path, {}).get(element_id, ()))
+    elif family_hint is not None:
+        pool = list(_JOKES_BY_FAMILY.get(path, {}).get(family_hint, ()))
+    else:
+        pool = list(load_jokes())
+
     candidates = [
         j
-        for j in load_jokes()
+        for j in pool
         if (age_band is None or j.age_band == age_band)
         and _persona_match(j)
         and (theme is None or j.theme is theme)
