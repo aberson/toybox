@@ -121,8 +121,7 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             {
                 "id": "fork",
                 "text": (
-                    '{guide_mentor} hands you a Helium balloon. "Where does Helium '
-                    'want to go first?"'
+                    '{guide_mentor} hands you a Helium balloon. "Where should it float first?"'
                 ),
                 "action_slot": "thinking",
                 "choices": [
@@ -143,7 +142,7 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             {
                 "id": "snacks",
                 "text": (
-                    "Helium hovers above the cupcakes but doesn't touch them — noble "
+                    "{guide_mentor} guides the Helium balloon above the cupcakes — noble "
                     "gases don't grab on. Tiptoe in a tiny circle, hands behind your back."
                 ),
                 "action_slot": "looking",
@@ -152,8 +151,8 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             {
                 "id": "corner",
                 "text": (
-                    "Helium drifts to a quiet corner and watches. Crouch down small "
-                    "and rest your chin on your knees like a sleepy balloon."
+                    "{guide_mentor} lets the Helium balloon drift to a quiet corner. "
+                    "Crouch down small and rest your chin on your knees like a sleepy balloon."
                 ),
                 "action_slot": "thinking",
                 "next": "join",
@@ -189,7 +188,10 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "pick",
-                "text": "What kind of sign should Neon light up tonight?",
+                "text": (
+                    "{guide_mentor} flicks the Neon switch. "
+                    "What kind of sign should we light up tonight?"
+                ),
                 "action_slot": "thinking",
                 "choices": [
                     {"label": "An ice-cream shop", "next": "icecream"},
@@ -323,7 +325,10 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "pose",
-                "text": "What kind of photo do you want Xenon to flash?",
+                "text": (
+                    "{guide_mentor} loads the Xenon flash bulb. "
+                    "What kind of photo should we snap?"
+                ),
                 "action_slot": "thinking",
                 "choices": [
                     {"label": "A silly face", "next": "silly"},
@@ -334,8 +339,8 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             {
                 "id": "silly",
                 "text": (
-                    "Stick out your tongue and cross your eyes. FLASH! Xenon caught "
-                    "the goofiest picture in history."
+                    "Stick out your tongue and cross your eyes. {guide_mentor} hits "
+                    "the Xenon flash — SNAP! Goofiest picture in history."
                 ),
                 "action_slot": "confused",
                 "next": "develop",
@@ -343,8 +348,8 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             {
                 "id": "hero",
                 "text": (
-                    "Hands on hips, chin up, cape billowing (imaginary). FLASH! "
-                    "Xenon froze you mid-power-pose."
+                    "Hands on hips, chin up, cape billowing (imaginary). {guide_mentor} "
+                    "fires the Xenon flash — SNAP! Frozen mid-power-pose."
                 ),
                 "action_slot": "cheering",
                 "next": "develop",
@@ -352,8 +357,8 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             {
                 "id": "yawn",
                 "text": (
-                    "Stretch your arms up and yawn HUGE. FLASH! Xenon caught the "
-                    "biggest yawn ever taken."
+                    "Stretch your arms up and yawn HUGE. {guide_mentor} pops the "
+                    "Xenon flash — SNAP! Biggest yawn ever taken."
                 ),
                 "action_slot": "sleeping",
                 "next": "develop",
@@ -406,7 +411,8 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             {
                 "id": "wave",
                 "text": (
-                    "You wave both arms big. Sodium spots you across the kitchen and waves back!"
+                    "You wave both arms big. {guide_mentor} spots the Sodium across "
+                    "the kitchen and waves it over to join you!"
                 ),
                 "action_slot": "waving",
                 "next": "join",
@@ -414,8 +420,8 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             {
                 "id": "hand",
                 "text": (
-                    "You stretch one hand out. Sodium runs over and grabs it tight — "
-                    "now you're salt!"
+                    "You stretch one hand out. {guide_mentor} dashes over and grabs "
+                    'your hand — the Sodium snaps right onto the Chlorine!'
                 ),
                 "action_slot": "pointing",
                 "next": "join",
@@ -423,8 +429,8 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             {
                 "id": "hum",
                 "text": (
-                    "Your humming carries across the room. Sodium follows the tune "
-                    "and pops up beside you."
+                    "Your humming carries across the room. {guide_mentor} brings the "
+                    "Sodium over and sets it down beside you."
                 ),
                 "action_slot": "cheering",
                 "next": "join",
@@ -461,8 +467,8 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             {
                 "id": "task",
                 "text": (
-                    "Fluorine needs to find the right teeth to help. Which tooth "
-                    "does Fluorine visit first?"
+                    "{guide_mentor} sets out a tube of toothpaste with Fluorine "
+                    "inside. Which tooth should we visit first?"
                 ),
                 "action_slot": "thinking",
                 "choices": [
@@ -474,7 +480,8 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             {
                 "id": "wiggly",
                 "text": (
-                    'Fluorine waves at the wiggly tooth — "Hang in there, little buddy!" '
+                    "{guide_mentor} dabs Fluorine on the wiggly tooth — "
+                    '"Hang in there, little buddy!" '
                     "Wiggle one finger like a loose tooth."
                 ),
                 "action_slot": "waving",
@@ -483,8 +490,8 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             {
                 "id": "molar",
                 "text": (
-                    "Fluorine high-fives the new molar way in the back. Open your "
-                    "mouth wide and tap the air with your finger."
+                    "{guide_mentor} brushes Fluorine onto the new molar way in the back. "
+                    "Open your mouth wide and tap the air with your finger."
                 ),
                 "action_slot": "cheering",
                 "next": "brush",
@@ -492,8 +499,8 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             {
                 "id": "front",
                 "text": (
-                    "Fluorine polishes the front tooth until it shines. Give a HUGE "
-                    "smile and bare your teeth like a friendly tiger."
+                    "{guide_mentor} polishes the front tooth with Fluorine until it shines. "
+                    "Give a HUGE smile and bare your teeth like a friendly tiger."
                 ),
                 "action_slot": "cheering",
                 "next": "brush",
@@ -528,7 +535,10 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "where",
-                "text": "Where does tiny Iodine want to ride along today?",
+                "text": (
+                    "{guide_mentor} dabs a tiny drop of Iodine on a band-aid. "
+                    "Where should it ride along today?"
+                ),
                 "action_slot": "thinking",
                 "choices": [
                     {"label": "On a pretzel", "next": "pretzel"},
@@ -593,7 +603,10 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "stroke",
-                "text": "Pick your swim stroke — how does Chlorine zoom around the pool?",
+                "text": (
+                    "{guide_mentor} cannonballs into the Chlorine pool "
+                    "— pick your swim stroke!"
+                ),
                 "action_slot": "thinking",
                 "choices": [
                     {"label": "Freestyle flutter", "next": "free"},
@@ -605,7 +618,7 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
                 "id": "free",
                 "text": (
                     "Pump your arms in circles, kick your feet small and quick — "
-                    "Chlorine sweeps the lane!"
+                    "the Chlorine swirls down the lane with you!"
                 ),
                 "action_slot": "running",
                 "next": "spot",
@@ -614,7 +627,7 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
                 "id": "back",
                 "text": (
                     "Lie back, sweep your arms one at a time over your head — slow "
-                    "and smooth. Chlorine looks up at the sky."
+                    "and smooth. The Chlorine ripples around you under the open sky."
                 ),
                 "action_slot": "looking",
                 "next": "spot",
@@ -622,8 +635,8 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             {
                 "id": "dog",
                 "text": (
-                    "Paws up, splash splash — Chlorine paddles like a happy puppy "
-                    "after a tennis ball."
+                    "Paws up, splash splash — the Chlorine splashes everywhere as "
+                    "you paddle after a tennis ball."
                 ),
                 "action_slot": "running",
                 "next": "spot",
@@ -662,7 +675,10 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "pick",
-                "text": "Which toy does Lithium want to bring to life?",
+                "text": (
+                    "{guide_mentor} loads a fresh Lithium battery. "
+                    "Which toy should we power up?"
+                ),
                 "action_slot": "thinking",
                 "choices": [
                     {"label": "A racecar", "next": "race"},
@@ -736,7 +752,10 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "warmup",
-                "text": "Stretch your legs first — what warm-up does Potassium do?",
+                "text": (
+                    "{guide_mentor} sips a Potassium banana smoothie. "
+                    "Stretch your legs first — what warm-up should we do?"
+                ),
                 "action_slot": "thinking",
                 "choices": [
                     {"label": "Toe touches", "next": "toes"},
@@ -802,7 +821,10 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "task",
-                "text": "Who needs Sodium's light tonight?",
+                "text": (
+                    "{guide_mentor} flicks on a glowing Sodium streetlamp. "
+                    "Who needs the light tonight?"
+                ),
                 "action_slot": "thinking",
                 "choices": [
                     {"label": "A cat heading home", "next": "cat"},
@@ -868,7 +890,10 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "tick",
-                "text": "How does Cesium count its perfect seconds?",
+                "text": (
+                    "{guide_mentor} sets the Cesium atomic clock. "
+                    "How should we count the perfect seconds?"
+                ),
                 "action_slot": "thinking",
                 "choices": [
                     {"label": "Tap toes one-two-one-two", "next": "toes"},
@@ -937,7 +962,7 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "snack",
-                "text": "What does Calcium snack on first?",
+                "text": "{guide_mentor} opens a Calcium snack pack. What should we munch on first?",
                 "action_slot": "thinking",
                 "choices": [
                     {"label": "A cup of milk", "next": "milk"},
@@ -956,7 +981,9 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "cheese",
-                "text": ("Nibble a cheese cube — squeak squeak. Calcium hops into your elbows."),
+                "text": (
+                    "Nibble a cheese cube — squeak squeak. The Calcium settles into your elbows."
+                ),
                 "action_slot": "thinking",
                 "next": "tower",
             },
@@ -1001,7 +1028,10 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "subject",
-                "text": "Who is Magnesium taking a picture of today?",
+                "text": (
+                    "{guide_mentor} loads the Magnesium camera flash. "
+                    "Who should we take a picture of today?"
+                ),
                 "action_slot": "thinking",
                 "choices": [
                     {"label": "A sleepy puppy", "next": "pup"},
@@ -1012,8 +1042,8 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             {
                 "id": "pup",
                 "text": (
-                    "Curl up small and rest your head on your hands. POP! Magnesium "
-                    "flashes — the puppy's eyes shine."
+                    "Curl up small and rest your head on your hands. POP! {guide_mentor} "
+                    "fires the Magnesium flash — the puppy's eyes shine."
                 ),
                 "action_slot": "sleeping",
                 "next": "develop",
@@ -1022,7 +1052,7 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
                 "id": "cake",
                 "text": (
                     "Hold up imaginary candles and puff your cheeks ready to blow. "
-                    "POP! Magnesium catches the wish."
+                    "POP! {guide_mentor} fires the Magnesium flash and catches your wish."
                 ),
                 "action_slot": "cheering",
                 "next": "develop",
@@ -1030,8 +1060,8 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             {
                 "id": "frog",
                 "text": (
-                    "Squat down low, then SPRING up. POP! Magnesium freezes the "
-                    "highest part of your jump."
+                    "Squat down low, then SPRING up. POP! {guide_mentor} fires the "
+                    "Magnesium flash and freezes the highest part of your jump."
                 ),
                 "action_slot": "jumping",
                 "next": "develop",
@@ -1067,7 +1097,10 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "design",
-                "text": "What shape does Strontium spray across the sky?",
+                "text": (
+                    "{guide_mentor} lights a Strontium firework. "
+                    "What shape should sparkle across the sky?"
+                ),
                 "action_slot": "thinking",
                 "choices": [
                     {"label": "A giant heart", "next": "heart"},
@@ -1079,7 +1112,7 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
                 "id": "heart",
                 "text": (
                     "Draw a heart in the air with both pointer fingers. BOOM! "
-                    "Strontium fills it in red sparks."
+                    "{guide_mentor} lights the Strontium and fills it in with red sparks."
                 ),
                 "action_slot": "pointing",
                 "next": "finale",
@@ -1087,8 +1120,8 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             {
                 "id": "star",
                 "text": (
-                    "Sweep your arm down like a shooting star. BOOM! Strontium "
-                    "trails red light behind it."
+                    "Sweep your arm down like a shooting star. BOOM! {guide_mentor} "
+                    "lights the Strontium and a red trail follows behind."
                 ),
                 "action_slot": "pointing",
                 "next": "finale",
@@ -1097,7 +1130,7 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
                 "id": "swirl",
                 "text": (
                     "Spin your finger in a big spiral above your head. BOOM! "
-                    "Strontium swirls the sky red."
+                    "{guide_mentor} lights the Strontium and the sky swirls red."
                 ),
                 "action_slot": "running",
                 "next": "finale",
@@ -1136,7 +1169,10 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "heat",
-                "text": ("The forge is glowing. What does Iron want to be shaped into?"),
+                "text": (
+                    "The forge is glowing. {guide_mentor} grips the hot Iron with tongs. "
+                    "What should we shape it into?"
+                ),
                 "action_slot": "thinking",
                 "choices": [
                     {"label": "A sturdy horseshoe", "next": "horseshoe"},
@@ -1212,7 +1248,10 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "roll",
-                "text": "Where does Copper roll first?",
+                "text": (
+                    "{guide_mentor} drops a Copper penny on the floor. "
+                    "Where should it roll first?"
+                ),
                 "action_slot": "thinking",
                 "choices": [
                     {"label": "Into a piggy bank", "next": "piggy"},
@@ -1279,7 +1318,10 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "polish",
-                "text": "What does Silver shine up today?",
+                "text": (
+                    "{guide_mentor} grabs a Silver polishing cloth. "
+                    "What should we shine up today?"
+                ),
                 "action_slot": "thinking",
                 "choices": [
                     {"label": "A round hand mirror", "next": "mirror"},
@@ -1345,7 +1387,10 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "design",
-                "text": "Whose crown is Gold forging tonight?",
+                "text": (
+                    "{guide_mentor} hammers a Gold bar on the anvil. "
+                    "Whose crown should we forge tonight?"
+                ),
                 "action_slot": "thinking",
                 "choices": [
                     {"label": "A queen of dragons", "next": "queen"},
@@ -1412,7 +1457,10 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "part",
-                "text": "Which part of the spaceship does Titanium make first?",
+                "text": (
+                    "{guide_mentor} unrolls the Titanium blueprint. "
+                    "Which part of the spaceship should we build first?"
+                ),
                 "action_slot": "thinking",
                 "choices": [
                     {"label": "The pointy nose", "next": "nose"},
@@ -1487,7 +1535,10 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "what",
-                "text": "What does Aluminum want to become today?",
+                "text": (
+                    "{guide_mentor} pulls a sheet of Aluminum foil. "
+                    "What should we shape it into today?"
+                ),
                 "action_slot": "thinking",
                 "choices": [
                     {"label": "A foil hat", "next": "hat"},
@@ -1554,7 +1605,7 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "drill",
-                "text": "What drill do the Tin soldiers run today?",
+                "text": "{guide_mentor} lines up the Tin soldiers. What drill should we run today?",
                 "action_slot": "thinking",
                 "choices": [
                     {"label": "March in a square", "next": "square"},
@@ -1619,7 +1670,10 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "color",
-                "text": "Which color stair does Bismuth grow first?",
+                "text": (
+                    "{guide_mentor} pours hot Bismuth into the mold. "
+                    "Which color stair should grow first?"
+                ),
                 "action_slot": "thinking",
                 "choices": [
                     {"label": "Pink and purple", "next": "pink"},
@@ -1684,7 +1738,10 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "make",
-                "text": "What does Silicon build into the chip today?",
+                "text": (
+                    "{guide_mentor} taps a Silicon wafer. "
+                    "What should we build into the chip today?"
+                ),
                 "action_slot": "thinking",
                 "choices": [
                     {"label": "A counting circuit", "next": "count"},
@@ -1748,7 +1805,10 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "shape",
-                "text": "What does Boron help the sand castle become?",
+                "text": (
+                    "{guide_mentor} sprinkles Boron into the sand bucket. "
+                    "What should the castle become?"
+                ),
                 "action_slot": "thinking",
                 "choices": [
                     {"label": "A tall tower", "next": "tower"},
@@ -1814,7 +1874,7 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "task",
-                "text": "What should Germanium's computer do first?",
+                "text": "{guide_mentor} flips on the Germanium computer. What should it do first?",
                 "action_slot": "thinking",
                 "choices": [
                     {"label": "Add two big numbers", "next": "add"},
@@ -1826,7 +1886,7 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
                 "id": "add",
                 "text": (
                     "Hold up three fingers, then four — push them together — that's "
-                    "seven! Germanium just did math."
+                    "seven! The Germanium transistors hum along to your math."
                 ),
                 "action_slot": "thinking",
                 "next": "shutdown",
@@ -1834,7 +1894,8 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             {
                 "id": "hello",
                 "text": (
-                    'Wave at the screen and say "hi there!" Germanium types the letters one by one.'
+                    'Wave at the screen and say "hi there!" {guide_mentor} watches '
+                    "the letters appear on the Germanium computer one by one."
                 ),
                 "action_slot": "waving",
                 "next": "shutdown",
@@ -1842,8 +1903,8 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             {
                 "id": "beep",
                 "text": (
-                    "Tap an imaginary key three times — BEEP BEEP BOOP. Germanium "
-                    "makes a tiny tune."
+                    "Tap an imaginary key three times — BEEP BEEP BOOP. {guide_mentor} "
+                    "smiles as the Germanium computer plays a tiny tune."
                 ),
                 "action_slot": "cheering",
                 "next": "shutdown",
@@ -1882,7 +1943,7 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "trip",
-                "text": "Where does Oxygen want to ride next?",
+                "text": "{guide_mentor} fills a fresh Oxygen tank. Where should we ride next?",
                 "action_slot": "thinking",
                 "choices": [
                     {"label": "Up to a hummingbird's wings", "next": "bird"},
@@ -1948,7 +2009,10 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "visit",
-                "text": "Who does Carbon say hello to first?",
+                "text": (
+                    "{guide_mentor} draws a smiley with a Carbon pencil. "
+                    "Who should we say hello to first?"
+                ),
                 "action_slot": "thinking",
                 "choices": [
                     {"label": "A leafy tree", "next": "tree"},
@@ -2025,7 +2089,10 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "scene",
-                "text": "Where does Sulfur stink up today?",
+                "text": (
+                    "{guide_mentor} cracks open a Sulfur jar — peeeeyew! "
+                    "Where should we stink up today?"
+                ),
                 "action_slot": "thinking",
                 "choices": [
                     {"label": "A bubbly hot spring", "next": "spring"},
@@ -2092,7 +2159,10 @@ _TEMPLATES: Final[list[dict[str, Any]]] = [
             },
             {
                 "id": "use",
-                "text": "What does Nitrogen want to do with all that air?",
+                "text": (
+                    "{guide_mentor} fills a balloon with Nitrogen. "
+                    "What should we do with all this puffy air?"
+                ),
                 "action_slot": "thinking",
                 "choices": [
                     {"label": "Float a kite", "next": "kite"},
