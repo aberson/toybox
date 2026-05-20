@@ -42,6 +42,12 @@ export interface ToyActionSpriteProps {
   // layouts adjust margin / flex behavior without re-deriving the
   // base pixel-art presentation rules.
   style?: CSSProperties;
+  // Optional cache-bust query value. When set, the sprite URL becomes
+  // ``<base>?v=<encodeURIComponent(cacheKey)>`` so a regenerated
+  // on-disk PNG at the same path renders the new bytes instead of the
+  // browser-cached bitmap. Used by the parent ToyActionGrid (threads
+  // ``row.seed``); the kiosk omits it (no cache-bust needed there).
+  cacheKey?: string;
 }
 
 export function ToyActionSprite(props: ToyActionSpriteProps): JSX.Element | null {
@@ -72,12 +78,17 @@ export function ToyActionSprite(props: ToyActionSpriteProps): JSX.Element | null
     background: "transparent",
   };
   const merged: CSSProperties = { ...baseStyle, ...(props.style ?? {}) };
+  const baseUrl = `/api/static/images/toy_actions/${props.toyId}/${props.slot}.png`;
+  const src =
+    props.cacheKey !== undefined
+      ? `${baseUrl}?v=${encodeURIComponent(props.cacheKey)}`
+      : baseUrl;
   return (
     <img
       data-testid="toy-action-sprite"
       data-slot={props.slot}
       data-toy-id={props.toyId}
-      src={`/api/static/images/toy_actions/${props.toyId}/${props.slot}.png`}
+      src={src}
       alt={alt}
       width={size}
       height={size}

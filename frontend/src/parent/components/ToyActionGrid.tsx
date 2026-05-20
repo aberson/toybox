@@ -75,6 +75,7 @@ function renderCellContents(
         toyDisplayName={toyDisplayName}
         size={88}
         style={{ margin: "0 auto" }}
+        cacheKey={row.seed != null ? String(row.seed) : undefined}
       />
     );
   }

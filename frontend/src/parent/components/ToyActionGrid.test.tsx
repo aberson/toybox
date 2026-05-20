@@ -250,6 +250,58 @@ describe("ToyActionGrid", () => {
       .toBeNull();
   });
 
+  // Cache-bust contract (image-gen mode toggle fix): regenerating a slot
+  // rewrites the same on-disk file with new bytes, so the parent UI must
+  // bust the browser cache by appending ``?v=<seed>`` to the sprite URL.
+  // ``ToyActionGrid`` threads ``row.seed`` (a number, optional) as the
+  // cache key whenever a done row has a non-null seed.
+  it("threads row.seed to the sprite as a cache-bust query param for done rows", () => {
+    render(
+      <ToyActionGrid
+        toyId="toy-1"
+        actions={[
+          fakeRow({
+            slot: "looking",
+            status: "done",
+            image_path: "data/images/toy_actions/toy-1/looking.png",
+            seed: 12345,
+          }),
+        ]}
+        onRegenerateAll={noop}
+        onRegenerateSlot={noop}
+      />,
+    );
+    const sprite = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
+    const src = sprite.getAttribute("src") ?? "";
+    // Partial-match keeps the test stable across URL-shape tweaks (the
+    // ``ToyActionSprite`` test pins the exact shape).
+    expect(src).toContain("?v=12345");
+  });
+
+  it("does NOT append ?v= when a done row's seed is null (backwards-compat)", () => {
+    render(
+      <ToyActionGrid
+        toyId="toy-1"
+        actions={[
+          fakeRow({
+            slot: "looking",
+            status: "done",
+            image_path: "data/images/toy_actions/toy-1/looking.png",
+            seed: null,
+          }),
+        ]}
+        onRegenerateAll={noop}
+        onRegenerateSlot={noop}
+      />,
+    );
+    const sprite = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
+    const src = sprite.getAttribute("src") ?? "";
+    // If seed is somehow null on a done row (legacy data, race), the
+    // grid must fall back to the bare URL — the previous (pre-fix)
+    // behavior — rather than emit a meaningless ``?v=null`` literal.
+    expect(src).not.toContain("?v=");
+  });
+
   it("count summary reports N/10 done correctly", () => {
     render(
       <ToyActionGrid
