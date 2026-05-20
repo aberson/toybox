@@ -70,6 +70,7 @@ from typing import Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .element_corpus import Family
 from .themes import Theme
 
 # ---------------------------------------------------------------------
@@ -157,6 +158,8 @@ class Song(BaseModel):
     license: str = Field(min_length=1, max_length=64)
     credit: str = Field(min_length=1, max_length=200)
     lyrics: str = Field(min_length=1, max_length=500)
+    element_id: str | None = Field(default=None, pattern=r"^[a-z]{1,3}-[0-9]{1,3}$")
+    family: Family | None = None
 
 
 # ---------------------------------------------------------------------
@@ -327,9 +330,12 @@ def _validate_raw_entry(raw: dict[str, object], *, seen_ids: set[str]) -> Song:
             f"{_MIN_DURATION_SECONDS} (got non-positive)"
         )
 
-    # Injection scan over title / credit / lyrics. Run BEFORE Pydantic
-    # so the message names the song id (Pydantic strips the context).
-    for field in ("title", "credit", "lyrics"):
+    # Injection scan over title / credit / lyrics / element_id / family.
+    # Run BEFORE Pydantic so the message names the song id (Pydantic
+    # strips the context). element_id + family added in Phase Q Step Q1
+    # for defense-in-depth — the per-field regex/enum gates would also
+    # catch a payload but the scan keeps the audit trail uniform.
+    for field in ("title", "credit", "lyrics", "element_id", "family"):
         text = raw.get(field)
         if isinstance(text, str):
             _check_injection(raw_id, text, field=field)
@@ -343,8 +349,19 @@ def _validate_raw_entry(raw: dict[str, object], *, seen_ids: set[str]) -> Song:
             f"song {raw_id!r} persona_compat must contain only non-empty strings, got {raw_pc!r}"
         )
 
+    # element_id + family are Phase Q optional. Pass through only when
+    # present in raw — omitting the key lets the model default kick in
+    # AND keeps the model_dump() shape parity for entries that don't
+    # carry the fields (otherwise dump would always emit element_id=null).
+    extras: dict[str, object] = {}
+    if "element_id" in raw:
+        extras["element_id"] = raw["element_id"]
+    if "family" in raw:
+        extras["family"] = raw["family"]
+
     # Now hand the coerced fields to Pydantic for the per-field shape
-    # invariants (min_length, max_length, extra=forbid, gt/le on duration).
+    # invariants (min_length, max_length, extra=forbid, gt/le on duration,
+    # element_id regex, family enum coercion).
     return Song(
         id=raw_id,
         title=str(raw.get("title", "")),
@@ -356,6 +373,7 @@ def _validate_raw_entry(raw: dict[str, object], *, seen_ids: set[str]) -> Song:
         license=str(raw.get("license", "")),
         credit=str(raw.get("credit", "")),
         lyrics=str(raw.get("lyrics", "")),
+        **extras,  # type: ignore[arg-type]
     )
 
 

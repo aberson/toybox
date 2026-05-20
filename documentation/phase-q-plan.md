@@ -116,6 +116,7 @@ Per [code-quality.md "Audit wire shape when storage representation changes"](../
 <!-- autofix-applied: 2026-05-19 -->
 ### Step Q1: Song + Joke schema — element_id + family fields
 - **Problem:** Extend `Song` and `Joke` Pydantic models with two optional fields: `element_id: str | None = None` (validator regex `^[a-z]{1,3}-[0-9]{1,3}$` when present) and `family: Family | None = None` (the `Family` StrEnum from `element_corpus.py`; pydantic coerces string values via `Family(value)` and rejects unknowns). Loaders accept both fields; existing entries continue loading. Add unit tests covering: element_id accepts valid + rejects malformed; family accepts the 10 enum slugs + rejects unknowns; both fields default to None; co-presence permitted (an entry may set both — e.g. a transition-metal-specific element).
+- **Status:** DONE (2026-05-19)
 - **Issue:** #196
 - **Flags:** --reviewers code
 - **Produces:** modified `src/toybox/activities/song_corpus.py`, `src/toybox/activities/joke_corpus.py`, `tests/unit/activities/test_song_corpus.py`, `tests/unit/activities/test_joke_corpus.py`

@@ -55,6 +55,7 @@ from typing import Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .element_corpus import Family
 from .themes import Theme
 
 # ---------------------------------------------------------------------
@@ -122,6 +123,8 @@ class Joke(BaseModel):
     optional_toy_slot: bool
     age_band: AgeBand
     persona_compat: tuple[str, ...] = Field(min_length=1)
+    element_id: str | None = Field(default=None, pattern=r"^[a-z]{1,3}-[0-9]{1,3}$")
+    family: Family | None = None
 
 
 # ---------------------------------------------------------------------
@@ -226,9 +229,11 @@ def _validate_raw_entry(raw: dict[str, object], *, seen_ids: set[str]) -> Joke:
         raise ValueError(f"duplicate joke id {raw_id!r}")
     seen_ids.add(raw_id)
 
-    # Injection scan over setup + punchline. Run BEFORE Pydantic so
-    # the message names the joke id (Pydantic strips the context).
-    for field in ("setup", "punchline"):
+    # Injection scan over setup / punchline / element_id / family.
+    # Run BEFORE Pydantic so the message names the joke id (Pydantic
+    # strips the context). element_id + family added in Phase Q Step Q1
+    # for defense-in-depth parity with song_corpus.
+    for field in ("setup", "punchline", "element_id", "family"):
         text = raw.get(field)
         if isinstance(text, str):
             _check_injection(raw_id, text, field=field)
@@ -242,8 +247,18 @@ def _validate_raw_entry(raw: dict[str, object], *, seen_ids: set[str]) -> Joke:
             f"joke {raw_id!r} persona_compat must contain only non-empty strings, got {raw_pc!r}"
         )
 
+    # element_id + family are Phase Q optional. Pass through only when
+    # present in raw so model_dump() shape stays parity with entries
+    # that don't carry the fields.
+    extras: dict[str, object] = {}
+    if "element_id" in raw:
+        extras["element_id"] = raw["element_id"]
+    if "family" in raw:
+        extras["family"] = raw["family"]
+
     # Now hand the coerced fields to Pydantic for the per-field shape
-    # invariants (min_length, max_length, extra=forbid).
+    # invariants (min_length, max_length, extra=forbid, element_id
+    # regex, family enum coercion).
     return Joke(
         id=raw_id,
         setup=str(raw.get("setup", "")),
@@ -252,6 +267,7 @@ def _validate_raw_entry(raw: dict[str, object], *, seen_ids: set[str]) -> Joke:
         optional_toy_slot=bool(raw.get("optional_toy_slot", False)),
         age_band=age_band,  # type: ignore[arg-type]
         persona_compat=tuple(raw_pc),
+        **extras,  # type: ignore[arg-type]
     )
 
 
