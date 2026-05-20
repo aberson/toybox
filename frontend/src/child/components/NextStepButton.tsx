@@ -20,8 +20,11 @@ export function NextStepButton(props: NextStepButtonProps): JSX.Element {
         appearance: "none",
         border: "none",
         borderRadius: 9999,
-        padding: "24px 56px",
-        fontSize: "clamp(1.5rem, 3vw, 2.25rem)",
+        // Padding + fontSize + marginTop all use min(vw, vh) so short
+        // viewports (iPad portrait with ElementCard on top) keep the
+        // Next button on screen without scrolling.
+        padding: "clamp(12px, 2vh, 24px) clamp(28px, 5vw, 56px)",
+        fontSize: "clamp(1.1rem, min(3vw, 3vh), 1.75rem)",
         fontWeight: 700,
         color: "white",
         background: props.busy
@@ -31,7 +34,7 @@ export function NextStepButton(props: NextStepButtonProps): JSX.Element {
         cursor: props.busy ? "default" : "pointer",
         // >=44pt per Apple HIG
         minWidth: 240,
-        marginTop: 32,
+        marginTop: "clamp(8px, 2vh, 32px)",
       }}
     >
       {props.busy ? "..." : label}

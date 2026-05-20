@@ -114,9 +114,11 @@ export function ChoiceButton(props: ChoiceButtonProps): JSX.Element {
         borderRadius: 9999,
         // Touch target ≥44pt per Apple HIG; the vertical padding +
         // line height combine to ~56pt on iPad portrait (matches
-        // NextStepButton's affordance).
-        padding: "20px 40px",
-        fontSize: "clamp(1.25rem, 2.4vw, 1.75rem)",
+        // NextStepButton's affordance). Vertical padding + fontSize
+        // both shrink on short viewports so a 3-choice fork step keeps
+        // every button + the body text + section margins on screen.
+        padding: "clamp(10px, 1.8vh, 20px) clamp(20px, 4vw, 40px)",
+        fontSize: "clamp(1rem, min(2.4vw, 2.8vh), 1.5rem)",
         fontWeight: 600,
         color: "white",
         background: isDisabled

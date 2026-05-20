@@ -400,7 +400,10 @@ export function StepCard(props: StepCardProps): JSX.Element {
         alignItems: "center",
         justifyContent: "center",
         textAlign: "center",
-        gap: 24,
+        // Section gap shrinks on short viewports so fork steps (with 3+
+        // choice buttons) and element steps (with ElementCard on top)
+        // keep every affordance reachable without scrolling.
+        gap: "clamp(8px, 2vh, 24px)",
         maxWidth: 1100,
         padding: "0 24px",
       }}
@@ -409,7 +412,7 @@ export function StepCard(props: StepCardProps): JSX.Element {
         <div
           style={{
             color: "#777",
-            fontSize: 22,
+            fontSize: "clamp(14px, min(2vw, 2.4vh), 22px)",
             letterSpacing: 1,
             textTransform: "uppercase",
           }}
@@ -574,10 +577,12 @@ export function StepCard(props: StepCardProps): JSX.Element {
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            gap: 16,
+            // Gap + marginTop shrink with viewport height so a 3-choice
+            // stack stays on screen on iPad portrait.
+            gap: "clamp(6px, 1.5vh, 16px)",
             width: "100%",
             maxWidth: 600,
-            marginTop: 24,
+            marginTop: "clamp(8px, 1.5vh, 24px)",
           }}
         >
           {choices.map((choice) => (
