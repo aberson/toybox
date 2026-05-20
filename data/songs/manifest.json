@@ -719,7 +719,8 @@
     ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
-    "lyrics": "Noble gases drift so quiet,\nNever grab a buddy, never start a riot.\nHelium floats and neon glows,\nArgon hides where nobody knows!"
+    "lyrics": "Noble gases drift so quiet,\nNever grab a buddy, never start a riot.\nHelium floats and neon glows,\nArgon hides where nobody knows!",
+    "family": "noble_gas"
   },
   {
     "id": "halogens-make-friends",
@@ -734,7 +735,8 @@
     ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
-    "lyrics": "Halogens love to make a friend,\nSticking close until the end.\nChlorine, fluorine, bromine too,\nGrab a buddy, that's what they do!"
+    "lyrics": "Halogens love to make a friend,\nSticking close until the end.\nChlorine, fluorine, bromine too,\nGrab a buddy, that's what they do!",
+    "family": "halogen"
   },
   {
     "id": "alkali-metals-go-zoom",
@@ -749,7 +751,8 @@
     ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
-    "lyrics": "Alkali metals zip and zoom,\nSoft as butter, fast as broom!\nSodium, potassium, lithium too,\nQuick to share what's inside of you!"
+    "lyrics": "Alkali metals zip and zoom,\nSoft as butter, fast as broom!\nSodium, potassium, lithium too,\nQuick to share what's inside of you!",
+    "family": "alkali_metal"
   },
   {
     "id": "alkaline-earths-keep-strong",
@@ -764,7 +767,8 @@
     ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
-    "lyrics": "Alkaline earths are strong and sure,\nCalcium keeps your bones secure.\nMagnesium makes the green leaves bright,\nEarth metals helping day and night!"
+    "lyrics": "Alkaline earths are strong and sure,\nCalcium keeps your bones secure.\nMagnesium makes the green leaves bright,\nEarth metals helping day and night!",
+    "family": "alkaline_earth"
   },
   {
     "id": "transition-metals-shiny-song",
@@ -779,7 +783,8 @@
     ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
-    "lyrics": "Transition metals shine so bright,\nIron, copper, silver light.\nGold and zinc and nickel too,\nBendy, shiny, strong and true.\nCoins and crowns and bridges tall,\nTransition metals build them all!"
+    "lyrics": "Transition metals shine so bright,\nIron, copper, silver light.\nGold and zinc and nickel too,\nBendy, shiny, strong and true.\nCoins and crowns and bridges tall,\nTransition metals build them all!",
+    "family": "transition_metal"
   },
   {
     "id": "post-transition-metals-bendy",
@@ -794,7 +799,8 @@
     ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
-    "lyrics": "Post-transition metals bend and bow,\nSoft and shiny, take a bow!\nAluminum cans and tin foil bright,\nLead so heavy it sinks out of sight!"
+    "lyrics": "Post-transition metals bend and bow,\nSoft and shiny, take a bow!\nAluminum cans and tin foil bright,\nLead so heavy it sinks out of sight!",
+    "family": "post_transition_metal"
   },
   {
     "id": "metalloids-in-between",
@@ -809,7 +815,8 @@
     ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
-    "lyrics": "Metalloids are in between,\nHalf-and-half, the in-between scene!\nSilicon makes computer chips hum,\nBoron, arsenic — here they come!"
+    "lyrics": "Metalloids are in between,\nHalf-and-half, the in-between scene!\nSilicon makes computer chips hum,\nBoron, arsenic — here they come!",
+    "family": "metalloid"
   },
   {
     "id": "nonmetals-everywhere",
@@ -824,7 +831,8 @@
     ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
-    "lyrics": "Nonmetals are everywhere you breathe,\nOxygen, nitrogen, never leave!\nCarbon in the tree and in the bread,\nHydrogen sparkles overhead.\nSoft and squishy, gas or stone,\nNonmetals make a happy home!"
+    "lyrics": "Nonmetals are everywhere you breathe,\nOxygen, nitrogen, never leave!\nCarbon in the tree and in the bread,\nHydrogen sparkles overhead.\nSoft and squishy, gas or stone,\nNonmetals make a happy home!",
+    "family": "nonmetal"
   },
   {
     "id": "lanthanides-glow-soft",
@@ -839,7 +847,8 @@
     ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
-    "lyrics": "Lanthanides glow soft and slow,\nInside your phone they help things go!\nCerium, neodymium, names so long,\nTiny helpers, mighty strong!"
+    "lyrics": "Lanthanides glow soft and slow,\nInside your phone they help things go!\nCerium, neodymium, names so long,\nTiny helpers, mighty strong!",
+    "family": "lanthanide"
   },
   {
     "id": "actinides-radiate-far",
@@ -854,7 +863,8 @@
     ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
-    "lyrics": "Actinides hum a sleepy tune,\nHidden away inside the room.\nUranium, thorium, deep and rare,\nScientists watch them way over there!"
+    "lyrics": "Actinides hum a sleepy tune,\nHidden away inside the room.\nUranium, thorium, deep and rare,\nScientists watch them way over there!",
+    "family": "actinide"
   },
   {
     "id": "gold-shiny-rhyme",
@@ -869,7 +879,8 @@
     ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
-    "lyrics": "Gold is shiny, gold is bright,\nGold makes crowns that catch the light!\nGold won't rust, it won't turn green,\nPrettiest metal you've ever seen!"
+    "lyrics": "Gold is shiny, gold is bright,\nGold makes crowns that catch the light!\nGold won't rust, it won't turn green,\nPrettiest metal you've ever seen!",
+    "element_id": "au-79"
   },
   {
     "id": "silver-spoon-song",
@@ -884,7 +895,8 @@
     ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
-    "lyrics": "Silver, silver, soft and white,\nSpoons and forks that catch the light!\nPretty as the moon at night,\nSilver shines and feels just right!"
+    "lyrics": "Silver, silver, soft and white,\nSpoons and forks that catch the light!\nPretty as the moon at night,\nSilver shines and feels just right!",
+    "element_id": "ag-47"
   },
   {
     "id": "iron-strong-rhyme",
@@ -899,7 +911,8 @@
     ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
-    "lyrics": "Iron is strong, iron is tough,\nBridges, nails, and stuff and stuff!\nInside your blood it helps you go,\nIron keeps you on the flow!"
+    "lyrics": "Iron is strong, iron is tough,\nBridges, nails, and stuff and stuff!\nInside your blood it helps you go,\nIron keeps you on the flow!",
+    "element_id": "fe-26"
   },
   {
     "id": "helium-balloon-float",
@@ -914,7 +927,8 @@
     ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
-    "lyrics": "Helium, helium, light as air,\nLifts a balloon up everywhere!\nHold the string and watch it rise,\nHelium soars into the skies!"
+    "lyrics": "Helium, helium, light as air,\nLifts a balloon up everywhere!\nHold the string and watch it rise,\nHelium soars into the skies!",
+    "element_id": "he-2"
   },
   {
     "id": "oxygen-breath-song",
@@ -929,7 +943,8 @@
     ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
-    "lyrics": "Breathe in, breathe out, oxygen-O,\nEverywhere we breathe it goes!\nIn the wind and in the trees,\nOxygen brings the gentle breeze."
+    "lyrics": "Breathe in, breathe out, oxygen-O,\nEverywhere we breathe it goes!\nIn the wind and in the trees,\nOxygen brings the gentle breeze.",
+    "element_id": "o-8"
   },
   {
     "id": "hydrogen-tiny-cheer",
@@ -944,7 +959,8 @@
     ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
-    "lyrics": "Hydrogen, hydrogen, smallest of all,\nTiniest atom, light and small!\nStars are made of hydrogen too,\nSparkle, sparkle, just like you!"
+    "lyrics": "Hydrogen, hydrogen, smallest of all,\nTiniest atom, light and small!\nStars are made of hydrogen too,\nSparkle, sparkle, just like you!",
+    "element_id": "h-1"
   },
   {
     "id": "neon-glow-rhyme",
@@ -959,7 +975,8 @@
     ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
-    "lyrics": "Neon, neon, orange and pink,\nGlowing signs that never blink!\nLight it up and watch it shine,\nNeon's a glow that feels just fine!"
+    "lyrics": "Neon, neon, orange and pink,\nGlowing signs that never blink!\nLight it up and watch it shine,\nNeon's a glow that feels just fine!",
+    "element_id": "ne-10"
   },
   {
     "id": "mercury-silver-river",
@@ -974,7 +991,8 @@
     ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
-    "lyrics": "Mercury, mercury, behind the glass,\nSilver river we watch as it flows past!\nNever to touch, just look from far,\nMercury shines like a silver star.\nPretty to see in the thermometer line,\nMercury sparkles, but it stays in time!"
+    "lyrics": "Mercury, mercury, behind the glass,\nSilver river we watch as it flows past!\nNever to touch, just look from far,\nMercury shines like a silver star.\nPretty to see in the thermometer line,\nMercury sparkles, but it stays in time!",
+    "element_id": "hg-80"
   },
   {
     "id": "copper-penny-shine",
@@ -989,7 +1007,8 @@
     ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
-    "lyrics": "Copper penny, copper bright,\nOrange-red and full of light!\nInside wires, inside pots,\nCopper helps connect the dots!"
+    "lyrics": "Copper penny, copper bright,\nOrange-red and full of light!\nInside wires, inside pots,\nCopper helps connect the dots!",
+    "element_id": "cu-29"
   },
   {
     "id": "uranium-glow-song",
@@ -1004,7 +1023,8 @@
     ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
-    "lyrics": "Uranium, uranium, sleepy and slow,\nLocked in a vault with a quiet glow.\nScientists keep it safe and sound,\nFar away from kids around!"
+    "lyrics": "Uranium, uranium, sleepy and slow,\nLocked in a vault with a quiet glow.\nScientists keep it safe and sound,\nFar away from kids around!",
+    "element_id": "u-92"
   },
   {
     "id": "sodium-salt-sparkle",
@@ -1019,7 +1039,8 @@
     ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
-    "lyrics": "Sodium hides inside the salt,\nSprinkled on bread is sodium's vault!\nTiny crystals, sparkly white,\nSodium makes the dinner right!"
+    "lyrics": "Sodium hides inside the salt,\nSprinkled on bread is sodium's vault!\nTiny crystals, sparkly white,\nSodium makes the dinner right!",
+    "element_id": "na-11"
   },
   {
     "id": "calcium-bone-cheer",
@@ -1034,7 +1055,8 @@
     ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
-    "lyrics": "Calcium, calcium, strong and white,\nBuilds your bones up tall and tight!\nMilk and cheese and broccoli too,\nCalcium grows the bones of you!"
+    "lyrics": "Calcium, calcium, strong and white,\nBuilds your bones up tall and tight!\nMilk and cheese and broccoli too,\nCalcium grows the bones of you!",
+    "element_id": "ca-20"
   },
   {
     "id": "carbon-best-buddy",
@@ -1049,7 +1071,8 @@
     ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
-    "lyrics": "Carbon, carbon, friend to all,\nIn a tree and in a ball!\nDiamonds shine, the pencil writes,\nCarbon's busy day and night.\nBread and bug and bone and you,\nCarbon's in the whole world too!"
+    "lyrics": "Carbon, carbon, friend to all,\nIn a tree and in a ball!\nDiamonds shine, the pencil writes,\nCarbon's busy day and night.\nBread and bug and bone and you,\nCarbon's in the whole world too!",
+    "element_id": "c-6"
   },
   {
     "id": "nitrogen-air-song",
@@ -1064,7 +1087,8 @@
     ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
-    "lyrics": "Nitrogen, nitrogen, most of the air,\nFloating gently everywhere!\nIn the breeze and in the sky,\nNitrogen is drifting by!"
+    "lyrics": "Nitrogen, nitrogen, most of the air,\nFloating gently everywhere!\nIn the breeze and in the sky,\nNitrogen is drifting by!",
+    "element_id": "n-7"
   },
   {
     "id": "chlorine-pool-rhyme",
@@ -1079,6 +1103,7 @@
     ],
     "license": "CC-BY-4.0",
     "credit": "Coqui TTS XTTS-v2 (operator-rendered)",
-    "lyrics": "Chlorine, chlorine, in the pool,\nKeeps the water bright and cool!\nSmells a bit, but does its job,\nChlorine scrubs each tiny glob!"
+    "lyrics": "Chlorine, chlorine, in the pool,\nKeeps the water bright and cool!\nSmells a bit, but does its job,\nChlorine scrubs each tiny glob!",
+    "element_id": "cl-17"
   }
 ]
