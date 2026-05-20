@@ -104,15 +104,19 @@ describe("StepCard sprite branch", () => {
     );
   });
 
-  it("hides the sprite when action_slot is null", () => {
+  it("renders the sprite with 'idle' fallback when action_slot is null but a toy is present", () => {
+    // Post-UAT change: the cast renders on every step (operator: "all
+    // toys along for the ride"). Steps without an explicit action_slot
+    // default to "idle" so the cast still surfaces.
     const activity = fakeActivity({
       toy_ids: ["toy-abc"],
       steps: [fakeStep({ action_slot: null })],
     });
     render(<StepCard activity={activity} />);
-    expect(screen.queryByTestId("toy-action-sprite")).toBeNull();
-    // Body text still renders — sprite-absence does not regress the
-    // kiosk's primary readable surface.
+    const sprite = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
+    expect(sprite.dataset["slot"]).toBe("idle");
+    expect(sprite.dataset["toyId"]).toBe("toy-abc");
+    // Body text still renders.
     expect(screen.getByTestId("step-text").textContent).toBe(
       "Pretend to be a cat",
     );
@@ -180,7 +184,11 @@ describe("StepCard sprite branch", () => {
     expect(sprite.alt).toBe("idle");
   });
 
-  it("places the sprite to the LEFT of the body text in the row layout", () => {
+  it("places the sprite alongside the body text in the row layout", () => {
+    // Post-UAT multi-toy refactor: sprite lands in a per-side column
+    // (data-testid="step-cast-left" or "step-cast-right") flanking the
+    // body text. The side is deterministic per toy_id hash so the kiosk
+    // is stable across re-renders.
     const activity = fakeActivity({
       toy_ids: ["toy-abc"],
       steps: [fakeStep({ action_slot: "looking" })],
@@ -188,10 +196,18 @@ describe("StepCard sprite branch", () => {
     render(<StepCard activity={activity} />);
     const row = screen.getByTestId("step-body-row");
     const children = Array.from(row.children);
-    // Two children: sprite first (left), body text second.
+    // Row has 2 children: one side-column + body text.
     expect(children).toHaveLength(2);
-    expect(children[0]?.getAttribute("data-testid")).toBe("toy-action-sprite");
-    expect(children[1]?.getAttribute("data-testid")).toBe("step-text");
+    const textIdx = children.findIndex(
+      (c) => c.getAttribute("data-testid") === "step-text",
+    );
+    expect(textIdx).toBeGreaterThanOrEqual(0);
+    const spriteCol = children[textIdx === 0 ? 1 : 0];
+    expect(
+      spriteCol?.getAttribute("data-testid") === "step-cast-left" ||
+        spriteCol?.getAttribute("data-testid") === "step-cast-right",
+    ).toBe(true);
+    expect(spriteCol?.querySelector("[data-testid='toy-action-sprite']")).not.toBeNull();
   });
 
   it("renders only the body text in the row when the sprite is hidden", () => {
@@ -204,6 +220,189 @@ describe("StepCard sprite branch", () => {
     const children = Array.from(row.children);
     expect(children).toHaveLength(1);
     expect(children[0]?.getAttribute("data-testid")).toBe("step-text");
+  });
+});
+
+describe("StepCard multi-toy cast (post-UAT)", () => {
+  it("renders every always-visible role's sprite on the step card", () => {
+    // Three friend/guide-type roles: all should render regardless of
+    // whether the step body names them.
+    const activity = fakeActivity({
+      toy_ids: ["toy-friend"],
+      roles: {
+        friend: {
+          role_name: "friend",
+          toy_id: "toy-friend",
+          generic_descriptor: null,
+          display_name: "Captain Bear",
+        },
+        guide_mentor: {
+          role_name: "guide_mentor",
+          toy_id: "toy-guide",
+          generic_descriptor: null,
+          display_name: "Wise Owl",
+        },
+        sidekick: {
+          role_name: "sidekick",
+          toy_id: "toy-sidekick",
+          generic_descriptor: null,
+          display_name: "Sparkle Cat",
+        },
+      },
+      steps: [
+        fakeStep({
+          action_slot: "looking",
+          // Step body names only Captain Bear; the other two still
+          // should render because they're always-visible roles.
+          body: "Captain Bear waves hello.",
+        }),
+      ],
+    });
+    render(<StepCard activity={activity} />);
+    const sprites = screen.getAllByTestId("toy-action-sprite");
+    const toyIds = sprites.map((el) => el.getAttribute("data-toy-id"));
+    expect(toyIds).toContain("toy-friend");
+    expect(toyIds).toContain("toy-guide");
+    expect(toyIds).toContain("toy-sidekick");
+    expect(sprites).toHaveLength(3);
+  });
+
+  it("hides boss/antagonist roles unless named in the current step body", () => {
+    const baseActivity = fakeActivity({
+      toy_ids: ["toy-friend"],
+      roles: {
+        friend: {
+          role_name: "friend",
+          toy_id: "toy-friend",
+          generic_descriptor: null,
+          display_name: "Captain Bear",
+        },
+        big_bad_boss: {
+          role_name: "big_bad_boss",
+          toy_id: "toy-boss",
+          generic_descriptor: null,
+          display_name: "Bowser",
+        },
+      },
+    });
+
+    // Step does NOT name Bowser → boss hidden.
+    const { unmount } = render(
+      <StepCard
+        activity={{
+          ...baseActivity,
+          steps: [fakeStep({ action_slot: "looking", body: "Captain Bear walks." })],
+        }}
+      />,
+    );
+    const beforeIds = screen
+      .getAllByTestId("toy-action-sprite")
+      .map((el) => el.getAttribute("data-toy-id"));
+    expect(beforeIds).toContain("toy-friend");
+    expect(beforeIds).not.toContain("toy-boss");
+    unmount();
+
+    // Step names Bowser → boss appears.
+    render(
+      <StepCard
+        activity={{
+          ...baseActivity,
+          steps: [
+            fakeStep({
+              action_slot: "looking",
+              body: "Bowser roars at Captain Bear.",
+            }),
+          ],
+        }}
+      />,
+    );
+    const afterIds = screen
+      .getAllByTestId("toy-action-sprite")
+      .map((el) => el.getAttribute("data-toy-id"));
+    expect(afterIds).toContain("toy-friend");
+    expect(afterIds).toContain("toy-boss");
+  });
+
+  it("splits the cast deterministically into left/right side columns by toy_id", () => {
+    const activity = fakeActivity({
+      toy_ids: ["toy-a"],
+      roles: {
+        friend: {
+          role_name: "friend",
+          toy_id: "toy-a",
+          generic_descriptor: null,
+          display_name: "A",
+        },
+        sidekick: {
+          role_name: "sidekick",
+          toy_id: "toy-b",
+          generic_descriptor: null,
+          display_name: "B",
+        },
+        guide_mentor: {
+          role_name: "guide_mentor",
+          toy_id: "toy-c",
+          generic_descriptor: null,
+          display_name: "C",
+        },
+      },
+      steps: [fakeStep({ action_slot: "looking", body: "All three are here." })],
+    });
+    const { rerender } = render(<StepCard activity={activity} />);
+    const sprites1 = screen.getAllByTestId("toy-action-sprite");
+    const sidesAndIds1 = sprites1.map((el) => {
+      const id = el.getAttribute("data-toy-id");
+      const parent = el.closest(
+        "[data-testid='step-cast-left'], [data-testid='step-cast-right']",
+      );
+      return { id, side: parent?.getAttribute("data-testid") };
+    });
+
+    // Re-render and confirm same side assignment per id (deterministic).
+    rerender(<StepCard activity={activity} />);
+    const sprites2 = screen.getAllByTestId("toy-action-sprite");
+    const sidesAndIds2 = sprites2.map((el) => {
+      const id = el.getAttribute("data-toy-id");
+      const parent = el.closest(
+        "[data-testid='step-cast-left'], [data-testid='step-cast-right']",
+      );
+      return { id, side: parent?.getAttribute("data-testid") };
+    });
+    // Sort by id so the comparison ignores DOM order, only side per id matters.
+    const sort = (arr: typeof sidesAndIds1) =>
+      [...arr].sort((a, b) => (a.id ?? "").localeCompare(b.id ?? ""));
+    expect(sort(sidesAndIds1)).toEqual(sort(sidesAndIds2));
+  });
+
+  it("uses 'idle' for sprites when step action_slot is null but roles exist", () => {
+    const activity = fakeActivity({
+      toy_ids: ["toy-friend"],
+      roles: {
+        friend: {
+          role_name: "friend",
+          toy_id: "toy-friend",
+          generic_descriptor: null,
+          display_name: "Captain Bear",
+        },
+      },
+      steps: [fakeStep({ action_slot: null, body: "Captain Bear stands still." })],
+    });
+    render(<StepCard activity={activity} />);
+    const sprite = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
+    expect(sprite.dataset["slot"]).toBe("idle");
+    expect(sprite.dataset["toyId"]).toBe("toy-friend");
+  });
+
+  it("falls back to single-sprite layout when activity has no roles map (pre-K)", () => {
+    const activity = fakeActivity({
+      toy_ids: ["toy-legacy"],
+      // roles intentionally omitted to simulate pre-K wire payload.
+      steps: [fakeStep({ action_slot: "looking" })],
+    });
+    render(<StepCard activity={activity} />);
+    const sprites = screen.getAllByTestId("toy-action-sprite");
+    expect(sprites).toHaveLength(1);
+    expect(sprites[0]?.getAttribute("data-toy-id")).toBe("toy-legacy");
   });
 });
 

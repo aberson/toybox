@@ -208,32 +208,109 @@ function lookupToyDisplayName(
   return undefined;
 }
 
-// Phase K K1+ multi-toy sprite resolution: pick the cast member whose
-// rendered display name appears earliest in the step body. Word-boundary
-// regex avoids substring false-positives (e.g. "Bear" inside "Big Bear").
-// Returns the fallback (activity-level ``toy_ids[0]``) when no role
-// resolves — pre-K activities, role-less templates, or steps whose body
-// names no cast member (transitional / parametric-only steps).
-function resolveStepToyId(
-  body: string | undefined,
-  roles: Activity["roles"],
-  fallback: string | null,
-): string | null {
-  if (!body || !roles) return fallback;
-  let bestIdx = -1;
-  let bestToyId: string | null = null;
+// Roles that show ALWAYS on the step card — friends, helpers, guides,
+// and other "along for the ride" cast members. Source of truth for the
+// classification is the operator's UAT feedback: "friend types or
+// guides, almost all, should be along for the ride."
+const ALWAYS_VISIBLE_ROLES: ReadonlySet<string> = new Set([
+  "friend",
+  "sidekick",
+  "helper_townsperson",
+  "quest_giver",
+  "guide_mentor",
+  "needs_saving",
+  "trickster",
+  "frenemy",
+]);
+
+// Roles that show ONLY when the current step's rendered body names
+// them — bosses/antagonists shouldn't loom on the card until their part.
+const CONTEXT_DEPENDENT_ROLES: ReadonlySet<string> = new Set([
+  "boss_mini_boss",
+  "big_bad_boss",
+]);
+
+// Deterministic left/right side assignment per toy id so the layout is
+// stable across re-renders (a kid hitting reload sees the same arrangement)
+// and roughly balanced across the activity's cast.
+function deterministicSide(toyId: string): "left" | "right" {
+  let hash = 0;
+  for (let i = 0; i < toyId.length; i++) {
+    hash = (hash + toyId.charCodeAt(i)) % 1000;
+  }
+  return hash % 2 === 0 ? "left" : "right";
+}
+
+// Sprite size shrinks with cast count so 4-toy steps still fit on
+// iPad portrait. Per-toy size is the same so the heaviest case caps the
+// step's vertical real estate.
+function spriteSizeForCount(count: number): number {
+  if (count <= 1) return 112;
+  if (count <= 3) return 84;
+  return 64;
+}
+
+interface CastMember {
+  toyId: string;
+  displayName: string;
+  side: "left" | "right";
+}
+
+// Multi-toy cast resolution. Returns every cast member that should
+// render at the current step: all ALWAYS_VISIBLE_ROLES toys + any
+// CONTEXT_DEPENDENT_ROLES toy whose display name is named in the step
+// body. Unknown role names (forward-compat for a future role taxonomy
+// extension) are included conservatively. Falls back to a single-sprite
+// list built from ``activity.toy_ids[0]`` for pre-K activities (no
+// roles map) so the F7-era single-sprite behavior is preserved.
+function resolveStepCast(
+  activity: Activity,
+  stepBody: string | undefined,
+): CastMember[] {
+  const roles = activity.roles;
+  if (!roles || Object.keys(roles).length === 0) {
+    const fallback =
+      activity.toy_ids !== undefined && activity.toy_ids.length > 0
+        ? (activity.toy_ids[0] ?? null)
+        : null;
+    if (fallback === null) return [];
+    return [
+      {
+        toyId: fallback,
+        displayName: lookupToyDisplayName(activity, fallback) ?? "",
+        side: deterministicSide(fallback),
+      },
+    ];
+  }
+  const cast: CastMember[] = [];
+  const seen = new Set<string>();
   for (const role of Object.values(roles)) {
     if (!role.toy_id) continue;
-    const name = role.display_name;
-    if (!name) continue;
-    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const match = new RegExp(`\\b${escaped}\\b`).exec(body);
-    if (match !== null && (bestIdx === -1 || match.index < bestIdx)) {
-      bestIdx = match.index;
-      bestToyId = role.toy_id;
+    if (seen.has(role.toy_id)) continue;
+    // ALWAYS_VISIBLE: include unconditionally.
+    // CONTEXT_DEPENDENT: include only if the rendered body names them.
+    // Unknown role-name (forward-compat for a future role added without
+    // updating these sets): include unconditionally — better to over-show
+    // than to silently hide a new role.
+    const classification: "always" | "context" | "unknown" =
+      ALWAYS_VISIBLE_ROLES.has(role.role_name)
+        ? "always"
+        : CONTEXT_DEPENDENT_ROLES.has(role.role_name)
+          ? "context"
+          : "unknown";
+    if (classification === "context") {
+      if (!stepBody) continue;
+      const escaped = role.display_name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      if (!new RegExp(`\\b${escaped}\\b`).test(stepBody)) continue;
     }
+    seen.add(role.toy_id);
+    cast.push({
+      toyId: role.toy_id,
+      displayName: role.display_name,
+      side: deterministicSide(role.toy_id),
+    });
   }
-  return bestToyId ?? fallback;
+  return cast;
 }
 
 // The kiosk renders the step flagged `current: true`. While the
@@ -263,30 +340,26 @@ export function StepCard(props: StepCardProps): JSX.Element {
       ? currentStep.choices
       : null;
 
-  // Phase F Step F7 sprite resolution. The sprite renders when the
-  // step opts in via ``action_slot`` and we can resolve a toy id.
+  // Phase F Step F7 + multi-toy cast (post-O UAT). Sprites render
+  // alongside the body text. Pre-K activities (no ``activity.roles``)
+  // get the single-sprite F7-era fallback from ``toy_ids[0]``. K+
+  // activities with a cast surface ALL friend/helper/guide-type roles
+  // every step; boss-style roles only render on steps where the body
+  // names them.
   //
-  // Phase K K1+ adds multi-toy role substitution into step bodies
-  // (e.g. ``{quest_giver}`` → "Bowser"). The activity-level
-  // ``toy_ids[0]`` is the persona-matched primary toy and is often
-  // unrelated to the cast — using it for every step shows the wrong
-  // toy whenever the body names a different role's display name.
-  // ``resolveStepToyId`` scans ``activity.roles`` for the role whose
-  // display name appears earliest in the rendered body and returns
-  // that role's toy_id; falls back to ``toy_ids[0]`` for pre-K
-  // activities or steps whose body names no cast member.
-  const slot =
+  // ``action_slot`` defaults to ``"idle"`` when the template doesn't
+  // specify one — pre-fix the kiosk omitted sprites entirely on
+  // non-action steps, which hid the cast for most step kinds. Operator
+  // feedback: cast should be visible across the whole activity.
+  const slotFromStep =
     previewStep !== null && typeof previewStep.action_slot === "string"
       ? previewStep.action_slot
       : null;
-  const fallbackToyId =
-    activity.toy_ids !== undefined && activity.toy_ids.length > 0
-      ? (activity.toy_ids[0] ?? null)
-      : null;
-  const toyId = resolveStepToyId(previewStep?.body, activity.roles, fallbackToyId);
-  const showSprite = slot !== null && toyId !== null;
-  const toyDisplayName =
-    showSprite && toyId !== null ? lookupToyDisplayName(activity, toyId) : undefined;
+  const slot = slotFromStep ?? "idle";
+  const cast = resolveStepCast(activity, previewStep?.body);
+  const spriteSize = spriteSizeForCount(cast.length);
+  const leftCast = cast.filter((m) => m.side === "left");
+  const rightCast = cast.filter((m) => m.side === "right");
 
   // Phase K K9: voice profile resolution + flag-driven affordances. The
   // resolver tolerates a null persona and returns the default profile;
@@ -503,19 +576,35 @@ export function StepCard(props: StepCardProps): JSX.Element {
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "center",
-            // Gap between sprite and body text when the sprite renders;
-            // collapses harmlessly to zero visual when the sprite is
-            // absent (single-child flex row).
+            // Gap between sprite columns + body text; collapses
+            // harmlessly to zero visual when neither column has sprites.
             gap: 24,
             width: "100%",
           }}
         >
-          {showSprite && slot !== null && toyId !== null && (
-            <ToyActionSprite
-              toyId={toyId}
-              slot={slot}
-              toyDisplayName={toyDisplayName}
-            />
+          {leftCast.length > 0 && (
+            <div
+              data-testid="step-cast-left"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 12,
+                flexShrink: 0,
+              }}
+            >
+              {leftCast.map((member) => (
+                <ToyActionSprite
+                  key={member.toyId}
+                  toyId={member.toyId}
+                  slot={slot}
+                  toyDisplayName={
+                    member.displayName.length > 0 ? member.displayName : undefined
+                  }
+                  size={spriteSize}
+                />
+              ))}
+            </div>
           )}
           <h1
             data-testid="step-text"
@@ -548,6 +637,30 @@ export function StepCard(props: StepCardProps): JSX.Element {
               enabled={clickableWordsEnabled}
             />
           </h1>
+          {rightCast.length > 0 && (
+            <div
+              data-testid="step-cast-right"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 12,
+                flexShrink: 0,
+              }}
+            >
+              {rightCast.map((member) => (
+                <ToyActionSprite
+                  key={member.toyId}
+                  toyId={member.toyId}
+                  slot={slot}
+                  toyDisplayName={
+                    member.displayName.length > 0 ? member.displayName : undefined
+                  }
+                  size={spriteSize}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
       {/*
