@@ -85,17 +85,22 @@ const ELEMENT_CARD_STYLES = `
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 24px;
-  padding: 20px 28px;
+  gap: 16px;
+  padding: 14px 20px;
   background: #ffffff;
   border-radius: 24px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
   animation: kiosk-element-card-pulse 1000ms ease-out forwards;
   max-width: min(720px, 92vw);
 }
+/* Each font-size + sprite-size clamp uses min(vw, vh) for the middle
+   term so the card shrinks on short viewports (iPad portrait, landscape
+   on tablet docks) — not just narrow ones. Upper bounds are tightened
+   from the original spec to keep the StepCard's NextStepButton on
+   screen below the card + body text + reward affordances. */
 .kiosk-element-card-sprite {
-  width: clamp(128px, 28vw, 256px);
-  height: clamp(128px, 28vw, 256px);
+  width: clamp(96px, min(20vw, 22vh), 200px);
+  height: clamp(96px, min(20vw, 22vh), 200px);
   aspect-ratio: 1 / 1;
   object-fit: cover;
   border-radius: 16px;
@@ -110,20 +115,20 @@ const ELEMENT_CARD_STYLES = `
   text-align: left;
 }
 .kiosk-element-card-symbol {
-  font-size: clamp(64px, 16vw, 160px);
+  font-size: clamp(48px, min(12vw, 14vh), 110px);
   font-weight: 800;
   line-height: 1;
   color: #1a1a1a;
   letter-spacing: -2px;
 }
 .kiosk-element-card-name {
-  font-size: clamp(24px, 5vw, 48px);
+  font-size: clamp(20px, min(4vw, 5vh), 36px);
   font-weight: 600;
   line-height: 1.1;
   color: #333;
 }
 .kiosk-element-card-atomic-number {
-  font-size: clamp(18px, 3.5vw, 32px);
+  font-size: clamp(16px, min(3vw, 3.5vh), 24px);
   font-weight: 500;
   line-height: 1.1;
   color: #777;

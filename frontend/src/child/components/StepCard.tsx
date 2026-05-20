@@ -520,9 +520,12 @@ export function StepCard(props: StepCardProps): JSX.Element {
               margin: 0,
               // ``flex: 1`` lets the body text fill the remaining row
               // width when the sprite is present, and naturally take
-              // the full row when it isn't.
+              // the full row when it isn't. Font-size clamp uses
+              // min(vw, vh) so portrait-tablet viewports shrink the
+              // body text to keep the NextStepButton on screen below
+              // the ElementCard + body text on element activity steps.
               flex: 1,
-              fontSize: "clamp(2rem, 5vw, 4rem)",
+              fontSize: "clamp(1.5rem, min(4vw, 5vh), 3rem)",
               lineHeight: 1.15,
               fontWeight: 700,
               color: "#222",
