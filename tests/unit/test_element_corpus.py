@@ -30,9 +30,11 @@ from typing import Any
 import pytest
 
 from toybox.activities.element_corpus import (
+    ELEMENT_ID_REGEX,
     Element,
     Family,
     clear_element_cache,
+    family_for,
     get_element,
     load_elements,
     peer_in_family,
@@ -817,3 +819,120 @@ def test_peer_out_of_family_raises_when_no_cross_family_peer(
     monkeypatch.setenv("TOYBOX_DATA_DIR", str(tmp_path))
     with pytest.raises(ValueError, match="(?i)no peer|empty|exhausted|cross|family"):
         peer_out_of_family("au-79", random.Random(0))
+
+
+# ---------------------------------------------------------------------
+# Phase Q Step Q5 — family_for() helper + ELEMENT_ID_REGEX consolidation
+# ---------------------------------------------------------------------
+
+
+def test_family_for_returns_correct_family_for_all_118_elements() -> None:
+    """Round-trip every shipped element id through family_for and assert
+    the result IS the same Family enum member the loader produced
+    (identity, not equality — per code-quality.md §2).
+    """
+    elements = load_elements()
+    assert len(elements) == 118, f"shipped corpus must have 118 entries, got {len(elements)}"
+    for element in elements:
+        resolved = family_for(element.id)
+        assert resolved is not None, f"family_for({element.id!r}) returned None"
+        assert resolved is element.family, (
+            f"family_for({element.id!r}) returned {resolved!r}; "
+            f"expected element.family ({element.family!r}) — identity required"
+        )
+
+
+def test_family_for_returns_none_for_unknown_id() -> None:
+    """Unknown element id should return None, not raise."""
+    assert family_for("xyz-999") is None
+    assert family_for("not-a-real-id") is None
+    # Empty + whitespace also return None (defensive — caller may
+    # thread a stale value through).
+    assert family_for("") is None
+
+
+def test_family_for_is_cached_across_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Second call to family_for must not re-iterate load_elements.
+
+    Probes by monkeypatching the underlying loader to a counter; the
+    second family_for call should NOT bump the counter.
+    """
+    import toybox.activities.element_corpus as ec
+
+    real_load = ec.load_elements
+    call_count = {"n": 0}
+
+    def counting_load() -> tuple[Element, ...]:
+        call_count["n"] += 1
+        return real_load()
+
+    # Prime the underlying _ELEMENT_CACHE first, then monkeypatch
+    # load_elements to detect re-entries from the family cache build.
+    real_load()
+    monkeypatch.setattr(ec, "load_elements", counting_load)
+
+    # First family_for call builds the cache (1 load).
+    family_for("h-1")
+    first_count = call_count["n"]
+    assert first_count >= 1, "first family_for call should have called load_elements"
+
+    # Second + third calls hit the cache (no additional loads).
+    family_for("h-1")
+    family_for("au-79")
+    assert call_count["n"] == first_count, (
+        f"family_for cache miss: expected {first_count} loads, got {call_count['n']}"
+    )
+
+
+def test_family_for_cache_invalidates_with_clear_element_cache(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """clear_element_cache must drop the family-by-id cache too."""
+    # Point at a fresh tmp corpus so the family cache binds to a
+    # different path than the shipped corpus.
+    _write_corpus(
+        tmp_path,
+        [
+            {
+                "id": "h-1",
+                "symbol": "H",
+                "name": "Hydrogen",
+                "atomic_number": 1,
+                "atomic_mass": 1.0,
+                "family": "nonmetal",
+                "phase_at_room_temp": "gas",
+                "color_description": "colorless",
+                "discovered_era": "1766",
+                "fun_fact": "Lightest element.",
+                "story_seed_hooks": ["balloon"],
+                "age_band": "3-5",
+            }
+        ],
+    )
+    monkeypatch.setenv("TOYBOX_DATA_DIR", str(tmp_path))
+    assert family_for("h-1") is Family.nonmetal
+    clear_element_cache()
+    # Re-binds against the same path on next call; still finds it.
+    assert family_for("h-1") is Family.nonmetal
+
+
+def test_element_id_regex_is_shared_with_song_and_joke_corpora() -> None:
+    """Per code-quality.md §2, the element-id regex must have ONE source
+    of truth. song_corpus + joke_corpus import ELEMENT_ID_REGEX from
+    element_corpus rather than redeclaring the pattern string.
+    """
+    import toybox.activities.joke_corpus as jc
+    import toybox.activities.song_corpus as sc
+
+    # Identity check — both modules MUST hold the same string object
+    # (Python interns short literal strings but importing the constant
+    # is the stronger guarantee).
+    assert sc.ELEMENT_ID_REGEX is ELEMENT_ID_REGEX
+    assert jc.ELEMENT_ID_REGEX is ELEMENT_ID_REGEX
+    # Sanity: the regex matches a representative element id and
+    # rejects malformed ones — defensive smoke test guarding against
+    # an accidental edit.
+    assert re.fullmatch(ELEMENT_ID_REGEX, "h-1") is not None
+    assert re.fullmatch(ELEMENT_ID_REGEX, "og-118") is not None
+    assert re.fullmatch(ELEMENT_ID_REGEX, "H-1") is None  # uppercase rejected
+    assert re.fullmatch(ELEMENT_ID_REGEX, "helium") is None  # missing number rejected

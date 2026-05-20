@@ -3982,6 +3982,85 @@ def _build_reward_step_metadata(resolved: ResolvedReward) -> dict[str, Any]:
     }
 
 
+def _extract_template_id_from_summary(summary_raw: object) -> str | None:
+    """Phase Q Step Q5 helper: pull ``template_id`` out of the ``summary`` JSON.
+
+    Mirrors the in-line decode pattern used elsewhere in this module
+    (``_row_to_response``, ``post_advance`` lazy-insert path) — kept
+    here so :func:`_insert_reward_step_as_current` can reuse it without
+    duplicating the JSON tolerance branches. Returns ``None`` for any
+    decode / shape failure so legacy rows continue to fall back to the
+    pre-Q reward behaviour.
+    """
+    if not summary_raw or not isinstance(summary_raw, str):
+        return None
+    try:
+        payload = json.loads(summary_raw)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    tid = payload.get("template_id")
+    if isinstance(tid, str) and tid:
+        return tid
+    return None
+
+
+def _resolve_primary_element_id(
+    conn: sqlite3.Connection,
+    *,
+    activity_id: str,
+    template_id: str | None,
+) -> str | None:
+    """Phase Q Step Q5: find the activity's "primary" element id.
+
+    The primary element id is the ``element_id`` of the first persisted
+    ``activity_steps`` row (lowest seq) whose template-time step has a
+    non-null ``element_id``. ``activity_steps`` does not store
+    ``element_id`` as its own column (additive, see
+    :func:`_resolve_element_id_for_persisted_step`) — we walk the
+    persisted rows in seq order and resolve each via the template.
+
+    Returns ``None`` when:
+
+    * the activity has no ``template_id`` (legacy row pre-M3 envelope),
+    * the template can't be loaded (deleted / orphaned),
+    * no persisted step row maps to a template step with ``element_id``.
+
+    Matches the M3 element_id surface contract: the kiosk's
+    ElementCard renders against the same template-time field.
+    """
+    if template_id is None:
+        return None
+    template = find_template_by_id(template_id)
+    if template is None:
+        return None
+    template_step_element: dict[str, str] = {}
+    for step in template.steps:
+        # Template steps without an ``id`` predate Phase G branching and
+        # can't be matched against ``activity_steps.step_template_id``;
+        # skip them rather than raise. Steps without ``element_id`` are
+        # outside Phase Q's element-aware reward scope.
+        if step.id is not None and step.element_id is not None:
+            template_step_element[step.id] = step.element_id
+    if not template_step_element:
+        return None
+    rows = conn.execute(
+        "SELECT step_template_id FROM activity_steps "
+        "WHERE activity_id = ? AND step_template_id IS NOT NULL "
+        "ORDER BY seq ASC",
+        (activity_id,),
+    ).fetchall()
+    for r in rows:
+        step_template_id = r["step_template_id"]
+        if not isinstance(step_template_id, str):
+            continue
+        element_id = template_step_element.get(step_template_id)
+        if element_id is not None:
+            return element_id
+    return None
+
+
 def _insert_reward_step_as_current(
     conn: sqlite3.Connection,
     *,
@@ -4050,12 +4129,24 @@ def _insert_reward_step_as_current(
     current_step_count = int(step_count_row["c"])
     new_seq = int(step_count_row["max_seq"]) + 1
 
+    # Phase Q Step Q5: extract the activity's primary element id from
+    # the first persisted step row whose template-time element_id is
+    # non-null. Pre-Q activities (and templates without element_id
+    # steps) thread ``None`` here, preserving the pre-Q reward picker
+    # behaviour (theme → untheme fallback).
+    summary_raw = row["summary"] if "summary" in row.keys() else None
+    template_id_for_element = _extract_template_id_from_summary(summary_raw)
+    primary_element_id = _resolve_primary_element_id(
+        conn, activity_id=activity_id, template_id=template_id_for_element
+    )
+
     context = RewardActivityContext(
         id=activity_id,
         session_id=str(session_id_raw) if session_id_raw is not None else "",
         persona_id=str(persona_id_raw) if persona_id_raw is not None else None,
         slot_fills_json=str(slot_fills_raw) if slot_fills_raw is not None else None,
         current_step_count=current_step_count,
+        element_id=primary_element_id,
     )
     resolved = resolve_reward(conn, context, reward_type_raw)
     if resolved is None:

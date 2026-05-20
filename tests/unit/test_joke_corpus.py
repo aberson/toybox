@@ -99,8 +99,7 @@ def test_shipped_corpus_covers_all_twelve_themes() -> None:
     deferred = {Theme.feelings}
     expected = set(Theme) - deferred
     assert themes_present == expected, (
-        f"missing themes: {expected - themes_present}; "
-        f"unexpected: {themes_present - expected}"
+        f"missing themes: {expected - themes_present}; unexpected: {themes_present - expected}"
     )
 
 
@@ -526,3 +525,139 @@ def test_joke_injection_guard_blocks_family_field_with_payload(
     monkeypatch.setenv("TOYBOX_DATA_DIR", str(tmp_path))
     with pytest.raises(ValueError, match="(?i)injection|ignore prior"):
         load_jokes()
+
+
+# ---------------------------------------------------------------------
+# Phase Q Step Q5 — element_id + family_hint pick kwargs
+# ---------------------------------------------------------------------
+
+
+def test_pick_joke_element_id_match_wins_over_theme_entry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """element_id filter selects ONLY the element-tagged entry, even
+    when a theme-only entry would also match.
+    """
+    _write_corpus(
+        tmp_path,
+        [
+            _good_entry(id="theme-only-joke", theme="silly", age_band="3-5"),
+            _good_entry(
+                id="neon-joke",
+                setup="Why does neon glow?",
+                punchline="Because it knows how to put on a show.",
+                element_id="ne-10",
+                family="noble_gas",
+                theme="silly",
+                age_band="3-5",
+            ),
+        ],
+    )
+    monkeypatch.setenv("TOYBOX_DATA_DIR", str(tmp_path))
+    chosen = pick_joke(seed=0, element_id="ne-10")
+    assert chosen is not None
+    assert chosen.id == "neon-joke"
+    assert chosen.element_id == "ne-10"
+
+
+def test_pick_joke_element_id_no_match_returns_none(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """element_id with no matching entry returns None — does NOT silently
+    widen to theme-tier.
+    """
+    _write_corpus(tmp_path, [_good_entry(id="why-chicken")])
+    monkeypatch.setenv("TOYBOX_DATA_DIR", str(tmp_path))
+    assert pick_joke(seed=0, element_id="ne-10") is None
+
+
+def test_pick_joke_family_hint_matches_family_field(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """family_hint selects ONLY entries with that Family."""
+    _write_corpus(
+        tmp_path,
+        [
+            _good_entry(id="no-family-joke"),
+            _good_entry(
+                id="gold-joke",
+                setup="Why is gold shiny?",
+                punchline="Because it works on its reflection.",
+                family="transition_metal",
+            ),
+            _good_entry(
+                id="neon-joke",
+                setup="Why does neon glow?",
+                punchline="Because it loves the spotlight.",
+                family="noble_gas",
+            ),
+        ],
+    )
+    monkeypatch.setenv("TOYBOX_DATA_DIR", str(tmp_path))
+    chosen = pick_joke(seed=0, family_hint=Family.noble_gas)
+    assert chosen is not None
+    assert chosen.id == "neon-joke"
+    assert chosen.family is Family.noble_gas
+
+
+def test_pick_joke_family_hint_uses_is_not_equality(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Defensive identity check — returned joke's family IS the passed
+    Family enum member (object identity, per code-quality.md §2).
+    """
+    _write_corpus(
+        tmp_path,
+        [
+            _good_entry(
+                id="krypton-joke",
+                setup="Why is krypton always alone?",
+                punchline="It's a noble gas and prefers it that way.",
+                family="noble_gas",
+            )
+        ],
+    )
+    monkeypatch.setenv("TOYBOX_DATA_DIR", str(tmp_path))
+    hint = Family.noble_gas
+    chosen = pick_joke(seed=0, family_hint=hint)
+    assert chosen is not None
+    assert chosen.family is hint, "returned family must be the SAME enum member (identity)"
+
+
+def test_pick_joke_element_id_and_family_kwargs_default_none() -> None:
+    """Existing tests still pass when the new kwargs are unset —
+    backwards compatibility.
+    """
+    a = pick_joke(seed=42, age_band="6-8")
+    b = pick_joke(seed=42, age_band="6-8", element_id=None, family_hint=None)
+    assert a is not None and b is not None
+    assert a.id == b.id
+
+
+def test_pick_joke_element_id_wins_when_both_kwargs_passed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When both element_id AND family_hint are passed, element wins."""
+    _write_corpus(
+        tmp_path,
+        [
+            _good_entry(
+                id="neon-joke",
+                setup="Why does neon glow?",
+                punchline="Spotlight life.",
+                element_id="ne-10",
+                family="noble_gas",
+            ),
+            _good_entry(
+                id="krypton-joke",
+                setup="Why is krypton alone?",
+                punchline="Noble gas tradition.",
+                element_id="kr-36",
+                family="noble_gas",
+            ),
+        ],
+    )
+    monkeypatch.setenv("TOYBOX_DATA_DIR", str(tmp_path))
+    chosen = pick_joke(seed=0, element_id="ne-10", family_hint=Family.noble_gas)
+    assert chosen is not None
+    assert chosen.id == "neon-joke"

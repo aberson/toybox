@@ -70,7 +70,7 @@ from typing import Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .element_corpus import Family
+from .element_corpus import ELEMENT_ID_REGEX, Family
 from .themes import Theme
 
 # ---------------------------------------------------------------------
@@ -158,7 +158,7 @@ class Song(BaseModel):
     license: str = Field(min_length=1, max_length=64)
     credit: str = Field(min_length=1, max_length=200)
     lyrics: str = Field(min_length=1, max_length=500)
-    element_id: str | None = Field(default=None, pattern=r"^[a-z]{1,3}-[0-9]{1,3}$")
+    element_id: str | None = Field(default=None, pattern=ELEMENT_ID_REGEX)
     family: Family | None = None
 
 
@@ -203,6 +203,16 @@ def _audio_file_path(audio_path: str) -> Path:
 # of TOYBOX_DATA_DIR (test monkeypatch) produces a fresh load.
 _SONG_CACHE: dict[Path, tuple[Song, ...]] = {}
 
+# Phase Q Step Q5: bucket caches for the element-tier and family-tier
+# reward picks. Built once per corpus-load (same path key as
+# :data:`_SONG_CACHE` so test monkeypatch reuses the same lifecycle).
+# Per pick the consumer does an O(1) dict lookup + a small filter over
+# the bucket. Per code-quality.md §2 the bucket VALUES are entries
+# from the same :data:`_SONG_CACHE` tuple — identity is preserved so
+# tests can assert ``picked is _SONG_CACHE[path][i]`` if needed.
+_SONGS_BY_ELEMENT_ID: dict[Path, dict[str, list[Song]]] = {}
+_SONGS_BY_FAMILY: dict[Path, dict[Family, list[Song]]] = {}
+
 
 def clear_song_cache() -> None:
     """Drop the in-process song cache (test hook).
@@ -210,8 +220,16 @@ def clear_song_cache() -> None:
     Production callers do not need to call this — the cache is keyed
     on the resolved path so an env change automatically forces a
     re-read.
+
+    Phase Q Step Q5: also invalidates the per-element_id and
+    per-family bucket caches so a same-process change of
+    ``TOYBOX_DATA_DIR`` produces freshly-rebuilt buckets the next
+    time :func:`pick_song` is called with ``element_id`` /
+    ``family_hint``.
     """
     _SONG_CACHE.clear()
+    _SONGS_BY_ELEMENT_ID.clear()
+    _SONGS_BY_FAMILY.clear()
 
 
 # ---------------------------------------------------------------------
@@ -440,6 +458,21 @@ def load_songs() -> tuple[Song, ...]:
 
     result = tuple(songs)
     _SONG_CACHE[path] = result
+
+    # Phase Q Step Q5: build the bucket caches once per corpus load so
+    # per-pick element-tier / family-tier lookups stay O(1) bucket +
+    # O(small) filter. The buckets reference the same :class:`Song`
+    # instances as the tuple — identity is preserved.
+    by_element: dict[str, list[Song]] = {}
+    by_family: dict[Family, list[Song]] = {}
+    for song in songs:
+        if song.element_id is not None:
+            by_element.setdefault(song.element_id, []).append(song)
+        if song.family is not None:
+            by_family.setdefault(song.family, []).append(song)
+    _SONGS_BY_ELEMENT_ID[path] = by_element
+    _SONGS_BY_FAMILY[path] = by_family
+
     return result
 
 
@@ -455,6 +488,8 @@ def pick_song(
     persona_id: str | None = None,
     theme: Theme | None = None,
     require_audio: bool = False,
+    element_id: str | None = None,
+    family_hint: Family | None = None,
 ) -> Song | None:
     """Deterministic seeded pick from the song corpus.
 
@@ -468,6 +503,19 @@ def pick_song(
       audio file currently exists on disk. Default False so tests
       and K11 itself can exercise the picker before the operator
       runs ``scripts/generate_song_corpus.py``.
+    * ``element_id`` — Phase Q Step Q5: when set, only entries whose
+      :attr:`Song.element_id` equals this value qualify. The bucket
+      cache (:data:`_SONGS_BY_ELEMENT_ID`) is consulted for O(1)
+      lookup before the per-pick filter.
+    * ``family_hint`` — Phase Q Step Q5: when set, only entries whose
+      :attr:`Song.family` IS this :class:`Family` member (identity,
+      not equality — per code-quality.md §2) qualify. Consulted via
+      :data:`_SONGS_BY_FAMILY`.
+
+    When ``element_id`` is set, ``family_hint`` is ignored (element
+    tier wins). When ``element_id`` is unset and ``family_hint`` is
+    set, the family bucket is the candidate pool. When both are
+    unset the picker walks the full corpus (legacy behaviour).
 
     Tie-break: candidates sorted by ``id`` ASC before the seeded pick,
     so the same ``(seed, filters)`` always produces the same song
@@ -490,9 +538,26 @@ def pick_song(
             return True
         return _audio_file_path(entry.audio_path).is_file()
 
+    # Force corpus load so the bucket caches are populated. Bucket
+    # caches are keyed on the same resolved path as :data:`_SONG_CACHE`.
+    load_songs()
+    path = _manifest_path()
+
+    # Phase Q Step Q5: pick the candidate pool based on element_id /
+    # family_hint. Element tier wins when both are passed — the caller
+    # in :mod:`toybox.activities.content_resolver` already encodes the
+    # element → family → theme fallback by issuing successive picks.
+    pool: list[Song]
+    if element_id is not None:
+        pool = list(_SONGS_BY_ELEMENT_ID.get(path, {}).get(element_id, ()))
+    elif family_hint is not None:
+        pool = list(_SONGS_BY_FAMILY.get(path, {}).get(family_hint, ()))
+    else:
+        pool = list(load_songs())
+
     candidates = [
         s
-        for s in load_songs()
+        for s in pool
         if (age_band is None or s.age_band == age_band)
         and _persona_match(s)
         and (theme is None or s.theme is theme)

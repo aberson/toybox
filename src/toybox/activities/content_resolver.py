@@ -75,6 +75,7 @@ from typing import Final, Literal, Protocol, cast
 from ..core import jokes_enabled as _jokes_enabled
 from ..core import songs_enabled as _songs_enabled
 from ..core.banned_themes import current_banned_themes_global
+from .element_corpus import Family, family_for
 from .generic_descriptors import GENERIC_DESCRIPTORS
 from .joke_corpus import pick_joke
 from .models import Animation
@@ -1121,6 +1122,13 @@ class RewardActivityContext:
       Mixed into the deterministic seed so a hypothetical re-advance
       at a different step count picks a different reward (a stable
       contract tests can assert).
+    * ``element_id`` — Phase Q Step Q5 optional. The activity's primary
+      element id, threaded into :func:`_try_pick_song` /
+      :func:`_try_pick_joke` so element-aware picks can win over the
+      theme fallback. ``None`` (the default) preserves pre-Q behaviour
+      — the resolver walks the existing theme → untheme chain. The
+      caller in :mod:`toybox.api.activities` extracts the value from
+      the first persisted step row whose ``element_id IS NOT NULL``.
     """
 
     id: str
@@ -1128,6 +1136,7 @@ class RewardActivityContext:
     persona_id: str | None
     slot_fills_json: str | None
     current_step_count: int
+    element_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1571,15 +1580,40 @@ def _first_theme_for_corpus(activity_themes: list[str]) -> Theme | None:
     return Theme(valid[0])
 
 
+def _resolve_family_hint(element_id: str | None) -> Family | None:
+    """Phase Q Step Q5: look up the family for ``element_id``, or ``None``.
+
+    Wraps :func:`family_for` with corpus-load defense (a malformed
+    element corpus bundle is a packaging error but the reward
+    fallback chain should still proceed). Returns ``None`` for
+    unknown ids or load failures — both surface to the caller as
+    "no family-tier candidate pool".
+    """
+    if element_id is None:
+        return None
+    try:
+        return family_for(element_id)
+    except (ValueError, OSError) as exc:
+        _logger.warning("reward resolver: family_for failed: %s", exc)
+        return None
+
+
 def _try_pick_joke(
     seed: int,
     persona_id: str | None,
     activity_themes: list[str],
+    element_id: str | None = None,
 ) -> ResolvedReward | None:
-    """Pick one joke; theme-first, untheme fallback. Returns ``None`` on miss.
+    """Pick one joke; element → family → theme → untheme fallback. Returns ``None`` on miss.
 
-    Per phase-l-plan §7 L3: "Try with one of the activity themes first
-    (lowest-id theme...). If returns None, fall back to ``theme=None``."
+    Per phase-l-plan §7 L3 + Phase Q Step Q5 element-aware reward
+    chain:
+
+    1. If ``element_id`` is set, try element-tier pick first.
+    2. If element-tier returned nothing AND ``element_id`` is set,
+       resolve family via :func:`family_for` and try family-tier.
+    3. Fall through to the existing theme-tier (lowest-id activity
+       theme) then untheme-tier picks.
 
     Corpus-load failures during the pick (the picker eagerly loads the
     corpus on first call) are caught and treated as a missed pick so
@@ -1588,7 +1622,15 @@ def _try_pick_joke(
     """
     theme = _first_theme_for_corpus(activity_themes)
     try:
-        joke = pick_joke(seed, persona_id=persona_id, theme=theme) if theme is not None else None
+        joke = None
+        if element_id is not None:
+            joke = pick_joke(seed, persona_id=persona_id, element_id=element_id)
+            if joke is None:
+                family_hint = _resolve_family_hint(element_id)
+                if family_hint is not None:
+                    joke = pick_joke(seed, persona_id=persona_id, family_hint=family_hint)
+        if joke is None and theme is not None:
+            joke = pick_joke(seed, persona_id=persona_id, theme=theme)
         if joke is None:
             joke = pick_joke(seed, persona_id=persona_id, theme=None)
     except (ValueError, OSError) as exc:
@@ -1612,20 +1654,35 @@ def _try_pick_song(
     seed: int,
     persona_id: str | None,
     activity_themes: list[str],
+    element_id: str | None = None,
 ) -> ResolvedReward | None:
-    """Pick one song with audio present; theme-first, untheme fallback.
+    """Pick one song with audio present; element → family → theme → untheme fallback.
 
-    Corpus-load / audio-probe failures during the pick are caught and
-    treated as a missed pick so the resolver's fallback chain proceeds.
-    See :func:`_try_pick_joke` for the same rationale.
+    Per Phase Q Step Q5 element-aware reward chain — see
+    :func:`_try_pick_joke` for the algorithm. Same corpus-load
+    defense.
     """
     theme = _first_theme_for_corpus(activity_themes)
     try:
-        song = (
-            pick_song(seed, persona_id=persona_id, theme=theme, require_audio=True)
-            if theme is not None
-            else None
-        )
+        song = None
+        if element_id is not None:
+            song = pick_song(
+                seed,
+                persona_id=persona_id,
+                element_id=element_id,
+                require_audio=True,
+            )
+            if song is None:
+                family_hint = _resolve_family_hint(element_id)
+                if family_hint is not None:
+                    song = pick_song(
+                        seed,
+                        persona_id=persona_id,
+                        family_hint=family_hint,
+                        require_audio=True,
+                    )
+        if song is None and theme is not None:
+            song = pick_song(seed, persona_id=persona_id, theme=theme, require_audio=True)
         if song is None:
             song = pick_song(seed, persona_id=persona_id, theme=None, require_audio=True)
     except (ValueError, OSError) as exc:
@@ -1812,11 +1869,15 @@ def resolve_reward(
             if picked is not None:
                 return picked
         elif kind == "joke":
-            picked = _try_pick_joke(seed, activity.persona_id, activity_themes)
+            picked = _try_pick_joke(
+                seed, activity.persona_id, activity_themes, element_id=activity.element_id
+            )
             if picked is not None:
                 return picked
         elif kind == "song":
-            picked = _try_pick_song(seed, activity.persona_id, activity_themes)
+            picked = _try_pick_song(
+                seed, activity.persona_id, activity_themes, element_id=activity.element_id
+            )
             if picked is not None:
                 return picked
     return None

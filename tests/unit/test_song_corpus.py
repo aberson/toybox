@@ -119,8 +119,7 @@ def test_shipped_corpus_covers_all_twelve_themes() -> None:
     deferred = {Theme.feelings}
     expected = set(Theme) - deferred
     assert themes_present == expected, (
-        f"missing themes: {expected - themes_present}; "
-        f"unexpected: {themes_present - expected}"
+        f"missing themes: {expected - themes_present}; unexpected: {themes_present - expected}"
     )
 
 
@@ -781,3 +780,151 @@ def test_m7a_backfill_family_songs_have_family(
     assert entry.family is expected_family, (
         f"{song_id!r} family mismatch: got {entry.family!r}, expected {expected_family!r}"
     )
+
+
+# ---------------------------------------------------------------------
+# Phase Q Step Q5 — element_id + family_hint pick kwargs
+# ---------------------------------------------------------------------
+
+
+def test_pick_song_element_id_match_wins_over_theme_entry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """element_id filter selects ONLY the element-tagged entry, even when
+    a theme-only entry would also match. Element tier is the narrowest
+    filter — its bucket is the candidate pool.
+    """
+    _write_manifest(
+        tmp_path,
+        [
+            _good_entry(id="theme-only-tune", theme="space", age_band="3-5"),
+            _good_entry(
+                id="neon-glow",
+                title="Neon Glow",
+                audio_path="audio/neon-glow.mp3",
+                element_id="ne-10",
+                family="noble_gas",
+                theme="space",
+                age_band="3-5",
+            ),
+        ],
+    )
+    monkeypatch.setenv("TOYBOX_DATA_DIR", str(tmp_path))
+    chosen = pick_song(seed=0, element_id="ne-10")
+    assert chosen is not None
+    assert chosen.id == "neon-glow"
+    assert chosen.element_id == "ne-10"
+
+
+def test_pick_song_element_id_no_match_returns_none(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """element_id with no matching entry returns None — does NOT silently
+    widen to theme-tier. Tier-widening is the resolver's job, not the
+    picker's.
+    """
+    _write_manifest(
+        tmp_path,
+        [_good_entry(id="rocket-launch-countdown")],
+    )
+    monkeypatch.setenv("TOYBOX_DATA_DIR", str(tmp_path))
+    assert pick_song(seed=0, element_id="ne-10") is None
+
+
+def test_pick_song_family_hint_matches_family_field(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """family_hint selects ONLY entries with that Family. Cross-family
+    entries (and entries with family=None) are excluded.
+    """
+    _write_manifest(
+        tmp_path,
+        [
+            _good_entry(id="no-family-tune"),
+            _good_entry(
+                id="gold-shimmer",
+                title="Gold Shimmer",
+                audio_path="audio/gold-shimmer.mp3",
+                family="transition_metal",
+            ),
+            _good_entry(
+                id="neon-glow",
+                title="Neon Glow",
+                audio_path="audio/neon-glow.mp3",
+                family="noble_gas",
+            ),
+        ],
+    )
+    monkeypatch.setenv("TOYBOX_DATA_DIR", str(tmp_path))
+    chosen = pick_song(seed=0, family_hint=Family.noble_gas)
+    assert chosen is not None
+    assert chosen.id == "neon-glow"
+    assert chosen.family is Family.noble_gas
+
+
+def test_pick_song_family_hint_uses_is_not_equality(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Defensive identity check — the returned entry's family attribute
+    IS the same Family enum member passed in (object identity, not
+    string equality). Per code-quality.md §2.
+    """
+    _write_manifest(
+        tmp_path,
+        [
+            _good_entry(
+                id="krypton-tune",
+                title="Krypton Tune",
+                audio_path="audio/krypton-tune.mp3",
+                family="noble_gas",
+            )
+        ],
+    )
+    monkeypatch.setenv("TOYBOX_DATA_DIR", str(tmp_path))
+    hint = Family.noble_gas
+    chosen = pick_song(seed=0, family_hint=hint)
+    assert chosen is not None
+    assert chosen.family is hint, "returned family must be the SAME enum member (identity)"
+
+
+def test_pick_song_element_id_and_family_kwargs_default_none() -> None:
+    """Existing tests still pass when the new kwargs are unset —
+    backwards compatibility. The shipped corpus picker behaves
+    identically with element_id=None and family_hint=None as before.
+    """
+    a = pick_song(seed=42, age_band="6-8")
+    b = pick_song(seed=42, age_band="6-8", element_id=None, family_hint=None)
+    assert a is not None and b is not None
+    assert a.id == b.id
+
+
+def test_pick_song_element_id_wins_when_both_kwargs_passed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When both element_id AND family_hint are passed, element wins.
+    Caller (content_resolver._try_pick_song) encodes the tier fallback
+    via successive picks — the picker doesn't widen on its own.
+    """
+    _write_manifest(
+        tmp_path,
+        [
+            _good_entry(
+                id="neon-glow",
+                title="Neon Glow",
+                audio_path="audio/neon-glow.mp3",
+                element_id="ne-10",
+                family="noble_gas",
+            ),
+            _good_entry(
+                id="krypton-tune",
+                title="Krypton Tune",
+                audio_path="audio/krypton-tune.mp3",
+                element_id="kr-36",
+                family="noble_gas",
+            ),
+        ],
+    )
+    monkeypatch.setenv("TOYBOX_DATA_DIR", str(tmp_path))
+    chosen = pick_song(seed=0, element_id="ne-10", family_hint=Family.noble_gas)
+    assert chosen is not None
+    assert chosen.id == "neon-glow"
