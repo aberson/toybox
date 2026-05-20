@@ -30,6 +30,7 @@ import { RoomIngestBulk } from "./components/RoomIngestBulk";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { StatsPanel } from "./components/StatsPanel";
 import { SubTabs, Tabs, useTabState } from "./components/Tabs";
+import { ToastList } from "./components/ToastList";
 import { ToyIngest } from "./components/ToyIngest";
 import { TranscriptsManager } from "./components/TranscriptsManager";
 import { TriggerButton } from "./components/TriggerButton";
@@ -1261,40 +1262,10 @@ export function App(): JSX.Element {
         </div>
         {/* Toasts are cross-cutting transient feedback — they MUST stay
             outside any tab gate so a mute-error toast (Settings-driven)
-            is visible from Play, etc. */}
-        {state.toasts.length > 0 && (
-          <div data-testid="toasts" style={{ marginTop: 16 }}>
-            {state.toasts.map((t) => (
-              <div
-                key={t.id}
-                role="status"
-                data-toast-kind={t.kind}
-                style={{
-                  padding: 8,
-                  margin: "4px 0",
-                  background:
-                    t.kind === "error"
-                      ? "#fdecea"
-                      : t.kind === "warning"
-                        ? "#fff8e1"
-                        : "#e3f2fd",
-                  border: "1px solid #ddd",
-                  borderRadius: 4,
-                  fontSize: 13,
-                }}
-              >
-                {t.message}
-                <button
-                  type="button"
-                  onClick={() => useParentStore.getState().dismissToast(t.id)}
-                  style={{ marginLeft: 8 }}
-                >
-                  dismiss
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+            is visible from Play, etc. ToastList owns the per-toast TTL
+            machinery (info kind auto-dismisses after 5s; warning/error
+            stay sticky). */}
+        <ToastList toasts={state.toasts} />
       </div>
     </main>
   );
