@@ -169,6 +169,7 @@ Per [code-quality.md "Audit wire shape when storage representation changes"](../
 
 ### Step Q6: Fixture-based end-to-end smoke gate
 - **Problem:** Add `tests/integration/test_phase_q_smoke.py` — a real-end-to-end smoke gate that loads a small in-memory corpus (3 element songs + 2 family songs + 1 generic-theme song; 3 element jokes + 1 generic-theme joke), then calls `resolve_reward()` through the API layer (or directly if simpler) with `RewardActivityContext` carrying known element_ids. Assertions in this order: (a) when element_id matches a corpus entry, that entry wins; (b) when element_id has no element-keyed entry but the family does, the family-tier song wins; (c) when neither element nor family has an entry, theme fallback fires; (d) when nothing matches, untheme fallback fires. This is the producer→consumer drift test required by code-quality.md.
+- **Status:** DONE (2026-05-20)
 - **Issue:** #201
 - **Flags:** --reviewers code
 - **Produces:** new `tests/integration/test_phase_q_smoke.py`
