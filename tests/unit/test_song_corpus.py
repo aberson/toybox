@@ -693,3 +693,91 @@ def test_song_injection_guard_blocks_family_field_with_payload(
     monkeypatch.setenv("TOYBOX_DATA_DIR", str(tmp_path))
     with pytest.raises(ValueError, match="(?i)injection|ignore prior"):
         load_songs()
+
+
+# ---------------------------------------------------------------------
+# Phase Q Step Q2 — M7a backfill assertions
+# ---------------------------------------------------------------------
+#
+# Q1 added optional ``element_id`` + ``family`` fields to the Song
+# model. Q2 backfills the 15 popular-element songs (with element_id)
+# and the 10 family songs (with family) in
+# ``data/songs/manifest.json`` so the Q5 picker can resolve element-id
+# and family-tier lookups directly off the production corpus.
+#
+# These tests assert against the SHIPPED manifest via ``load_songs()``
+# — NOT a fixture — per code-quality.md §1: producer-consumer drift
+# (the picker is the consumer) is invisible to fixture tests.
+
+# Popular-element backfill (15 entries) — song_id → expected element_id.
+M7A_POPULAR_ELEMENT_BACKFILL: dict[str, str] = {
+    "gold-shiny-rhyme": "au-79",
+    "silver-spoon-song": "ag-47",
+    "iron-strong-rhyme": "fe-26",
+    "helium-balloon-float": "he-2",
+    "oxygen-breath-song": "o-8",
+    "hydrogen-tiny-cheer": "h-1",
+    "neon-glow-rhyme": "ne-10",
+    "mercury-silver-river": "hg-80",
+    "copper-penny-shine": "cu-29",
+    "uranium-glow-song": "u-92",
+    "sodium-salt-sparkle": "na-11",
+    "calcium-bone-cheer": "ca-20",
+    "carbon-best-buddy": "c-6",
+    "nitrogen-air-song": "n-7",
+    "chlorine-pool-rhyme": "cl-17",
+}
+
+# Family backfill (10 entries) — song_id → expected Family member.
+M7A_FAMILY_BACKFILL: dict[str, Family] = {
+    "noble-gases-drift-quiet": Family.noble_gas,
+    "halogens-make-friends": Family.halogen,
+    "alkali-metals-go-zoom": Family.alkali_metal,
+    "alkaline-earths-keep-strong": Family.alkaline_earth,
+    "transition-metals-shiny-song": Family.transition_metal,
+    "post-transition-metals-bendy": Family.post_transition_metal,
+    "metalloids-in-between": Family.metalloid,
+    "nonmetals-everywhere": Family.nonmetal,
+    "lanthanides-glow-soft": Family.lanthanide,
+    "actinides-radiate-far": Family.actinide,
+}
+
+
+@pytest.mark.parametrize(
+    ("song_id", "expected_element_id"),
+    sorted(M7A_POPULAR_ELEMENT_BACKFILL.items()),
+)
+def test_m7a_backfill_popular_elements_have_element_id(
+    song_id: str, expected_element_id: str
+) -> None:
+    """Each of the 15 popular-element songs carries its element_id from the manifest."""
+    songs = load_songs()
+    by_id = {s.id: s for s in songs}
+    assert song_id in by_id, f"popular-element song {song_id!r} missing from shipped corpus"
+    entry = by_id[song_id]
+    assert entry.element_id == expected_element_id, (
+        f"{song_id!r} element_id mismatch: got {entry.element_id!r}, "
+        f"expected {expected_element_id!r}"
+    )
+
+
+@pytest.mark.parametrize(
+    ("song_id", "expected_family"),
+    sorted(M7A_FAMILY_BACKFILL.items()),
+)
+def test_m7a_backfill_family_songs_have_family(
+    song_id: str, expected_family: Family
+) -> None:
+    """Each of the 10 family songs carries its Family enum member from the manifest.
+
+    Identity (``is``) comparison per code-quality.md §2: the Family
+    StrEnum is the single source of truth and any re-duplication must
+    fail loudly.
+    """
+    songs = load_songs()
+    by_id = {s.id: s for s in songs}
+    assert song_id in by_id, f"family song {song_id!r} missing from shipped corpus"
+    entry = by_id[song_id]
+    assert entry.family is expected_family, (
+        f"{song_id!r} family mismatch: got {entry.family!r}, expected {expected_family!r}"
+    )
