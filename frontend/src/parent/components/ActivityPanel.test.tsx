@@ -58,6 +58,110 @@ function fakeActivityAtSeq(
   return fakeActivity({ steps, ...overrides });
 }
 
+describe("ActivityPanel cast row", () => {
+  it("renders nothing when activity has no roles", () => {
+    render(
+      <ActivityPanel
+        activity={fakeActivity()}
+        onRegenerate={async () => undefined}
+        onEnd={async () => undefined}
+        onDidntWork={async () => undefined}
+      />,
+    );
+    expect(screen.queryByTestId("activity-cast")).toBeNull();
+  });
+
+  it("renders nothing when activity.roles is an empty record", () => {
+    render(
+      <ActivityPanel
+        activity={fakeActivity({ roles: {} })}
+        onRegenerate={async () => undefined}
+        onEnd={async () => undefined}
+        onDidntWork={async () => undefined}
+      />,
+    );
+    expect(screen.queryByTestId("activity-cast")).toBeNull();
+  });
+
+  it("renders comma-separated display names sorted by role_name", () => {
+    render(
+      <ActivityPanel
+        activity={fakeActivity({
+          roles: {
+            quest_giver: {
+              role_name: "quest_giver",
+              toy_id: "t-owl",
+              generic_descriptor: null,
+              display_name: "Wise Owl",
+            },
+            friend: {
+              role_name: "friend",
+              toy_id: "t-bear",
+              generic_descriptor: null,
+              display_name: "Captain Bear",
+            },
+          },
+        })}
+        onRegenerate={async () => undefined}
+        onEnd={async () => undefined}
+        onDidntWork={async () => undefined}
+      />,
+    );
+    const cast = screen.getByTestId("activity-cast");
+    expect(cast.textContent).toBe("cast: Captain Bear, Wise Owl");
+  });
+
+  it("deduplicates one toy filling two roles", () => {
+    render(
+      <ActivityPanel
+        activity={fakeActivity({
+          roles: {
+            guide_mentor: {
+              role_name: "guide_mentor",
+              toy_id: "t-snowball",
+              generic_descriptor: null,
+              display_name: "Snowball",
+            },
+            friend: {
+              role_name: "friend",
+              toy_id: "t-snowball",
+              generic_descriptor: null,
+              display_name: "Snowball",
+            },
+          },
+        })}
+        onRegenerate={async () => undefined}
+        onEnd={async () => undefined}
+        onDidntWork={async () => undefined}
+      />,
+    );
+    const cast = screen.getByTestId("activity-cast");
+    expect(cast.textContent).toBe("cast: Snowball");
+  });
+
+  it("includes generic-descriptor roles by display_name", () => {
+    render(
+      <ActivityPanel
+        activity={fakeActivity({
+          roles: {
+            guide_mentor: {
+              role_name: "guide_mentor",
+              toy_id: null,
+              generic_descriptor: "a kindly mentor",
+              display_name: "a kindly mentor",
+            },
+          },
+        })}
+        onRegenerate={async () => undefined}
+        onEnd={async () => undefined}
+        onDidntWork={async () => undefined}
+      />,
+    );
+    const cast = screen.getByTestId("activity-cast");
+    expect(cast.textContent).toBe("cast: a kindly mentor");
+  });
+});
+
 describe("ActivityPanel Step Back", () => {
   it("renders the Step Back button when onStepBack is supplied", () => {
     render(

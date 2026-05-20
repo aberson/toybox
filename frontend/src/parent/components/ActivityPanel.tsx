@@ -90,6 +90,26 @@ export function ActivityPanel(props: ActivityPanelProps): JSX.Element {
     typeof (personaMeta as Record<string, unknown>)["display_name"] === "string"
       ? ((personaMeta as Record<string, unknown>)["display_name"] as string)
       : null;
+  // Cast members from the resolved K5 role-slot map. Deduplicated on
+  // toy_id (a toy filling two roles shows once); generic descriptors
+  // are deduplicated on display_name. Ordered by role_name so the
+  // surface is stable across renders.
+  const castDisplayNames: string[] = (() => {
+    if (!activity.roles) return [];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    const entries = Object.values(activity.roles).sort((a, b) =>
+      a.role_name.localeCompare(b.role_name),
+    );
+    for (const role of entries) {
+      const key = role.toy_id ?? `desc:${role.display_name}`;
+      if (seen.has(key)) continue;
+      if (role.display_name.length === 0) continue;
+      seen.add(key);
+      out.push(role.display_name);
+    }
+    return out;
+  })();
 
   // Step 23: confirm dialog for the End button. ``window.confirm``
   // matches the ChildProfileEditor / TranscriptsManager sibling
@@ -125,6 +145,14 @@ export function ActivityPanel(props: ActivityPanelProps): JSX.Element {
           style={{ margin: "0 0 4px 0", color: "#1769aa", fontSize: 13 }}
         >
           persona: {personaName}
+        </p>
+      )}
+      {castDisplayNames.length > 0 && (
+        <p
+          data-testid="activity-cast"
+          style={{ margin: "0 0 4px 0", color: "#1769aa", fontSize: 13 }}
+        >
+          cast: {castDisplayNames.join(", ")}
         </p>
       )}
       <p style={{ margin: "0 0 8px 0", color: "#555", fontSize: 13 }}>
