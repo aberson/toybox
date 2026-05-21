@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>speech diagnostic</title>
+<style>
+  body { font: 18px/1.4 -apple-system, sans-serif; padding: 16px; max-width: 600px; margin: 0 auto; }
+  button { font-size: 24px; padding: 16px 24px; margin: 8px 0; width: 100%; }
+  pre { background: #f0f0f0; padding: 12px; white-space: pre-wrap; word-wrap: break-word; font-size: 14px; }
+  .ok { color: green; } .bad { color: red; } .warn { color: orange; }
+</style>
+</head>
+<body>
+<h1>Speech synthesis diagnostic</h1>
+<button id="probe">1. Probe API state</button>
+<button id="speak">2. Speak "hello hello hello"</button>
+<button id="speakloud">3. Speak louder + slower</button>
+<button id="speaknocancel">4. Speak WITHOUT pre-cancel</button>
+<button id="speakdeferred">5. Speak with cancel + 50ms delay</button>
+<button id="speakenglish">6. Speak with explicit English voice (Samantha)</button>
+<button id="listenglish">7. List all English voices</button>
+<button id="cancel">cancel</button>
+<pre id="out">tap "Probe API state" first.</pre>
+<script>
+const out = document.getElementById('out');
+function log(s, cls) {
+  const line = cls ? `<span class="${cls}">${s}</span>` : s;
+  out.innerHTML += line + '\n';
+}
+function clr() { out.innerHTML = ''; }
+
+document.getElementById('probe').onclick = () => {
+  clr();
+  log('=== API presence ===');
+  log('window.speechSynthesis: ' + (typeof window.speechSynthesis), typeof window.speechSynthesis === 'object' ? 'ok' : 'bad');
+  log('SpeechSynthesisUtterance: ' + (typeof window.SpeechSynthesisUtterance), typeof window.SpeechSynthesisUtterance === 'function' ? 'ok' : 'bad');
+  if (!window.speechSynthesis) return;
+  log('');
+  log('=== State ===');
+  log('paused: ' + window.speechSynthesis.paused);
+  log('pending: ' + window.speechSynthesis.pending);
+  log('speaking: ' + window.speechSynthesis.speaking);
+  log('');
+  log('=== Voices ===');
+  const v = window.speechSynthesis.getVoices();
+  log('count: ' + v.length, v.length > 0 ? 'ok' : 'bad');
+  if (v.length === 0) {
+    log('NO VOICES — speech will silently no-op.', 'bad');
+    log('attaching voiceschanged listener; tap probe again in 2s to see if list populated');
+    window.speechSynthesis.addEventListener('voiceschanged', () => {
+      log('voiceschanged fired! voices=' + window.speechSynthesis.getVoices().length, 'ok');
+    }, { once: true });
+  } else {
+    log('first 3 voices:');
+    v.slice(0, 3).forEach((vc, i) => log('  ' + i + ': ' + vc.name + ' (' + vc.lang + ') default=' + vc.default));
+  }
+  log('');
+  log('=== User-agent ===');
+  log(navigator.userAgent);
+  log('standalone (PWA mode): ' + (window.navigator.standalone === true), window.navigator.standalone === true ? 'warn' : 'ok');
+};
+
+function trySpeak(text, rate, pitch) {
+  clr();
+  log('Attempting speak("' + text + '", rate=' + rate + ', pitch=' + pitch + ')');
+  if (!window.speechSynthesis) {
+    log('NO API', 'bad');
+    return;
+  }
+  try {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = rate;
+    u.pitch = pitch;
+    u.volume = 1.0;
+    u.onstart = () => log('onstart fired — utterance is being spoken', 'ok');
+    u.onend = () => log('onend fired — utterance finished', 'ok');
+    u.onerror = (ev) => log('onerror fired: ' + (ev.error || 'unknown'), 'bad');
+    u.onboundary = () => log('onboundary fired (word boundary reached)');
+    u.onpause = () => log('onpause fired');
+    u.onresume = () => log('onresume fired');
+    log('queuing utterance...');
+    window.speechSynthesis.speak(u);
+    log('speak() returned without throwing', 'ok');
+    setTimeout(() => {
+      log('after 500ms: speaking=' + window.speechSynthesis.speaking + ' pending=' + window.speechSynthesis.pending + ' paused=' + window.speechSynthesis.paused);
+    }, 500);
+    setTimeout(() => {
+      log('after 2000ms: speaking=' + window.speechSynthesis.speaking + ' pending=' + window.speechSynthesis.pending + ' paused=' + window.speechSynthesis.paused);
+    }, 2000);
+  } catch (e) {
+    log('threw: ' + e.message, 'bad');
+  }
+}
+
+document.getElementById('speak').onclick = () => trySpeak('hello hello hello', 1.0, 1.0);
+document.getElementById('speakloud').onclick = () => trySpeak('hello hello hello', 0.8, 1.2);
+
+function trySpeakNoCancel(text) {
+  clr();
+  log('Speak WITHOUT pre-cancel: "' + text + '"');
+  if (!window.speechSynthesis) return;
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1.0; u.pitch = 1.0; u.volume = 1.0;
+    u.onstart = () => log('onstart fired', 'ok');
+    u.onend = () => log('onend fired', 'ok');
+    u.onerror = (ev) => log('onerror: ' + (ev.error || 'unknown'), 'bad');
+    log('NO cancel call. queuing...');
+    window.speechSynthesis.speak(u);
+    log('speak() returned');
+  } catch (e) {
+    log('threw: ' + e.message, 'bad');
+  }
+}
+
+function trySpeakDeferred(text) {
+  clr();
+  log('Speak with cancel + 50ms delay: "' + text + '"');
+  if (!window.speechSynthesis) return;
+  try {
+    window.speechSynthesis.cancel();
+    log('cancel() called, waiting 50ms...');
+    setTimeout(() => {
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 1.0; u.pitch = 1.0; u.volume = 1.0;
+      u.onstart = () => log('onstart fired', 'ok');
+      u.onend = () => log('onend fired', 'ok');
+      u.onerror = (ev) => log('onerror: ' + (ev.error || 'unknown'), 'bad');
+      log('queuing after delay...');
+      window.speechSynthesis.speak(u);
+      log('speak() returned');
+    }, 50);
+  } catch (e) {
+    log('threw: ' + e.message, 'bad');
+  }
+}
+
+document.getElementById('speaknocancel').onclick = () => trySpeakNoCancel('hello hello hello');
+document.getElementById('speakdeferred').onclick = () => trySpeakDeferred('hello hello hello');
+
+function trySpeakEnglish(text, preferredName) {
+  clr();
+  log('Speak with explicit voice. preferred="' + preferredName + '"');
+  const all = window.speechSynthesis.getVoices();
+  log('total voices: ' + all.length);
+  let voice = all.find(v => v.name === preferredName);
+  if (!voice) {
+    log('preferred not found; searching for any en-* voice');
+    voice = all.find(v => v.lang && v.lang.toLowerCase().startsWith('en'));
+  }
+  if (!voice) {
+    log('NO ENGLISH VOICE AT ALL', 'bad');
+    return;
+  }
+  log('using: ' + voice.name + ' (' + voice.lang + ') localService=' + voice.localService + ' default=' + voice.default, 'ok');
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    u.voice = voice;
+    u.lang = voice.lang;
+    u.rate = 1.0; u.pitch = 1.0; u.volume = 1.0;
+    u.onstart = () => log('onstart fired', 'ok');
+    u.onend = () => log('onend fired', 'ok');
+    u.onerror = (ev) => log('onerror: ' + (ev.error || 'unknown'), 'bad');
+    window.speechSynthesis.speak(u);
+    log('speak() returned. speaking=' + window.speechSynthesis.speaking + ' pending=' + window.speechSynthesis.pending);
+    setTimeout(() => log('+500ms: speaking=' + window.speechSynthesis.speaking), 500);
+    setTimeout(() => log('+2000ms: speaking=' + window.speechSynthesis.speaking), 2000);
+  } catch (e) {
+    log('threw: ' + e.message, 'bad');
+  }
+}
+
+document.getElementById('speakenglish').onclick = () => trySpeakEnglish('hello hello hello', 'Samantha');
+document.getElementById('listenglish').onclick = () => {
+  clr();
+  const all = window.speechSynthesis.getVoices();
+  const en = all.filter(v => v.lang && v.lang.toLowerCase().startsWith('en'));
+  log('Total: ' + all.length + ', English: ' + en.length, en.length > 0 ? 'ok' : 'bad');
+  en.slice(0, 20).forEach((v, i) => log(i + ': ' + v.name + ' (' + v.lang + ') localService=' + v.localService + ' default=' + v.default));
+};
+document.getElementById('cancel').onclick = () => {
+  window.speechSynthesis && window.speechSynthesis.cancel();
+  log('cancel() called');
+};
+</script>
+</body>
+</html>
