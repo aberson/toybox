@@ -14,11 +14,19 @@ Mirrors the auth + connect pattern used in
 
 from __future__ import annotations
 
+import sys
+
+import pytest
 from fastapi.testclient import TestClient
 
 from toybox.core.pubsub import PubSub
 from toybox.ws.envelope import build_envelope
 from toybox.ws.topics import Topic
+
+pytestmark = pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="starlette TestClient WS teardown races on Linux — see issue #210",
+)
 
 
 def _publish_toy_actions_envelope(pubsub: PubSub) -> dict[str, object]:

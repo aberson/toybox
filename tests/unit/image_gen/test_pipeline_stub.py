@@ -272,7 +272,7 @@ def test_build_pipeline_loads_ip_adapter_with_pinned_args(
     """
     monkeypatch.setenv(CARTOON_MODE_ENV, mode)
 
-    import diffusers
+    diffusers = pytest.importorskip("diffusers")
 
     fake_pipe = MagicMock(name="fake_sd_pipeline")
     # ``pipe.scheduler.config`` is read by the LCMScheduler.from_config
