@@ -1,0 +1,45 @@
+name: frontend-tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# Cancel superseded runs on the same ref so PRs don't pile up.
+concurrency:
+  group: frontend-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: typecheck + eslint + vitest (ubuntu-22.04 / node 20)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Type-check (tsc -b --noEmit)
+        run: npm run typecheck
+
+      - name: Lint (eslint)
+        run: npm run lint
+
+      # Vitest only — Playwright e2e (`npm run test:ui`) needs a running
+      # backend on :8000 + generated assets; runs as a phase-close iPad
+      # UAT instead of inline CI.
+      - name: Unit tests (vitest)
+        run: npm run test

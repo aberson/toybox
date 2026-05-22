@@ -1,0 +1,64 @@
+name: linux-tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# Cancel superseded runs on the same ref so PRs don't pile up.
+concurrency:
+  group: linux-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ruff + mypy + pytest (ubuntu-22.04 / py3.12)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.11.7"
+
+      # Cache uv downloads keyed on uv.lock at ~/.cache/uv.
+      # Hits whenever uv.lock is unchanged, regardless of branch.
+      - name: Cache uv downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-py3.12-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-py3.12-
+
+      # toybox uses [dependency-groups] dev (PEP 735), which uv syncs by
+      # default. The image_gen optional-dependencies extra is omitted on
+      # CI — torch + diffusers + transformers would balloon the install,
+      # CI has no CUDA GPU, and tests that need image-gen are marked
+      # `requires_gpu` and skipped below.
+      - name: Sync dev environment
+        run: uv sync --frozen
+
+      - name: Lint (ruff)
+        run: uv run ruff check .
+
+      - name: Format check (ruff)
+        run: uv run ruff format --check .
+
+      - name: Type-check (mypy --strict)
+        run: uv run mypy src
+
+      # `requires_gpu` tests need real CUDA + image_gen checkpoints; skip
+      # on CPU-only GitHub-hosted runners. `slow` tests (e2e synthetic-
+      # audio pipeline) self-skip when artifacts are missing, so they
+      # collect cleanly but execute no body on CI.
+      - name: Unit + integration tests
+        run: uv run pytest -m "not requires_gpu"
