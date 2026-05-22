@@ -8,11 +8,12 @@ import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-
-@pytest.mark.skipif(
+pytestmark = pytest.mark.skipif(
     sys.platform != "win32",
     reason="starlette TestClient WS teardown races on Linux — see issue #210",
 )
+
+
 @pytest.mark.parametrize(
     "origin",
     ["http://127.0.0.1:4000", "http://localhost:4000"],
