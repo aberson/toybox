@@ -1,84 +1,245 @@
 # toybox
 
-Local-first home device that watches for play opportunities, suggests structured activity scripts to a parent, and runs approved activities through a kiosk-style child app featuring AI-driven personas (Wizard, Princess, Detective, Periodic Table Professor, plus a user-grown library).
+![Python](https://img.shields.io/badge/python-3.12-blue) [![linux-tests](https://github.com/aberson/toybox/actions/workflows/linux-tests.yml/badge.svg?branch=master)](https://github.com/aberson/toybox/actions/workflows/linux-tests.yml) [![frontend-tests](https://github.com/aberson/toybox/actions/workflows/frontend-tests.yml/badge.svg?branch=master)](https://github.com/aberson/toybox/actions/workflows/frontend-tests.yml) ![pytest](https://img.shields.io/badge/pytest-1983%20passing-brightgreen) ![vitest](https://img.shields.io/badge/vitest-598%20passing-brightgreen) ![Local-first](https://img.shields.io/badge/local--first-family%20private-purple) ![License](https://img.shields.io/badge/license-MIT-blue)
 
-Runs entirely on home hardware. Internet is optional — Claude is reached over the user's subscription OAuth, and the system degrades to a fully-offline mode without it.
+A local-first home AI that watches for play opportunities, suggests structured activities to a parent, and runs the approved ones on a child kiosk featuring AI personas.
 
-**v1 ship point:** end of Phase A — the closed-loop demo with a manual "trigger" button instead of a real mic. v1 testing is **adult-only** before children participate.
+The mic listens passively. A trigger NLP and Claude (when available) propose activity scripts on the parent's tab. Only what the parent taps **Approve** appears on the child's iPad — installed as a PWA, locked to one app via Guided Access, no app store, no cloud account. The activity loop is built on 1,243 branching templates across `request_play`, `request_activity`, `embedded`, and `ending` slot-fills, with songs, jokes, and 118-element periodic-table microgames as per-activity rewards.
 
-## Build status
+**Two complementary surfaces:**
 
-**Phase M COMPLETE 2026-05-18 at master `a096e11`.** All 14 step issues closed (#153 M1, #154 M2, #155 M3, #156 M4, #157 M5, #158 M6, #159 M7, #160 M8, #161 M9, #162 M10, #163 M11, #164 M12, #165 M13, #166 M14) + umbrella [#152](https://github.com/aberson/toybox/issues/152) closed. M2b sprite render + M7b TTS render + M14 iPad UAT all shipped in the operator session. **UAT verdict: 11/12 PASS, 1 DEFERRED** (row #4 `shrink_into_helium_balloon_voyage` blocked by defect D2 — re-test scheduled in Phase N N6 [#176](https://github.com/aberson/toybox/issues/176) once N0 [#168](https://github.com/aberson/toybox/issues/168) ships). Exceeds 10/12 quality bar. UAT run-doc: [`documentation/runs/2026-05-18-phase-m-uat.md`](documentation/runs/2026-05-18-phase-m-uat.md). M2b mid-session prompt+overlay redesign (SD 1.5 + 4-step LCM cannot render legible glyphs at 512², swapped to Pillow text overlay — rounded white panel, Comic Sans Bold, periodic-table-cell layout — composited post-diffusion; 14 canonical sprites in git, 104 local-only).
+- **Parent app** (`/parent`): two-level tab shell. Mic-hot indicator, listening transcripts with retention sweep, suggestion queue, persona/toy/room/child management, banned themes, image-gen mode, household settings.
+- **Child kiosk** (`/child`): full-bleed PWA. Persona avatar reacts; step cards advance; toy-action sprites overlay on the active toy; branching choice buttons; song/joke reward step.
 
-**Phase M UAT surfaced 3 defects + 1 feature request — folded into 2 follow-up phases (14 issues minted at /repo-sync):**
-- **Phase N** (umbrella [#167](https://github.com/aberson/toybox/issues/167), 9 steps [#168-#176](https://github.com/aberson/toybox/issues/167)) — `element_microgame` template shape (4 steps + 2 binary forks per element, 118 templates), bundled with D1 fix (`persona_reasoning` text mismatch, [#169](https://github.com/aberson/toybox/issues/169)) + D2 fix (child-kiosk persona-letter blocks Next button on element cards, [#168](https://github.com/aberson/toybox/issues/168) — BLOCKER GATE).
-- **Phase O** (umbrella [#177](https://github.com/aberson/toybox/issues/177), 3 steps [#178-#180](https://github.com/aberson/toybox/issues/177)) — parent UX 5-tab refresh (All / Adventures / Elements / Feelings & Friends / Transcriptions) via typed wire-shape widening + `categorize.ts` helper on `PlayQueueList`.
+Both share types, ws envelopes, and the same FastAPI backend — one async process, one SQLite file, one mic.
 
-Phase M delivers two parallel content-depth tracks through the existing branching-template + corpus + persona substrate (Phase G/K/L); zero new step kinds, one schema addition (`step.element_id`), one new theme value (`feelings`):
+<table>
+<tr>
+<td width="25%" valign="top" align="center">
+<a href="src/toybox/personas/library/avatars/wizard.png"><img src="src/toybox/personas/library/avatars/wizard.png" alt="Wizard persona avatar — one of four AI personas a child can choose on the kiosk" width="100%"></a>
+<br/><sub><b>Personas</b><br/>4 hand-illustrated AI characters the child picks at session start</sub>
+</td>
+<td width="25%" valign="top" align="center">
+<a href="data/images/elements/h-1.png"><img src="data/images/elements/h-1.png" alt="Hydrogen element sprite — Pillow text overlay composited over an SD 1.5 + LCM-LoRA diffusion" width="100%"></a>
+<br/><sub><b>Element microgames</b><br/>118-element periodic-table corpus, sprite per element</sub>
+</td>
+<td width="25%" valign="top" align="center">
+<a href="data/sprites/templates/thinking.png"><img src="data/sprites/templates/thinking.png" alt="Thinking toy-action sprite template — overlaid on the active toy during the activity loop" width="100%"></a>
+<br/><sub><b>Toy action sprites</b><br/>10 action poses overlay on the active toy mid-activity</sub>
+</td>
+<td width="25%" valign="top" align="center">
+<!-- TODO: capture parent UI or kiosk screenshot during a real run. See documentation/operator/screenshot-capture.md. -->
+<img src="frontend/public/icons/icon-512.png" alt="toybox icon placeholder — replace with parent UI or kiosk screenshot once captured" width="100%">
+<br/><sub><b>iPad kiosk</b><br/>PWA over LAN, no app store (screenshot TODO)</sub>
+</td>
+</tr>
+</table>
 
-- **Track 1 — Periodic Table Professor expansion** (direct serve for Child B, 4yo Periodic-Table-fascinated pre-reader): 118-entry element corpus + loader + injection guard (M1) → 118-element sprite render script (M2a, M2b runtime deferred) → kiosk `ElementCard` + `step.element_id` cross-stack wire + new `/api/static/elements/` mount (M3) → 118 "Meet an Element" single-step templates (M4) → 30 element-family pretend-play templates (M5) → 15 Magic-School-Bus shrink-down journeys (M6) → 25 element-themed song manifest entries (M7a, M7b TTS render deferred).
-- **Track 2 — SEL templates** (direct serve for Child A, 6yo early-reader, social play): new `Theme.feelings` enum + 87-row downstream grep audit (M8) → 20 feelings-naming branching templates (M9) → 20 two-act perspective-taking templates (M10) → 25 conflict-resolution templates split across `request_play` + `request_activity` (M11) → 15 friendship/repair templates with mandatory "first-try-fails, second-try-works" recovery in all 45 forks (M12).
-- **Cross-cutting:** 8-sub-test Phase M smoke gate (M13) — propose → approve → advance → reward through real corpora + real DB, no mocks. Caught a latent M4 step-id bug that would have broken the kiosk's ElementCard at running state; fixed inline.
+> **25 → 1,243 activity templates** across 14 phases shipped, fully on-device. Catalog grows by parent approvals → labeled events → SFT corpus, waiting on ≥50 rows before LoRA fine-tune kicks in (Phase E).
+>
+> **iPad UAT 11/12 PASS** at Phase M close (2026-05-18) — kiosk runs as a Guided Access app on a real iPad over Wi-Fi LAN. **1,983 pytest + 598 vitest** green at the same point. Fully offline once whisper-small + persona avatars + element sprites are cached locally.
 
-**Catalog growth: 1000 → 1243 templates** (+243). Backend **1983 pytest pass / 3 skipped** (+51 net from 1932 at Phase L close), **frontend 598 vitest pass** (unchanged net after M3 trim). 0 type errors, 0 lint violations. M13 smoke gate runs in 1.65s. iPad UAT (M14) + sprite render (M2b) + TTS render (M7b) pending the bundled operator session per the new operator-step-shape rule at [`.claude/rules/plan-and-issue-flow.md`](../.claude/rules/plan-and-issue-flow.md) § "Operator-type steps must not produce code artifacts" (promoted from a per-project memory to a workspace rule mid-session after the M2 mid-build halt — wired into `/plan-review` Section 22 + `/plan-wrap` Section 11 to prevent recurrence).
+## What makes this different
 
-**Phase L (rewards system) shipped 2026-05-17 at master `5aaf8ed`** — formerly missing from this README. L1-L12 + 2 emergent fix rounds; 1932 pytest + 592 vitest at close; UAT iter 3 all PASS. Load-bearing pattern: two-phase terminal advance keeps `state=running` while the reward step renders, Phase 2 dismiss transitions to `completed`. Jokes/songs reframed as per-activity reward TYPES; embedded/ending/spontaneity interjection surfaces deleted in favor of set-intersection tag matching.
+Most "home AI" devices stream audio off-box, route through a vendor account, or stand in for the parent. This one doesn't:
 
-### Phase history (post-v1)
+- **Local-first by default.** Mic capture, silero-VAD, faster-whisper, trigger NLP, persona library, activity generator — all run on one home machine. Internet is only used for Claude calls over the user's subscription OAuth (no API key) and first-run model downloads.
+- **Parent approves every activity before the kiosk shows it.** The mic listens passively; the activity generator surfaces suggestions on the parent's tab; nothing appears on the child surface until the parent taps **Approve**. PIN-gated LAN binding refuses non-loopback host until a parent PIN is set.
+- **No app store, no cloud account, no installer.** Child kiosk is a PWA installed via Safari → Add to Home Screen → Guided Access. The home machine binds `0.0.0.0` with `TOYBOX_LAN_IP` set and the iPad connects directly over Wi-Fi.
+- **Capability-gated.** Every Claude call goes through a capability gate so a network outage degrades to a fully-offline curated activity generator with no behavior change for the child.
 
-- **v1 ship — Phase A** (2026-05-02): closed-loop demo with manual "trigger" button.
-- **Phase B** (2026-05-03): audio capture + silero-VAD + faster-whisper + mode-aware Claude escalation. Real mic + STT live in production.
-- **Phase C + D** (2026-05-03): toy/room/child ingestion, activity-quality eval scaffold, anti-signal feedback (commits `20c9b97` + `87e692b`).
-- **iPad-Kiosk** (2026-05-04 → 2026-05-10): child kiosk as PWA on real iPad over LAN.
-- **Phase F → F.5** (2026-05-06 → 2026-05-09): toy action sprites — F archived after c10.dll crash class ([#61](https://github.com/aberson/toybox/issues/61)); replaced by F.5 (SD 1.5 + LCM-LoRA + Tier C composite). All 5 F.5 steps shipped; #61 closed via F.5-5 soft-pass soak.
-- **Phase G** (2026-05-10): branching gameplay — 200 branching templates (50 per intent) via overnight 4-agent soak (50× scope, 0% validation failures); catalog grew 25 → 225 templates.
-- **Phase H** (2026-05-10): parent UX revamp — panel-toggle nav → two-level tabbed shell; `banned_themes` promoted from per-child column to global setting.
-- **Phase I** (2026-05-11): transcript retention + display refresh — household-scoped retention preset, 10s-cadence sweep, fade-out animation.
-- **Phase J** (2026-05-14): autonomous play queue — parent Play surface becomes a scrolling queue fed by an autonomous cadence task + transcript-driven `on_intent` wire; tunable `play_target_depth` ∈ {1, 3, 5} and `play_cadence_seconds` ∈ {0, 10, 30, 60}; ActivityPanel pins as queue head when one is approved.
-- **Phase K** (2026-05-15 → 2026-05-16): roles + songs + jokes + voice — K1-K15 substrate 2026-05-15; K16 + K16b template backfill brought the catalog to 1000 templates (250 × 4 intents); K17 smoke gate green; K18 iPad UAT 12/14 PASS 2026-05-16; two cosmetic defects filed as follow-ups ([#137](https://github.com/aberson/toybox/issues/137), [#138](https://github.com/aberson/toybox/issues/138)).
-- **Phase L** (2026-05-17): rewards system + jokes/songs as per-activity reward TYPES — L1-L12 + 2 emergent fix rounds; embedded/ending/spontaneity surfaces deleted in favor of set-intersection tag matching; load-bearing two-phase terminal advance pattern keeps `state=running` while reward step renders. 1932 pytest + 592 vitest at close. UAT iter 3 all PASS. Master `5aaf8ed`.
-- **Phase M** (2026-05-18): content depth — Periodic Table Professor expansion (Track 1: all 118 elements + ElementCard + 118 Meet templates + 30 family-pretend + 15 shrink-down + 25 element-themed songs) and SEL templates (Track 2: new `Theme.feelings` + 80 templates across feelings-naming + perspective-taking + conflict-resolution + friendship-repair). Autonomous block (M1, M2a, M3-M13) shipped 2026-05-18 at master `768ad1d`; M2b sprite render shipped at `ad5c5f7` with mid-session prompt+overlay redesign (Pillow text overlay over orb-of-element diffusion; 14 canonical sprites in git, 104 local-only); M7b TTS audio render + M14 iPad UAT shipped in operator session 2026-05-18 at master `a096e11`. **UAT verdict: 11/12 PASS, 1 DEFERRED** (row #4 blocked by D2, retest scheduled in Phase N N6). Catalog 1000 → 1243 templates. 1983 pytest + 598 vitest. M13 8-sub-test smoke gate runs in 1.65s with no mocks. Umbrella [#152](https://github.com/aberson/toybox/issues/152) closed; 3 defects + 1 feature request folded into Phase N (#167) and Phase O (#177).
+The architecture is family-agnostic — the test case happens to be two real kids (a 6-year-old early-reader and a 4-year-old Periodic-Table-fascinated pre-reader), which is why elements and SEL templates are both load-bearing in the catalog.
 
-### In flight
+**Deep dives:** [Architecture](documentation/plan/architecture.md) · [Data model](documentation/plan/data-model.md) · [API](documentation/plan/api.md) · [Activity loop](documentation/plan/activity-loop.md) · [Runtime](documentation/plan/runtime.md) · [Risks](documentation/plan/risks.md)
 
-- **Phase E** (local model + tool-loop): two backend substrate carve-outs shipped ahead of the gated-on-data full ship — Step 28 carve-out 2026-05-05 (commit `33a4b3c`: tool registry + ClaudeActivityGenerator wrapper + env-var dispatch), Step 27 (E3) carve-out 2026-05-13 (commit `4f735a0`: PII redactor `src/toybox/ai/redact.py` + migration 0013 `redact_for_sft` opt-out + `eval_dump.py --sft-export` mode + `data/models/lora/REGISTRY.md` template + end-to-end smoke gate). Full ship remainder gated on ≥50 SFT-filter rows in `labeled_events` — populated naturally as parents tag activities.
+---
 
-Backend modules live: `audio/{capture,vad,ring_buffer,devices,stt,pipeline}`, `core/{escalation,throttle,banned_themes,image_gen_mode,…}`, `image_gen/{worker,capability,…}`, `activities/{generator,content_resolver,slots,_validator,…}`, `api/{listening,activities,auth,auth_dep,transcripts,children,toys,rooms,metrics,image_gen_settings,banned_themes_settings,…}`, `ws/{server,heartbeat,envelope,topics}`. Frontend parent app (`/parent`) is now a two-level tab shell; child kiosk (`/child`) is the full-bleed kiosk with persona avatar + step cards + persona-specific toy action sprites + branching choice buttons.
+## The activity loop
 
-## Stack
+```
+        ┌──────────────────────────────────────────────────────────┐
+        │                   the activity loop                      │
+        │                                                          │
+        │   ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌───────┐ │
+        │   │         │    │         │    │         │    │       │ │
+        │   │  HEAR   │───►│ TRIGGER │───►│ PROPOSE │───►│PARENT │ │
+        │   │         │    │         │    │         │    │APPROVE│ │
+        │   └─────────┘    └─────────┘    └─────────┘    └───┬───┘ │
+        │    silero VAD     NLP registry   1,243-template    │     │
+        │    + faster-      + Claude       branching         │     │
+        │      whisper      escalation     catalog +         │     │
+        │      small        (offline OK)   persona slot      │     │
+        │                                                    ▼     │
+        │   ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌───────┐ │
+        │   │  HOME   │◄───│ REWARD  │◄───│   RUN   │◄───│ KIOSK │ │
+        │   │  ROOM   │    │         │    │         │    │  PWA  │ │
+        │   └─────────┘    └─────────┘    └─────────┘    └───────┘ │
+        │    kids play      song/joke      step cards     persona  │
+        │    + chatter      reward step    + sprite       avatar   │
+        │    feeds back     advances on    overlay        + iPad   │
+        │    into HEAR      kiosk          on active      Guided   │
+        │                                  toy            Access   │
+        │                                                          │
+        └──────────────────────────────────────────────────────────┘
+```
+
+The mic loop and the activity loop are deliberately the same loop. Chatter while an activity is running feeds back into the trigger NLP — saying "let's play unicorns" mid-activity surfaces a fresh suggestion on the parent's tab without interrupting what's already on the kiosk. The parent decides whether to queue, advance, or replace.
+
+**Read the full pipeline:** [activity-loop.md](documentation/plan/activity-loop.md) · [runtime.md](documentation/plan/runtime.md)
+
+---
+
+## How activities are built
+
+```
+   plain-text intent ("let's play unicorns")
+              │
+              ▼
+   ┌─────────────────────┐
+   │  trigger NLP        │   curated regex registry, deterministic, offline
+   │  + Claude escalate  │   Claude only on ambiguous phrases (rate-limited)
+   └──────────┬──────────┘
+              │  intent + slot hints
+              ▼
+   ┌─────────────────────┐
+   │ branching template  │   1,243 templates × 4 intents
+   │ catalog             │   (request_play / request_activity / embedded / ending)
+   └──────────┬──────────┘
+              │  template + slot-fill
+              ▼
+   ┌─────────────────────┐
+   │ content resolver    │   real toys, real rooms, real child profile
+   │ + persona binding   │   per-toy allowed_roles, per-child banned_themes
+   └──────────┬──────────┘
+              │  resolved activity (steps + sprites + reward)
+              ▼
+   ┌─────────────────────┐
+   │ parent suggestion   │   optimistic concurrency on activities
+   │ queue + approval    │   If-Match-Version on every mutation
+   └─────────────────────┘
+```
+
+Every activity has a slot for a persona (Wizard / Princess / Detective / Periodic-Table Professor, plus parent-grown ones), a theme (from a 12-theme corpus), and a reward type (song / joke / element microgame). The branching templates encode two binary forks per script and tag each fork with the persona role taxonomy + theme allowlist so the resolver can pick a script that respects per-toy and per-child constraints.
+
+**Read the catalog mechanics:** [data-model.md](documentation/plan/data-model.md) · [phase-l-plan.md](documentation/phase-l-plan.md) (rewards as per-activity reward TYPES)
+
+---
+
+## What the child sees
+
+```
+                 ┌────────────────────────────────────┐
+                 │  child kiosk (PWA, full-bleed)     │
+                 │                                    │
+                 │   ╔═══════════════════╗            │
+                 │   ║                   ║            │
+                 │   ║  persona avatar   ║   step 2 of 5
+                 │   ║   (Wizard mode)   ║            │
+                 │   ║                   ║            │
+                 │   ╚═══════════════════╝            │
+                 │                                    │
+                 │   ┌──────────────────────────┐     │
+                 │   │  "Wave at your toy!"     │     │
+                 │   │   [waving sprite overlay │     │
+                 │   │    on the toy in frame]  │     │
+                 │   └──────────────────────────┘     │
+                 │                                    │
+                 │   ┌─────────────┐ ┌─────────────┐  │
+                 │   │ I did it!   │ │ I'm stuck   │  │
+                 │   └─────────────┘ └─────────────┘  │
+                 │                                    │
+                 └────────────────────────────────────┘
+                          │
+                          ▼
+                 ┌────────────────────┐
+                 │  reward step       │
+                 │  (song or joke)    │
+                 │   ♪ TTS-rendered   │
+                 │     element song   │
+                 └────────────────────┘
+```
+
+Persona avatar reacts to advance / branch / reward events via ws. Step cards advance forward only; "step back across a branch choice" was an emergent fix in Phase G UAT. The reward step renders before the activity transitions to `completed` — the two-phase terminal advance pattern from Phase L keeps `state=running` while the reward is on-screen, Phase 2 dismiss completes the activity.
+
+**Read the kiosk wiring:** [api.md](documentation/plan/api.md) (ws envelopes + topics)
+
+---
+
+## Why not just have a smart speaker do it?
+
+Smart speakers route audio off-device, tie the household to a vendor account, and replace the parent with a voice assistant. None of those are acceptable failure modes for a play device that lives in a family room with young children.
+
+So toybox listens locally (silero-VAD + faster-whisper, no audio leaves the box), keeps Claude in an advisory role (rate-limited, capability-gated, opt-out by killing network), and gates every kiosk-visible action on a parent approval. The result is an assistant that helps a parent come up with structured play, not one that plays alongside the kid in the parent's absence.
+
+---
+
+# The Story So Far of toybox
+
+- **Original motivation** — A passive home device that helps a parent improvise structured play with young children, with all audio + state on one home machine and no cloud account.
+- **The closed loop (Phase A, 2026-05-02)** — Mic placeholder + listening state machine + persona library + offline activity generator + parent + child UI wired end-to-end. The skeleton works; v1 ships.
+- **Actually hearing the room (Phase B)** — silero-VAD + faster-whisper-small replace the placeholder; mode-aware Claude escalation routes short triggers through the NLP registry and only the ambiguous phrases through Claude.
+- **Real content + ingest (Phase C–D)** — Toys, rooms, child profiles editable in the parent app; anti-signal feedback so bad suggestions get downweighted; parent PIN gates LAN binding.
+- **iPad kiosk (2026-05-04 → 2026-05-10)** — Child surface as a real PWA on a real iPad over LAN, installed via Safari → Add to Home Screen → Guided Access. No app store.
+- **Toy action sprites (Phase F → F.5)** — SD 1.5 + LCM-LoRA + Tier C composite generates per-toy action sprites locally. F shipped with a c10.dll crash class ([#61](https://github.com/aberson/toybox/issues/61)) → archived; F.5 replaced it cleanly.
+- **Branching gameplay (Phase G, 2026-05-10)** — Overnight 4-agent soak grew the template catalog **25 → 225** with 0% validation failures.
+- **Parent UX revamp (Phase H, 2026-05-10)** — Panel-toggle nav → two-level tab shell; per-child columns promoted to global household settings.
+- **Transcript management (Phase I, 2026-05-11)** — Household-scoped retention preset, 10s-cadence sweep, fade-out animation on the display.
+- **Autonomous play queue (Phase J, 2026-05-14)** — Parent's Play surface becomes an autonomously-fed scrolling queue; tunable cadence + queue depth.
+- **Roles + songs + jokes + voice (Phase K, 2026-05-15 → 2026-05-16)** — 10-role taxonomy, 12-theme corpus, 75-song TTS render, song/joke rewards. Catalog **225 → 1,000** templates.
+- **Rewards system (Phase L, 2026-05-17)** — Jokes/songs reframed as per-activity reward TYPES; embedded/ending/spontaneity interjection surfaces deleted in favor of set-intersection tag matching. Two-phase terminal advance pattern shipped.
+- **Content depth (Phase M, 2026-05-18)** — Periodic-Table-Professor expansion (118 elements + sprites + microgames + 25 element-themed songs) + SEL templates (feelings-naming + perspective-taking + conflict-resolution + friendship-repair). Catalog **1,000 → 1,243**. iPad UAT 11/12 PASS.
+- **Now (Phase N–Q)** — `element_microgame` template shape (N), parent UX 5-tab refresh (O), IP-Adapter-based toy image regeneration on SD 1.5 (P), 1:1 element-id → reward mapping (Q).
+- **In flight: Phase E** — Local model fine-tune via LoRA. Backend substrate already shipped in two carve-outs ([Step 28](https://github.com/aberson/toybox/issues), [Step 27 / E3 at `4f735a0`](https://github.com/aberson/toybox/commit/4f735a0)). Full ship gated on ≥50 SFT-filter rows in `labeled_events` — populated naturally as parents tag activities.
+
+---
+
+<details>
+
+<summary><b>Stack</b></summary>
 
 | Layer | Tool | Why |
-|-------|------|-----|
+|---|---|---|
 | Backend | Python 3.12 + FastAPI | async-native, ws built-in |
 | ASR | faster-whisper (`small`) | local STT; GPU when available, CPU fallback |
 | VAD | silero-vad (ONNX) | gates STT on detected speech only |
 | AI | Claude (subscription OAuth) | capability-gated; offline mode supported |
 | Curated NLP | Python regex + intent registry | fast, deterministic, offline-capable |
+| Image-gen | SD 1.5 + LCM-LoRA + Pillow overlay | per-toy action sprites + element sprites, locally |
+| TTS | Coqui XTTS-v2 (CPU/GPU) | song + joke reward rendering, locally |
 | DB | SQLite (WAL mode) | local, file-based, single-writer |
 | Mic capture | sounddevice | callback-based, bridged to asyncio |
 | Frontend | React + TypeScript + Vite | one project, two routes (`/parent`, `/child`) |
 | Real-time | WebSockets (FastAPI) | parent ↔ backend ↔ child |
 | Type sync | pydantic-to-typescript | TS types codegen from Pydantic models |
-| Tests | pytest + Playwright | unit + integration + UI smoke |
+| Tests | pytest + vitest + Playwright | unit + integration + UI smoke |
 | Lint/format | ruff (line-length=100) | dev/ standard |
 | Type check | mypy strict | dev/ standard |
-| Package mgmt | uv | dev/ standard |
+| Package mgmt | uv (Python) + npm (frontend) | dev/ standard |
 
-**Process model:** single uvicorn worker. SQLite + multi-worker leads to silent corruption under contention; mic capture, AI calls, and ws all live in one async process anyway.
+**Process model:** single uvicorn worker. SQLite + multi-worker leads to silent corruption under contention; mic capture, AI calls, image-gen worker, TTS render, and ws all live in one async process.
 
-## Prerequisites
+</details>
+
+<details>
+
+<summary><b>Prerequisites</b></summary>
 
 | Component | Minimum |
-|-----------|---------|
+|---|---|
 | OS | Windows 11 (primary), macOS 13+, Linux (Ubuntu 22.04+) |
 | RAM | 8 GB |
-| Disk | 5 GB free (incl. ~500 MB whisper-small download) |
+| Disk | 5 GB free (incl. ~500 MB whisper-small download + ~2 GB SD 1.5 + LoRAs) |
 | CPU | 4 cores ≥3.0 GHz |
 | GPU | not required; `auto`-detected. CUDA path needs CUDA Toolkit 11.8/12.x **and** cuDNN 8.x |
 | Mic | any 16 kHz mono-capable USB or built-in mic |
-| Network | only required first-run (model download, OAuth) and for Claude calls |
+| iPad | any iPad on the same Wi-Fi as the home machine (kiosk runs as PWA) |
+| Network | required first-run only (model downloads + Claude OAuth) |
 
-## First-time setup
+</details>
+
+<details>
+
+<summary><b>Setup</b></summary>
 
 ```powershell
 # Python deps
@@ -102,10 +263,14 @@ uv run python -m toybox.audio.stt --download
 uv run python -m toybox.main --check
 ```
 
-## Run dev
+</details>
+
+<details>
+
+<summary><b>Run dev</b></summary>
 
 ```powershell
-# Terminal 1 — backend (loopback only by default; LAN binding requires PIN)
+# Terminal 1 — backend (loopback only by default; LAN binding requires parent PIN)
 uv run python -m toybox.main --host 127.0.0.1 --port 8000
 
 # Terminal 2 — frontend
@@ -114,27 +279,37 @@ cd frontend; npm run dev
 # Open http://localhost:4000/parent
 ```
 
-Vite pins `server.port: 4000, strictPort: true` and proxies `/api` + `/ws` to the backend at `:8000`.
+Vite pins `server.port: 4000, strictPort: true` and proxies `/api` + `/ws` to the backend at `:8000`. The dev port is `:4000`, not the typical `:3000`.
 
-## Run on iPad (kiosk)
+</details>
 
-The child kiosk runs on a real iPad over the home Wi-Fi LAN — no proxy, no cloud, no app-store install. Full procedure with troubleshooting is in [`documentation/operator/ipad-setup.md`](documentation/operator/ipad-setup.md). Quick path:
+<details>
+
+<summary><b>Run on iPad (kiosk)</b></summary>
+
+The child kiosk runs on a real iPad over the home Wi-Fi LAN — no proxy, no cloud, no app-store install. Full procedure with troubleshooting is in [documentation/operator/ipad-setup.md](documentation/operator/ipad-setup.md). Quick path:
 
 **Prereqs (on the home machine):**
+
 - Parent PIN is set (LAN binding is gated on this — confirm via `GET /api/auth/parent/status`).
 - Find the home machine's LAN IP (`ipconfig`, IPv4 under the Wi-Fi adapter — not Ethernet, not Hyper-V/Docker/WSL virtual switches).
 - **Set `TOYBOX_LAN_IP` and bind backend to `0.0.0.0` in the same shell** — without this env var the backend's WS Origin allow-list is loopback-only and the iPad's WS handshake will be rejected with HTTP 403:
+
   ```powershell
   $env:TOYBOX_LAN_IP = "192.168.x.x"   # your LAN IP from ipconfig
   uv run python -m toybox.main --host 0.0.0.0 --port 8000
   ```
+
 - Frontend dev server bound to `0.0.0.0`:
+
   ```powershell
   cd frontend; npm run dev -- --host 0.0.0.0
   ```
+
 - iPad is on the **same Wi-Fi SSID** as the home machine. Guest networks, AP-isolated SSIDs, and corporate networks that block client-to-client traffic do **not** work.
 
 **On the iPad:**
+
 1. Open Safari → navigate to `http://<lan-ip>:4000/child`.
 2. Enter the parent PIN once. This confirms LAN reachability and primes iOS audio unlock.
 3. Share button → **Add to Home Screen** → name it `toybox` → Add.
@@ -142,67 +317,120 @@ The child kiosk runs on a real iPad over the home Wi-Fi LAN — no proxy, no clo
 
 **Dev iteration tip:** desktop Safari → Develop → Enter Responsive Design Mode → pick an iPad preset. Catches viewport / orientation / touch issues without a real iPad in front of you. Audio unlock and Guided Access do require the real device.
 
-If something doesn't work (silent audio, WS won't connect, iPad sleeps mid-activity, home-screen icon disappears), the troubleshooting matrix is in [`documentation/operator/ipad-setup.md#troubleshooting`](documentation/operator/ipad-setup.md#troubleshooting).
+</details>
 
-## Quality gates
+<details>
+
+<summary><b>Quality gates</b></summary>
 
 ```powershell
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy src
 uv run pytest
-cd frontend; npm run typecheck; npm run lint; npm run test
+
+cd frontend
+npm run typecheck
+npm run lint
+npm run test
 ```
 
-## Key design decisions
+Backend `1,983 pytest pass / 3 skipped`, frontend `598 vitest pass`, 0 type errors, 0 lint violations at Phase M close (master `a096e11`, 2026-05-18). Phase M smoke gate (`tests/integration/test_phase_m_smoke.py`) runs the full propose → approve → advance → reward path through real corpora and real DB in 1.65s — no mocks.
 
-- **Local-first, family-private.** All state stays on one home machine. Internet optional.
-- **Single FastAPI process for everything.** Mic capture, STT, NLP, AI calls, REST, ws — all one async process. Trade-off: a slow Claude call could starve the mic loop. Mitigated with `asyncio.to_thread` + circuit breaker.
+</details>
+
+<details>
+
+<summary><b>Key design decisions</b></summary>
+
+- **Local-first, family-private.** All state stays on one home machine. Internet optional after first-run model downloads.
+- **Single FastAPI process for everything.** Mic capture, STT, NLP, AI calls, image-gen worker, TTS render, REST, ws — all one async process. Trade-off: a slow Claude call could starve the mic loop. Mitigated with `asyncio.to_thread` + circuit breaker.
 - **Claude via OAuth, not API key.** Aligns billing with the user's subscription; capability gate falls back to offline cleanly.
-- **Linear activity scripts for v1.** Tree branching deferred. "Regenerate from here" effectively branches when needed.
+- **Branching templates, not free-form generation, for v1+.** 1,243-template catalog with persona-role + theme + reward-type tagging. Free-form Claude generation is reserved for ambiguous-trigger escalation, never for kiosk-visible activity bodies.
 - **Single Vite project, two routes.** Parent and child share types and rendering primitives; child loads the smaller chunk.
 - **Single-worker SQLite + WAL.** Multi-worker silently corrupts; one worker is fine for a household device.
 - **Optimistic concurrency on activities.** `If-Match-Version` on every mutation; multi-tab races resolve cleanly with 409.
-- **Default bind 127.0.0.1.** LAN binding requires a parent PIN (Phase D); startup guard refuses non-loopback host without one.
-- **Mic-hot indicator as a first-class UI element.** Constant-on visual signal that mic capture is live.
+- **Default bind 127.0.0.1.** LAN binding requires a parent PIN; startup guard refuses non-loopback host without one (a startup invariant, not a documented convention).
+- **Mic-hot indicator as a first-class UI element.** Constant-on visual signal that mic capture is live, visible from across the room.
 
-Full design rationale, schema, and listening-pipeline data flow live in [`documentation/plan.md`](documentation/plan.md).
+Full design rationale, schema, and listening-pipeline data flow live in [documentation/plan.md](documentation/plan.md) and the per-topic deep dives under [documentation/plan/](documentation/plan/).
 
-## Development process
+</details>
 
-`/build-phase --plan documentation/plan.md` per phase. Steps within a phase use `/build-step` (or `/build-step-tdd` for schema/CRUD work).
+<details>
 
-Build order: Phase A → B → C → D. Manual operator steps (M1–M5) interleave as marked in the plan.
-
-- **Phase A** — closed-loop skeleton (steps 1–10): project skeleton, schema, persona library, listening state machine, Claude client, NLP registry, offline activity generator, activity API + ws, parent UI, child UI. End of Phase A = v1.
-- **Phase B** — hearing (steps 11–14b): audio capture + VAD, faster-whisper, transcript pipeline, mode-aware Claude escalation, end-to-end synthetic-audio test.
-- **Phase C** — content (steps 15–18): toy ingest, room ingest bulk, child profile editor, generator wired to real content.
-- **Phase D** — polish (steps 19–23): anti-signal feedback, parent PIN gate, transcript management, live activity polish, metrics + operator dashboard.
-
-## Project structure
+<summary><b>Project structure</b></summary>
 
 ```
 toybox/
 ├── documentation/
-│   ├── plan.md                       # canonical plan
-│   └── operator/                     # recovery + setup runbooks
-├── src/toybox/                       # backend (Phase A step 1+)
-│   ├── api/                          # FastAPI routes + ws
-│   ├── core/                         # state machines, errors, capability gate
-│   ├── db/migrations/                # forward-only SQL migrations
-│   ├── ai/                           # Claude OAuth client + circuit breaker
-│   ├── audio/                        # sounddevice + VAD + STT
-│   └── triggers/                     # curated NLP registry
+│   ├── plan.md                       # canonical plan + status
+│   ├── plan/                         # architecture / data-model / api / runtime / activity-loop / risks / phase-e
+│   ├── phase-{k,l,m,n,o,p,q}-plan.md # feature plans
+│   ├── operator/                     # iPad setup + Claude OAuth setup + recovery runbooks
+│   └── runs/                         # phase verification artifacts (UAT pass docs, soak runs)
+├── src/toybox/
+│   ├── api/                          # FastAPI routes + ws (activities, auth, transcripts, children, toys, rooms, …)
+│   ├── core/                         # state machines, errors, capability gate, escalation, throttle
+│   ├── ai/                           # Claude OAuth client + circuit breaker + PII redactor
+│   ├── audio/                        # sounddevice capture + silero-VAD + faster-whisper STT
+│   ├── activities/                   # generator + content resolver + slot resolver + branching templates
+│   ├── activities/templates/branching/   # 1,243-template catalog (50+ per intent)
+│   ├── image_gen/                    # SD 1.5 + LCM-LoRA worker + Pillow text overlay
+│   ├── personas/library/             # persona library + avatars (Wizard, Princess, Detective, Periodic-Table)
+│   ├── triggers/                     # curated NLP registry
+│   ├── db/migrations/                # forward-only SQL migrations (0001 → 0017+)
+│   └── ws/                           # ws server + heartbeat + envelope + topics
 ├── frontend/
 │   ├── src/parent/                   # parent route (App + api + ws + store + components)
 │   ├── src/child/                    # child kiosk route (App + api + ws + store + sfx + components)
-│   ├── src/shared/                   # types.ts, errors.ts (codegen)
-│   ├── public/sfx/                   # SFX assets (silence-stub for v1; real WAVs in M4)
+│   ├── src/shared/                   # types.ts + errors.ts (codegen from Pydantic)
+│   ├── public/sfx/                   # SFX assets
 │   └── playwright/                   # e2e smoke specs (parent.spec.ts + child.spec.ts)
-├── data/                             # runtime: db, images, models (gitignored)
-└── tests/                            # pytest unit + integration
+├── data/                             # runtime: db, models, images, sprites (gitignored except canonical sprites)
+├── tests/                            # pytest unit + integration + integration/smoke gates
+└── .github/workflows/                # linux-tests.yml + frontend-tests.yml
 ```
+
+</details>
+
+<details>
+
+<summary><b>Development process</b></summary>
+
+`/build-phase --plan documentation/<phase>-plan.md` per phase. Steps within a phase use `/build-step` (or `/build-step-tdd` for schema/CRUD work). The full skill pipeline lives in `dev/CLAUDE.md`: `/plan-init` or `/plan-feature` → `/plan-review` → `/plan-wrap` → `/repo-init` or `/repo-sync` → `/build-phase` → `/repo-update`.
+
+Phase plans live at `documentation/<name>-plan.md`. Each plan step has an `**Issue:** #N` link to a GitHub issue; build-phase walks the plan in order and dispatches `/build-step` per step. UAT happens via bundled iPad sessions at phase close (operator-step format documented in [`dev/.claude/rules/plan-and-issue-flow.md`](../dev/.claude/rules/plan-and-issue-flow.md) §"Operator-type steps must not produce code artifacts").
+
+</details>
+
+<details>
+
+<summary><b>Phase status (full audit trail)</b></summary>
+
+**Phase M COMPLETE 2026-05-18 at master `a096e11`.** All 14 step issues closed (#153–#166) + umbrella [#152](https://github.com/aberson/toybox/issues/152) closed. M2b sprite render + M7b TTS render + M14 iPad UAT all shipped in the operator session. **UAT verdict: 11/12 PASS, 1 DEFERRED** (row #4 `shrink_into_helium_balloon_voyage` blocked by defect D2 — re-test scheduled in Phase N N6 [#176](https://github.com/aberson/toybox/issues/176) once N0 [#168](https://github.com/aberson/toybox/issues/168) ships). Exceeds 10/12 quality bar. UAT run-doc: [`documentation/runs/2026-05-18-phase-m-uat.md`](documentation/runs/2026-05-18-phase-m-uat.md).
+
+**Phase M UAT surfaced 3 defects + 1 feature request — folded into 2 follow-up phases (14 issues minted at /repo-sync):**
+
+- **Phase N** (umbrella [#167](https://github.com/aberson/toybox/issues/167), 9 steps [#168–#176](https://github.com/aberson/toybox/issues/167)) — `element_microgame` template shape, bundled with D1 + D2 fixes.
+- **Phase O** (umbrella [#177](https://github.com/aberson/toybox/issues/177), 3 steps [#178–#180](https://github.com/aberson/toybox/issues/177)) — parent UX 5-tab refresh.
+- **Phase P** (umbrella [#182](https://github.com/aberson/toybox/issues/182), 9 steps [#183–#191](https://github.com/aberson/toybox/issues/182)) — toy image-gen quality redo via IP-Adapter Plus on SD 1.5.
+- **Phase Q** (umbrella [#195](https://github.com/aberson/toybox/issues/195), 11 steps [#196–#206](https://github.com/aberson/toybox/issues/195)) — 1:1 element-id → reward mapping.
+
+Phase N parallel-safe block (N0 + N0b + N1-prep + N3) shipped 2026-05-18 at master `555246b`; pytest 2044 (+60) + vitest 601 (+3). Remaining: N1.5 / N1 / N2 / N4 / N5 / N6.
+
+</details>
+
+---
 
 ## License
 
-Family-private project; not currently licensed for redistribution.
+MIT — see [LICENSE](LICENSE). Family-private project; the code is MIT but no warranty, support, or fitness-for-redistribution claim is made.
+
+---
+
+## Acknowledgments
+
+- Built alongside two kids who actually play with it.
+- Personas illustrated by hand; element sprites composited from Stable Diffusion 1.5 + LCM-LoRA + Pillow text overlay.
+- Songs voiced via Coqui XTTS-v2.
