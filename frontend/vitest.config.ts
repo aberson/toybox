@@ -10,9 +10,12 @@ export default defineConfig({
     exclude: ["node_modules", "dist", "playwright"],
     // Per-test environment: pure-reducer .test.ts files default to node
     // (no DOM needed); Step 18's .test.tsx files mount React components
-    // and need a DOM. ``environmentMatchGlobs`` picks happy-dom for the
-    // tsx subset without slowing the pure-reducer tests.
+    // and need a DOM. ws.test.ts files instantiate CloseEvent (not a
+    // Node global on Node 20) so route them to happy-dom as well.
     environment: "node",
-    environmentMatchGlobs: [["src/**/*.test.tsx", "happy-dom"]],
+    environmentMatchGlobs: [
+      ["src/**/*.test.tsx", "happy-dom"],
+      ["src/**/ws.test.ts", "happy-dom"],
+    ],
   },
 });
