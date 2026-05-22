@@ -114,6 +114,17 @@ module = [
 ]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+# image_gen calls into diffusers, which ships no py.typed marker.
+# The `# type: ignore[no-untyped-call]` comments in pipeline.py are
+# load-bearing locally (where the image_gen extra is installed and
+# mypy sees real-but-untyped diffusers functions) but appear unused
+# on CI (where image_gen is omitted and diffusers resolves to Any).
+# Disabling unused-ignore for this module keeps both configs green
+# without churning the source on every env switch.
+module = ["toybox.image_gen.pipeline"]
+warn_unused_ignores = false
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
