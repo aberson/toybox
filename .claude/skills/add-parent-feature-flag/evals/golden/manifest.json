@@ -1,0 +1,38 @@
+{
+  "manifest_version": 2,
+  "skill": "add-parent-feature-flag",
+  "generated_at": "2026-05-30T23:21:22Z",
+  "good_source": "hand-crafted",
+  "verification_summary": {
+    "accepted": 25,
+    "inert": 0,
+    "total": 25
+  },
+  "bads": [
+    { "file": "bad_missing_enabled_suffix.md",        "defect_type": "conditional-behavior",    "assertion_id": 1,  "verified_fails": true, "regen_attempts": 1 },
+    { "file": "bad_wrong_default_constant_name.md",    "defect_type": "required-content",        "assertion_id": 2,  "verified_fails": true, "regen_attempts": 1 },
+    { "file": "bad_camelcase_flag_key.md",             "defect_type": "format",                  "assertion_id": 3,  "verified_fails": true, "regen_attempts": 1 },
+    { "file": "bad_abbreviated_kebab_path.md",         "defect_type": "format",                  "assertion_id": 4,  "verified_fails": true, "regen_attempts": 1 },
+    { "file": "bad_reimplemented_storage.md",          "defect_type": "anti-pattern",            "assertion_id": 5,  "verified_fails": true, "regen_attempts": 1 },
+    { "file": "bad_dropped_noqa_a001.md",              "defect_type": "required-content",        "assertion_id": 6,  "verified_fails": true, "regen_attempts": 1 },
+    { "file": "bad_init_reexport.md",                  "defect_type": "anti-pattern",            "assertion_id": 7,  "verified_fails": true, "regen_attempts": 1 },
+    { "file": "bad_auth_on_get.md",                    "defect_type": "conditional-behavior",    "assertion_id": 8,  "verified_fails": true, "regen_attempts": 1 },
+    { "file": "bad_added_optimistic_concurrency.md",   "defect_type": "anti-pattern",            "assertion_id": 9,  "verified_fails": true, "regen_attempts": 1 },
+    { "file": "bad_added_ws_broadcast.md",             "defect_type": "anti-pattern",            "assertion_id": 10, "verified_fails": true, "regen_attempts": 1 },
+    { "file": "bad_wrong_422_detail.md",               "defect_type": "required-content",        "assertion_id": 11, "verified_fails": true, "regen_attempts": 1 },
+    { "file": "bad_wrong_router_cohort.md",            "defect_type": "conditional-behavior",    "assertion_id": 12, "verified_fails": true, "regen_attempts": 1 },
+    { "file": "bad_bad_migration_version.md",          "defect_type": "structural",              "assertion_id": 13, "verified_fails": true, "regen_attempts": 1 },
+    { "file": "bad_migration_begin_commit.md",         "defect_type": "anti-pattern",            "assertion_id": 14, "verified_fails": true, "regen_attempts": 1 },
+    { "file": "bad_numeric_seed_value.md",             "defect_type": "format",                  "assertion_id": 15, "verified_fails": true, "regen_attempts": 1 },
+    { "file": "bad_feature_flags_codegen.md",          "defect_type": "anti-pattern",            "assertion_id": 16, "verified_fails": true, "regen_attempts": 1 },
+    { "file": "bad_default_drift.md",                  "defect_type": "internal-inconsistency",  "assertion_id": 17, "verified_fails": true, "regen_attempts": 1 },
+    { "file": "bad_single_quoted_kiosk_path.md",       "defect_type": "format",                  "assertion_id": 18, "verified_fails": true, "regen_attempts": 1 },
+    { "file": "bad_one_test_list_updated.md",          "defect_type": "structural",              "assertion_id": 19, "verified_fails": true, "regen_attempts": 1 },
+    { "file": "bad_deleted_all_true_test.md",          "defect_type": "conditional-behavior",    "assertion_id": 20, "verified_fails": true, "regen_attempts": 1 },
+    { "file": "bad_missing_parent_api_methods.md",     "defect_type": "structural",              "assertion_id": 21, "verified_fails": true, "regen_attempts": 1 },
+    { "file": "bad_missing_bootstrap_row.md",          "defect_type": "anti-pattern",            "assertion_id": 22, "verified_fails": true, "regen_attempts": 1 },
+    { "file": "bad_skipped_parent_ui.md",              "defect_type": "anti-pattern",            "assertion_id": 23, "verified_fails": true, "regen_attempts": 1 },
+    { "file": "bad_skipped_verification.md",           "defect_type": "content",                 "assertion_id": 24, "verified_fails": true, "regen_attempts": 1 },
+    { "file": "bad_nonboolean_not_deferred.md",        "defect_type": "conditional-behavior",    "assertion_id": 25, "verified_fails": true, "regen_attempts": 1 }
+  ]
+}

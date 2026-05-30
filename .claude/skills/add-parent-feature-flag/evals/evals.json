@@ -1,0 +1,233 @@
+{
+  "skill": "add-parent-feature-flag",
+  "version": "1.0",
+  "description": "True/false evaluation for the add-parent-feature-flag skill. The skill's 'output' is the set of files it creates/edits across the toybox codebase (backend core module, settings router, app registration, migration, shared TS, kiosk routing, lock/unit tests, parent UI) plus its verification report. Assertions are graded by reading that produced output alone.",
+  "passing_threshold": "23/25",
+  "categories": [
+    {
+      "name": "Name derivation (Step 0)",
+      "evals": [
+        {
+          "id": 1,
+          "statement": "The flag's snake_case key carries the literal `_enabled` suffix; if the operator's name lacked it, the output appended it (e.g. 'starfield background' -> `starfield_background_enabled`). If the key has no `_enabled` suffix, this assertion grades FALSE.",
+          "source": "SKILL.md, line 22",
+          "defect_type": "conditional-behavior",
+          "result": null
+        },
+        {
+          "id": 2,
+          "statement": "The default constant is named exactly `<FLAG_SNAKE>.upper() + \"_DEFAULT\"` (e.g. `STARFIELD_BACKGROUND_ENABLED_DEFAULT`), matching the unit test's `f\"{key.upper()}_DEFAULT\"` derivation. Any other constant name (abbreviated, camelCased, or missing the `_DEFAULT` suffix) grades FALSE.",
+          "source": "SKILL.md, line 37",
+          "defect_type": "required-content",
+          "result": null
+        },
+        {
+          "id": 3,
+          "statement": "The TS union member, the TS defaults key, and the kiosk-map key are all snake_case string literals identical to the Pydantic key; the ONLY camelCase identifiers are the Pydantic model classes `<FlagPascal>Response`/`<FlagPascal>Update` and the parent ApiClient methods `get<FlagPascal>`/`set<FlagPascal>`. A camelCased union/defaults/kiosk key grades FALSE.",
+          "source": "SKILL.md, lines 24, 38",
+          "defect_type": "format",
+          "result": null
+        },
+        {
+          "id": 4,
+          "statement": "Every kebab form (route leaf, kiosk path value, parent URL literal) is the mechanical full kebab of the snake key with every `_` replaced by `-` and no abbreviation (e.g. `read_me_button_enabled` -> `read-me-button-enabled`, never `read-me-enabled`). An abbreviated or partially-kebabed path grades FALSE.",
+          "source": "SKILL.md, line 40",
+          "defect_type": "format",
+          "result": null
+        }
+      ]
+    },
+    {
+      "name": "Backend core module (Step 1)",
+      "evals": [
+        {
+          "id": 5,
+          "statement": "`src/toybox/core/<FLAG_SNAKE>.py` delegates all storage to `FeatureFlagSetting` (imported from `._feature_flag`) and is cloned from a surviving reference module (`clickable_words_enabled` / `jokes_enabled`), NOT from a Phase-L-deleted flag. If the module re-implements `'true'`/`'false'` string storage itself, or templates off `play_embedded_enabled`/`play_endings_enabled`/`play_spontaneity_enabled`, this grades FALSE.",
+          "source": "SKILL.md, lines 46, 84, 395",
+          "defect_type": "anti-pattern",
+          "result": null
+        },
+        {
+          "id": 6,
+          "statement": "The `# noqa: A001` comment is preserved verbatim on the `set` function signature. If the noqa comment is dropped, reworded, or moved, this grades FALSE (ruff would flag the builtin `set` shadow).",
+          "source": "SKILL.md, lines 46, 76",
+          "defect_type": "required-content",
+          "result": null
+        },
+        {
+          "id": 7,
+          "statement": "The new core module is NOT re-exported from `core/__init__.py`, and the module imports ONLY `FeatureFlagSetting` from `_feature_flag` (never its internals, whose `__all__` is empty). A new `__init__.py` re-export or an import of a private `_feature_flag` symbol grades FALSE.",
+          "source": "SKILL.md, line 84",
+          "defect_type": "anti-pattern",
+          "result": null
+        }
+      ]
+    },
+    {
+      "name": "Settings router (Step 2)",
+      "evals": [
+        {
+          "id": 8,
+          "statement": "In `src/toybox/api/<FLAG_SNAKE>_settings.py` the GET route is unauthenticated (household read) and the PUT route is parent-scoped via `Depends(RequireScope({TokenScope.parent}))`. If an auth dependency is added to GET, or PUT lacks the parent-scope guard, this grades FALSE.",
+          "source": "SKILL.md, line 92",
+          "defect_type": "conditional-behavior",
+          "result": null
+        },
+        {
+          "id": 9,
+          "statement": "The settings router does NOT introduce an If-Match-Version header, a version token, or a 409 response — settings PUTs are last-write-wins. Any optimistic-concurrency / version-gating machinery on this route grades FALSE.",
+          "source": "SKILL.md, line 94",
+          "defect_type": "anti-pattern",
+          "result": null
+        },
+        {
+          "id": 10,
+          "statement": "The PUT handler does NOT add a WebSocket broadcast on change. If any WS broadcast/publish call is emitted from the settings router, this grades FALSE.",
+          "source": "SKILL.md, lines 95-96",
+          "defect_type": "anti-pattern",
+          "result": null
+        },
+        {
+          "id": 11,
+          "statement": "On a non-bool value the PUT raises HTTP 422 with detail exactly `{\"error\": \"invalid_<FLAG_SNAKE>\"}`, and the router's `connect(...)` keeps `check_same_thread=False`. A different 422 detail string, or a dropped `check_same_thread=False`, grades FALSE.",
+          "source": "SKILL.md, lines 94, 162",
+          "defect_type": "required-content",
+          "result": null
+        }
+      ]
+    },
+    {
+      "name": "App registration (Step 3)",
+      "evals": [
+        {
+          "id": 12,
+          "statement": "The `include_router(<FLAG_SNAKE>_settings_router)` call is added to `src/toybox/app.py` (the only file with `include_router`, NOT `main.py`) in alphabetical position WITHIN the boolean `*_enabled_settings_router` cohort. Placing it in the numeric/preset block (image_gen/banned_themes/transcript_retention/play_target_depth/play_cadence_seconds), in `main.py`, or out of alphabetical order grades FALSE.",
+          "source": "SKILL.md, lines 181, 190-194",
+          "defect_type": "conditional-behavior",
+          "result": null
+        }
+      ]
+    },
+    {
+      "name": "Migration seed (Step 4)",
+      "evals": [
+        {
+          "id": 13,
+          "statement": "The migration file is named `<NNNN>_<FLAG_SNAKE>.sql` where `<NNNN>` = (current MAX migration version)+1 zero-padded to 4 digits (0022 given a 0021 highest), matching `^(\\d+)_[A-Za-z0-9_]+\\.sql$`. A reused, non-incremented, or non-zero-padded version grades FALSE.",
+          "source": "SKILL.md, line 210",
+          "defect_type": "structural",
+          "result": null
+        },
+        {
+          "id": 14,
+          "statement": "The migration contains NO `BEGIN`/`COMMIT`/`ROLLBACK` of its own, every statement ends with `;`, and it is forward-only (no down/rollback). Any self-managed transaction keyword or a missing terminating `;` grades FALSE.",
+          "source": "SKILL.md, lines 213-217",
+          "defect_type": "anti-pattern",
+          "result": null
+        },
+        {
+          "id": 15,
+          "statement": "The seeded value is the lowercase STRING `'true'` or `'false'` (matching `<Default Bool>`), inserted via `INSERT OR IGNORE`. A `0`/`1`, capitalized `'True'`/`'False'`, or a plain `INSERT` (non-idempotent) grades FALSE.",
+          "source": "SKILL.md, lines 216, 228, 231",
+          "defect_type": "format",
+          "result": null
+        }
+      ]
+    },
+    {
+      "name": "Frontend shared + kiosk routing (Steps 5-6)",
+      "evals": [
+        {
+          "id": 16,
+          "statement": "`frontend/src/shared/feature_flags.ts` is hand-edited with the Edit tool (UTF-8, no BOM), NOT regenerated via codegen and NOT round-tripped through PowerShell `Get-Content -Raw`/`Set-Content`/`Out-File -Encoding utf8`; its object literals stay flat (no nested braces). A `tools/gen_types_ts.py` regeneration, a BOM-prefixed file, a mojibaked `§` header, or a nested-brace literal grades FALSE.",
+          "source": "SKILL.md, lines 237, 239, 384-386",
+          "defect_type": "anti-pattern",
+          "result": null
+        },
+        {
+          "id": 17,
+          "statement": "The boolean default for the flag is identical across all sources of truth that the lock test cross-checks: `PHASE_K_FEATURE_FLAG_DEFAULTS[<FLAG_SNAKE>]` (bare lowercase `true`/`false`), the backend `<FLAG_UPPER>_DEFAULT`, the migration seed string, and the test fixtures — all equal to `<Default Bool>`. If the TS defaults value disagrees with the backend default (e.g. backend `True`, TS `false`), this grades FALSE.",
+          "source": "SKILL.md, lines 241-250, 340-346",
+          "defect_type": "internal-inconsistency",
+          "result": null
+        },
+        {
+          "id": 18,
+          "statement": "A flat entry `<FLAG_SNAKE>: \"/api/settings/<flag-kebab>\"` with a DOUBLE-quoted value is added to `KIOSK_FEATURE_FLAG_PATHS` in `frontend/src/child/api.ts`. A single-quoted value (silently dropped by the lock-test regex) or a missing kiosk entry grades FALSE.",
+          "source": "SKILL.md, lines 256-260",
+          "defect_type": "format",
+          "result": null
+        }
+      ]
+    },
+    {
+      "name": "Lock/unit test updates (Step 7)",
+      "evals": [
+        {
+          "id": 19,
+          "statement": "Both hardcoded flag-list tests are updated: `_backend_canonical_defaults()` in `tests/integration/test_phase_k_feature_flag_lists_agree.py` (new entry in the `from toybox.core import (...)` tuple AND the defaults dict), and the `FLAGS` fixture in `tests/unit/core/test_phase_k_feature_flags.py` (a `FlagFixture(<FLAG_SNAKE>, \"<FLAG_SNAKE>\", <Default Bool>)` row AND its import). Updating only one of the two test files grades FALSE.",
+          "source": "SKILL.md, lines 270-281",
+          "defect_type": "structural",
+          "result": null
+        },
+        {
+          "id": 20,
+          "statement": "Conditional on the default: if `<Default Bool>` is `False`, `test_all_surviving_flags_default_true` is UPDATED (excluding/filtering the new flag) and its docstring corrected — never simply deleted; if `<Default Bool>` is `True`, that test is left unchanged. Deleting the test, or leaving it asserting all-True with a new False-defaulting flag, grades FALSE.",
+          "source": "SKILL.md, line 283",
+          "defect_type": "conditional-behavior",
+          "result": null
+        }
+      ]
+    },
+    {
+      "name": "Parent UI — silent-wiring trap (Step 8)",
+      "evals": [
+        {
+          "id": 21,
+          "statement": "`frontend/src/parent/api.ts` gains a `get<FlagPascal>` + `set<FlagPascal>` method pair on `ApiClient`, both targeting the URL literal `/api/settings/<flag-kebab>` (GET and PUT respectively). A missing getter/setter pair or a wrong URL literal grades FALSE.",
+          "source": "SKILL.md, lines 291-314",
+          "defect_type": "structural",
+          "result": null
+        },
+        {
+          "id": 22,
+          "statement": "`frontend/src/parent/App.tsx` bootstrap is fully wired: the `api.get<FlagPascal>` call is added to the `Promise.allSettled([...])` array, a matching `<flag>Result` name is added to the destructuring tuple in the SAME positional order, AND the `[\"<FLAG_SNAKE>\", <flag>Result]` row is added to `flagBootstrapResults`. Omitting the `flagBootstrapResults` row (the silent gap — `tsc` stays green but the persisted value is never read) grades FALSE.",
+          "source": "SKILL.md, lines 317-323",
+          "defect_type": "anti-pattern",
+          "result": null
+        },
+        {
+          "id": 23,
+          "statement": "Step 8 (parent-UI fetch + toggle) is performed even though no lock test or `tsc` forces it. If the output skips the parent UI on the basis of green CI / passing lock test — shipping a flag with no operator-visible toggle — this grades FALSE.",
+          "source": "SKILL.md, lines 14, 287-289, 350",
+          "defect_type": "anti-pattern",
+          "result": null
+        }
+      ]
+    },
+    {
+      "name": "Verification (Step 9)",
+      "evals": [
+        {
+          "id": 24,
+          "statement": "The output runs and reports the mandatory verification gates before declaring done: the backend lock+unit pytest pair, `ruff check`/`ruff format --check`/`mypy src`, the frontend `npm run typecheck`+`npm run test`, and the DB migrate. Declaring the flag done without running these gates grades FALSE.",
+          "source": "SKILL.md, lines 354-380",
+          "defect_type": "content",
+          "result": null
+        }
+      ]
+    },
+    {
+      "name": "Scope guards (Limitations)",
+      "evals": [
+        {
+          "id": 25,
+          "statement": "When the requested setting is numeric/preset/list rather than a boolean enabled/disabled flag (e.g. a cadence-seconds or banned-themes setting), the output STOPS and asks the operator instead of applying the boolean pattern. Wiring a non-boolean setting through this boolean leaf-helper pattern grades FALSE.",
+          "source": "SKILL.md, lines 16, 392",
+          "defect_type": "conditional-behavior",
+          "result": null
+        }
+      ]
+    }
+  ]
+}

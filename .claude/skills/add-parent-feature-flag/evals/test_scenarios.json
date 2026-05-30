@@ -1,0 +1,27 @@
+{
+  "skill": "add-parent-feature-flag",
+  "version": "1.0",
+  "scenarios": [
+    {
+      "id": "scenario_1",
+      "name": "Default-True boolean flag, name lacks _enabled suffix",
+      "description": "Main happy path. Operator names a feature in plain prose with no _enabled suffix and accepts the default-True. Exercises full Step 0-9 wiring including suffix derivation, the kebab route, the boolean cohort placement, migration 0022, all three sources-of-truth, both hardcoded test lists left asserting all-True, and the mandatory parent-UI Step 8.",
+      "context": "Operator request: \"Add a parent feature flag for the starfield background on the kiosk.\" No default specified, so the skill uses the convention default True. Toybox state: highest existing migration is src/toybox/db/migrations/0021_drop_deprecated_play_flags.sql; the boolean cohort in app.py currently lists clickable_words_enabled, jokes_enabled, play_standalone_enabled, read_me_button_enabled, songs_enabled with a 'five parent-controlled feature flags' comment; reference modules clickable_words_enabled.py and jokes_enabled.py exist. Derived tokens: <FLAG_SNAKE>=starfield_background_enabled, <flag-kebab>=starfield-background-enabled, <FLAG_UPPER>=STARFIELD_BACKGROUND_ENABLED, <FlagPascal>=StarfieldBackgroundEnabled, <Default Bool>=True.",
+      "expected_assertions": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]
+    },
+    {
+      "id": "scenario_2",
+      "name": "Default-False boolean flag, name already suffixed",
+      "description": "Edge case that fires the Step-7 conditional. Operator asks for an opt-in (default-off) flag whose name already ends in _enabled. The default-False forces every source-of-truth to carry 'false'/false, the migration seed to be 'false', and — critically — requires UPDATING test_all_surviving_flags_default_true (not deleting it) plus fixing its post-L5 docstring.",
+      "context": "Operator request: \"Add a parent feature flag quiet_mode_enabled, default off.\" Default Bool = False. Same toybox state as scenario_1 (highest migration 0021, five-flag boolean cohort). Derived tokens: <FLAG_SNAKE>=quiet_mode_enabled (already suffixed, no append needed), <flag-kebab>=quiet-mode-enabled, <FLAG_UPPER>=QUIET_MODE_ENABLED, <FlagPascal>=QuietModeEnabled, <Default Bool>=False. Note: tests/unit/core/test_phase_k_feature_flags.py contains test_all_surviving_flags_default_true asserting `all(f.default is True for f in FLAGS)` with a docstring claiming the lone opt-in flag was removed in L5.",
+      "expected_assertions": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]
+    },
+    {
+      "id": "scenario_3",
+      "name": "Non-boolean setting must defer (scope guard)",
+      "description": "Edge case that must trigger the Limitations scope guard. The operator's request is for a numeric/preset setting, NOT a boolean enabled/disabled flag. The correct behavior is to STOP and ask the operator rather than force the request through the boolean leaf-helper pattern. Only the scope-guard assertion applies; the skill should produce no file wiring.",
+      "context": "Operator request: \"Add a parent feature flag for image-gen cadence seconds, default 90.\" This is a numeric setting (seconds), not a boolean enabled/disabled flag, and per the skill it belongs to the separate numeric/preset/list cohort with a different shape. The skill must recognize the non-boolean shape and stop to ask rather than emit core module / router / migration wiring.",
+      "expected_assertions": [25]
+    }
+  ]
+}
