@@ -1,0 +1,6 @@
+commit	score	status	description	wall_seconds
+9667637	0.928165	baseline	initial baseline (structural 0.820413, absolute 1.0 N=3-confirmed)	180.000
+de37dce	0.928165	revert	fold cp1252 note in Step 5 (in-place, lines_delta=0); ties baseline, not a simplification win	30.000
+dc2b58f	0.928165	revert	trim Limitations rationale (mid-line removal, actual lines_delta=0); ties baseline, no simplification win	25.000
+ce3e4de	0.925896	revert	remove redundant true/false restatement line (-1 line) but structural fell 0.8204->0.8147; composite<baseline	33.000
+347d34b	0.911241	revert	RADICAL: collapse Step 3c comment repro (-8 lines, structural 0.8204->0.8281 +0.008); BUT scenario_1 render misplaced router (asrt 12, render-variance unrelated to edit) -> abs 0.9667, composite 0.9112 < baseline	250.000
