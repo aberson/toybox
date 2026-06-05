@@ -37,7 +37,6 @@ A fresh-context model should know:
 - Backfill `family` on M7a's 10 family songs so they serve as the family-tier fallback
 - Coverage-gate lint test (every element has at least one song path + one joke path)
 - End-to-end integration test (fixture-based smoke gate)
-- Operator iPad UAT (real-world smoke gate)
 
 **Out:**
 - New persona, theme, or age_band taxonomy entries
@@ -215,14 +214,7 @@ Per [code-quality.md "Audit wire shape when storage representation changes"](../
 - **Done when:** `Get-ChildItem data\songs\audio\element-song-*.mp3 | Measure-Object | Select-Object Count` returns 103 (matches the 103 new song entries from Q7).
 - **Depends on:** Q7
 
-### Step Q9: Operator iPad UAT — real-world smoke gate
-- **Type:** operator
-- **Problem:** With backend + frontend running, operator triggers an element activity (e.g. a meet_element template for Titanium, or an element_microgame for Iron) on the iPad kiosk, advances through to the reward step, confirms the kid sees a **Titanium-specific** song or joke (lyric/punchline references titanium-spaceship, titanium-strong, etc.), not a family song and not a random theme song. Repeat for ≥3 elements covering different families (one transition metal, one halogen, one noble gas). Then trigger an element with NO custom entry (use Bismuth or one of the rarer ones the LLM may have skipped) — confirm the family-tier fallback fires (e.g. a post-transition-metals family song). Then trigger a non-element activity — confirm theme-based picking still works.
-- **Issue:** #206
-- **Flags:**
-- **Produces:** run doc at `documentation/runs/2026-05-19-phase-q-uat.md` with PASS/FAIL per element + free-form observations
-- **Done when:** operator records PASS verdict in the run doc with verification screenshots; any FAIL surfaces as a follow-up issue.
-- **Depends on:** Q5, Q7, Q7.5, Q8
+<!-- Step Q9 (operator iPad UAT) cut 2026-05-21 — de-facto validated via earlier sessions and rolled into the bundled N+O+P+Q iPad UAT. Issue #206 closed. -->
 
 ## 8. Risks and Open Questions
 
@@ -231,7 +223,7 @@ Per [code-quality.md "Audit wire shape when storage representation changes"](../
 | **LLM-author quality** | 221 LLM-generated entries may include duds (unfunny, awkward, scientifically wrong, element-as-character personification) | Q7 operator inline-edit for individual stinkers; conditional Q7b revises generator prompt + regenerates if systemic quality issue surfaces |
 | **LLM token cost + wall clock** | 226 LLM calls in Q7 — ~5s wall clock each ≈ 20 min; token cost roughly 10-30k tokens depending on prompt length and Claude model | Acceptable for one-time corpus authoring; operator accepts cost before invoking Q7 |
 | **Audio render time** | 103 × ~10s = ~17 min on modern CPU, longer on older hardware | Q8 operator runs in background; not blocking |
-| **Producer→consumer drift on element_id + family** | Both fields are shape constants shared across 5+ surfaces (`Element.id` / `Family` enum / `Song.element_id` / `Song.family` / `Joke.element_id` / `Joke.family` / `activity.steps[i].element_id` / `RewardActivityContext.element_id`) | Single source of truth per [code-quality.md §2](../../dev/.claude/rules/code-quality.md): `Family` StrEnum + element_id regex defined ONCE each (in `element_corpus.py` and the M3 step-id validator respectively); every consumer imports rather than redefines; Q6 fixture-based smoke gate + Q7.5 coverage gate + Q9 iPad UAT cover the round trip |
+| **Producer→consumer drift on element_id + family** | Both fields are shape constants shared across 5+ surfaces (`Element.id` / `Family` enum / `Song.element_id` / `Song.family` / `Joke.element_id` / `Joke.family` / `activity.steps[i].element_id` / `RewardActivityContext.element_id`) | Single source of truth per [code-quality.md §2](../../dev/.claude/rules/code-quality.md): `Family` StrEnum + element_id regex defined ONCE each (in `element_corpus.py` and the M3 step-id validator respectively); every consumer imports rather than redefines; Q6 fixture-based smoke gate + Q7.5 coverage gate cover the round trip (real-world chain rolls into bundled N+O+P+Q UAT) |
 | **Picker performance** | 1000+ corpus entries × every reward fire | Q5 builds `_BY_ELEMENT_ID: dict[str, list[Song]]` + `_BY_FAMILY: dict[Family, list[Song]]` caches at load time; per-pick is O(1) lookup + filter |
 | **Coqui voice consistency** | New element-songs render via XTTS-v2 but operator may have updated the model since M7a | Q8 operator notes the model id in run doc; if it differs from M7a, accept slight voice drift as known cost |
 | **Wire shape regression** | `RewardActivityContext` extension is internal to the resolver; `ResolvedReward` wire shape unchanged | Pre-commit codegen hook catches any drift; expected no-op |
@@ -255,15 +247,15 @@ Per [code-quality.md "Audit wire shape when storage representation changes"](../
 - Same call with neither element nor family match but a `themes=["space"]` and a space-themed corpus song returns the space song.
 - Same call with no element/family/theme match returns the untheme fallback.
 
-**Producer→consumer drift smoke gate** (Q6 + Q9):
+**Producer→consumer drift smoke gate** (Q6):
 - Q6: fixture-based integration test exercising the round trip with both populated and sparse corpora.
-- Q9: real-world iPad UAT exercises the full producer (activity gets element_id from M3 corpus) → consumer (reward picker reads the same field) chain with real Coqui-rendered audio.
+- Real-world iPad exercise of the full producer→consumer chain is folded into the bundled N+O+P+Q iPad UAT (standalone Q9 step cut 2026-05-21).
 
 **Existing tests that might break:**
 - `test_content_resolver.py`'s reward-fallback tests — `RewardActivityContext` signature extension is backwards-compatible (`element_id` defaults to None) so existing call sites don't change. If any test constructs the context positionally, refactor to keyword args.
 - `test_song_corpus.py` / `test_joke_corpus.py` validator tests — the new optional field shouldn't break existing entries, but the test that asserts `extra="forbid"` rejects unknown fields will need an explicit known-field allowlist.
 
-**How to verify end-to-end** (Q9 operator flow):
+**How to verify end-to-end** (bundled iPad UAT element-reward checks):
 1. `uv run python -m toybox.db.migrate`
 2. `uv run python -m toybox.main --host 0.0.0.0 --port 8000` (in one shell)
 3. `cd frontend; npm run dev` (in another shell)
