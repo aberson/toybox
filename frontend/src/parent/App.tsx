@@ -19,6 +19,7 @@ import type {
   SpokenTextLimit,
 } from "./api";
 import { PHASE_K_FEATURE_FLAG_DEFAULTS } from "./api";
+import { CatalogPanel } from "./components/CatalogPanel";
 import { CapabilityBanner } from "./components/CapabilityBanner";
 import { SearchPanel } from "./components/SearchPanel";
 import { ChildProfileEditor } from "./components/ChildProfileEditor";
@@ -127,6 +128,13 @@ const KIDS_SUBTAB_VALUES: readonly KidsSubTab[] = [
   "rewards",
 ];
 const SETTINGS_SUBTAB_VALUES: readonly SettingsSubTab[] = ["settings", "stats"];
+
+// Phase T Step T3: [Queue | Browse catalog] toggle values. Defined at
+// module scope alongside the other tab value arrays (TOP_TAB_VALUES,
+// PLAY_SUBTAB_VALUES, etc.) so hooks can reference this without a
+// closure-dependency issue.
+const VIEW_TAB_VALUES = ["queue", "browse"] as const;
+type ViewTab = (typeof VIEW_TAB_VALUES)[number];
 
 export function App(): JSX.Element {
   // Phase O Step O1: run the localStorage migration BEFORE the first
@@ -244,6 +252,40 @@ export function App(): JSX.Element {
     "settings",
     SETTINGS_SUBTAB_VALUES,
   );
+
+  // Phase T Step T3: [Queue | Browse catalog] toggle — one per Play
+  // sub-tab so switching between Adventures / Elements / etc. each
+  // remembers whether the user last looked at the queue or the catalog.
+  // Stored separately so "All" in browse mode doesn't reset "Adventures"
+  // back to queue mode on the next visit.
+  const allViewTab = useTabState<ViewTab>(
+    "toybox.parent.tabs.play-view-all",
+    "queue",
+    VIEW_TAB_VALUES,
+  );
+  const adventuresViewTab = useTabState<ViewTab>(
+    "toybox.parent.tabs.play-view-adventures",
+    "queue",
+    VIEW_TAB_VALUES,
+  );
+  const elementsViewTab = useTabState<ViewTab>(
+    "toybox.parent.tabs.play-view-elements",
+    "queue",
+    VIEW_TAB_VALUES,
+  );
+  const feelingsViewTab = useTabState<ViewTab>(
+    "toybox.parent.tabs.play-view-feelings-friends",
+    "queue",
+    VIEW_TAB_VALUES,
+  );
+  const currentViewTab =
+    playTab.value === "all"
+      ? allViewTab
+      : playTab.value === "adventures"
+        ? adventuresViewTab
+        : playTab.value === "elements"
+          ? elementsViewTab
+          : feelingsViewTab;
 
   // Live ``transcript`` envelope fanout — TranscriptsManager
   // subscribes so a new utterance appears in the list without the user
@@ -1230,33 +1272,90 @@ export function App(): JSX.Element {
                       api={api}
                       onPropose={handleSearchPropose}
                     />
-                    <PlayQueueList
-                      active={state.active}
-                      proposedList={state.proposedList}
-                      cadenceSeconds={0}
-                      filterCategory={
-                        playTab.value === "all" ? undefined : playTab.value
-                      }
-                      onApprove={handleApprove}
-                      onDismiss={handleDismiss}
-                      onRegenerate={handleRegenerate}
-                      onEnd={handleEnd}
-                      onStepBack={handleStepBack}
-                      onDidntWork={handleDidntWork}
-                      onThumbsUp={handleThumbsUp}
-                      onRecast={handleRecast}
-                      onNewActivity={handleNewActivity}
-                      onInsertJoke={handleInsertJoke}
-                      onInsertSong={handleInsertSong}
-                      onApproveQuestion={handleApproveQuestion}
-                      jokesEnabled={featureFlags.jokes_enabled}
-                      songsEnabled={featureFlags.songs_enabled}
-                      activeRewardsCount={activeRewardsCount}
-                      activeRewards={activeRewards}
-                    />
-                    <div style={{ marginTop: 12, textAlign: "right" }}>
-                      <TriggerButton onTrigger={handleTrigger} />
+                    {/* Phase T Step T3: [Queue | Browse catalog] segment
+                        control. Persisted per sub-tab so Adventures /
+                        Elements / Feelings can each remember their last
+                        view independently. Transcriptions is excluded
+                        (already guarded by the outer check). */}
+                    <div
+                      role="tablist"
+                      data-testid="view-toggle"
+                      style={{ display: "flex", gap: 6, margin: "10px 0 8px 0" }}
+                    >
+                      {(["queue", "browse"] as const).map((v) => {
+                        const active = currentViewTab.value === v;
+                        return (
+                          <button
+                            key={v}
+                            type="button"
+                            role="tab"
+                            aria-selected={active ? "true" : "false"}
+                            data-testid={`view-tab-${v}`}
+                            onClick={() => {
+                              if (!active) currentViewTab.setValue(v);
+                            }}
+                            style={{
+                              padding: "5px 14px",
+                              fontSize: 13,
+                              fontWeight: active ? 600 : 500,
+                              borderRadius: 999,
+                              border: active
+                                ? "1px solid #2563eb"
+                                : "1px solid #d1d5db",
+                              background: active ? "#dbeafe" : "#fff",
+                              color: active ? "#1e3a8a" : "#374151",
+                              cursor: active ? "default" : "pointer",
+                            }}
+                          >
+                            {v === "queue" ? "Queue" : "Browse catalog"}
+                          </button>
+                        );
+                      })}
                     </div>
+                    {currentViewTab.value === "queue" && (
+                      <>
+                        <PlayQueueList
+                          active={state.active}
+                          proposedList={state.proposedList}
+                          cadenceSeconds={0}
+                          filterCategory={
+                            playTab.value === "all" ? undefined : playTab.value
+                          }
+                          onApprove={handleApprove}
+                          onDismiss={handleDismiss}
+                          onRegenerate={handleRegenerate}
+                          onEnd={handleEnd}
+                          onStepBack={handleStepBack}
+                          onDidntWork={handleDidntWork}
+                          onThumbsUp={handleThumbsUp}
+                          onRecast={handleRecast}
+                          onNewActivity={handleNewActivity}
+                          onInsertJoke={handleInsertJoke}
+                          onInsertSong={handleInsertSong}
+                          onApproveQuestion={handleApproveQuestion}
+                          jokesEnabled={featureFlags.jokes_enabled}
+                          songsEnabled={featureFlags.songs_enabled}
+                          activeRewardsCount={activeRewardsCount}
+                          activeRewards={activeRewards}
+                        />
+                        <div style={{ marginTop: 12, textAlign: "right" }}>
+                          <TriggerButton onTrigger={handleTrigger} />
+                        </div>
+                      </>
+                    )}
+                    {currentViewTab.value === "browse" && (
+                      <CatalogPanel
+                        filterCategory={
+                          playTab.value === "all"
+                            ? undefined
+                            : (playTab.value as
+                                | "adventures"
+                                | "elements"
+                                | "feelings-friends")
+                        }
+                        api={api}
+                      />
+                    )}
                   </>
                 )}
                 {playTab.value === "transcriptions" && (

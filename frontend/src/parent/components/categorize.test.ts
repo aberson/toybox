@@ -29,8 +29,9 @@
 
 import { describe, expect, it } from "vitest";
 
+import type { CatalogEntry } from "../../shared/types";
 import type { Activity } from "../api";
-import { categorize } from "./categorize";
+import { categorize, categorizeTemplate } from "./categorize";
 
 // Minimal shape: only the fields categorize() reads. The cast at the
 // helper call below is the load-bearing line — if Activity (post O2
@@ -241,5 +242,57 @@ describe("categorize() — Phase O Step O2 (precedence: Elements > Feelings & Fr
       recommended_themes: [],
     });
     expect(categorize(activity)).toBe("adventures");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// categorizeTemplate() — Phase T Step T3
+// ---------------------------------------------------------------------------
+
+function fakeCatalogEntry(overrides: Partial<CatalogEntry> = {}): CatalogEntry {
+  return {
+    id: "t1",
+    title: "Test Template",
+    intent: "play",
+    themes: [],
+    step_count: 3,
+    ...overrides,
+  };
+}
+
+describe("categorizeTemplate() — Phase T Step T3", () => {
+  it("filterCategory undefined → always returns true regardless of themes", () => {
+    const entry = fakeCatalogEntry({ themes: ["feelings", "periodic_table"] });
+    expect(categorizeTemplate(entry, undefined)).toBe(true);
+  });
+
+  it("periodic_table theme + filterCategory 'elements' → true", () => {
+    const entry = fakeCatalogEntry({ themes: ["periodic_table", "science"] });
+    expect(categorizeTemplate(entry, "elements")).toBe(true);
+  });
+
+  it("periodic_table theme + filterCategory 'adventures' → false", () => {
+    const entry = fakeCatalogEntry({ themes: ["periodic_table"] });
+    expect(categorizeTemplate(entry, "adventures")).toBe(false);
+  });
+
+  it("feelings theme + filterCategory 'feelings-friends' → true", () => {
+    const entry = fakeCatalogEntry({ themes: ["feelings", "friendship"] });
+    expect(categorizeTemplate(entry, "feelings-friends")).toBe(true);
+  });
+
+  it("feelings theme + filterCategory 'adventures' → false", () => {
+    const entry = fakeCatalogEntry({ themes: ["feelings"] });
+    expect(categorizeTemplate(entry, "adventures")).toBe(false);
+  });
+
+  it("no special themes + filterCategory 'adventures' → true (default bucket)", () => {
+    const entry = fakeCatalogEntry({ themes: ["treasure", "exploration"] });
+    expect(categorizeTemplate(entry, "adventures")).toBe(true);
+  });
+
+  it("no special themes + filterCategory 'elements' → false", () => {
+    const entry = fakeCatalogEntry({ themes: ["treasure"] });
+    expect(categorizeTemplate(entry, "elements")).toBe(false);
   });
 });

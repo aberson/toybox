@@ -35,9 +35,25 @@
 //     (also Phase O) provides the codegen-emitted typed contract for
 //     future cross-route consumers.
 
+import type { CatalogEntry } from "../../shared/types";
 import type { Activity } from "../api";
 
 export type ActivityCategory = "adventures" | "elements" | "feelings-friends";
+
+// Internal helper: bucket a theme list into a category.
+// Precedence: Elements > Feelings & Friends > Adventures.
+//
+// For Activities, the "elements" bucket is detected via per-step
+// ``element_id`` (see ``categorize()``). For CatalogEntry templates,
+// there is no per-step element_id on the wire; instead element templates
+// carry the ``"periodic_table"`` theme. This helper covers the theme
+// dimension that both code paths share.
+function categoryFromThemes(themes: readonly string[]): ActivityCategory {
+  if (themes.includes("feelings")) {
+    return "feelings-friends";
+  }
+  return "adventures";
+}
 
 export function categorize(activity: Activity): ActivityCategory {
   const steps = activity.steps ?? [];
@@ -51,8 +67,25 @@ export function categorize(activity: Activity): ActivityCategory {
     }
   }
   const themes = activity.recommended_themes ?? [];
-  if (themes.includes("feelings")) {
-    return "feelings-friends";
-  }
-  return "adventures";
+  return categoryFromThemes(themes);
+}
+
+// Phase T Step T3 — filter a CatalogEntry against one of the three
+// parent-UI content sub-tabs. Returns true when the entry belongs to
+// the supplied category. When ``filterCategory`` is ``undefined`` (the
+// "All" sub-tab), always returns true.
+//
+// Element templates carry the ``"periodic_table"`` theme by convention
+// (set by generator.py on every element_microgame template). The
+// ``"elements"`` bucket therefore matches on that theme — same
+// precedence as ``categorize()`` (Elements > Feelings > Adventures).
+export function categorizeTemplate(
+  entry: CatalogEntry,
+  filterCategory: ActivityCategory | undefined,
+): boolean {
+  if (filterCategory === undefined) return true;
+  const actual = entry.themes.includes("periodic_table")
+    ? "elements"
+    : categoryFromThemes(entry.themes);
+  return actual === filterCategory;
 }

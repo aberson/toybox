@@ -3,7 +3,7 @@
 // error. All routes hit /api/* (vite dev proxy forwards to :8000).
 // Shapes mirror src/toybox/api/activities.py and core/version_check.py.
 
-import type { Animation, RewardType } from "../shared/types";
+import type { Animation, CatalogResponse, RewardType } from "../shared/types";
 
 export type ActivityState =
   | "proposed"
@@ -2045,6 +2045,18 @@ export class ApiClient {
       `/api/search?${search.toString()}`,
       { method: "GET", signal: opts.signal },
     );
+  }
+
+  // Phase T Step T2: offline template catalog. Returns the full list of
+  // available templates so the CatalogPanel (T3) can render them without
+  // a search query. The backend derives the response from the same
+  // ``_Template`` objects the slot-picker uses so the list stays in sync
+  // with the proposer's view of the world.
+  async getCatalog(opts: RequestOptions = {}): Promise<CatalogResponse> {
+    return this.request<CatalogResponse>("/api/catalog", {
+      method: "GET",
+      signal: opts.signal,
+    });
   }
 
   // Step 22: wipe all transcripts. PIN re-confirm body is required on
