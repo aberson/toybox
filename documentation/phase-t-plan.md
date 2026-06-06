@@ -292,6 +292,7 @@ button posts. No new backend endpoint needed for "launch from catalog".
   `categorizeTemplate` filter correctness for all 3 category values, theme chip deselect, empty
   state; no regressions in existing parent UI tests
 - **Depends on:** T2
+- **Status:** DONE (2026-06-06)
 
 ### Step T4: iPad UAT — catalog browse validation
 - **Problem:** CatalogPanel is new UI that runs on real hardware with real children; vitest
