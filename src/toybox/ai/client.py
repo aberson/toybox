@@ -112,6 +112,24 @@ class AIClient(Protocol):
         ...
 
 
+@runtime_checkable
+class SyncAIClient(Protocol):
+    """Synchronous Protocol for callers in a sync FastAPI route.
+
+    ``AnthropicClient.complete_text_sync`` and ``StubClient.complete_text_sync``
+    both implement this. Callers that need a sync call (e.g. ``post_approve``)
+    depend on this Protocol, not on ``AIClient`` (which is async).
+    """
+
+    def complete_text_sync(
+        self,
+        messages: Sequence[AIMessage],
+        *,
+        max_tokens: int = 1024,
+        system: str | None = None,
+    ) -> AIResponse: ...
+
+
 class AnthropicClient:
     """OAuth-direct client for the Anthropic Messages API.
 
@@ -176,7 +194,7 @@ class AnthropicClient:
                 text += block.get("text", "")
         return text
 
-    def _complete_text_sync(
+    def _do_complete_text_sync(
         self,
         messages: Sequence[AIMessage],
         max_tokens: int,
@@ -192,6 +210,15 @@ class AnthropicClient:
         data = self._post_messages(payload)
         return AIResponse(text=self._extract_text(data), model=text_model())
 
+    def complete_text_sync(
+        self,
+        messages: Sequence[AIMessage],
+        *,
+        max_tokens: int = 1024,
+        system: str | None = None,
+    ) -> AIResponse:  # pragma: no cover - exercised only against live API
+        return self._do_complete_text_sync(messages, max_tokens, system)
+
     async def complete_text(
         self,
         messages: Sequence[AIMessage],
@@ -199,7 +226,7 @@ class AnthropicClient:
         max_tokens: int = 1024,
         system: str | None = None,
     ) -> AIResponse:
-        return await asyncio.to_thread(self._complete_text_sync, messages, max_tokens, system)
+        return await asyncio.to_thread(self._do_complete_text_sync, messages, max_tokens, system)
 
     def _describe_image_sync(
         self,
@@ -283,6 +310,22 @@ class StubClient:
             text = f"[stub:{text_model()}] " + (messages[-1].content if messages else "")
         return AIResponse(text=text, model=text_model())
 
+    def complete_text_sync(
+        self,
+        messages: Sequence[AIMessage],
+        *,
+        max_tokens: int = 1024,
+        system: str | None = None,
+    ) -> AIResponse:
+        self.calls.append(
+            ("complete_text_sync", tuple(messages), {"max_tokens": max_tokens, "system": system})
+        )
+        if self._responses:
+            text = self._responses.pop(0)
+        else:
+            text = f"[stub-sync:{text_model()}] " + (messages[-1].content if messages else "")
+        return AIResponse(text=text, model=text_model())
+
     async def describe_image(
         self,
         image_bytes: bytes,
@@ -313,6 +356,7 @@ __all__ = [
     "DEFAULT_TEXT_MODEL",
     "DEFAULT_VISION_MODEL",
     "StubClient",
+    "SyncAIClient",
     "TEXT_MODEL_ENV",
     "VISION_MODEL_ENV",
     "text_model",

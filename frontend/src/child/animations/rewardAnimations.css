@@ -128,3 +128,36 @@
 .all-done-shine {
   animation: all-done-shine 2s ease-in-out infinite;
 }
+
+/*
+ * Phase S Step S2: avatar animation utility classes.
+ *
+ * Applied to PersonaAvatar via the ``animationName`` prop. Each class
+ * uses a keyframe already defined above. Durations are per-keyframe safe
+ * values that satisfy the NO FLASHING constraint (no brightness spikes
+ * faster than 2.5s) for sensory-sensitive children.
+ */
+
+.avatar-animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.avatar-animate-pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.avatar-animate-wobble {
+  animation: wobble 1.8s ease-in-out infinite;
+}
+
+.avatar-animate-jump {
+  animation: jump 1.2s ease-in-out infinite;
+}
+
+.avatar-animate-shine {
+  animation: shine 2.5s ease-in-out infinite;
+}
+
+.avatar-animate-spin {
+  animation: spin 5s linear infinite;
+}
