@@ -160,6 +160,7 @@ CLAUDE.md states "Every Claude call goes through the capability gate for offline
   - Vitest tests: `gradientForPersona` returns distinct values for all 5 persona_ids and null; App renders persona-specific background when activity has persona_id
 - **Done when:** `npm run typecheck && npm run lint && npm test -- --run` all pass; `gradientForPersona` test covers all 6 inputs (5 personas + null); no regressions in existing child kiosk tests
 - **Depends on:** none
+- **Status:** DONE (2026-06-05)
 
 <!-- autofix-applied: 2026-06-05 -->
 ### Step S2: Claude approve-time animation annotation + avatar CSS animations

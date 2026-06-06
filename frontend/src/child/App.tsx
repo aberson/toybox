@@ -30,6 +30,7 @@ import {
 } from "./wakeLock";
 import { ChildWsClient } from "./ws";
 import type { Envelope } from "./ws";
+import { gradientForPersona, PERSONA_GRADIENT_FALLBACK } from "./theming";
 
 // Mirrors parent App's deriveWsUrl. The token rides in-band as the
 // first ws message, never in the URL.
@@ -93,14 +94,27 @@ function clearStoredKioskPin(): void {
 // Outer layer: pinned to the viewport edges so the gradient bleeds into
 // the iPad's rounded corners with no color band. Carries no padding —
 // the inner content layer handles safe-area inset spacing.
-const FULL_BLEED_BACKGROUND_STYLE: CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  margin: 0,
-  background: "linear-gradient(180deg, #fefefe 0%, #f4f4f7 100%)",
-  boxSizing: "border-box",
-  overflow: "hidden",
-};
+//
+// Phase S S1: background gradient is persona-keyed. ``gradientForPersona``
+// returns the fallback (warm idle) when activity is null or the persona is
+// unknown, so the static no-activity appearance is preserved.
+function buildFullBleedBackgroundStyle(gradient: string): CSSProperties {
+  return {
+    position: "fixed",
+    inset: 0,
+    margin: 0,
+    background: gradient,
+    boxSizing: "border-box",
+    overflow: "hidden",
+  };
+}
+
+// Idle fallback — used before any activity is present and when
+// ``gradientForPersona`` returns the default. Kept as a stable object
+// reference so the root element doesn't trigger an extra paint on
+// every no-activity render.
+const FULL_BLEED_BACKGROUND_IDLE_STYLE: CSSProperties =
+  buildFullBleedBackgroundStyle(PERSONA_GRADIENT_FALLBACK);
 
 // Inner layer: holds all kiosk content, centered. Padding uses
 // env(safe-area-inset-*) so on iPad the content clears the camera notch
@@ -701,10 +715,20 @@ export function App(): JSX.Element {
       featureFlags[key] ? "true" : "false";
   }
 
+  // Phase S S1: derive the background gradient from the current
+  // activity's persona_id. Falls back to the warm idle gradient when
+  // no activity is present or the persona is unknown — matches the
+  // no-activity idle state exactly so the visual is stable before boot.
+  const backgroundGradient = gradientForPersona(activity?.persona_id);
+  const fullBleedStyle =
+    backgroundGradient === PERSONA_GRADIENT_FALLBACK
+      ? FULL_BLEED_BACKGROUND_IDLE_STYLE
+      : buildFullBleedBackgroundStyle(backgroundGradient);
+
   return (
     <main
       data-testid="child-root"
-      style={FULL_BLEED_BACKGROUND_STYLE}
+      style={fullBleedStyle}
       {...featureFlagDatasetAttrs}
     >
       <div style={FULL_BLEED_CONTENT_STYLE}>

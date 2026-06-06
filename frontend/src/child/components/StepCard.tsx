@@ -483,7 +483,15 @@ export function StepCard(props: StepCardProps): JSX.Element {
         // keep every affordance reachable without scrolling.
         gap: "clamp(8px, 2vh, 24px)",
         maxWidth: 1100,
-        padding: "0 24px",
+        // Phase S S1: card surface treatment — a subtle rounded card
+        // lifts the step content off the persona gradient so the text
+        // stays readable regardless of background hue. The padding
+        // increase (was "0 24px") gives the body more breathing room.
+        padding: "clamp(16px, 3vh, 32px) clamp(24px, 4vw, 48px)",
+        background: "rgba(255,255,255,0.82)",
+        borderRadius: 20,
+        boxShadow: "0 8px 32px rgba(0,0,0,0.25), 0 2px 8px rgba(0,0,0,0.15)",
+        border: "1.5px solid rgba(0,0,0,0.10)",
       }}
     >
       {totalSteps > 0 && (
@@ -621,11 +629,19 @@ export function StepCard(props: StepCardProps): JSX.Element {
               // min(vw, vh) so portrait-tablet viewports shrink the
               // body text to keep the NextStepButton on screen below
               // the ElementCard + body text on element activity steps.
+              //
+              // Phase S S1: minimum lowered from 1.5rem → 1.2rem to
+              // keep very small viewports from going tiny, but the
+              // responsive middle band is bumped (min(4vw,5vh) →
+              // min(4.5vw,5.5vh)) to hit ~1.25rem+ at arm's-length
+              // iPad portrait widths (~768px = ~34.5px body). The 3rem
+              // cap is unchanged — prevents oversized text on wide
+              // desktop viewports.
               flex: 1,
-              fontSize: "clamp(1.5rem, min(4vw, 5vh), 3rem)",
-              lineHeight: 1.15,
+              fontSize: "clamp(1.2rem, min(4.5vw, 5.5vh), 3rem)",
+              lineHeight: 1.2,
               fontWeight: 700,
-              color: "#222",
+              color: "#1a1a2e",
             }}
           >
             {/*
