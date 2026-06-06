@@ -145,6 +145,7 @@ The `question` field is additive and `Optional[str]`-defaulting to `None` — no
 - **Produces:** deleted files: `core/play_cadence.py`, `core/play_cadence_seconds.py`, `api/play_cadence_seconds_settings.py`, `core/proposed_ttl.py`, 4 test files; modified: `main.py`, `app.py`, `PlayQueueSettingsControls.tsx`, `SettingsPanel.tsx`, `App.tsx`, `api.ts`, `TriggerButton.tsx`
 - **Done when:** `uv run pytest` passes (cadence/proposed_ttl test files deleted, not just skipped); `npm run typecheck` passes; `npm run test` passes; `TriggerButton` is visually prominent (full-width or clearly-styled CTA, not a text link); `grep -r play_cadence src/ frontend/src tests/` returns 0 results (no orphan imports)
 - **Depends on:** none
+- **Status:** DONE (2026-06-05)
 
 <!-- plan-review autofix 2026-06-05: added orphan-import grep to Done-when -->
 ### Step R2: Spoken text character limit
