@@ -983,6 +983,7 @@ def generate(
     resolved_children: ResolvedChildren | None = None,
     preferred_themes: Sequence[str] = (),
     category: str | None = None,
+    pinned_template_id: str | None = None,
 ) -> Activity:
     """Generate a deterministic :class:`Activity`.
 
@@ -1072,17 +1073,45 @@ def generate(
     toy_name = picked_toy.display_name if picked_toy is not None else DEFAULT_TOY_NAME
     toy_ids: tuple[str, ...] = (picked_toy.id,) if picked_toy is not None else ()
 
-    template, _source_intent = _select_template(
-        intent,
-        hour,
-        rng,
-        slot=slot,
-        toy=toy_name,
-        conn=conn,
-        banned_themes=banned_themes,
-        preferred_themes=preferred_themes,
-        category=category,
-    )
+    # Phase R Step R4: when the caller pinned a specific template id
+    # (e.g. "Play again" in the search UI), short-circuit the slot-picker
+    # and use that template directly.  If the id is no longer in the
+    # registry (template renamed/deleted), fall back to the normal picker
+    # and log a warning so the operator can diagnose stale ids.
+    if pinned_template_id is not None:
+        pinned = find_template_by_id(pinned_template_id)
+        if pinned is not None:
+            template = pinned
+            _source_intent = intent  # keep intent consistent for callers
+        else:
+            import logging as _logging
+            _logging.getLogger(__name__).warning(
+                "generate: pinned_template_id %r not found; falling back to picker",
+                pinned_template_id,
+            )
+            template, _source_intent = _select_template(
+                intent,
+                hour,
+                rng,
+                slot=slot,
+                toy=toy_name,
+                conn=conn,
+                banned_themes=banned_themes,
+                preferred_themes=preferred_themes,
+                category=category,
+            )
+    else:
+        template, _source_intent = _select_template(
+            intent,
+            hour,
+            rng,
+            slot=slot,
+            toy=toy_name,
+            conn=conn,
+            banned_themes=banned_themes,
+            preferred_themes=preferred_themes,
+            category=category,
+        )
 
     # Resolve every parametric slot (``{room}``, ``{action_verb}``,
     # ``{adjective}``, etc.) once per template so the title and all

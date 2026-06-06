@@ -454,6 +454,14 @@ class ProposeRequest(BaseModel):
     # :func:`_apply_category_filter`: when no templates match, the
     # filter degrades to no-op rather than starve the picker.
     category: Literal["adventures", "elements", "feelings-friends"] | None = None
+    # Phase R Step R4: optional template pin. When set, the generator
+    # bypasses the slot-picker and uses the named template directly.
+    # Supplied by the search UI's "Play again"/"Try this" buttons so a
+    # parent can replay a specific past template rather than getting a
+    # random activity of the same intent.  When the template_id is
+    # unknown (template deleted/renamed), generate() falls back to the
+    # normal picker and logs a warning.
+    template_id: str | None = None
 
 
 class ApproveRequest(BaseModel):
@@ -2240,6 +2248,7 @@ def _do_propose(
                 resolved_children=resolved_children,
                 preferred_themes=preferred_themes,
                 category=body.category,
+                pinned_template_id=body.template_id,
             )
             loop_tool_calls = None
     else:
@@ -2262,6 +2271,7 @@ def _do_propose(
             resolved_children=resolved_children,
             preferred_themes=preferred_themes,
             category=body.category,
+            pinned_template_id=body.template_id,
         )
     # Phase K K5: role-slot resolution. When the picked template
     # declared ``required_roles`` or ``optional_roles`` at K3 schema

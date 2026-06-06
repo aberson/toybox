@@ -40,6 +40,7 @@ from .api.read_me_button_enabled_settings import (
 )
 from .api.rewards import router as rewards_router
 from .api.rooms import router as rooms_router
+from .api.search import router as search_router
 from .api.songs_enabled_settings import router as songs_enabled_settings_router
 from .api.spoken_text_limit_settings import router as spoken_text_limit_settings_router
 from .api.toys import admin_router as toys_admin_router
@@ -98,6 +99,9 @@ def create_app() -> FastAPI:
     app.include_router(rooms_router)
     app.include_router(transcripts_router)
     app.include_router(metrics_router)
+    # Phase R Step R4: activity + template search (no auth — read-only).
+    # Prefix is embedded in search.py's router declaration (``/api/search``).
+    app.include_router(search_router)
     app.include_router(build_ws_router())
 
     # Static read-only mount for committed toy + room images so the

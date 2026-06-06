@@ -237,3 +237,107 @@ def test_category_elements_with_no_element_template_falls_back(
     assert body["template_id"] == "category_filter_adv_only"
 
     generator.clear_template_cache()
+
+
+def test_propose_with_template_id_body_pins_template(
+    client: TestClient,
+    parent_headers: dict[str, str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Phase R Step R4: ``ProposeRequest.template_id`` pins the template.
+
+    The critical wiring being tested:
+
+        ProposeRequest.template_id
+          → _do_propose passes pinned_template_id=body.template_id
+          → generate(..., pinned_template_id=...) short-circuits the
+            slot-picker and uses the named template directly
+          → the response body carries template_id matching the pinned id
+
+    If the ``pinned_template_id=body.template_id`` assignment were removed
+    from ``_do_propose``, the generator would pick a random template and
+    the response ``template_id`` would NOT equal the requested id.  CI
+    would not catch this without this test.
+
+    Strategy: stage a two-template pool (same intent) so the unforced
+    picker can land on EITHER template, but the pin must land on the
+    specific one requested.  Use different seeds for extra confidence
+    (the seeded picker without a pin would pick the non-pinned template).
+    """
+    from toybox.activities import generator
+
+    # Two templates for the same intent.  The picker's seed lands on
+    # ``pin_a`` by default; the pin forces ``pin_b`` to prove the override.
+    two_template_fixture: dict[str, Any] = {
+        "intent": "boredom",
+        "templates": [
+            {
+                "id": "pin_test_template_a",
+                "title": "Template A (default pick)",
+                "buckets": ["always"],
+                "steps": [
+                    {"text": "Step one for A."},
+                    {"text": "Step two for A."},
+                    {"text": "Step three for A."},
+                ],
+            },
+            {
+                "id": "pin_test_template_b",
+                "title": "Template B (pinned target)",
+                "buckets": ["always"],
+                "steps": [
+                    {"text": "Step one for B."},
+                    {"text": "Step two for B."},
+                    {"text": "Step three for B."},
+                ],
+            },
+        ],
+    }
+
+    staged = tmp_path / "templates_pin_test"
+    staged.mkdir()
+    (staged / "boredom.json").write_text(
+        json.dumps(two_template_fixture),
+        encoding="utf-8",
+    )
+    src_schema = (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "toybox"
+        / "activities"
+        / "templates"
+        / "_schema.json"
+    )
+    shutil.copy(src_schema, staged / "_schema.json")
+    monkeypatch.setattr(generator, "TEMPLATES_DIR", staged)
+    generator.clear_template_cache()
+
+    # POST with template_id pinned to "pin_test_template_b".
+    payload: dict[str, Any] = {
+        "intent": "boredom",
+        "slot": None,
+        "hour": 12,
+        "seed": 0,  # seed 0 would pick template_a without the pin
+        "template_id": "pin_test_template_b",
+    }
+    response = client.post(
+        "/api/activities/propose",
+        json=payload,
+        headers=parent_headers,
+    )
+    assert response.status_code == 201, response.text
+    body: dict[str, Any] = response.json()
+
+    # The pin MUST win: response template_id must equal the requested id,
+    # not whatever the seeded picker would have chosen.
+    assert body["template_id"] == "pin_test_template_b", (
+        f"Expected pinned template 'pin_test_template_b' but got "
+        f"{body.get('template_id')!r}; the pinned_template_id wiring "
+        f"in _do_propose may be broken"
+    )
+    # Sanity: the title matches the pinned template (proves it's not a
+    # coincidence where both templates produce the same id).
+    assert body["steps"][0]["body"] == "Step one for B."
+
+    generator.clear_template_cache()

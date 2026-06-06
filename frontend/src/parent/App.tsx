@@ -20,6 +20,7 @@ import type {
 } from "./api";
 import { PHASE_K_FEATURE_FLAG_DEFAULTS } from "./api";
 import { CapabilityBanner } from "./components/CapabilityBanner";
+import { SearchPanel } from "./components/SearchPanel";
 import { ChildProfileEditor } from "./components/ChildProfileEditor";
 import { Header } from "./components/Header";
 import { PinLogin } from "./components/PinLogin";
@@ -207,6 +208,11 @@ export function App(): JSX.Element {
   // values into the UI. SettingsPanel writes update this state via the
   // ``onSpokenTextLimitChanged`` callback.
   const [spokenTextLimit, setSpokenTextLimit] = useState<number>(150);
+  // Phase R Step R4: activity + template search query. Non-empty string
+  // renders SearchPanel above PlayQueueList on the Play tab; clearing it
+  // restores the normal queue view. The state is top-level so the input
+  // persists when the user switches Play sub-tabs.
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [authMode, setAuthMode] = useState<AuthMode>("bootstrap");
   const [authStatus, setAuthStatus] = useState<ParentAuthStatus | null>(null);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
@@ -1081,6 +1087,37 @@ export function App(): JSX.Element {
     [],
   );
 
+  // Phase R Step R4: propose from search results. Calls the same propose
+  // endpoint as the trigger button but with an optional template_id so
+  // the backend picks that exact template rather than running the slot
+  // picker. When template_id is null/undefined, falls back to the normal
+  // proposal flow (the parent clicked "Play again" on a template-less
+  // activity).
+  const handleSearchPropose = useCallback(
+    async (payload: { template_id?: string | null }): Promise<void> => {
+      try {
+        const now = new Date();
+        const seed = Math.floor(Math.random() * 1_000_000);
+        const proposePayload = {
+          intent: "request_play" as const,
+          slot: "freeplay",
+          hour: now.getHours(),
+          seed,
+          ...(payload.template_id != null
+            ? { template_id: payload.template_id }
+            : {}),
+        };
+        const activity = await api.propose(proposePayload);
+        useParentStore.getState().applyMutationResult(activity);
+        setSearchQuery("");
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "propose failed";
+        useParentStore.getState().pushToast("error", `search propose: ${message}`);
+      }
+    },
+    [api],
+  );
+
   // Step 21: gate on PIN status before rendering the main app.
   if (authMode === "bootstrap") {
     return (
@@ -1181,6 +1218,18 @@ export function App(): JSX.Element {
               <div role="tabpanel" style={{ marginTop: 12 }}>
                 {playTab.value !== "transcriptions" && (
                   <>
+                    {/* Phase R Step R4: search input always rendered on
+                        non-transcriptions Play sub-tabs.  SearchPanel
+                        renders its own results section when searchQuery
+                        is non-empty; the normal PlayQueueList renders
+                        unconditionally below (both can show so the queue
+                        stays visible while the parent reviews results). */}
+                    <SearchPanel
+                      searchQuery={searchQuery}
+                      onSearchQueryChange={setSearchQuery}
+                      api={api}
+                      onPropose={handleSearchPropose}
+                    />
                     <PlayQueueList
                       active={state.active}
                       proposedList={state.proposedList}

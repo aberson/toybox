@@ -186,6 +186,10 @@ export interface ProposePayload {
   // the "All" sub-tab semantics. Backend soft-fallback if no template
   // matches the category.
   category?: "adventures" | "elements" | "feelings-friends" | null;
+  // Phase R Step R4: optional template pin. When set, the backend
+  // bypasses the slot-picker and uses this template directly. Supplied
+  // by the search UI's "Play again"/"Try this" buttons.
+  template_id?: string | null;
 }
 
 // Step 18: child-profile editor wire shapes. Mirror the Pydantic
@@ -658,6 +662,26 @@ export interface ImageGenModeResponse {
 // the PUT requires parent scope.
 export interface TranscriptRetentionResponse {
   seconds: number;
+}
+
+// Phase R Step R4: activity + template search wire shapes.
+export interface PastActivityResult {
+  id: string;
+  title: string | null;
+  template_id: string | null;
+  state: string;
+  created_at: string;
+}
+
+export interface TemplateResult {
+  id: string;
+  title: string;
+  intent: string;
+}
+
+export interface SearchResponse {
+  past_activities: PastActivityResult[];
+  templates: TemplateResult[];
 }
 
 // Phase R Step R2: spoken text character limit. The wire body is
@@ -2004,6 +2028,21 @@ export class ApiClient {
     if (params.limit !== undefined) search.set("limit", String(params.limit));
     return this.request<TranscriptListResponse>(
       `/api/transcripts/search?${search.toString()}`,
+      { method: "GET", signal: opts.signal },
+    );
+  }
+
+  // Phase R Step R4: search past activities and templates.
+  // ``q`` is sent verbatim; the backend rejects empty/whitespace-only
+  // queries with 422.  The caller should debounce before calling.
+  async searchActivities(
+    q: string,
+    opts: RequestOptions = {},
+  ): Promise<SearchResponse> {
+    const search = new URLSearchParams();
+    search.set("q", q);
+    return this.request<SearchResponse>(
+      `/api/search?${search.toString()}`,
       { method: "GET", signal: opts.signal },
     );
   }
