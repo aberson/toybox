@@ -14,7 +14,6 @@ import type {
   ParentTokenResponse,
   PhaseKFeatureFlag,
   PhaseKFeatureFlags,
-  PlayCadenceSeconds,
   PlayTargetDepth,
   RewardType,
 } from "./api";
@@ -155,21 +154,15 @@ export function App(): JSX.Element {
   // TranscriptsManager so the I4 fade machinery uses the same source-
   // of-truth as the picker. No WS broadcast — single-parent kiosk.
   const [retentionSeconds, setRetentionSeconds] = useState<number>(60);
-  // Phase J step J8: play-queue cadence + target depth seeded from
-  // ``GET /api/settings/play-cadence-seconds`` and
-  // ``GET /api/settings/play-target-depth`` during bootstrap. Both
-  // mirror the retentionSeconds plumbing — optimistic default lives
-  // in ``useState``, the fetch fills it post-login, and the value
-  // threads down to ``PlayQueueList`` (cadence) and J10's
-  // SettingsPanel controls (both). 30s cadence + depth 3 are the
-  // backend defaults; matching them locally keeps a failed bootstrap
-  // fetch from flashing odd values into the UI.
-  const [playCadenceSeconds, setPlayCadenceSeconds] = useState<number>(30);
-  // J10 threads playTargetDepth into the new SettingsPanel segmented
-  // control. The state lives here in J8 so the bootstrap parallel-
-  // fetch lands the resolved value before SettingsPanel mounts in J10
-  // — wiring the consumer in J10 doesn't require touching the
-  // bootstrap path again.
+  // Phase J step J8: play-queue target depth seeded from
+  // ``GET /api/settings/play-target-depth`` during bootstrap. Mirrors
+  // the retentionSeconds plumbing — optimistic default lives in
+  // ``useState``, the fetch fills it post-login. Depth 3 is the
+  // backend default; matching locally keeps a failed bootstrap fetch
+  // from flashing odd values into the UI.
+  // J10 threads playTargetDepth into the SettingsPanel segmented
+  // control. The state lives here so the bootstrap parallel-fetch
+  // lands the resolved value before SettingsPanel mounts.
   const [playTargetDepth, setPlayTargetDepth] = useState<number>(3);
   // Phase K step K2: eight parent-controlled feature flags. Seeded
   // optimistically from PHASE_K_FEATURE_FLAG_DEFAULTS (which matches
@@ -326,15 +319,14 @@ export function App(): JSX.Element {
       }
       // Phase I step I3 + Phase J step J8: seed the transcript retention
       // preset alongside the play-queue settings + proposed-list snapshot
-      // in parallel. All four are independent reads; running them
-      // sequentially would cost three extra round-trips on the login
-      // path. Each failure is handled independently so a single bad
-      // endpoint doesn't poison the others — optimistic defaults
-      // (matching the backend defaults) stay in place when a probe
-      // rejects. No toast — matches the rest of the bootstrap's posture.
+      // in parallel. All are independent reads; running them sequentially
+      // would cost extra round-trips on the login path. Each failure is
+      // handled independently so a single bad endpoint doesn't poison the
+      // others — optimistic defaults (matching the backend defaults) stay
+      // in place when a probe rejects. No toast — matches the rest of the
+      // bootstrap's posture.
       const [
         retentionResult,
-        cadenceResult,
         targetDepthResult,
         proposedResult,
         jokesEnabledResult,
@@ -345,7 +337,6 @@ export function App(): JSX.Element {
         rewardsListResult,
       ] = await Promise.allSettled([
         api.getTranscriptRetention({ signal: aborter.signal }),
-        api.getPlayCadenceSeconds({ signal: aborter.signal }),
         api.getPlayTargetDepth({ signal: aborter.signal }),
         api.listProposedActivities(
           { include_active: true },
@@ -386,15 +377,6 @@ export function App(): JSX.Element {
         console.warn(
           "transcript retention initial fetch failed, using default",
           retentionResult.reason,
-        );
-      }
-      if (cadenceResult.status === "fulfilled") {
-        setPlayCadenceSeconds(cadenceResult.value.value);
-      } else if (!isAbortError(cadenceResult.reason)) {
-        // eslint-disable-next-line no-console
-        console.warn(
-          "play cadence initial fetch failed, using default",
-          cadenceResult.reason,
         );
       }
       if (targetDepthResult.status === "fulfilled") {
@@ -1017,23 +999,14 @@ export function App(): JSX.Element {
     [api, refetchActivity],
   );
 
-  // Phase J step J10: SettingsPanel reconciliation callbacks for the
-  // two new play-queue controls. The control owns the optimistic
+  // Phase J step J10: SettingsPanel reconciliation callback for the
+  // play-queue target depth control. The control owns the optimistic
   // pendingValue + inline error surface; once the PUT resolves the
   // component bubbles the response value here and we update the lifted
-  // state so it stays the source-of-truth. ``setPlayCadenceSeconds``
-  // also flows back down into PlayQueueList for TTL math, so a
-  // successful cadence change updates two consumers from this single
-  // state setter.
+  // state so it stays the source-of-truth.
   const handlePlayTargetDepthChanged = useCallback(
     (value: PlayTargetDepth): void => {
       setPlayTargetDepth(value);
-    },
-    [],
-  );
-  const handlePlayCadenceSecondsChanged = useCallback(
-    (value: PlayCadenceSeconds): void => {
-      setPlayCadenceSeconds(value);
     },
     [],
   );
@@ -1156,7 +1129,7 @@ export function App(): JSX.Element {
                     <PlayQueueList
                       active={state.active}
                       proposedList={state.proposedList}
-                      cadenceSeconds={playCadenceSeconds}
+                      cadenceSeconds={0}
                       filterCategory={
                         playTab.value === "all" ? undefined : playTab.value
                       }
@@ -1255,10 +1228,6 @@ export function App(): JSX.Element {
                     onRetentionChanged={setRetentionSeconds}
                     currentPlayTargetDepth={playTargetDepth}
                     onPlayTargetDepthChanged={handlePlayTargetDepthChanged}
-                    currentPlayCadenceSeconds={playCadenceSeconds}
-                    onPlayCadenceSecondsChanged={
-                      handlePlayCadenceSecondsChanged
-                    }
                     currentFeatureFlags={featureFlags}
                     onFeatureFlagChanged={handleFeatureFlagChanged}
                   />

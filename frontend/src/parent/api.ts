@@ -654,18 +654,10 @@ export interface TranscriptRetentionResponse {
   seconds: number;
 }
 
-// Phase J step J1: play-queue cadence + target depth presets. These
-// are the canonical literal-unions for the two household settings
-// driving the autonomous play queue. ``PlayCadenceSeconds = 0`` means
-// "cadence disabled" — it is a real in-set value, NOT a sentinel for
-// unset. The wire body is ``{value: <preset>}`` in both directions for
-// both settings, mirroring the GET/PUT pair on transcript-retention.
-export type PlayCadenceSeconds = 0 | 10 | 30 | 60;
+// Phase J step J1: play-queue target depth presets. The wire body is
+// ``{value: <preset>}`` in both directions, mirroring the GET/PUT
+// pair on transcript-retention.
 export type PlayTargetDepth = 1 | 3 | 5;
-
-export interface PlayCadenceSecondsResponse {
-  value: PlayCadenceSeconds;
-}
 
 export interface PlayTargetDepthResponse {
   value: PlayTargetDepth;
@@ -1734,37 +1726,6 @@ export class ApiClient {
   ): Promise<PlayTargetDepthResponse> {
     return this.request<PlayTargetDepthResponse>(
       "/api/settings/play-target-depth",
-      {
-        method: "PUT",
-        body: JSON.stringify({ value }),
-        signal: opts.signal,
-      },
-    );
-  }
-
-  // Phase J step J1: play-queue cadence read-write pair. Same
-  // wire-shape conventions as ``getPlayTargetDepth``. Valid values:
-  // 0 / 10 / 30 / 60. ``0`` is a real value meaning "cadence
-  // disabled"; it MUST round-trip rather than be coerced to a default
-  // anywhere on this path.
-  async getPlayCadenceSeconds(
-    opts: RequestOptions = {},
-  ): Promise<PlayCadenceSecondsResponse> {
-    return this.request<PlayCadenceSecondsResponse>(
-      "/api/settings/play-cadence-seconds",
-      {
-        method: "GET",
-        signal: opts.signal,
-      },
-    );
-  }
-
-  async setPlayCadenceSeconds(
-    value: PlayCadenceSeconds,
-    opts: RequestOptions = {},
-  ): Promise<PlayCadenceSecondsResponse> {
-    return this.request<PlayCadenceSecondsResponse>(
-      "/api/settings/play-cadence-seconds",
       {
         method: "PUT",
         body: JSON.stringify({ value }),

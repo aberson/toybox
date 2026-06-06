@@ -4,9 +4,9 @@ Content master for the jokes corpus. When ``False``, no surface
 (standalone / embedded / endings / spontaneity) delivers a joke step.
 Default is ``True``; migration 0015 seeds the row on first run.
 
-Mirrors :mod:`toybox.core.play_cadence_seconds` for shape — defensive
-get with WARNING-and-fallback, set with type validation, UPSERT
-semantics. Implementation lives in :mod:`toybox.core._feature_flag`.
+Follows the feature-flag settings convention — defensive get with
+WARNING-and-fallback, set with type validation, UPSERT semantics.
+Implementation lives in :mod:`toybox.core._feature_flag`.
 """
 
 from __future__ import annotations

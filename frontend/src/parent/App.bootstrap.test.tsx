@@ -1,22 +1,21 @@
 // Phase J step J8 reviewer-finding regression tests for the parallel
 // bootstrap path.
 //
-// continueBootstrap() in App.tsx fires four reads in parallel via
+// continueBootstrap() in App.tsx fires reads in parallel via
 // ``Promise.allSettled``:
 //   1. /api/settings/transcript-retention
-//   2. /api/settings/play-cadence-seconds
-//   3. /api/settings/play-target-depth
-//   4. /api/activities/proposed?include_active=true
+//   2. /api/settings/play-target-depth
+//   3. /api/activities/proposed?include_active=true
+//   ... plus feature flags
 // Then constructs a ParentWsClient and calls start().
 //
 // Two regressions we pin here:
 //
-// (A) Happy path — all four reads resolve, the resolved values are
-//     lifted into the right places: ``proposedList`` + ``active`` into
-//     the parent store; ``cadenceSeconds`` threaded down as a
-//     PlayQueueList prop; ``playTargetDepth`` lifted (J10 will consume
-//     it from local state but the bootstrap fetch already needs to
-//     land it cleanly).
+// (A) Happy path — all reads resolve, the resolved values are lifted
+//     into the right places: ``proposedList`` + ``active`` into the
+//     parent store; ``playTargetDepth`` lifted to state.
+//     ``cadenceSeconds`` is now a fixed 0 (disabled) — no longer
+//     fetched from the backend.
 //
 // (B) Abort halts WS — if the aborter fires mid-bootstrap (e.g. the
 //     parent unmounts), ``Promise.allSettled`` swallows the abort as
@@ -86,13 +85,12 @@ afterEach(() => {
 
 interface FetchOpts {
   retentionSeconds?: number;
-  cadenceSeconds?: number;
   targetDepth?: number;
   // When set, ``listProposedActivities`` returns this list + active.
   proposedItems?: unknown[];
   proposedActive?: unknown | null;
   // Per-endpoint delay (ms) so a test can race an abort against the
-  // parallel fetches. Applied uniformly to all four bootstrap reads.
+  // parallel fetches. Applied uniformly to all bootstrap reads.
   bootstrapDelayMs?: number;
 }
 
@@ -210,9 +208,6 @@ function stubFullAuthFetch(opts: FetchOpts = {}): Mock {
     if (url.endsWith("/api/settings/transcript-retention")) {
       return respondWithDelay({ seconds: opts.retentionSeconds ?? 60 });
     }
-    if (url.endsWith("/api/settings/play-cadence-seconds")) {
-      return respondWithDelay({ value: opts.cadenceSeconds ?? 30 });
-    }
     if (url.endsWith("/api/settings/play-target-depth")) {
       return respondWithDelay({ value: opts.targetDepth ?? 3 });
     }
@@ -307,19 +302,18 @@ beforeEach(() => {
 });
 
 describe("App bootstrap parallel-fetch happy path (J8)", () => {
-  it("lifts all four resolved values: proposedList + active into store, cadence into PlayQueueList prop, targetDepth fetched", async () => {
+  it("lifts all resolved values: proposedList + active into store, targetDepth fetched", async () => {
     const proposedItem = fakeProposedActivity();
     const activeItem = fakeRunningActivity();
     const fetchMock = stubFullAuthFetch({
       retentionSeconds: 300,
-      cadenceSeconds: 60,
       targetDepth: 5,
       proposedItems: [proposedItem],
       proposedActive: activeItem,
     });
     render(<App />);
     await driveLoginToTabShell();
-    // All four bootstrap endpoints were probed exactly once.
+    // Bootstrap endpoints probed exactly once (cadence endpoint removed).
     const urls = fetchMock.mock.calls.map((call) => String(call[0]));
     expect(
       urls.filter((u) => u.endsWith("/api/settings/transcript-retention"))
@@ -328,7 +322,7 @@ describe("App bootstrap parallel-fetch happy path (J8)", () => {
     expect(
       urls.filter((u) => u.endsWith("/api/settings/play-cadence-seconds"))
         .length,
-    ).toBe(1);
+    ).toBe(0);
     expect(
       urls.filter((u) => u.endsWith("/api/settings/play-target-depth"))
         .length,
@@ -364,13 +358,12 @@ describe("App bootstrap parallel-fetch happy path (J8)", () => {
       expect(store.proposedList[0]?.id).toBe("act-bootstrap-proposed");
       expect(store.active?.id).toBe("act-bootstrap-active");
     });
-    // cadenceSeconds threads down to PlayQueueList. The latest prop
-    // render carries the resolved value (60), not the optimistic
-    // default (30).
+    // cadenceSeconds is now a fixed 0 (disabled) passed directly to
+    // PlayQueueList — no bootstrap fetch involved.
     await waitFor(() => {
       const latest = playQueueListPropsLog[playQueueListPropsLog.length - 1];
       expect(latest).toBeDefined();
-      expect(latest!.cadenceSeconds).toBe(60);
+      expect(latest!.cadenceSeconds).toBe(0);
     });
     // The WS client was constructed once after the parallel reads
     // settled — this is the un-aborted happy path.

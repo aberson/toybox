@@ -7,9 +7,9 @@ reward types. The five remaining flags share the
 :mod:`toybox.core._feature_flag` storage contract; tests below are
 parameterized over those five so any future drift surfaces uniformly.
 
-Mirrors :mod:`tests.unit.core.test_play_cadence_seconds` for shape —
-same fresh-migrated-DB fixture, same defensive-fallback assertions,
-same set-rejection assertions.
+Follows the feature-flag unit test convention — same fresh-migrated-DB
+fixture, same defensive-fallback assertions, same set-rejection
+assertions.
 """
 
 from __future__ import annotations

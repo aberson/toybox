@@ -80,7 +80,6 @@ interface StubApi {
   setBannedThemesGlobal: Mock;
   setTranscriptRetention: Mock;
   setPlayTargetDepth: Mock;
-  setPlayCadenceSeconds: Mock;
   // Phase K step K2 feature-flag setters. Mocked as identity echos so
   // a click on a row resolves cleanly without the test needing to
   // hand-wire eight per-flag handlers.
@@ -116,9 +115,6 @@ function buildStubApi(snapshot: MetricsSnapshot): StubApi {
       seconds,
     })) as Mock,
     setPlayTargetDepth: vi.fn(async (value: number) => ({ value })) as Mock,
-    setPlayCadenceSeconds: vi.fn(
-      async (value: number) => ({ value }),
-    ) as Mock,
     setJokesEnabled: vi.fn(async (value: boolean) => ({ value })) as Mock,
     setSongsEnabled: vi.fn(async (value: boolean) => ({ value })) as Mock,
     setPlayStandaloneEnabled: vi.fn(
@@ -142,7 +138,7 @@ function buildStubApi(snapshot: MetricsSnapshot): StubApi {
   };
 }
 
-// Phase I step I3: SettingsPanel gained two new required props
+// Phase I step I3: SettingsPanel gained new required props
 // (``currentRetentionSeconds`` + ``onRetentionChanged``). Tests that
 // only care about the older toggles pass through a shared default; the
 // new control's contract has its own dedicated test file
@@ -154,8 +150,6 @@ function renderSettingsPanel(
     onRetentionChanged?: (n: number) => void;
     currentPlayTargetDepth?: number;
     onPlayTargetDepthChanged?: (n: number) => void;
-    currentPlayCadenceSeconds?: number;
-    onPlayCadenceSecondsChanged?: (n: number) => void;
     currentFeatureFlags?: PhaseKFeatureFlags;
     onFeatureFlagChanged?: (key: PhaseKFeatureFlag, value: boolean) => void;
   } = {},
@@ -168,10 +162,6 @@ function renderSettingsPanel(
       currentPlayTargetDepth={overrides.currentPlayTargetDepth ?? 3}
       onPlayTargetDepthChanged={
         overrides.onPlayTargetDepthChanged ?? (() => {})
-      }
-      currentPlayCadenceSeconds={overrides.currentPlayCadenceSeconds ?? 30}
-      onPlayCadenceSecondsChanged={
-        overrides.onPlayCadenceSecondsChanged ?? (() => {})
       }
       currentFeatureFlags={
         overrides.currentFeatureFlags ?? PHASE_K_FEATURE_FLAG_DEFAULTS
@@ -215,7 +205,7 @@ describe("SettingsPanel", () => {
         screen.getByTestId("listening-mode-btn-4").getAttribute("data-active"),
       ).toBe("true");
     });
-    // mic_enabled=false → mute toggle reads "muted".
+    // mic_enabled=false → mute toggle reads "false".
     expect(
       screen
         .getByTestId("operator-mic-mute-toggle")
@@ -244,8 +234,6 @@ describe("SettingsPanel", () => {
         onRetentionChanged={() => {}}
         currentPlayTargetDepth={3}
         onPlayTargetDepthChanged={() => {}}
-        currentPlayCadenceSeconds={30}
-        onPlayCadenceSecondsChanged={() => {}}
         currentFeatureFlags={PHASE_K_FEATURE_FLAG_DEFAULTS}
         onFeatureFlagChanged={() => {}}
       />,
@@ -424,8 +412,8 @@ describe("SettingsPanel", () => {
     ).toBe("false");
   });
 
-  // Phase J step J10: both new play-queue settings cards mount and
-  // receive their threaded values. Full per-control behavior lives in
+  // Phase J step J10: play-queue target depth card mounts and receives
+  // its threaded value. Full per-control behavior lives in
   // PlayQueueSettingsControls.test.tsx — this is the panel-level
   // integration assertion.
   it("threads currentPlayTargetDepth to the play-target-depth picker's pressed button", () => {
@@ -440,22 +428,6 @@ describe("SettingsPanel", () => {
     expect(
       screen
         .getByTestId("play-target-depth-1")
-        .getAttribute("aria-pressed"),
-    ).toBe("false");
-  });
-
-  it("threads currentPlayCadenceSeconds to the cadence picker's pressed button", () => {
-    const snapshot = fakeSnapshot();
-    const api = buildStubApi(snapshot);
-    renderSettingsPanel(api, { currentPlayCadenceSeconds: 10 });
-    expect(
-      screen
-        .getByTestId("play-cadence-seconds-10")
-        .getAttribute("aria-pressed"),
-    ).toBe("true");
-    expect(
-      screen
-        .getByTestId("play-cadence-seconds-0")
         .getAttribute("aria-pressed"),
     ).toBe("false");
   });

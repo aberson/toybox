@@ -41,8 +41,7 @@ _logger = logging.getLogger(__name__)
 # returned to callers as Python ``bool``. The :data:`_VALID_RAW` set is
 # the membership check applied to the persisted value; out-of-set
 # strings log a warning and fall back to the default rather than
-# raising (mirrors :mod:`toybox.core.play_cadence_seconds`'s
-# defensive-read pattern).
+# raising — falls back to the per-flag default instead.
 _TRUE_RAW = "true"
 _FALSE_RAW = "false"
 _VALID_RAW: frozenset[str] = frozenset({_TRUE_RAW, _FALSE_RAW})
@@ -75,8 +74,7 @@ class FeatureFlagSetting:
         3. The string is not in :data:`_VALID_RAW`.
 
         Cases 2 and 3 log at WARNING with the offending value truncated
-        to 64 chars — mirrors :mod:`toybox.core.play_cadence_seconds`
-        so a corrupt blob can't flood the logs.
+        to 64 chars so a corrupt blob can't flood the logs.
         """
         row = conn.execute(
             "SELECT value FROM settings WHERE key = ?",

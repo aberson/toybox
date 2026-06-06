@@ -134,12 +134,6 @@ function stubFullAuthFetch(): Mock {
         headers: { "Content-Type": "application/json" },
       });
     }
-    if (url.endsWith("/api/settings/play-cadence-seconds")) {
-      return new Response(JSON.stringify({ value: 30 }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
     if (url.endsWith("/api/settings/play-target-depth")) {
       return new Response(JSON.stringify({ value: 3 }), {
         status: 200,

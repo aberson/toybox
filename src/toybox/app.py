@@ -31,7 +31,6 @@ from .api.image_gen_settings import router as image_gen_settings_router
 from .api.jokes_enabled_settings import router as jokes_enabled_settings_router
 from .api.listening import router as listening_router
 from .api.metrics import router as metrics_router
-from .api.play_cadence_seconds_settings import router as play_cadence_seconds_settings_router
 from .api.play_standalone_enabled_settings import (
     router as play_standalone_enabled_settings_router,
 )
@@ -73,7 +72,6 @@ def create_app() -> FastAPI:
     app.include_router(banned_themes_settings_router)
     app.include_router(transcript_retention_settings_router)
     app.include_router(play_target_depth_settings_router)
-    app.include_router(play_cadence_seconds_settings_router)
     # Phase K Step K2 + Phase L Step L5: five parent-controlled feature
     # flags (originally eight; L5 removed the three Phase K play-surface
     # flags as part of re-framing jokes/songs as per-activity reward

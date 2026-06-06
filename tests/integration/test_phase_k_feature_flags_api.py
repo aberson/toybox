@@ -8,7 +8,7 @@ round-trip + auth gating for each remaining flag. One representative
 flag (``jokes_enabled``) gets an explicit GET-PUT-GET persistence test
 against the live SQLite file.
 
-Mirrors :mod:`tests.integration.test_play_cadence_seconds_api`.
+Follows the feature-flag integration test convention.
 """
 
 from __future__ import annotations
@@ -45,8 +45,8 @@ class FlagEndpoint:
     """Parameterizes the suite over each surviving Phase K flag endpoint.
 
     ``get_db_dep`` is each module's ``get_db`` FastAPI dependency so
-    the per-endpoint override is targeted (mirrors the pattern in
-    test_play_cadence_seconds_api.py).
+    the per-endpoint override is targeted (standard get_db override
+    pattern for settings integration tests).
     """
 
     key: str
@@ -102,9 +102,7 @@ def app_with_overrides(db_path: Path) -> Iterator[FastAPI]:
             conn.close()
 
     # Override every Phase K flag's get_db plus the auth dependency, so
-    # all eight endpoints share the test DB. Mirrors
-    # test_play_cadence_seconds_api.py's pattern (override get_db +
-    # get_auth_db both).
+    # all endpoints share the test DB (override get_db + get_auth_db).
     for endpoint in FLAG_ENDPOINTS:
         app.dependency_overrides[endpoint.get_db_dep] = _override_db  # type: ignore[index]
     app.dependency_overrides[get_auth_db] = _override_db

@@ -72,8 +72,6 @@ from .core.bind_guard import BindGuardError, check_bind_safe, pin_is_set
 from .core.capability import CapabilityReason
 from .core.escalation import EscalationDispatcher
 from .core.listening import ListeningMode, Publisher, current_mode
-from .core.play_cadence import start_cadence_loop
-from .core.proposed_ttl import start_proposed_ttl_sweep
 from .core.pubsub import PubSub
 from .core.queue import PROPOSED_QUEUE_CAP, PROPOSED_STATE, evict_oldest_for_capacity
 from .core.throttle import MinIntervalThrottle, min_interval_from_env
@@ -1023,7 +1021,7 @@ def _persist_dispatcher_activity(
             )
 
     # Late-import the API helpers so this module's import surface stays
-    # tight (mirrors :mod:`toybox.core.play_cadence`'s pattern). The
+    # tight (lazy-import pattern). The
     # response shape is the single seam the parent UI consumes; reusing
     # ``_row_to_response`` keeps the WS envelope and REST GET byte-
     # identical.
@@ -1185,38 +1183,9 @@ async def _metrics_lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         async with image_gen_worker_lifespan(app), transcript_sweep_lifespan(app):
             task = start_metrics_publisher(pubsub, deps)
-            # Cadence task fires the autonomous play-queue proposes.
-            # Pass the ``get_judge_call`` FastAPI dependency itself
-            # (not its result) so the cadence loop re-resolves the
-            # judge_call partial PER TICK — an OAuth token added or
-            # removed mid-process is picked up on the next propose
-            # without a backend restart. ``get_judge_call`` does a
-            # fresh ``load_token`` per call, so this is cheap.
-            from .api.activities import get_judge_call  # noqa: PLC0415
-
-            cadence_task = start_cadence_loop(
-                get_pubsub,
-                db_path,
-                judge_call_factory=get_judge_call,
-            )
-            # TTL sweep reaps proposed rows older than 3× cadence so
-            # the scrolling queue doesn't accumulate ghost cards when
-            # the parent is away. Same teardown shape as the cadence
-            # task above — cancel + gather with ``return_exceptions``.
-            ttl_task = start_proposed_ttl_sweep(get_pubsub, db_path)
             try:
                 yield
             finally:
-                # Stop cadence before the metrics publisher so the
-                # publisher's last snapshot doesn't observe a half-
-                # cancelled cadence task. Mirror the ws server's
-                # pattern: gather with ``return_exceptions=True`` so
-                # the CancelledError doesn't escape and produce a
-                # ``Task exception was never retrieved`` warning.
-                cadence_task.cancel()
-                await asyncio.gather(cadence_task, return_exceptions=True)
-                ttl_task.cancel()
-                await asyncio.gather(ttl_task, return_exceptions=True)
                 task.cancel()
                 await asyncio.gather(task, return_exceptions=True)
     finally:

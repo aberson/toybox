@@ -10,7 +10,6 @@ import {
 import type {
   Activity,
   FetchLike,
-  PlayCadenceSeconds,
   PlayTargetDepth,
   VersionConflictBody,
 } from "./api";
@@ -404,62 +403,5 @@ describe("ApiClient — Phase J6 play-queue additions", () => {
     });
   });
 
-  describe("getPlayCadenceSeconds / setPlayCadenceSeconds", () => {
-    it("getPlayCadenceSeconds calls GET /api/settings/play-cadence-seconds and returns {value}", async () => {
-      const fetchImpl = vi
-        .fn<Parameters<FetchLike>, ReturnType<FetchLike>>()
-        .mockResolvedValue(jsonResponse(200, { value: 30 }));
-      const client = new ApiClient({ fetchImpl, getToken: () => "t" });
-      const result = await client.getPlayCadenceSeconds();
-      const [url, init] = fetchImpl.mock.calls[0]!;
-      expect(url).toBe("/api/settings/play-cadence-seconds");
-      expect(init?.method).toBe("GET");
-      expect(result.value).toBe(30);
-    });
-
-    it("setPlayCadenceSeconds PUTs {value: 60} and returns {value}", async () => {
-      const fetchImpl = vi
-        .fn<Parameters<FetchLike>, ReturnType<FetchLike>>()
-        .mockResolvedValue(jsonResponse(200, { value: 60 }));
-      const client = new ApiClient({ fetchImpl, getToken: () => "t" });
-      const value: PlayCadenceSeconds = 60;
-      const result = await client.setPlayCadenceSeconds(value);
-      const [url, init] = fetchImpl.mock.calls[0]!;
-      expect(url).toBe("/api/settings/play-cadence-seconds");
-      expect(init?.method).toBe("PUT");
-      expect(JSON.parse(init?.body as string)).toEqual({ value: 60 });
-      expect(result.value).toBe(60);
-    });
-
-    it("setPlayCadenceSeconds round-trips 0 — NOT a sentinel for unset", async () => {
-      // ``0`` is a valid in-set value meaning "cadence disabled". A
-      // truthiness shortcut anywhere on this wire path would silently
-      // coerce it back to the default. We pin both directions: the
-      // body MUST contain ``{value: 0}`` (not ``{}``), and the typed
-      // result MUST return 0 (not undefined / null / fallback).
-      const fetchImpl = vi
-        .fn<Parameters<FetchLike>, ReturnType<FetchLike>>()
-        .mockResolvedValue(jsonResponse(200, { value: 0 }));
-      const client = new ApiClient({ fetchImpl, getToken: () => "t" });
-      const zero: PlayCadenceSeconds = 0;
-      const result = await client.setPlayCadenceSeconds(zero);
-      const init = fetchImpl.mock.calls[0]?.[1];
-      const body = JSON.parse(init?.body as string);
-      expect(body).toEqual({ value: 0 });
-      expect("value" in body).toBe(true);
-      expect(result.value).toBe(0);
-    });
-
-    it("setPlayCadenceSeconds accepts each canonical preset 0/10/30/60", async () => {
-      const presets: PlayCadenceSeconds[] = [0, 10, 30, 60];
-      for (const v of presets) {
-        const fetchImpl = vi
-          .fn<Parameters<FetchLike>, ReturnType<FetchLike>>()
-          .mockResolvedValue(jsonResponse(200, { value: v }));
-        const client = new ApiClient({ fetchImpl, getToken: () => "t" });
-        const result = await client.setPlayCadenceSeconds(v);
-        expect(result.value).toBe(v);
-      }
-    });
-  });
 });
+

@@ -26,13 +26,11 @@ import type {
   MetricsSnapshot,
   PhaseKFeatureFlag,
   PhaseKFeatureFlags,
-  PlayCadenceSeconds,
   PlayTargetDepth,
 } from "../api";
 import { BannedThemesSettings } from "./BannedThemesSettings";
 import { PlayFeaturesControls } from "./PlayFeaturesControls";
 import {
-  PlayCadenceSecondsControl,
   PlayTargetDepthControl,
 } from "./PlayQueueSettingsControls";
 import { TranscriptRetentionControl } from "./TranscriptRetentionControl";
@@ -423,7 +421,6 @@ export interface SettingsPanelProps {
     | "setBannedThemesGlobal"
     | "setTranscriptRetention"
     | "setPlayTargetDepth"
-    | "setPlayCadenceSeconds"
     | "setPlayStandaloneEnabled"
     | "setClickableWordsEnabled"
     | "setReadMeButtonEnabled"
@@ -436,20 +433,16 @@ export interface SettingsPanelProps {
   // a successful PUT response back up so App.tsx can update its state.
   currentRetentionSeconds: number;
   onRetentionChanged: (seconds: number) => void;
-  // Phase J step J10: play-queue settings pickers. Both values live
-  // in App.tsx (seeded by J8's bootstrap parallel-fetch) and thread
-  // through here so the cadence value also feeds PlayQueueList's TTL
-  // math. Each callback bubbles a successful PUT response back up so
-  // the lifted state stays the source of truth.
+  // Phase J step J10: play-queue target depth picker. Value lives in
+  // App.tsx (seeded by the bootstrap parallel-fetch) and threads
+  // through here. The callback bubbles a successful PUT response back
+  // up so the lifted state stays the source of truth.
   currentPlayTargetDepth: number;
   onPlayTargetDepthChanged: (value: PlayTargetDepth) => void;
-  currentPlayCadenceSeconds: number;
-  onPlayCadenceSecondsChanged: (value: PlayCadenceSeconds) => void;
-  // Phase K step K2: eight feature flags lifted to App.tsx so the
-  // bootstrap parallel-fetch can seed them once and SettingsPanel can
-  // bubble each PUT response back up. The callback is a single
-  // (key, value) pair so adding a ninth flag is a single-line edit
-  // upstream.
+  // Phase K step K2: feature flags lifted to App.tsx so the bootstrap
+  // parallel-fetch can seed them once and SettingsPanel can bubble
+  // each PUT response back up. The callback is a single (key, value)
+  // pair so adding a flag is a single-line edit upstream.
   currentFeatureFlags: PhaseKFeatureFlags;
   onFeatureFlagChanged: (key: PhaseKFeatureFlag, value: boolean) => void;
 }
@@ -466,8 +459,6 @@ export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
     onRetentionChanged,
     currentPlayTargetDepth,
     onPlayTargetDepthChanged,
-    currentPlayCadenceSeconds,
-    onPlayCadenceSecondsChanged,
     currentFeatureFlags,
     onFeatureFlagChanged,
   } = props;
@@ -545,11 +536,6 @@ export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
           api={api}
           currentValue={currentPlayTargetDepth}
           onValueChanged={onPlayTargetDepthChanged}
-        />
-        <PlayCadenceSecondsControl
-          api={api}
-          currentValue={currentPlayCadenceSeconds}
-          onValueChanged={onPlayCadenceSecondsChanged}
         />
       </div>
       <div style={{ marginTop: 12 }}>

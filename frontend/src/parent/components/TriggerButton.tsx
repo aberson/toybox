@@ -20,12 +20,9 @@ export function TriggerButton(props: TriggerButtonProps): JSX.Element {
       setBusy(false);
     }
   };
-  // Phase J step J8: restyled to a small de-emphasized link affordance
-  // ("+ trigger now"). Pre-J8 this was the prominent top-of-tab CTA;
-  // with the autonomous cadence loop seeding proposals on its own the
-  // manual trigger becomes a fallback. The button still uses
-  // ``<button>`` for keyboard + a11y parity with the prior version —
-  // only the styling moves to a text-link presentation.
+  // Prominent primary CTA button. With the autonomous cadence loop
+  // removed the manual trigger is the primary way to seed proposals,
+  // so it gets a full-width, visually-weighty style.
   const disabled = busy || props.disabled === true;
   return (
     <button
@@ -36,16 +33,20 @@ export function TriggerButton(props: TriggerButtonProps): JSX.Element {
       }}
       disabled={disabled}
       style={{
-        padding: 0,
-        fontSize: 13,
-        background: "transparent",
-        color: disabled ? "#777" : "#1769aa",
+        width: "100%",
+        padding: "10px 16px",
+        fontSize: 15,
+        fontWeight: 600,
+        background: disabled ? "#9ca3af" : "#1d4ed8",
+        color: "#fff",
         border: "none",
-        textDecoration: "underline",
+        borderRadius: 6,
         cursor: busy ? "wait" : disabled ? "not-allowed" : "pointer",
+        boxShadow: disabled ? "none" : "0 1px 3px rgba(0,0,0,0.2)",
+        transition: "background 0.15s",
       }}
     >
-      {busy ? "loading…" : "+ trigger now"}
+      {busy ? "Loading…" : "Trigger now"}
     </button>
   );
 }

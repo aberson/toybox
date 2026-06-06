@@ -10,8 +10,8 @@ controlled household setting.
 No WS broadcast: single-parent kiosk model. The next ``App.tsx`` mount
 fetches the fresh value.
 
-Shape mirrors :mod:`toybox.api.play_cadence_seconds_settings` — same
-prefix, same ``get_db`` dependency layout, same manual
+Shape follows the feature-flag settings convention — same prefix,
+same ``get_db`` dependency layout, same manual
 ``ValueError → HTTPException(422)`` translation.
 """
 
