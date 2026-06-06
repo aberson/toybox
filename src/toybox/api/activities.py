@@ -200,6 +200,72 @@ def get_judge_call() -> JudgeCall:
     )
 
 
+def get_sync_ai_client() -> Any:
+    """FastAPI dependency: return a SyncAIClient (or None if no token).
+
+    Production: builds an AnthropicClient from the on-disk OAuth token.
+    Tests override this dep to inject StubClient.complete_text_sync.
+    Returns None when no token is on disk — annotator skips gracefully.
+    """
+    from ..ai.client import AnthropicClient  # noqa: PLC0415
+    from ..ai.oauth import load_token  # noqa: PLC0415
+
+    token = load_token()
+    if token is None:
+        return None
+    return AnthropicClient(token)
+
+
+def _annotate_and_persist_step_animations(
+    conn: sqlite3.Connection,
+    activity_id: str,
+    persona_id: str | None,
+    sync_client: Any,
+) -> None:
+    """Phase S S2: annotate each step with an avatar animation hint and
+    persist the result into activity_steps.metadata_json before the WS
+    broadcast fires.
+
+    No-ops when sync_client is None (no OAuth token on disk) or when
+    annotate_step_animations returns {} (Claude unavailable). The kiosk
+    falls back to 'float' for steps without avatar_animation in metadata.
+    """
+    if sync_client is None:
+        return
+    from ..ai.animator import annotate_step_animations  # noqa: PLC0415
+
+    steps = _fetch_steps(conn, activity_id)
+    annotations = annotate_step_animations(steps, persona_id, sync_client)
+    if not annotations:
+        return
+
+    # Fetch step rows so we can merge into existing metadata blobs.
+    step_rows = conn.execute(
+        "SELECT seq, metadata_json FROM activity_steps WHERE activity_id = ? ORDER BY seq ASC",
+        (activity_id,),
+    ).fetchall()
+
+    with conn:
+        for row in step_rows:
+            seq = int(row["seq"])
+            if seq not in annotations:
+                continue
+            existing: dict[str, Any] = {}
+            raw = row["metadata_json"]
+            if raw:
+                try:
+                    decoded = json.loads(str(raw))
+                    if isinstance(decoded, dict):
+                        existing = decoded
+                except json.JSONDecodeError:
+                    pass
+            existing["avatar_animation"] = annotations[seq]
+            conn.execute(
+                "UPDATE activity_steps SET metadata_json = ? WHERE activity_id = ? AND seq = ?",
+                (json.dumps(existing, sort_keys=True), activity_id, seq),
+            )
+
+
 class ChoiceOption(BaseModel):
     """Phase G G3: one runtime choice button on an activity step.
 
@@ -2608,6 +2674,7 @@ def post_approve(
     pubsub: Annotated[PubSub, Depends(get_pubsub)],
     expected_version: Annotated[int, Depends(if_match_version_dependency)],
     _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
+    sync_client: Annotated[Any, Depends(get_sync_ai_client)],  # Phase S S2
 ) -> ActivityResponse:
     """proposed → approved (optimistically).
 
@@ -2713,6 +2780,14 @@ def post_approve(
     )
     if not ok:
         raise VersionConflictError(int(row["version"]), str(row["state"]))
+    # Phase S S2: annotate each step with avatar animation hints and
+    # persist into metadata_json before the WS broadcast fires.
+    _annotate_and_persist_step_animations(
+        conn,
+        activity_id,
+        row["persona_id"] if "persona_id" in row.keys() else None,
+        sync_client,
+    )
     response = _row_to_response(conn, row)
     _emit_state(pubsub, response)
     return response

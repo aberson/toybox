@@ -1,6 +1,8 @@
 import { useState } from "react";
 import type { JSX } from "react";
 
+import "../animations/rewardAnimations.css";
+
 export interface PersonaAvatarProps {
   // Optional: path to the persona's avatar image. The library shipped
   // in M5 will populate this; for v1 we render a colored letter circle
@@ -13,6 +15,9 @@ export interface PersonaAvatarProps {
   size?: number;
   // Optional aria-label override. Defaults to "persona avatar".
   label?: string;
+  // Phase S S2: avatar animation name from step metadata.
+  // Applies .avatar-animate-{name} class. Defaults to "float".
+  animationName?: string;
 }
 
 // Deterministic fallback color from the letter so two activities with
@@ -45,11 +50,13 @@ export function PersonaAvatar(props: PersonaAvatarProps): JSX.Element {
     props.imagePath !== null &&
     props.imagePath !== "" &&
     !imgFailed;
+  const avatarAnimClass = `avatar-animate-${props.animationName ?? "float"}`;
   if (showImage) {
     return (
       <img
         data-testid="persona-avatar"
         data-avatar-mode="image"
+        className={avatarAnimClass}
         src={props.imagePath ?? ""}
         alt={label}
         onError={() => setImgFailed(true)}
@@ -68,6 +75,7 @@ export function PersonaAvatar(props: PersonaAvatarProps): JSX.Element {
     <div
       data-testid="persona-avatar"
       data-avatar-mode="letter"
+      className={avatarAnimClass}
       role="img"
       aria-label={label}
       style={{

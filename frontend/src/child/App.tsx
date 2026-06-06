@@ -725,6 +725,17 @@ export function App(): JSX.Element {
       ? FULL_BLEED_BACKGROUND_IDLE_STYLE
       : buildFullBleedBackgroundStyle(backgroundGradient);
 
+  // Phase S S2: extract avatar_animation from the current step's metadata.
+  // Falls back to "float" for legacy activities (no animation in metadata).
+  const currentStep =
+    activity !== null ? activity.steps.find((s) => s.current) ?? null : null;
+  const avatarAnimName: string = (() => {
+    if (currentStep === null) return "float";
+    const m = currentStep.metadata as Record<string, unknown> | null | undefined;
+    const anim = m?.["avatar_animation"];
+    return typeof anim === "string" && anim.length > 0 ? anim : "float";
+  })();
+
   return (
     <main
       data-testid="child-root"
@@ -742,7 +753,7 @@ export function App(): JSX.Element {
               gap: 24,
             }}
           >
-            <PersonaAvatar letter="?" size={200} label="waiting" />
+            <PersonaAvatar letter="?" size={200} label="waiting" animationName="float" />
             <h1
               style={{
                 margin: 0,
@@ -762,6 +773,7 @@ export function App(): JSX.Element {
                 imagePath={avatarImage(activity)}
                 letter={avatarLetter(activity)}
                 size={240}
+                animationName={avatarAnimName}
               />
             )}
             <StepCard
@@ -805,6 +817,7 @@ export function App(): JSX.Element {
               imagePath={avatarImage(activity)}
               letter={avatarLetter(activity)}
               size={240}
+              animationName="float"
             />
             <h1
               data-testid="all-done-heading"
