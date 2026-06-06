@@ -223,6 +223,19 @@ export const KIOSK_FEATURE_FLAG_PATHS: Readonly<
   read_me_button_enabled: "/api/settings/read-me-button-enabled",
 };
 
+// Phase R Step R2: spoken text character limit wire shape. The kiosk
+// fetches ``GET /api/settings/spoken-text-limit`` on boot (unauthenticated
+// household read) and passes the value down to StepCard → ReadMeButton.
+//
+// ``SpokenTextLimit`` is a literal union of the five canonical presets so
+// the compiler catches any future mis-wiring of a raw ``number`` against a
+// prop that expects one of the valid values (0=off, others are char limits).
+export type SpokenTextLimit = 0 | 50 | 100 | 150 | 250;
+
+export interface SpokenTextLimitResponse {
+  value: SpokenTextLimit;
+}
+
 // Step 21: ``POST /api/auth/parent`` is now PIN-gated. The kiosk does
 // not own the PIN and will get its token from the parent UI via the
 // kiosk pairing flow (``POST /api/auth/pair``). Until that landing
@@ -368,6 +381,19 @@ export class ApiClient {
   ): Promise<FeatureFlagResponse> {
     return this.request<FeatureFlagResponse>(
       KIOSK_FEATURE_FLAG_PATHS[flag],
+      { method: "GET", signal: opts.signal },
+    );
+  }
+
+  // Phase R Step R2: kiosk bootstrap fetcher for the spoken text limit.
+  // Unauthenticated household read (matches getFeatureFlag). The value
+  // is passed down to StepCard → ReadMeButton so TTS is truncated at
+  // the parent-configured limit.
+  async getSpokenTextLimit(
+    opts: RequestOptions = {},
+  ): Promise<SpokenTextLimitResponse> {
+    return this.request<SpokenTextLimitResponse>(
+      "/api/settings/spoken-text-limit",
       { method: "GET", signal: opts.signal },
     );
   }

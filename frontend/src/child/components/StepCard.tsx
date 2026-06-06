@@ -57,6 +57,11 @@ export interface StepCardProps {
   // bootstrap fetch (``featureFlags.songs_enabled`` etc.).
   songsEnabled?: boolean;
   jokesEnabled?: boolean;
+  // Phase R Step R2: spoken text character limit for the Read Me button.
+  // Passed through from App.tsx's bootstrap-fetched setting. ``0``
+  // means no truncation (off). Optional + defaults to 0 so existing
+  // tests that mount StepCard without an App don't need to thread it.
+  spokenTextLimit?: number;
 }
 
 // Step kinds that should get a Read Me button. ``song`` is excluded —
@@ -754,6 +759,7 @@ export function StepCard(props: StepCardProps): JSX.Element {
           text={readMeText}
           profile={voiceProfile}
           enabled={readMeButtonEnabled}
+          limit={props.spokenTextLimit ?? 0}
         />
       )}
     </section>

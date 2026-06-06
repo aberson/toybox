@@ -27,12 +27,14 @@ import type {
   PhaseKFeatureFlag,
   PhaseKFeatureFlags,
   PlayTargetDepth,
+  SpokenTextLimit,
 } from "../api";
 import { BannedThemesSettings } from "./BannedThemesSettings";
 import { PlayFeaturesControls } from "./PlayFeaturesControls";
 import {
   PlayTargetDepthControl,
 } from "./PlayQueueSettingsControls";
+import { SpokenTextLimitControl } from "./SpokenTextLimitControl";
 import { TranscriptRetentionControl } from "./TranscriptRetentionControl";
 
 const GRID_STYLE: CSSProperties = {
@@ -424,6 +426,7 @@ export interface SettingsPanelProps {
     | "setPlayStandaloneEnabled"
     | "setClickableWordsEnabled"
     | "setReadMeButtonEnabled"
+    | "setSpokenTextLimit"
   >;
   // Phase I step I3: transcript retention picker source-of-truth. The
   // value lives in App.tsx (fetched once on mount via the
@@ -445,6 +448,12 @@ export interface SettingsPanelProps {
   // pair so adding a flag is a single-line edit upstream.
   currentFeatureFlags: PhaseKFeatureFlags;
   onFeatureFlagChanged: (key: PhaseKFeatureFlag, value: boolean) => void;
+  // Phase R Step R2: spoken text character limit. Value lives in
+  // App.tsx (seeded by the bootstrap parallel-fetch) and threads
+  // through here. The callback bubbles a successful PUT response back
+  // up so the lifted state stays the source of truth.
+  currentSpokenTextLimit: number;
+  onSpokenTextLimitChanged: (value: SpokenTextLimit) => void;
 }
 
 // Settings sub-tab. Renders the three toggle cards + the global
@@ -461,6 +470,8 @@ export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
     onPlayTargetDepthChanged,
     currentFeatureFlags,
     onFeatureFlagChanged,
+    currentSpokenTextLimit,
+    onSpokenTextLimitChanged,
   } = props;
   const [listeningMode, setListeningMode] = useState<number>(3);
   const [micEnabled, setMicEnabled] = useState<boolean>(true);
@@ -536,6 +547,11 @@ export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
           api={api}
           currentValue={currentPlayTargetDepth}
           onValueChanged={onPlayTargetDepthChanged}
+        />
+        <SpokenTextLimitControl
+          api={api}
+          currentValue={currentSpokenTextLimit}
+          onValueChanged={onSpokenTextLimitChanged}
         />
       </div>
       <div style={{ marginTop: 12 }}>

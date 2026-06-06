@@ -16,6 +16,7 @@ import type {
   PhaseKFeatureFlags,
   PlayTargetDepth,
   RewardType,
+  SpokenTextLimit,
 } from "./api";
 import { PHASE_K_FEATURE_FLAG_DEFAULTS } from "./api";
 import { CapabilityBanner } from "./components/CapabilityBanner";
@@ -199,6 +200,13 @@ export function App(): JSX.Element {
   const [activeRewards, setActiveRewards] = useState<
     ReadonlyArray<{ id: string; display_name: string }>
   >([]);
+  // Phase R Step R2: household-scoped spoken text character limit.
+  // Seeded from ``GET /api/settings/spoken-text-limit`` during bootstrap
+  // (mirrors the retentionSeconds plumbing). 150 is the backend default;
+  // matching locally keeps a failed bootstrap fetch from flashing odd
+  // values into the UI. SettingsPanel writes update this state via the
+  // ``onSpokenTextLimitChanged`` callback.
+  const [spokenTextLimit, setSpokenTextLimit] = useState<number>(150);
   const [authMode, setAuthMode] = useState<AuthMode>("bootstrap");
   const [authStatus, setAuthStatus] = useState<ParentAuthStatus | null>(null);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
@@ -335,6 +343,7 @@ export function App(): JSX.Element {
         clickableWordsResult,
         readMeButtonResult,
         rewardsListResult,
+        spokenTextLimitResult,
       ] = await Promise.allSettled([
         api.getTranscriptRetention({ signal: aborter.signal }),
         api.getPlayTargetDepth({ signal: aborter.signal }),
@@ -361,6 +370,8 @@ export function App(): JSX.Element {
         // backend fallback chain silently degrades if the pool is
         // actually empty.
         api.listRewards({ signal: aborter.signal }),
+        // Phase R Step R2: seed the spoken text limit for SettingsPanel.
+        api.getSpokenTextLimit({ signal: aborter.signal }),
       ]);
       // ``Promise.allSettled`` swallows aborts as rejected results, so
       // a mid-bootstrap unmount (e.g. parent navigates away while these
@@ -477,6 +488,16 @@ export function App(): JSX.Element {
         console.warn(
           "rewards list initial fetch failed, assuming available",
           rewardsListResult.reason,
+        );
+      }
+      // Phase R Step R2: seed the spoken text limit from the bootstrap fetch.
+      if (spokenTextLimitResult.status === "fulfilled") {
+        setSpokenTextLimit(spokenTextLimitResult.value.value);
+      } else if (!isAbortError(spokenTextLimitResult.reason)) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          "spoken text limit initial fetch failed, using default",
+          spokenTextLimitResult.reason,
         );
       }
       const ws = new ParentWsClient({
@@ -1026,6 +1047,15 @@ export function App(): JSX.Element {
     [],
   );
 
+  // Phase R Step R2: SettingsPanel reconciliation callback for the
+  // spoken text limit control. Mirrors handlePlayTargetDepthChanged.
+  const handleSpokenTextLimitChanged = useCallback(
+    (value: SpokenTextLimit): void => {
+      setSpokenTextLimit(value);
+    },
+    [],
+  );
+
   // Step 21: gate on PIN status before rendering the main app.
   if (authMode === "bootstrap") {
     return (
@@ -1230,6 +1260,8 @@ export function App(): JSX.Element {
                     onPlayTargetDepthChanged={handlePlayTargetDepthChanged}
                     currentFeatureFlags={featureFlags}
                     onFeatureFlagChanged={handleFeatureFlagChanged}
+                    currentSpokenTextLimit={spokenTextLimit}
+                    onSpokenTextLimitChanged={handleSpokenTextLimitChanged}
                   />
                 )}
                 {settingsTab.value === "stats" && (

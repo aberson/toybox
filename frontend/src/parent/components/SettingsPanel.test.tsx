@@ -91,6 +91,7 @@ interface StubApi {
   setPlaySpontaneityEnabled: Mock;
   setClickableWordsEnabled: Mock;
   setReadMeButtonEnabled: Mock;
+  setSpokenTextLimit: Mock;
 }
 
 function buildStubApi(snapshot: MetricsSnapshot): StubApi {
@@ -135,6 +136,7 @@ function buildStubApi(snapshot: MetricsSnapshot): StubApi {
     setReadMeButtonEnabled: vi.fn(
       async (value: boolean) => ({ value }),
     ) as Mock,
+    setSpokenTextLimit: vi.fn(async (value: number) => ({ value })) as Mock,
   };
 }
 
@@ -152,6 +154,8 @@ function renderSettingsPanel(
     onPlayTargetDepthChanged?: (n: number) => void;
     currentFeatureFlags?: PhaseKFeatureFlags;
     onFeatureFlagChanged?: (key: PhaseKFeatureFlag, value: boolean) => void;
+    currentSpokenTextLimit?: number;
+    onSpokenTextLimitChanged?: (n: number) => void;
   } = {},
 ): void {
   render(
@@ -167,6 +171,8 @@ function renderSettingsPanel(
         overrides.currentFeatureFlags ?? PHASE_K_FEATURE_FLAG_DEFAULTS
       }
       onFeatureFlagChanged={overrides.onFeatureFlagChanged ?? (() => {})}
+      currentSpokenTextLimit={overrides.currentSpokenTextLimit ?? 150}
+      onSpokenTextLimitChanged={overrides.onSpokenTextLimitChanged ?? (() => {})}
     />,
   );
 }
@@ -236,6 +242,8 @@ describe("SettingsPanel", () => {
         onPlayTargetDepthChanged={() => {}}
         currentFeatureFlags={PHASE_K_FEATURE_FLAG_DEFAULTS}
         onFeatureFlagChanged={() => {}}
+        currentSpokenTextLimit={150}
+        onSpokenTextLimitChanged={() => {}}
       />,
     );
     unmount();

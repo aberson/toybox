@@ -127,6 +127,84 @@ describe("ReadMeButton — enabled render", () => {
   });
 });
 
+describe("ReadMeButton — spoken text truncation (limit prop)", () => {
+  it("limit=0 (off): speak() receives the full text unchanged", () => {
+    const stepText = "The quick brown fox jumps over the lazy dog.";
+    render(
+      <ReadMeButton
+        text={stepText}
+        profile={TEST_PROFILE}
+        enabled={true}
+        limit={0}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("read-me-button"));
+    expect(tts.speak).toHaveBeenCalledWith(stepText, TEST_PROFILE);
+  });
+
+  it("limit omitted: speak() receives the full text (no truncation)", () => {
+    const stepText = "Short text.";
+    render(
+      <ReadMeButton
+        text={stepText}
+        profile={TEST_PROFILE}
+        enabled={true}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("read-me-button"));
+    expect(tts.speak).toHaveBeenCalledWith(stepText, TEST_PROFILE);
+  });
+
+  it("text shorter than limit: speak() receives the full text (no truncation)", () => {
+    const stepText = "Hi there!";
+    render(
+      <ReadMeButton
+        text={stepText}
+        profile={TEST_PROFILE}
+        enabled={true}
+        limit={100}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("read-me-button"));
+    // text.length (9) < limit (100) — no truncation.
+    expect(tts.speak).toHaveBeenCalledWith(stepText, TEST_PROFILE);
+  });
+
+  it("text longer than limit: speak() receives text truncated at word boundary + '…'", () => {
+    // "Hello world" is 11 chars. Limit 8 → slice to 8 = "Hello wo",
+    // last space at index 5 → cut at "Hello" + "…".
+    const stepText = "Hello world, this is a long sentence.";
+    render(
+      <ReadMeButton
+        text={stepText}
+        profile={TEST_PROFILE}
+        enabled={true}
+        limit={8}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("read-me-button"));
+    // Slice "Hello wo" → lastSpace at 5 → "Hello" + "…"
+    expect(tts.speak).toHaveBeenCalledWith("Hello…", TEST_PROFILE);
+  });
+
+  it("text with no spaces within limit: speak() hard-cuts at limit + '…'", () => {
+    // A single long word with no spaces — the fallback path uses hard cut.
+    const stepText = "supercalifragilistic";
+    render(
+      <ReadMeButton
+        text={stepText}
+        profile={TEST_PROFILE}
+        enabled={true}
+        limit={5}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("read-me-button"));
+    // No space in "super" (slice to 5 chars = "super"), lastSpace = -1
+    // → fallback to hard cut at 5 → "super" + "…"
+    expect(tts.speak).toHaveBeenCalledWith("super…", TEST_PROFILE);
+  });
+});
+
 describe("ReadMeButton — click handler", () => {
   it("calls cancel() before speak() with the full text + profile", () => {
     const stepText = "The brave knight set out for the dragon's lair.";

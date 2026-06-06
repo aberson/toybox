@@ -41,6 +41,7 @@ from .api.read_me_button_enabled_settings import (
 from .api.rewards import router as rewards_router
 from .api.rooms import router as rooms_router
 from .api.songs_enabled_settings import router as songs_enabled_settings_router
+from .api.spoken_text_limit_settings import router as spoken_text_limit_settings_router
 from .api.toys import admin_router as toys_admin_router
 from .api.toys import router as toys_router
 from .api.transcript_retention_settings import router as transcript_retention_settings_router
@@ -72,6 +73,7 @@ def create_app() -> FastAPI:
     app.include_router(banned_themes_settings_router)
     app.include_router(transcript_retention_settings_router)
     app.include_router(play_target_depth_settings_router)
+    app.include_router(spoken_text_limit_settings_router)
     # Phase K Step K2 + Phase L Step L5: five parent-controlled feature
     # flags (originally eight; L5 removed the three Phase K play-surface
     # flags as part of re-framing jokes/songs as per-activity reward

@@ -29,6 +29,29 @@ export interface ReadMeButtonProps {
   text: string;
   profile: VoiceProfile;
   enabled: boolean;
+  // Phase R Step R2: optional character limit for spoken text. When > 0,
+  // the text is truncated at a word boundary at or below ``limit`` chars
+  // and a ``…`` is appended before passing to ``speak()``. The full
+  // ``text`` remains visible on screen — truncation only affects the TTS
+  // call. ``0`` (or omitted) means no truncation.
+  limit?: number;
+}
+
+// Truncate ``text`` to at most ``limit`` characters at a word boundary.
+// Finds the last space at or before position ``limit`` and splits there.
+// Returns ``text`` unchanged when:
+//   - ``limit`` is 0 or falsy (off)
+//   - ``text.length <= limit`` (already short enough)
+// Appends ``…`` (U+2026) when truncation occurs.
+function truncateAtWordBoundary(text: string, limit: number): string {
+  if (!limit || text.length <= limit) return text;
+  // Slice to the limit first, then walk back to the last space so we
+  // don't cut mid-word. If no space is found (one very long word),
+  // fall back to a hard cut at ``limit``.
+  const slice = text.slice(0, limit);
+  const lastSpace = slice.lastIndexOf(" ");
+  const cutAt = lastSpace > 0 ? lastSpace : limit;
+  return text.slice(0, cutAt) + "…";
 }
 
 // Hit target ≥44pt per Apple HIG. Inflated to 48px so the bubble's
@@ -43,7 +66,7 @@ const HIT_TARGET_PX = 48;
 const BASE_OPACITY = 0.6;
 
 export function ReadMeButton(props: ReadMeButtonProps): JSX.Element | null {
-  const { text, profile, enabled } = props;
+  const { text, profile, enabled, limit = 0 } = props;
   if (!enabled) return null;
 
   const handleClick = (): void => {
@@ -51,8 +74,11 @@ export function ReadMeButton(props: ReadMeButtonProps): JSX.Element | null {
     // succession, or a word tap from ClickableText is mid-utterance)
     // so the read-me starts cleanly from the beginning.
     cancel();
+    // Apply the spoken text limit before TTS. Truncation happens here
+    // (not on the visible text) so the full body stays on screen.
+    const spokenText = truncateAtWordBoundary(text, limit);
     // Swallow rejections — see ClickableText for the rationale.
-    void speak(text, profile).catch(() => {});
+    void speak(spokenText, profile).catch(() => {});
   };
 
   // Hover / focus / active styling is hard to express inline (React

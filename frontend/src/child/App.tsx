@@ -232,6 +232,11 @@ export function App(): JSX.Element {
   const [featureFlags, setFeatureFlags] = useState<KioskFeatureFlags>(
     KIOSK_FEATURE_FLAG_DEFAULTS,
   );
+  // Phase R Step R2: spoken text character limit fetched on boot.
+  // Seeded to 150 (the backend default) so a slow / failed bootstrap
+  // fetch keeps a sane value. Passed to StepCard → ReadMeButton so
+  // the TTS call is truncated at the parent-configured limit.
+  const [spokenTextLimit, setSpokenTextLimit] = useState<number>(150);
 
   if (apiRef.current === null) {
     apiRef.current = new ApiClient({
@@ -288,11 +293,28 @@ export function App(): JSX.Element {
           "clickable_words_enabled",
           "read_me_button_enabled",
         ];
-        const flagResults = await Promise.allSettled(
-          flagKeys.map((key) =>
-            api.getFeatureFlag(key, { signal: aborter.signal }),
+        // Phase R Step R2: batch the spoken text limit fetch alongside the
+        // feature flag fetches so all six HTTP round-trips fire in parallel.
+        // The limit fetch is the last element; its index is ``flagKeys.length``.
+        const [flagResults, limitResult] = await Promise.all([
+          Promise.allSettled(
+            flagKeys.map((key) =>
+              api.getFeatureFlag(key, { signal: aborter.signal }),
+            ),
           ),
-        );
+          api
+            .getSpokenTextLimit({ signal: aborter.signal })
+            .catch((err: unknown) => {
+              if (!isAbortError(err)) {
+                // eslint-disable-next-line no-console
+                console.warn(
+                  "spoken text limit initial fetch failed, using default",
+                  err,
+                );
+              }
+              return null;
+            }),
+        ]);
         // Mid-bootstrap unmount (StrictMode double-mount, or user
         // navigates away) surfaces here as a batch of aborts. Bail
         // explicitly so we don't construct a ws after the cleanup
@@ -316,6 +338,9 @@ export function App(): JSX.Element {
         });
         if (flagsTouched) {
           setFeatureFlags(nextFlags);
+        }
+        if (limitResult !== null) {
+          setSpokenTextLimit(limitResult.value);
         }
         const ws = new ChildWsClient({
           url: deriveWsUrl(),
@@ -735,6 +760,10 @@ export function App(): JSX.Element {
               // round-trips by refreshing the kiosk.
               songsEnabled={featureFlags.songs_enabled}
               jokesEnabled={featureFlags.jokes_enabled}
+              // Phase R Step R2: thread the spoken text limit so
+              // ReadMeButton truncates TTS at the parent-configured
+              // word-boundary limit.
+              spokenTextLimit={spokenTextLimit}
             />
           </>
         )}

@@ -654,6 +654,18 @@ export interface TranscriptRetentionResponse {
   seconds: number;
 }
 
+// Phase R Step R2: spoken text character limit. The wire body is
+// ``{value: <preset>}`` in both directions, mirroring the GET/PUT
+// pair on transcript-retention. ``0`` means "off" (no truncation);
+// other values are the max character count before word-boundary
+// truncation kicks in for TTS. The child kiosk fetches this on boot
+// and passes it to ReadMeButton.
+export type SpokenTextLimit = 0 | 50 | 100 | 150 | 250;
+
+export interface SpokenTextLimitResponse {
+  value: SpokenTextLimit;
+}
+
 // Phase J step J1: play-queue target depth presets. The wire body is
 // ``{value: <preset>}`` in both directions, mirroring the GET/PUT
 // pair on transcript-retention.
@@ -1699,6 +1711,36 @@ export class ApiClient {
       {
         method: "PUT",
         body: JSON.stringify({ seconds }),
+        signal: opts.signal,
+      },
+    );
+  }
+
+  // Phase R Step R2: spoken text limit read-write pair. The GET is
+  // unauthenticated (matches ``getTranscriptRetention`` — household
+  // read); the PUT requires parent scope. Body shape on both sides is
+  // ``{value: <preset>}``. Valid values: 0 / 50 / 100 / 150 / 250.
+  async getSpokenTextLimit(
+    opts: RequestOptions = {},
+  ): Promise<SpokenTextLimitResponse> {
+    return this.request<SpokenTextLimitResponse>(
+      "/api/settings/spoken-text-limit",
+      {
+        method: "GET",
+        signal: opts.signal,
+      },
+    );
+  }
+
+  async setSpokenTextLimit(
+    value: SpokenTextLimit,
+    opts: RequestOptions = {},
+  ): Promise<SpokenTextLimitResponse> {
+    return this.request<SpokenTextLimitResponse>(
+      "/api/settings/spoken-text-limit",
+      {
+        method: "PUT",
+        body: JSON.stringify({ value }),
         signal: opts.signal,
       },
     );
