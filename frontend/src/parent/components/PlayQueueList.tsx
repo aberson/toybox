@@ -80,6 +80,14 @@ export interface PlayQueueListProps {
   onInsertSong?: (activity: Activity) => Promise<void>;
   jokesEnabled?: boolean;
   songsEnabled?: boolean;
+  // Phase R Step R3: Q&A gating. Called when the parent clicks "Good
+  // answer" or "Skip" on the current step's question banner. Optional
+  // so older callers compile; when absent the question panel shows
+  // question text only (no approve/skip buttons).
+  onApproveQuestion?: (
+    activity: Activity,
+    result: "approved" | "skipped",
+  ) => Promise<void>;
   // Phase L L9: count of active picture rewards in the parent's
   // library (App-lifted from a bootstrap ``listRewards`` GET). Passes
   // through to each SuggestionCard for its dropdown's eligibility
@@ -132,7 +140,8 @@ type ActionKey =
   | "recast"
   | "newActivity"
   | "insertJoke"
-  | "insertSong";
+  | "insertSong"
+  | "approveQuestion";
 
 type BusyMap = Record<ActionKey, Set<string>>;
 
@@ -149,6 +158,7 @@ function emptyBusy(): BusyMap {
     newActivity: new Set(),
     insertJoke: new Set(),
     insertSong: new Set(),
+    approveQuestion: new Set(),
   };
 }
 
@@ -170,6 +180,7 @@ export function PlayQueueList(props: PlayQueueListProps): JSX.Element {
     onInsertSong,
     jokesEnabled,
     songsEnabled,
+    onApproveQuestion,
     activeRewardsCount,
     activeRewards,
     filterCategory,
@@ -416,6 +427,14 @@ export function PlayQueueList(props: PlayQueueListProps): JSX.Element {
           }
           jokesEnabled={jokesEnabled}
           songsEnabled={songsEnabled}
+          onApproveQuestion={
+            onApproveQuestion !== undefined
+              ? (result) =>
+                  runGuarded("approveQuestion", active.id, () =>
+                    onApproveQuestion(active, result),
+                  )
+              : undefined
+          }
           busy={{
             regenerate: busy.regenerate.has(active.id),
             end: busy.end.has(active.id),
@@ -424,6 +443,7 @@ export function PlayQueueList(props: PlayQueueListProps): JSX.Element {
             stepBack: busy.stepBack.has(active.id),
             insertJoke: busy.insertJoke.has(active.id),
             insertSong: busy.insertSong.has(active.id),
+            approveQuestion: busy.approveQuestion.has(active.id),
           }}
         />
       )}

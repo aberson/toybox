@@ -288,6 +288,14 @@ class ActivityStepResponse(BaseModel):
     # pattern. ``None`` on the overwhelming majority of steps (non-
     # Periodic-Table content).
     element_id: str | None = None
+    # Phase R Step R3: optional Q&A gating. ``question`` is the text
+    # displayed to the child and parent. ``question_pending`` is True
+    # when question IS NOT NULL AND question_approved IS NULL — the child
+    # kiosk hides Next ("Waiting for parent…") and the parent panel shows
+    # approve/skip buttons. Both are None/False on the overwhelming
+    # majority of steps (no Q&A on most templates).
+    question: str | None = None
+    question_pending: bool = False
 
 
 class RoleAssignment(BaseModel):
@@ -523,6 +531,31 @@ class AdvanceRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     choice_index: int | None = Field(default=None, ge=0)
+
+
+class ApproveQuestionRequest(BaseModel):
+    """Phase R Step R3: body for POST /api/activities/{id}/approve-question.
+
+    ``result`` is the parent's resolution for the current step's Q&A gate:
+    ``"approved"`` when the child gave a satisfactory answer (sets
+    ``question_approved=1``), ``"skipped"`` when the parent decides to
+    skip the check (sets ``question_approved=2``). Either value unblocks
+    the advance path. ``version`` is the current activity version for the
+    optimistic-concurrency check (same 409 pattern as other mutations).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    result: Literal["approved", "skipped"]
+    version: int = Field(ge=1)
+
+
+class ApproveQuestionResponse(BaseModel):
+    """Phase R Step R3: response from POST /api/activities/{id}/approve-question."""
+
+    model_config = ConfigDict(frozen=True)
+
+    version: int = Field(ge=1)
 
 
 def _ensure_session(conn: sqlite3.Connection, session_id: str | None) -> str:
@@ -840,7 +873,8 @@ def _fetch_steps(
 ) -> list[ActivityStepResponse]:
     rows = conn.execute(
         "SELECT seq, body, sfx, expected_action, current, action_slot, "
-        " choices_json, chosen_label, kind, metadata_json, step_template_id "
+        " choices_json, chosen_label, kind, metadata_json, step_template_id, "
+        " question, question_approved "
         "FROM activity_steps WHERE activity_id = ? ORDER BY seq ASC",
         (activity_id,),
     ).fetchall()
@@ -852,6 +886,10 @@ def _fetch_steps(
         element_id = _resolve_element_id_for_persisted_step(template_id, r["step_template_id"])
         metadata = _decode_step_metadata_json(r["metadata_json"])
         metadata = _enrich_element_metadata(metadata, element_id)
+        # Phase R Step R3: Q&A gating columns.
+        question_val: str | None = r["question"] if "question" in r.keys() else None
+        question_approved_val = r["question_approved"] if "question_approved" in r.keys() else None
+        question_pending = question_val is not None and question_approved_val is None
         responses.append(
             ActivityStepResponse(
                 seq=int(r["seq"]),
@@ -865,6 +903,8 @@ def _fetch_steps(
                 kind=r["kind"],
                 metadata=metadata,
                 element_id=element_id,
+                question=question_val,
+                question_pending=question_pending,
             )
         )
     return responses
@@ -3662,7 +3702,8 @@ def post_advance(
         raise VersionConflictError(current_version, current_state)
 
     steps = conn.execute(
-        "SELECT id, seq, current, choices_json, step_template_id, kind "
+        "SELECT id, seq, current, choices_json, step_template_id, kind, "
+        " question, question_approved "
         "FROM activity_steps WHERE activity_id = ? ORDER BY seq ASC",
         (activity_id,),
     ).fetchall()
@@ -3738,6 +3779,23 @@ def post_advance(
             detail={"code": "no_current_step", "id": activity_id},
         )
     current_row = steps[current_index]
+
+    # Phase R Step R3: Q&A gating. If the current step has a ``question``
+    # that has not yet been approved or skipped (question_approved IS
+    # NULL), block the advance so the parent must resolve it first.
+    current_question = (
+        current_row["question"] if "question" in current_row.keys() else None
+    )
+    current_q_approved = (
+        current_row["question_approved"]
+        if "question_approved" in current_row.keys()
+        else None
+    )
+    if current_question is not None and current_q_approved is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "question_pending"},
+        )
 
     # Pre-G2 path: the next row already exists in activity_steps.
     # This holds for in-flight activities created BEFORE G2 (all 5 rows
@@ -3944,6 +4002,116 @@ def post_advance(
     response = _row_to_response(conn, row)
     _emit_state(pubsub, response)
     return response
+
+
+@router.post("/{activity_id}/approve-question", response_model=ApproveQuestionResponse)
+def post_approve_question(
+    activity_id: str,
+    body: ApproveQuestionRequest,
+    conn: Annotated[sqlite3.Connection, Depends(get_activities_db)],
+    pubsub: Annotated[PubSub, Depends(get_pubsub)],
+    _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
+) -> ApproveQuestionResponse:
+    """Phase R Step R3: approve or skip the current step's Q&A gate.
+
+    Validates that the current running activity has a pending question on
+    its current step, sets ``question_approved`` (1=approved, 2=skipped),
+    bumps ``activities.version`` in the same transaction, then calls
+    ``_emit_state`` so the child kiosk receives the updated envelope and
+    unhides the Next button.
+
+    Returns ``{"version": N}`` on success. Raises 409 on:
+
+    * version_conflict — ``body.version`` does not match the persisted
+      version (standard optimistic-concurrency pattern).
+    * no_current_step — running activity has no current step row.
+    * no_question_pending — the current step has no question, or the
+      question was already resolved (idempotency guard).
+    * invalid_transition — activity is not in a state where a question
+      can be resolved (must be ``running`` or ``paused``).
+    """
+    row = _fetch_activity_row(conn, activity_id)
+    current_state = str(row["state"])
+    current_version = int(row["version"])
+
+    if current_state not in {STATE_RUNNING, STATE_PAUSED}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "invalid_transition",
+                "current_state": current_state,
+                "target_state": "approve_question",
+            },
+        )
+    if current_version != body.version:
+        raise VersionConflictError(current_version, current_state)
+
+    # Find the current step row.
+    current_step_row = conn.execute(
+        "SELECT id, question, question_approved "
+        "FROM activity_steps WHERE activity_id = ? AND current = 1 LIMIT 1",
+        (activity_id,),
+    ).fetchone()
+    if current_step_row is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "no_current_step", "id": activity_id},
+        )
+
+    question_val = (
+        current_step_row["question"]
+        if "question" in current_step_row.keys()
+        else None
+    )
+    q_approved_val = (
+        current_step_row["question_approved"]
+        if "question_approved" in current_step_row.keys()
+        else None
+    )
+    if question_val is None or q_approved_val is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "no_question_pending",
+                "id": activity_id,
+                "question": question_val,
+                "question_approved": q_approved_val,
+            },
+        )
+
+    approved_value = 1 if body.result == "approved" else 2
+    step_id = str(current_step_row["id"])
+
+    # Single transaction: set question_approved on the step row + bump
+    # activities.version. Both must be atomic so optimistic-concurrency
+    # clients see a consistent (version, question_approved) pair.
+    with conn:
+        conn.execute(
+            "UPDATE activity_steps SET question_approved = ? WHERE id = ?",
+            (approved_value, step_id),
+        )
+        conn.execute(
+            "UPDATE activities SET version = version + 1 WHERE id = ?",
+            (activity_id,),
+        )
+
+    # Re-read the updated row so the response and WS envelope carry the
+    # new version. ``_emit_state`` uses ``_row_to_response`` which re-reads
+    # activity_steps including the updated question_approved — the child
+    # kiosk receives question_pending=False and unhides the Next button.
+    updated_row = _fetch_activity_row(conn, activity_id)
+    new_version = int(updated_row["version"])
+    response_obj = _row_to_response(conn, updated_row)
+    _emit_state(pubsub, response_obj)
+
+    _logger.info(
+        "approve_question activity=%s result=%s version=%d->%d",
+        activity_id,
+        body.result,
+        current_version,
+        new_version,
+    )
+    return ApproveQuestionResponse(version=new_version)
 
 
 def _has_reward_step(conn: sqlite3.Connection, activity_id: str) -> bool:
@@ -4771,6 +4939,8 @@ def get_activity(
 __all__ = [
     "ActivityResponse",
     "ActivityStepResponse",
+    "ApproveQuestionRequest",
+    "ApproveQuestionResponse",
     "ApproveRequest",
     "DidntWorkRequest",
     "ProposeRequest",

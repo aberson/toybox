@@ -413,3 +413,141 @@ describe("ActivityPanel End confirm", () => {
   });
 
 });
+
+// ---------------------------------------------------------------------------
+// Phase R Step R3: Q&A gating panel.
+// ---------------------------------------------------------------------------
+
+describe("ActivityPanel Q&A gating", () => {
+  function fakeActivityWithQuestion(question: string): Activity {
+    return fakeActivity({
+      steps: [
+        {
+          seq: 1,
+          body: "Do something fun",
+          sfx: null,
+          expected_action: null,
+          current: true,
+          question,
+          question_pending: true,
+        },
+      ],
+    });
+  }
+
+  it("renders question-panel and question-text when current step has a pending question", () => {
+    render(
+      <ActivityPanel
+        activity={fakeActivityWithQuestion("What is your favourite colour?")}
+        onRegenerate={async () => undefined}
+        onEnd={async () => undefined}
+        onDidntWork={async () => undefined}
+        onApproveQuestion={async () => undefined}
+      />,
+    );
+    expect(screen.getByTestId("question-panel")).toBeTruthy();
+    expect(screen.getByTestId("question-text").textContent).toContain(
+      "What is your favourite colour?",
+    );
+  });
+
+  it("hides question-panel when current step has no question", () => {
+    render(
+      <ActivityPanel
+        activity={fakeActivity()}
+        onRegenerate={async () => undefined}
+        onEnd={async () => undefined}
+        onDidntWork={async () => undefined}
+        onApproveQuestion={async () => undefined}
+      />,
+    );
+    expect(screen.queryByTestId("question-panel")).toBeNull();
+  });
+
+  it("hides question-panel when question_pending is false (already resolved)", () => {
+    const activity = fakeActivity({
+      steps: [
+        {
+          seq: 1,
+          body: "Do something",
+          sfx: null,
+          expected_action: null,
+          current: true,
+          question: "What colour?",
+          question_pending: false,
+        },
+      ],
+    });
+    render(
+      <ActivityPanel
+        activity={activity}
+        onRegenerate={async () => undefined}
+        onEnd={async () => undefined}
+        onDidntWork={async () => undefined}
+        onApproveQuestion={async () => undefined}
+      />,
+    );
+    expect(screen.queryByTestId("question-panel")).toBeNull();
+  });
+
+  it("renders approve and skip buttons when onApproveQuestion is supplied", () => {
+    render(
+      <ActivityPanel
+        activity={fakeActivityWithQuestion("Can you name an element?")}
+        onRegenerate={async () => undefined}
+        onEnd={async () => undefined}
+        onDidntWork={async () => undefined}
+        onApproveQuestion={async () => undefined}
+      />,
+    );
+    expect(screen.getByTestId("approve-question-button")).toBeTruthy();
+    expect(screen.getByTestId("skip-question-button")).toBeTruthy();
+  });
+
+  it("hides approve/skip buttons when onApproveQuestion is omitted", () => {
+    render(
+      <ActivityPanel
+        activity={fakeActivityWithQuestion("Can you name an element?")}
+        onRegenerate={async () => undefined}
+        onEnd={async () => undefined}
+        onDidntWork={async () => undefined}
+      />,
+    );
+    // Question text still shows, but buttons are absent.
+    expect(screen.getByTestId("question-panel")).toBeTruthy();
+    expect(screen.queryByTestId("approve-question-button")).toBeNull();
+    expect(screen.queryByTestId("skip-question-button")).toBeNull();
+  });
+
+  it("clicking approve-question-button fires onApproveQuestion with 'approved'", () => {
+    const onApproveQuestion = vi.fn(async (): Promise<void> => undefined);
+    render(
+      <ActivityPanel
+        activity={fakeActivityWithQuestion("What animal?")  }
+        onRegenerate={async () => undefined}
+        onEnd={async () => undefined}
+        onDidntWork={async () => undefined}
+        onApproveQuestion={onApproveQuestion}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("approve-question-button"));
+    expect(onApproveQuestion).toHaveBeenCalledOnce();
+    expect(onApproveQuestion).toHaveBeenCalledWith("approved");
+  });
+
+  it("clicking skip-question-button fires onApproveQuestion with 'skipped'", () => {
+    const onApproveQuestion = vi.fn(async (): Promise<void> => undefined);
+    render(
+      <ActivityPanel
+        activity={fakeActivityWithQuestion("What animal?")}
+        onRegenerate={async () => undefined}
+        onEnd={async () => undefined}
+        onDidntWork={async () => undefined}
+        onApproveQuestion={onApproveQuestion}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("skip-question-button"));
+    expect(onApproveQuestion).toHaveBeenCalledOnce();
+    expect(onApproveQuestion).toHaveBeenCalledWith("skipped");
+  });
+});

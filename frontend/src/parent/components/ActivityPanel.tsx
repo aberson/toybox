@@ -14,6 +14,8 @@ export interface ActivityPanelBusy {
   // so older callers compile; defaults to false when omitted.
   insertJoke?: boolean;
   insertSong?: boolean;
+  // Phase R Step R3: in-flight flag for the approve-question buttons.
+  approveQuestion?: boolean;
 }
 
 export interface ActivityPanelProps {
@@ -38,6 +40,11 @@ export interface ActivityPanelProps {
   onInsertSong?: () => Promise<void>;
   jokesEnabled?: boolean;
   songsEnabled?: boolean;
+  // Phase R Step R3: Q&A gating. Called when the parent clicks "Good
+  // answer" or "Skip" on the current step's question banner. Optional
+  // so older callers compile; when absent the question banner is
+  // read-only (no buttons shown, the question text still appears).
+  onApproveQuestion?: (result: "approved" | "skipped") => Promise<void>;
   // Optional in-flight flags. Same idea as SuggestionCard's busy: keep
   // a rapid second click from racing the first with the same version.
   busy?: ActivityPanelBusy;
@@ -57,6 +64,7 @@ export function ActivityPanel(props: ActivityPanelProps): JSX.Element {
     onInsertSong,
     jokesEnabled,
     songsEnabled,
+    onApproveQuestion,
   } = props;
   const busy: ActivityPanelBusy = props.busy ?? {
     regenerate: false,
@@ -65,7 +73,18 @@ export function ActivityPanel(props: ActivityPanelProps): JSX.Element {
     thumbsUp: false,
     stepBack: false,
   };
-  const currentSeq = activity.steps.find((s) => s.current)?.seq;
+  // Phase R Step R3: Q&A gating — detect if the current step has a
+  // pending question that the parent needs to resolve.
+  const currentStep = activity.steps.find((s) => s.current) ?? null;
+  const pendingQuestion: string | null =
+    currentStep !== null &&
+    typeof currentStep.question === "string" &&
+    currentStep.question.length > 0 &&
+    currentStep.question_pending === true
+      ? currentStep.question
+      : null;
+  const approveQuestionBusy = busy.approveQuestion ?? false;
+  const currentSeq = currentStep?.seq;
   const stepBackEnabled =
     currentSeq !== undefined &&
     currentSeq >= 2 &&
@@ -170,6 +189,56 @@ export function ActivityPanel(props: ActivityPanelProps): JSX.Element {
             </li>
           ))}
         </ol>
+      )}
+      {/*
+        Phase R Step R3: Q&A gating. When the current step has a pending
+        question, show the question text + "Good answer" / "Skip" buttons.
+        The server gates advance on question_pending; clicking either button
+        calls the approve-question endpoint which broadcasts a WS envelope
+        so the child kiosk unhides the Next button.
+      */}
+      {pendingQuestion !== null && (
+        <div
+          data-testid="question-panel"
+          style={{
+            marginTop: 10,
+            padding: "10px 14px",
+            background: "#fff8e1",
+            border: "1px solid #ffe082",
+            borderRadius: 6,
+          }}
+        >
+          <p
+            data-testid="question-text"
+            style={{ margin: "0 0 8px 0", fontSize: 14, color: "#5d4037" }}
+          >
+            Child Q&A: {pendingQuestion}
+          </p>
+          {onApproveQuestion !== undefined && (
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="button"
+                data-testid="approve-question-button"
+                disabled={approveQuestionBusy}
+                onClick={() => {
+                  void onApproveQuestion("approved");
+                }}
+              >
+                {approveQuestionBusy ? "..." : "Good answer"}
+              </button>
+              <button
+                type="button"
+                data-testid="skip-question-button"
+                disabled={approveQuestionBusy}
+                onClick={() => {
+                  void onApproveQuestion("skipped");
+                }}
+              >
+                {approveQuestionBusy ? "..." : "Skip"}
+              </button>
+            </div>
+          )}
+        </div>
       )}
       {(onInsertJoke !== undefined || onInsertSong !== undefined) && (
         <div

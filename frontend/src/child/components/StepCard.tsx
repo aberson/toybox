@@ -729,11 +729,53 @@ export function StepCard(props: StepCardProps): JSX.Element {
           ))}
         </div>
       )}
+      {/*
+        Phase R Step R3: Q&A gating. When the current step has a
+        ``question`` field and ``question_pending`` is true, show the
+        question text and replace the Next button with "Waiting for
+        parent…". The parent's ActivityPanel resolves the question via
+        the approve-question endpoint, which emits a WS envelope that
+        sets question_pending=false and lets the Next button re-appear.
+      */}
+      {currentStep !== null && typeof currentStep.question === "string" && currentStep.question.length > 0 && (
+        <div
+          data-testid="step-question"
+          style={{
+            marginTop: "clamp(8px, 2vh, 20px)",
+            padding: "12px 16px",
+            background: "#fff8e1",
+            border: "1px solid #ffe082",
+            borderRadius: 8,
+            fontSize: "clamp(1rem, min(2.5vw, 3vh), 1.5rem)",
+            color: "#5d4037",
+            maxWidth: 600,
+            textAlign: "center",
+          }}
+        >
+          {currentStep.question}
+        </div>
+      )}
       {stepKind !== "song" && stepKind !== "reward" && choices === null && props.onAdvance !== undefined && (
-        <NextStepButton
-          onClick={props.onAdvance}
-          busy={props.advanceBusy === true}
-        />
+        currentStep !== null && currentStep.question_pending === true
+          ? (
+            <div
+              data-testid="waiting-for-parent"
+              style={{
+                marginTop: "clamp(8px, 2vh, 20px)",
+                color: "#888",
+                fontSize: "clamp(1rem, min(2.5vw, 3vh), 1.5rem)",
+                fontStyle: "italic",
+              }}
+            >
+              Waiting for parent…
+            </div>
+          )
+          : (
+            <NextStepButton
+              onClick={props.onAdvance}
+              busy={props.advanceBusy === true}
+            />
+          )
       )}
       {/*
         Phase K K9 / K12: watermarked Read Me bubble. Self-positioning

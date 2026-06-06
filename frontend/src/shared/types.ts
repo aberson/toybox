@@ -127,6 +127,11 @@ export interface ActivityStep {
   expected_action: string | null;
   current: boolean;
   element_id: string | null;
+  /** Phase R Step R3: Q&A gating. ``question`` is the text displayed to the child
+   * and parent. ``question_pending`` is true when a question exists and has not
+   * yet been approved or skipped. Both are absent / false on most steps. */
+  question?: string | null;
+  question_pending?: boolean;
 }
 
 /**

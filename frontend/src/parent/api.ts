@@ -29,6 +29,12 @@ export interface ActivityStep {
   // ``null`` on non-element steps (the wire shape always emits the
   // key — never missing — per the M3 contract).
   element_id?: string | null;
+  // Phase R Step R3: Q&A gating. ``question`` is the text the parent
+  // must resolve before the child can advance. ``question_pending`` is
+  // true when a question is set and not yet approved/skipped. Both are
+  // absent / false on most steps (additive, backward-compatible).
+  question?: string | null;
+  question_pending?: boolean;
 }
 
 /**
@@ -1152,6 +1158,28 @@ export class ApiClient {
       ifMatchVersion: version,
       signal: opts.signal,
     });
+  }
+
+  // Phase R Step R3: approve or skip the current step's Q&A gate.
+  // ``result`` is "approved" (child gave a good answer) or "skipped"
+  // (parent decides to move on). ``version`` is the optimistic-
+  // concurrency version for the 409 version_conflict check.
+  // Returns ``{"version": N}`` on success; the caller should update
+  // the store so the next mutation uses the fresh version.
+  async approveStepQuestion(
+    id: string,
+    version: number,
+    result: "approved" | "skipped",
+    opts: RequestOptions = {},
+  ): Promise<{ version: number }> {
+    return this.request<{ version: number }>(
+      `/api/activities/${encodeURIComponent(id)}/approve-question`,
+      {
+        method: "POST",
+        body: JSON.stringify({ result, version }),
+        signal: opts.signal,
+      },
+    );
   }
 
   // Step 15: parent thumbs-up writes parent_signal=+1 to the

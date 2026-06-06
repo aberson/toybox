@@ -864,6 +864,31 @@ export function App(): JSX.Element {
     [api, refetchActivity],
   );
 
+  // Phase R Step R3: parent approves or skips a Q&A gate on the
+  // current step. The approve-question endpoint returns {"version": N};
+  // we refetch the full activity so the store sees the updated
+  // question_pending=false wire shape and the kiosk's WS subscription
+  // also receives the updated envelope via _emit_state on the backend.
+  const handleApproveQuestion = useCallback(
+    async (target: Activity, result: "approved" | "skipped"): Promise<void> => {
+      try {
+        await api.approveStepQuestion(target.id, target.version, result);
+        // Refetch to get the updated activity (question_pending=false).
+        const fresh = await refetchActivity(target.id);
+        if (fresh !== null) {
+          useParentStore.getState().applyMutationResult(fresh);
+        }
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "approve question failed";
+        useParentStore
+          .getState()
+          .pushToast("error", `Q&A: ${message}`);
+      }
+    },
+    [api, refetchActivity],
+  );
+
   // Phase K K15 Surface P: parent inserts a joke / song at
   // current_step+1 on the running/paused active activity. Same
   // ``withConflictHandler`` shape as recast — 409 ``version_conflict``
@@ -1174,6 +1199,7 @@ export function App(): JSX.Element {
                       onNewActivity={handleNewActivity}
                       onInsertJoke={handleInsertJoke}
                       onInsertSong={handleInsertSong}
+                      onApproveQuestion={handleApproveQuestion}
                       jokesEnabled={featureFlags.jokes_enabled}
                       songsEnabled={featureFlags.songs_enabled}
                       activeRewardsCount={activeRewardsCount}

@@ -108,6 +108,14 @@ export interface ActivityStep {
   // shape and resolves to a real corpus entry at template load.
   // Optional + nullable so pre-M3 wire payloads typecheck.
   element_id?: string | null;
+  // Phase R Step R3: optional Q&A gating fields. ``question`` is the
+  // text the child is asked (shown in StepCard below the step body).
+  // ``question_pending`` is true when the question exists AND the
+  // parent has not yet approved or skipped it — the kiosk hides the
+  // Next button and shows "Waiting for parent…". Both are absent on
+  // the overwhelming majority of steps (no Q&A on most templates).
+  question?: string | null;
+  question_pending?: boolean;
 }
 
 /**

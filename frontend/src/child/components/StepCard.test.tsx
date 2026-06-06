@@ -1294,3 +1294,79 @@ describe("StepCard N0 — persona-letter hidden on element steps (D2 fix)", () =
   });
 });
 
+// ---------------------------------------------------------------------------
+// Phase R Step R3: Q&A gating — StepCard renders question text and replaces
+// the Next button with "Waiting for parent…" when question_pending is true.
+// ---------------------------------------------------------------------------
+
+describe("StepCard Q&A gating", () => {
+  it("renders question text when the current step has a question string", () => {
+    const activity = fakeActivity({
+      steps: [
+        fakeStep({
+          question: "What is your favourite colour?",
+          question_pending: true,
+        }),
+      ],
+    });
+    render(<StepCard activity={activity} onAdvance={vi.fn()} />);
+    const questionEl = screen.getByTestId("step-question");
+    expect(questionEl.textContent).toContain("What is your favourite colour?");
+  });
+
+  it("renders 'Waiting for parent…' instead of the Next button when question_pending is true", () => {
+    const activity = fakeActivity({
+      steps: [
+        fakeStep({
+          question: "Name an element!",
+          question_pending: true,
+        }),
+      ],
+    });
+    render(<StepCard activity={activity} onAdvance={vi.fn()} />);
+    expect(screen.getByTestId("waiting-for-parent")).toBeTruthy();
+    // Next button must not be present while waiting.
+    expect(screen.queryByRole("button", { name: /next/i })).toBeNull();
+  });
+
+  it("renders the Next button (not 'Waiting') when question_pending is false", () => {
+    // question resolved — question_pending=false means the parent already approved/skipped.
+    const activity = fakeActivity({
+      steps: [
+        fakeStep({
+          question: "What animal?",
+          question_pending: false,
+        }),
+      ],
+    });
+    render(<StepCard activity={activity} onAdvance={vi.fn()} />);
+    expect(screen.queryByTestId("waiting-for-parent")).toBeNull();
+    expect(screen.getByRole("button", { name: /next/i })).toBeTruthy();
+  });
+
+  it("renders the Next button when the step has no question at all", () => {
+    const activity = fakeActivity({
+      steps: [fakeStep()],
+    });
+    render(<StepCard activity={activity} onAdvance={vi.fn()} />);
+    expect(screen.queryByTestId("step-question")).toBeNull();
+    expect(screen.queryByTestId("waiting-for-parent")).toBeNull();
+    expect(screen.getByRole("button", { name: /next/i })).toBeTruthy();
+  });
+
+  it("does not render question text when question is an empty string", () => {
+    // The backend won't emit an empty string (question is NULL or non-empty),
+    // but defensive guard: empty string must NOT render the question block.
+    const activity = fakeActivity({
+      steps: [
+        fakeStep({
+          question: "",
+          question_pending: false,
+        }),
+      ],
+    });
+    render(<StepCard activity={activity} onAdvance={vi.fn()} />);
+    expect(screen.queryByTestId("step-question")).toBeNull();
+  });
+});
+

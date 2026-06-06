@@ -210,6 +210,12 @@ class Step(BaseModel):
         pattern=r"^[a-z]{1,3}-[0-9]{1,3}$",
         max_length=16,
     )
+    # Phase R Step R3: optional Q&A gating. When set, the child kiosk
+    # displays the question text below the step body and replaces the
+    # Next button with "Waiting for parent…". The parent's ActivityPanel
+    # shows the question + approve/skip buttons. The advance endpoint
+    # gates on question_approved (NULL = pending).
+    question: str | None = None
 
     @model_validator(mode="after")
     def _check_next_xor_choices(self) -> Step:
@@ -334,6 +340,12 @@ class ActivityStep(BaseModel):
         pattern=r"^[a-z]{1,3}-[0-9]{1,3}$",
         max_length=16,
     )
+    # Phase R Step R3: runtime Q&A gating columns. Both carried through
+    # from migration 0023. ``question`` mirrors the template-time
+    # :attr:`Step.question`; ``question_approved`` records the parent's
+    # resolution (NULL = pending, 1 = approved, 2 = skipped).
+    question: str | None = None
+    question_approved: int | None = None
 
 
 class Activity(BaseModel):
