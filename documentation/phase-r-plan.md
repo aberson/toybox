@@ -155,6 +155,7 @@ The `question` field is additive and `Optional[str]`-defaulting to `None` — no
 - **Produces:** `src/toybox/core/spoken_text_limit.py`, `src/toybox/api/spoken_text_limit_settings.py`, `src/toybox/db/migrations/0022_spoken_text_limit.sql`, updated `app.py`, `SpokenTextLimitControl.tsx`, updated `SettingsPanel.tsx`, parent `App.tsx`, child `App.tsx`, `api.ts`, `ReadMeButton.tsx`, `StepCard.tsx`
 - **Done when:** `uv run pytest` passes (unit + integration tests for new setting); `npm run test` passes; `npm run typecheck` passes; a step body longer than 150 chars is truncated at a word boundary when spoken, leaving the full text visible; child `App.tsx` fetches spoken-text-limit on mount and passes it through to ReadMeButton
 - **Depends on:** none
+- **Status:** DONE (2026-06-05)
 
 ### Step R3: Q&A gating (parent-approval mode)
 - **Problem:** Add optional `question: str | None` to template `Step` and runtime `ActivityStep`. When a step has a question, the child kiosk displays it and hides the Next button (replacing it with "Waiting for parent…"). The parent's ActivityPanel shows the question + "Good answer" / "Skip" buttons. The advance endpoint returns 409 `{"detail": "question_pending"}` when a step's question is unresolved. New endpoint `POST /api/activities/{id}/approve-question` resolves it (returns `{"version": N}` on success, bumps `activities.version`, emits WS envelope). Note for future: add Speech-To-Text (STT) auto-grade as a setting toggle on this surface.
