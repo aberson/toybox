@@ -161,6 +161,7 @@ The `question` field is additive and `Optional[str]`-defaulting to `None` — no
 - **Problem:** Add optional `question: str | None` to template `Step` and runtime `ActivityStep`. When a step has a question, the child kiosk displays it and hides the Next button (replacing it with "Waiting for parent…"). The parent's ActivityPanel shows the question + "Good answer" / "Skip" buttons. The advance endpoint returns 409 `{"detail": "question_pending"}` when a step's question is unresolved. New endpoint `POST /api/activities/{id}/approve-question` resolves it (returns `{"version": N}` on success, bumps `activities.version`, emits WS envelope). Note for future: add Speech-To-Text (STT) auto-grade as a setting toggle on this surface.
 - **Issue:** #214#
 - **Flags:** --reviewers code
+- **Status:** DONE (2026-06-05)
 - **Produces:** `src/toybox/db/migrations/0023_activity_step_question.sql` (adds `activity_steps.question TEXT NULL` + `activity_steps.question_approved INTEGER NULL`), updated `models.py`, updated `activities.py` (serializer + advance gate + new endpoint with WS emit + version bump), updated `shared/types.ts` (via codegen), updated `StepCard.tsx`, updated `ActivityPanel.tsx`, updated parent `App.tsx`, updated `api.ts`
 - **Done when:** `uv run pytest` passes (new tests: advance returns 409 when question unresolved; approve-question endpoint sets `question_approved` AND bumps `activities.version`; advance succeeds after approval; approve-question broadcasts WS envelope); `npm run typecheck` passes; `npm run test` passes; a template step with `"question": "Name 3 animals!"` causes the kiosk to show the question + "Waiting for parent…" instead of Next, and after parent approves the child transitions to show the Next button without a page reload
 - **Depends on:** none
@@ -170,6 +171,7 @@ The `question` field is additive and `Optional[str]`-defaulting to `None` — no
 - **Problem:** Add `GET /api/search?q=<query>` returning matching past activities (LIKE scan on `activities.summary`, limit 20) and matching templates (in-memory scan of loaded template registry by id/title). Parent UI gets a persistent search input pinned above the activity queue on the Play tab; typing replaces the queue view with `SearchPanel` results (no new sub-tab). Each result has a "Play again" / "Try this" button that POSTs to the existing propose endpoint with `template_id` pinned.
 - **Issue:** #215#
 - **Flags:** --reviewers code
+- **Status:** DONE (2026-06-05)
 - **Produces:** `src/toybox/api/search.py`, updated `app.py`, `SearchPanel.tsx`, updated `App.tsx`, updated `api.ts`
 - **Done when:** `uv run pytest` passes (integration test: search for a known template title returns it in `templates`; search for a known past activity title returns it in `past_activities`); `npm run typecheck` passes; `npm run test` passes; the parent can type a search term and see results from both sources
 - **Depends on:** none
