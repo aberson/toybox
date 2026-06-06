@@ -1,6 +1,6 @@
 # toybox
 
-![Python](https://img.shields.io/badge/python-3.12-blue) [![linux-tests](https://github.com/aberson/toybox/actions/workflows/linux-tests.yml/badge.svg?branch=master)](https://github.com/aberson/toybox/actions/workflows/linux-tests.yml) [![frontend-tests](https://github.com/aberson/toybox/actions/workflows/frontend-tests.yml/badge.svg?branch=master)](https://github.com/aberson/toybox/actions/workflows/frontend-tests.yml) ![pytest](https://img.shields.io/badge/pytest-2288%20passing-brightgreen) ![vitest](https://img.shields.io/badge/vitest-682%20passing-brightgreen) ![Local-first](https://img.shields.io/badge/local--first-family%20private-purple) ![License](https://img.shields.io/badge/license-MIT-blue)
+![Python](https://img.shields.io/badge/python-3.12-blue) [![linux-tests](https://github.com/aberson/toybox/actions/workflows/linux-tests.yml/badge.svg?branch=master)](https://github.com/aberson/toybox/actions/workflows/linux-tests.yml) [![frontend-tests](https://github.com/aberson/toybox/actions/workflows/frontend-tests.yml/badge.svg?branch=master)](https://github.com/aberson/toybox/actions/workflows/frontend-tests.yml) ![pytest](https://img.shields.io/badge/pytest-2298%20passing-brightgreen) ![vitest](https://img.shields.io/badge/vitest-709%20passing-brightgreen) ![Local-first](https://img.shields.io/badge/local--first-family%20private-purple) ![License](https://img.shields.io/badge/license-MIT-blue)
 
 A local-first home AI that watches for play opportunities, suggests structured activities to a parent, and runs the approved ones on a child kiosk featuring AI personas.
 
@@ -37,7 +37,7 @@ Both share types, ws envelopes, and the same FastAPI backend — one async proce
 
 > **25 → 1,243 activity templates** across 14 phases shipped, fully on-device. Catalog grows by parent approvals → labeled events → SFT corpus, waiting on ≥50 rows before LoRA fine-tune kicks in (Phase E).
 >
-> **iPad UAT 11/12 PASS** at Phase M close (2026-05-18) — kiosk runs as a Guided Access app on a real iPad over Wi-Fi LAN. **2,288 pytest + 682 vitest** green at Phase R close (2026-06-05). Fully offline once whisper-small + persona avatars + element sprites are cached locally.
+> **iPad UAT 11/12 PASS** at Phase M close (2026-05-18) — kiosk runs as a Guided Access app on a real iPad over Wi-Fi LAN. **2,298 pytest + 709 vitest** green at Phase S close (2026-06-05). Fully offline once whisper-small + persona avatars + element sprites are cached locally.
 
 ## What makes this different
 
@@ -189,6 +189,7 @@ So toybox listens locally (silero-VAD + faster-whisper, no audio leaves the box)
 - **Rewards system (Phase L, 2026-05-17)** — Jokes/songs reframed as per-activity reward TYPES; embedded/ending/spontaneity interjection surfaces deleted in favor of set-intersection tag matching. Two-phase terminal advance pattern shipped.
 - **Content depth (Phase M, 2026-05-18)** — Periodic-Table-Professor expansion (118 elements + sprites + microgames + 25 element-themed songs) + SEL templates (feelings-naming + perspective-taking + conflict-resolution + friendship-repair). Catalog **1,000 → 1,243**. iPad UAT 11/12 PASS.
 - **UX refinements (Phase R, 2026-06-05)** — Cadence loop removed; TriggerButton promoted to prominent CTA; spoken text character limit (parent-configurable, word-boundary truncation); Q&A gating on activity steps (approve-question endpoint + WS push to child kiosk); activity search (GET /api/search, template pinning via ProposeRequest.template_id). **2,288 pytest + 682 vitest** passing.
+- **Kiosk visual refresh (Phase S, 2026-06-05)** — Persona-keyed background gradients (detective/princess/wizard/periodic_table/null each get a distinct CSS gradient); step card more prominent (larger font, stronger shadow, dark border); Claude assigns one avatar animation per step at approve-time (`animator.py`, sync urllib call, `SyncAIClient` Protocol); `PersonaAvatar` plays the matching infinite CSS animation (`float/pulse/wobble/jump/shine/spin`) for the duration of each step. **2,298 pytest + 709 vitest** passing.
 - **In flight: Phase E** — Local model fine-tune via LoRA. Backend substrate already shipped in two carve-outs ([Step 28](https://github.com/aberson/toybox/issues), [Step 27 / E3 at `4f735a0`](https://github.com/aberson/toybox/commit/4f735a0)). Full ship gated on ≥50 SFT-filter rows in `labeled_events` — populated naturally as parents tag activities.
 
 ---

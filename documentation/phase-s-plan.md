@@ -178,6 +178,7 @@ CLAUDE.md states "Every Claude call goes through the capability gate for offline
   - `tests/integration/test_approve_animations.py` — integration test: POST approve → GET activity → assert each step's `metadata.avatar_animation` is a valid Animation member
 - **Done when:** `uv run pytest tests/ -x -q` passes; `uv run mypy src` 0 errors; `npm run typecheck && npm run test -- --run` pass; integration test confirms annotation round-trip; legacy activities (no `avatar_animation` in metadata) render with `float` fallback (existing activity fixture test)
 - **Depends on:** S1
+- **Status:** DONE (2026-06-05)
 
 <!-- autofix-applied: 2026-06-05 -->
 ### Step S3: iPad UAT — visual validation (closes R5 #216 + S3)
@@ -192,7 +193,7 @@ CLAUDE.md states "Every Claude call goes through the capability gate for offline
   4. No flashing, no strobe, no rapid brightness changes observed
   5. Step card body is clearly readable at arm's length
   6. R5 check: all Phase R features (cadence gone, Read Me limit, Q&A gating, search) still functional — no regressions from S1/S2
-  7. Both Child A (6) and Child B (4) sensory constraint satisfied — no animation triggers concern
+  7. Both Child A (age 6) and Child B (age 4) — the real children who use this device — confirm no animation triggers sensory concern
 - **Depends on:** S2
 
 ## 8. Risks and Open Questions

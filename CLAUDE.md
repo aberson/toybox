@@ -68,6 +68,6 @@ cd frontend; npm run typecheck; npm run lint; npm run test
 
 - Plan: `documentation/plan.md` (12 KB index)
 - Plan sub-docs: `documentation/plan/architecture.md`, `data-model.md`, `api.md`, `runtime.md`, `activity-loop.md`, `how-to-run.md`, `risks.md`, `appendix.md`
-- Phase R plan (latest): `documentation/phase-r-plan.md` — R5 iPad UAT (#216) still pending
+- Phase S plan (latest): `documentation/phase-s-plan.md` — S3 iPad UAT (#220) + R5 (#216) deferred, bundled with Phase T UAT
 - Operator runbooks: `documentation/operator/`
 - README: `README.md`
