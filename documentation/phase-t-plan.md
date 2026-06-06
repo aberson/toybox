@@ -259,6 +259,7 @@ button posts. No new backend endpoint needed for "launch from catalog".
   mypy src` 0 errors; `uv run ruff check .` clean; `git diff --exit-code
   frontend/src/shared/types.ts` confirms codegen ran and types.ts includes `CatalogEntry`
 - **Depends on:** T1 (UAT cleared)
+- **Status:** DONE (2026-06-06)
 
 <!-- autofix-applied: 2026-06-06 -->
 ### Step T3: Frontend `CatalogPanel` + [Queue / Browse catalog] toggle

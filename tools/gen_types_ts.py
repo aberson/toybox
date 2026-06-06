@@ -299,7 +299,41 @@ def _build_types_ts_content() -> str:
         "}\n"
     )
 
-    return header + choice_step + role_block + template_type_block + reward_block + activity_block
+    catalog_block = (
+        "\n/**\n"
+        " * Phase T Step T2 — offline template catalog wire shapes. Mirrors\n"
+        " * :class:`toybox.api.catalog.CatalogEntry` and\n"
+        " * :class:`toybox.api.catalog.CatalogResponse`. The CatalogPanel\n"
+        " * (T3) imports these to render the full template list without\n"
+        " * a search query.\n"
+        " *\n"
+        " * ``themes`` drives the theme chip filter UI; ``step_count`` is\n"
+        " * displayed on each card (\"N steps\"). Both are derived from the\n"
+        " * ``_Template`` dataclass in ``generator.py`` at request time.\n"
+        " */\n"
+        "export interface CatalogEntry {\n"
+        "  id: string;\n"
+        "  title: string;\n"
+        "  intent: string;\n"
+        "  themes: string[];\n"
+        "  step_count: number;\n"
+        "}\n"
+        "\n"
+        "export interface CatalogResponse {\n"
+        "  entries: CatalogEntry[];\n"
+        "  total: number;\n"
+        "}\n"
+    )
+
+    return (
+        header
+        + choice_step
+        + role_block
+        + template_type_block
+        + reward_block
+        + activity_block
+        + catalog_block
+    )
 
 
 def run_error_codes_fallback() -> int:

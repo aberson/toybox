@@ -160,3 +160,27 @@ export interface Activity {
   template_id: string | null;
   recommended_themes: string[];
 }
+
+/**
+ * Phase T Step T2 — offline template catalog wire shapes. Mirrors
+ * :class:`toybox.api.catalog.CatalogEntry` and
+ * :class:`toybox.api.catalog.CatalogResponse`. The CatalogPanel
+ * (T3) imports these to render the full template list without
+ * a search query.
+ *
+ * ``themes`` drives the theme chip filter UI; ``step_count`` is
+ * displayed on each card ("N steps"). Both are derived from the
+ * ``_Template`` dataclass in ``generator.py`` at request time.
+ */
+export interface CatalogEntry {
+  id: string;
+  title: string;
+  intent: string;
+  themes: string[];
+  step_count: number;
+}
+
+export interface CatalogResponse {
+  entries: CatalogEntry[];
+  total: number;
+}

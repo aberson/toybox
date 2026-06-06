@@ -22,6 +22,7 @@ from .api.activities import router as activities_router
 from .api.audio import router as audio_router
 from .api.auth import router as auth_router
 from .api.banned_themes_settings import router as banned_themes_settings_router
+from .api.catalog import router as catalog_router
 from .api.children import router as children_router
 from .api.clickable_words_enabled_settings import (
     router as clickable_words_enabled_settings_router,
@@ -102,6 +103,9 @@ def create_app() -> FastAPI:
     # Phase R Step R4: activity + template search (no auth — read-only).
     # Prefix is embedded in search.py's router declaration (``/api/search``).
     app.include_router(search_router)
+    # Phase T Step T2: full offline template catalog (no auth — read-only).
+    # Prefix is embedded in catalog.py's router declaration (``/api/catalog``).
+    app.include_router(catalog_router)
     app.include_router(build_ws_router())
 
     # Static read-only mount for committed toy + room images so the
