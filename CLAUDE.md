@@ -68,6 +68,7 @@ cd frontend; npm run typecheck; npm run lint; npm run test
 
 - Plan: `documentation/plan.md` (12 KB index)
 - Plan sub-docs: `documentation/plan/architecture.md`, `data-model.md`, `api.md`, `runtime.md`, `activity-loop.md`, `how-to-run.md`, `risks.md`, `appendix.md`
-- Phase S plan (latest): `documentation/phase-s-plan.md` — S3 iPad UAT (#220) + R5 (#216) deferred, bundled with Phase T UAT
+- Phase U plan (latest): `documentation/phase-u-plan.md` — U4 iPad UAT (#232) pending; AnimateDiff WebP approach deprecated in favour of Phase V hybrid (SVD idle + CSS slot-entry)
+- Phase T plan: `documentation/phase-t-plan.md` — T1 bundled iPad UAT (#223) + T4 catalog UAT (#226) pending; umbrella #222 open
 - Operator runbooks: `documentation/operator/`
 - README: `README.md`

@@ -1,6 +1,6 @@
 # toybox
 
-![Python](https://img.shields.io/badge/python-3.12-blue) [![linux-tests](https://github.com/aberson/toybox/actions/workflows/linux-tests.yml/badge.svg?branch=master)](https://github.com/aberson/toybox/actions/workflows/linux-tests.yml) [![frontend-tests](https://github.com/aberson/toybox/actions/workflows/frontend-tests.yml/badge.svg?branch=master)](https://github.com/aberson/toybox/actions/workflows/frontend-tests.yml) ![pytest](https://img.shields.io/badge/pytest-2298%20passing-brightgreen) ![vitest](https://img.shields.io/badge/vitest-709%20passing-brightgreen) ![Local-first](https://img.shields.io/badge/local--first-family%20private-purple) ![License](https://img.shields.io/badge/license-MIT-blue)
+![Python](https://img.shields.io/badge/python-3.12-blue) [![linux-tests](https://github.com/aberson/toybox/actions/workflows/linux-tests.yml/badge.svg?branch=master)](https://github.com/aberson/toybox/actions/workflows/linux-tests.yml) [![frontend-tests](https://github.com/aberson/toybox/actions/workflows/frontend-tests.yml/badge.svg?branch=master)](https://github.com/aberson/toybox/actions/workflows/frontend-tests.yml) ![pytest](https://img.shields.io/badge/pytest-2323%20passing-brightgreen) ![vitest](https://img.shields.io/badge/vitest-731%20passing-brightgreen) ![Local-first](https://img.shields.io/badge/local--first-family%20private-purple) ![License](https://img.shields.io/badge/license-MIT-blue)
 
 A local-first home AI that watches for play opportunities, suggests structured activities to a parent, and runs the approved ones on a child kiosk featuring AI personas.
 
@@ -37,7 +37,7 @@ Both share types, ws envelopes, and the same FastAPI backend — one async proce
 
 > **25 → 1,243 activity templates** across 14 phases shipped, fully on-device. Catalog grows by parent approvals → labeled events → SFT corpus, waiting on ≥50 rows before LoRA fine-tune kicks in (Phase E).
 >
-> **iPad UAT 11/12 PASS** at Phase M close (2026-05-18) — kiosk runs as a Guided Access app on a real iPad over Wi-Fi LAN. **2,298 pytest + 709 vitest** green at Phase S close (2026-06-05). Fully offline once whisper-small + persona avatars + element sprites are cached locally.
+> **iPad UAT 11/12 PASS** at Phase M close (2026-05-18) — kiosk runs as a Guided Access app on a real iPad over Wi-Fi LAN. **2,323 pytest + 731 vitest** green at Phase U close (2026-06-07). Fully offline once whisper-small + persona avatars + element sprites are cached locally.
 
 ## What makes this different
 
