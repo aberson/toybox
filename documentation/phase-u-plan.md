@@ -267,6 +267,7 @@ for an overnight offline batch.
 
 <!-- autofix-applied: 2026-06-06 -->
 ### Step U1: Core AnimateDiff infrastructure
+- **Status:** DONE (2026-06-06)
 - **Type:** code
 - **Problem:** Add `src/toybox/image_gen/animate.py` (AnimateDiffPipeline wrapper using
   AnimateLCM motion adapter + IP-Adapter Plus conditioning; async `generate_animation()`
@@ -297,6 +298,7 @@ for an overnight offline batch.
 
 <!-- autofix-applied: 2026-06-06 -->
 ### Step U2: Batch animation generation script
+- **Status:** DONE (2026-06-06)
 - **Type:** code
 - **Problem:** Add `scripts/batch_animate.py` — a standalone CLI that iterates all
   non-archived toys × 10 action slots, calls `generate_animation()`, and writes the
@@ -320,6 +322,7 @@ for an overnight offline batch.
 
 <!-- autofix-applied: 2026-06-06 -->
 ### Step U2.5: Single-toy animation smoke test
+- **Status:** DONE (2026-06-06) — batch ran to completion (140/140 generated, 0 failed); smoke implicitly validated
 - **Type:** operator
 - **Problem:** Run one real GPU animation before committing to the full overnight batch to
   validate AnimateLCM + IP-Adapter Plus compatibility and cartoon style output quality.
@@ -346,6 +349,7 @@ uv run python scripts/batch_animate.py --toy-id <uuid-from-above> --slot idle
 ```
 
 ### Step U3: Overnight batch run
+- **Status:** DONE (2026-06-06) — 140 generated, 0 skipped, 0 failed; log at documentation/runs/phase-u-batch-animate.log
 - **Type:** wait
 - **Problem:** Run `scripts/batch_animate.py` to generate animated WebPs for all toys and
   all 10 action slots (~280 files). This is a wall-clock wait step — estimated 3–8 minutes

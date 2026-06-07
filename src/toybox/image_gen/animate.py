@@ -172,8 +172,9 @@ def _build_animate_pipeline() -> Any:
         DEFAULT_BASE_MODEL_PATH,
         motion_adapter=adapter,
         torch_dtype=torch.float16,
-        safety_checker=None,
-        requires_safety_checker=False,
+        variant="fp16",
+        use_safetensors=True,
+        local_files_only=True,
     )
     # AnimateLCM requires beta_schedule="linear"; standard AnimateDiff
     # adapters use DDIM — do NOT omit this parameter.
@@ -187,7 +188,7 @@ def _build_animate_pipeline() -> Any:
     )
     pipe.set_ip_adapter_scale(IP_ADAPTER_SCALE)
     pipe.to("cuda")
-    pipe.enable_vae_slicing()
+    pipe.vae.enable_slicing()
     return pipe
 
 
