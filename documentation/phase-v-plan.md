@@ -135,37 +135,55 @@ triggering a re-render that would restart the animation.
 ## 7. Build Steps
 
 ### Step V1: ToyActionSprite CSS intro + idle WebP state machine
+- **Umbrella:** #234
 - **Type:** code
 - **Problem:** Extend `ToyActionSprite.tsx` with:
   (a) A `SLOT_INTRO_ANIMATIONS` map (slot → CSS animation name) covering all 10 slots.
-  (b) CSS keyframes for each intro animation (inline `<style>` or a `ToyActionSprite.css`
-      module — prefer CSS module to keep the component file readable).
+  (b) CSS keyframes for each intro animation in `ToyActionSprite.module.css`. Each
+      slot's animation is targeted via attribute selector (e.g.
+      `img[data-animating="jumping"] { animation: bounceUp 0.6s forwards; }`).
   (c) An `animating` boolean ref; set `true` on mount and on slot-prop change (via
-      `useEffect`). While `animating=true`, the `<img>` carries an `animating` CSS class
-      that applies the slot-appropriate intro animation.
-  (d) `onAnimationEnd` handler: sets `animating=false`, then if `slot === "idle"` sets
-      `format` state to `"webp"` (triggering the SVD loop attempt); otherwise leaves
-      `format` as `"png"`.
+      `useEffect`). While `animating=true`, the `<img>` carries a `data-animating="<slot>"`
+      attribute (e.g. `data-animating="jumping"`). The CSS module targets this attribute
+      for the slot-appropriate keyframe. Using a data attribute avoids CSS module
+      class-name mangling in test assertions.
+  (d) `onAnimationEnd` handler: sets `animating=false` (removes `data-animating`), then
+      if `slot === "idle"` sets `format` state to `"webp"` (triggering the SVD loop
+      attempt); otherwise leaves `format` as `"png"`.
   (e) The existing WebP-first `onError` fallback chain (webp → png → hidden) from Phase U
       is preserved — it only fires during the idle steady state.
+  (f) Initial render uses `format="png"` during the animating phase; format only switches
+      to `"webp"` after `onAnimationEnd` fires for the idle slot. The CSS intro animation
+      plays on the sharp static PNG; the animated WebP activates after idle intro
+      completes. **This is a breaking change from Phase U** (which started with
+      `format="webp"`); existing tests must be updated (see below).
   Add tests:
-  - `plays_intro_animation_on_mount`: assert `animating` class present immediately after
-    render.
-  - `clears_animating_on_animation_end`: fire `animationend` event, assert class removed.
+  - `plays_intro_animation_on_mount`: assert `img.dataset.animating === slot` immediately
+    after render (data-animating attribute present; avoids CSS module name mangling).
+  - `clears_animating_on_animation_end`: fire `animationend` event, assert `data-animating`
+    attribute is absent.
   - `transitions_to_webp_after_idle_intro`: fire `animationend` with slot=idle, assert src
     switches to `.webp`.
   - `stays_png_after_non_idle_intro`: fire `animationend` with slot=jumping, assert src
     stays `.png`.
-  - `replays_intro_on_slot_change`: change `slot` prop, assert `animating` class reappears.
-- **Issue:** #233
+  - `replays_intro_on_slot_change`: change `slot` prop, assert `data-animating` reappears
+    with new slot value.
+  Update existing Phase U tests (`ToyActionSprite.test.tsx`) — initial src is now `.png`
+  (format starts as `"png"` during animation), not `.webp`:
+  - `renders an <img> with the correct src + alt` → assert `.png` initial src
+  - `falls back to png on webp 404` → WebP fallback fires only during idle steady state,
+    not initial render; restructure to test idle-steady-state webp→png path
+  - `appends ?v=<cacheKey> to the initial webp src` → assert initial `.png` src with key
+  - `emits the bare webp URL with no query string when cacheKey is omitted` → assert
+    initial `.png` src
+- **Issue:** #235
 - **Flags:** --reviewers code
 - **Produces:**
-  - `frontend/src/child/components/ToyActionSprite.tsx` — state machine + intro class
-  - `frontend/src/child/components/ToyActionSprite.module.css` — all 10 keyframe animations
-  - `frontend/src/child/components/ToyActionSprite.test.tsx` — 5 new tests
+  - `frontend/src/child/components/ToyActionSprite.tsx` — state machine + data-animating attribute
+  - `frontend/src/child/components/ToyActionSprite.module.css` — all 10 keyframe animations (first CSS module in project; vitest handles via Vite transform natively)
+  - `frontend/src/child/components/ToyActionSprite.test.tsx` — 5 new tests + 4 Phase U test updates
 - **Done when:** `npm run test` passes including new tests; `npm run typecheck` clean;
-  `npm run lint` clean; visual inspection in browser confirms intro animations play on
-  slot change
+  `npm run lint` clean
 - **Depends on:** none
 
 ### Step V2: SVD idle batch
@@ -176,22 +194,25 @@ triggering a re-render that would restart the animation.
   `data/images/toy_actions/<toy_id>/idle.webp` (overwriting the Phase U AnimateDiff output).
   After adding the flag, run the full idle batch for all toys.
   The `run_c()` implementation in `scripts/compare_animate.py` is the reference; adapt it
-  into `batch_animate.py`'s existing job-loop structure.
-- **Issue:** #234
+  into `batch_animate.py`'s existing job-loop structure. Note: `run_c()` does not pass
+  `local_files_only=True` to `from_pretrained()`; the batch path must pass it explicitly
+  to prevent network access when running offline with the model already on disk.
+- **Issue:** #236
 - **Flags:** --reviewers code
 - **Produces:**
   - `scripts/batch_animate.py` — `--approach svd` flag + SVD generation path
   - ~28 `.webp` files overwritten at `data/images/toy_actions/<toy_id>/idle.webp`
 - **Done when:** `uv run python scripts/batch_animate.py --approach svd --slot idle --dry-run`
   lists all non-archived toys; full batch completes with 0 failures; a sample
-  `idle.webp` opened in browser shows the character moving (not a static frame)
+  `idle.webp` opened in browser shows the character moving (not a static frame);
+  `uv run ruff check scripts/batch_animate.py` clean; `uv run mypy src` clean
 - **Depends on:** V1 (CSS animations can be tested independently; SVD WebPs only matter once
   the `onAnimationEnd` → webp transition is wired)
 
 ### Step V3: iPad UAT — hybrid animation
 - **Type:** operator
 - **Problem:** Validate the hybrid animation on real iPad hardware with both children.
-- **Issue:** #235
+- **Issue:** #237
 - **Produces:** UAT run-doc at `documentation/runs/2026-06-<date>-phase-v-uat.md`
 - **Done when:** Operator confirms on iPad:
   1. Step loads → intro animation plays once for the active slot (e.g. jumping bounces in)
@@ -211,4 +232,4 @@ triggering a re-render that would restart the animation.
 | `onAnimationEnd` fires before CSS is applied in test env | JSDOM CSS animation timing is unreliable | Use `fireEvent.animationEnd` in tests; don't rely on actual timing |
 | Overwriting Phase U idle WebPs | 28 files replaced; no rollback | Phase U WebPs were poor quality; SVD is strictly better. Batch is re-runnable with --force |
 | SVD `enable_model_cpu_offload` + Windows | CPU offload is slower on Windows; no known error | Matches compare_animate.py which already ran successfully on this machine |
-| CSS module import in existing test setup | Vitest config needs `moduleNameMapper` for `.module.css` | Already configured for other CSS modules in the project |
+| CSS module class-name mangling in tests | CSS modules transform class names; `.classList.contains('animating')` would fail | Use `data-animating="<slot>"` attribute as the test hook; CSS targets attribute selectors. No existing `.module.css` files in project — first-use; vitest handles CSS modules via Vite transform natively without extra config |
