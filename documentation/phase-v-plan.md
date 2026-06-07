@@ -189,6 +189,7 @@ triggering a re-render that would restart the animation.
 
 ### Step V2: SVD idle batch
 - **Type:** wait
+- **Status:** DONE (2026-06-07) — code shipped at 241eaf0; batch pending operator run
 - **Problem:** Add `--approach svd` flag to `scripts/batch_animate.py`. When `--approach svd`
   is used: reads the existing static `idle.png` for each toy as the input image (not the raw
   reference photo), runs `StableVideoDiffusionPipeline`, writes the animated WebP to
