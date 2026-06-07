@@ -96,11 +96,9 @@ describe("StepCard sprite branch", () => {
     const sprite = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
     expect(sprite.dataset["slot"]).toBe("looking");
     expect(sprite.dataset["toyId"]).toBe("toy-abc");
-    // URL composes from the toy_id + slot — the worker writes sprites
-    // under ``data/images/toy_actions/<toy_id>/<slot>.png`` and the
-    // backend's static-files mount lives at ``/api/static/images``.
+    // Phase U: initial src is .webp (WebP-first with PNG fallback).
     expect(sprite.getAttribute("src")).toBe(
-      "/api/static/images/toy_actions/toy-abc/looking.png",
+      "/api/static/images/toy_actions/toy-abc/looking.webp",
     );
   });
 

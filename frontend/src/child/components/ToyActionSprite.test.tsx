@@ -23,11 +23,9 @@ describe("ToyActionSprite", () => {
       />,
     );
     const img = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
-    // src is the full computed URL; happy-dom prefixes it with the
-    // test origin (``http://localhost:3000``) so we assert the suffix
-    // — the load-bearing part is the path under ``/api/static/images``.
+    // Phase U: initial src is .webp (WebP-first with PNG fallback).
     expect(img.getAttribute("src")).toBe(
-      "/api/static/images/toy_actions/toy-abc/looking.png",
+      "/api/static/images/toy_actions/toy-abc/looking.webp",
     );
     expect(img.alt).toBe("Mr. Unicorn looking");
     // Default size is 112 px — the kiosk passes no size override.
@@ -39,15 +37,29 @@ describe("ToyActionSprite", () => {
     expect(img.dataset["slot"]).toBe("looking");
   });
 
-  it("hides itself when the image fails to load (404)", () => {
+  // Phase U: two-stage fallback. First error (webp 404) falls back to png;
+  // second error (png 404) hides the element.
+  it("falls back to png on webp 404", () => {
+    render(<ToyActionSprite toyId="toy-missing" slot="jumping" />);
+    const img = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
+    expect(img.getAttribute("src")).toBe(
+      "/api/static/images/toy_actions/toy-missing/jumping.webp",
+    );
+    fireEvent.error(img);
+    const imgAfter = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
+    expect(imgAfter.getAttribute("src")).toBe(
+      "/api/static/images/toy_actions/toy-missing/jumping.png",
+    );
+  });
+
+  it("hides itself when both webp and png fail to load", () => {
     const { container } = render(
       <ToyActionSprite toyId="toy-missing" slot="jumping" />,
     );
     const img = screen.getByTestId("toy-action-sprite");
-    // Simulate the browser's onError event firing — the asset 404s
-    // (capability disabled, generation pending, generation failed)
-    // so the component must drop itself from the DOM.
     fireEvent.error(img);
+    const imgAfterFirst = screen.getByTestId("toy-action-sprite");
+    fireEvent.error(imgAfterFirst);
     expect(
       container.querySelector('[data-testid="toy-action-sprite"]'),
     ).toBeNull();
@@ -78,42 +90,37 @@ describe("ToyActionSprite", () => {
   // ``cacheKey`` prop adds a ``?v=<value>`` query string so the browser
   // treats the post-regenerate URL as a distinct resource. ``ToyActionGrid``
   // threads ``row.seed`` as the cache key for done rows.
-  it("appends ?v=<cacheKey> to the src when cacheKey is provided", () => {
+  // Phase U: cacheKey applies to the currently-attempted format (initially webp).
+  it("appends ?v=<cacheKey> to the initial webp src when cacheKey is provided", () => {
     render(
       <ToyActionSprite toyId="t" slot="idle" cacheKey="seed-12345" />,
     );
     const img = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
     expect(img.getAttribute("src")).toBe(
-      "/api/static/images/toy_actions/t/idle.png?v=seed-12345",
+      "/api/static/images/toy_actions/t/idle.webp?v=seed-12345",
     );
   });
 
-  it("emits the bare URL with no query string when cacheKey is omitted (backwards-compat)", () => {
+  it("emits the bare webp URL with no query string when cacheKey is omitted", () => {
     render(<ToyActionSprite toyId="t" slot="idle" />);
     const img = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
-    // The kiosk and any existing callsite that doesn't pass cacheKey
-    // must continue to get the bare URL — no stray ``?v=`` that would
-    // bust the cache unnecessarily on every render.
     expect(img.getAttribute("src")).toBe(
-      "/api/static/images/toy_actions/t/idle.png",
+      "/api/static/images/toy_actions/t/idle.webp",
     );
   });
 
   it("URL-encodes the cacheKey value (space and ampersand)", () => {
-    // ``encodeURIComponent`` is the contract: spaces become %20, ampersands
-    // become %26 — guarantees the query string parses cleanly regardless
-    // of what shape the upstream seed/version value takes.
     const { rerender } = render(
       <ToyActionSprite toyId="t" slot="idle" cacheKey="a b" />,
     );
     let img = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
     expect(img.getAttribute("src")).toBe(
-      "/api/static/images/toy_actions/t/idle.png?v=a%20b",
+      "/api/static/images/toy_actions/t/idle.webp?v=a%20b",
     );
     rerender(<ToyActionSprite toyId="t" slot="idle" cacheKey="a&b" />);
     img = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
     expect(img.getAttribute("src")).toBe(
-      "/api/static/images/toy_actions/t/idle.png?v=a%26b",
+      "/api/static/images/toy_actions/t/idle.webp?v=a%26b",
     );
   });
 });
