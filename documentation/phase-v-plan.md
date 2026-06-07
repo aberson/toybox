@@ -137,6 +137,7 @@ triggering a re-render that would restart the animation.
 ### Step V1: ToyActionSprite CSS intro + idle WebP state machine
 - **Umbrella:** #234
 - **Type:** code
+- **Status:** DONE (2026-06-07)
 - **Problem:** Extend `ToyActionSprite.tsx` with:
   (a) A `SLOT_INTRO_ANIMATIONS` map (slot → CSS animation name) covering all 10 slots.
   (b) CSS keyframes for each intro animation in `ToyActionSprite.module.css`. Each
