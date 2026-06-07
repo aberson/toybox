@@ -1,0 +1,101 @@
+/* Phase V: CSS keyframe intro animations for each slot.
+   Targeted via data-animating attribute to avoid CSS-module class-name
+   mangling in test assertions. Each animation uses forwards fill-mode
+   so the final frame is held until animationend fires. */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes tiltIn {
+  from { opacity: 0; transform: rotate(-15deg) scale(0.85); }
+  to   { opacity: 1; transform: rotate(0deg) scale(1); }
+}
+
+@keyframes bounceUp {
+  0%   { opacity: 0; transform: translateY(30px); }
+  60%  { opacity: 1; transform: translateY(-8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes bounceWiggle {
+  0%   { opacity: 0; transform: translateY(20px) rotate(0deg); }
+  50%  { opacity: 1; transform: translateY(-6px) rotate(6deg); }
+  75%  { transform: translateY(0) rotate(-4deg); }
+  100% { opacity: 1; transform: translateY(0) rotate(0deg); }
+}
+
+@keyframes floatIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes swingIn {
+  0%   { opacity: 0; transform: rotate(-20deg); transform-origin: top center; }
+  70%  { opacity: 1; transform: rotate(8deg); transform-origin: top center; }
+  100% { opacity: 1; transform: rotate(0deg); transform-origin: top center; }
+}
+
+@keyframes slideInFast {
+  from { opacity: 0; transform: translateX(30px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slowFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes wobbleIn {
+  0%   { opacity: 0; transform: rotate(-10deg) scale(0.9); }
+  40%  { opacity: 1; transform: rotate(6deg) scale(1.05); }
+  70%  { transform: rotate(-4deg) scale(0.98); }
+  100% { opacity: 1; transform: rotate(0deg) scale(1); }
+}
+
+/* Intro animation selectors — one per slot */
+img[data-animating="idle"] {
+  animation: fadeIn 0.4s forwards;
+}
+
+img[data-animating="pointing"] {
+  animation: slideInLeft 0.5s forwards;
+}
+
+img[data-animating="looking"] {
+  animation: tiltIn 0.5s forwards;
+}
+
+img[data-animating="jumping"] {
+  animation: bounceUp 0.6s forwards;
+}
+
+img[data-animating="cheering"] {
+  animation: bounceWiggle 0.6s forwards;
+}
+
+img[data-animating="thinking"] {
+  animation: floatIn 0.7s forwards;
+}
+
+img[data-animating="waving"] {
+  animation: swingIn 0.5s forwards;
+}
+
+img[data-animating="running"] {
+  animation: slideInFast 0.3s forwards;
+}
+
+img[data-animating="sleeping"] {
+  animation: slowFadeIn 1.0s forwards;
+}
+
+img[data-animating="confused"] {
+  animation: wobbleIn 0.6s forwards;
+}

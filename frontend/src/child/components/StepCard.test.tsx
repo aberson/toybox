@@ -96,9 +96,10 @@ describe("StepCard sprite branch", () => {
     const sprite = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
     expect(sprite.dataset["slot"]).toBe("looking");
     expect(sprite.dataset["toyId"]).toBe("toy-abc");
-    // Phase U: initial src is .webp (WebP-first with PNG fallback).
+    // Phase V: initial src is .png during the CSS intro animation phase.
+    // Format transitions to .webp only after animationend fires for idle slot.
     expect(sprite.getAttribute("src")).toBe(
-      "/api/static/images/toy_actions/toy-abc/looking.webp",
+      "/api/static/images/toy_actions/toy-abc/looking.png",
     );
   });
 
