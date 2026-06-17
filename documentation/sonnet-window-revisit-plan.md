@@ -99,6 +99,7 @@ Row: `commit | verdict (OK | needs-fix | reverted) | note`.
 - **Files:** src/toybox/ (activities, api, ws), frontend/src/parent/, frontend/src/child/, documentation/sonnet-window-revisit-findings.md
 - **Done when:** a7ebf84 (R3 gating) reviewed FIRST for safety-correctness; c6d4816 (R2 limit) confirmed sane for kids; 222a804 (R1) + fafb9c5 (R4 search) reviewed; test suite green; verdicts appended; fixes applied where needed.
 - **Flags:** --reviewers code
+- **Status:** DONE (2026-06-17) — all 5 commits OK (no Sonnet error). a7ebf84 R3 gate verified sound (server-side, parent-scope, fails-closed, atomic) by orchestrator + adversarial reviewer. Cross-cutting pre-existing finding (kiosk holds parent token; gate UI-enforced not credential-enforced until Phase D Step 20) filed as #244.
 
 <!-- autofix-applied: 2026-06-17 -->
 ### Step 2: Re-review launcher LAN-bind security (02f8c76)
