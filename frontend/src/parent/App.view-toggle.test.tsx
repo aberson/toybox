@@ -38,6 +38,7 @@ const CATALOG_RESPONSE = {
       intent: "boredom",
       themes: [],
       step_count: 2,
+      has_element: false,
     },
   ],
   total: 1,

@@ -256,43 +256,66 @@ function fakeCatalogEntry(overrides: Partial<CatalogEntry> = {}): CatalogEntry {
     intent: "play",
     themes: [],
     step_count: 3,
+    has_element: false,
     ...overrides,
   };
 }
 
 describe("categorizeTemplate() — Phase T Step T3", () => {
-  it("filterCategory undefined → always returns true regardless of themes", () => {
-    const entry = fakeCatalogEntry({ themes: ["feelings", "periodic_table"] });
+  it("filterCategory undefined → always returns true regardless of fields", () => {
+    const entry = fakeCatalogEntry({ themes: ["feelings"], has_element: true });
     expect(categorizeTemplate(entry, undefined)).toBe(true);
   });
 
-  it("periodic_table theme + filterCategory 'elements' → true", () => {
-    const entry = fakeCatalogEntry({ themes: ["periodic_table", "science"] });
+  it("has_element + filterCategory 'elements' → true", () => {
+    const entry = fakeCatalogEntry({ themes: ["science"], has_element: true });
     expect(categorizeTemplate(entry, "elements")).toBe(true);
   });
 
-  it("periodic_table theme + filterCategory 'adventures' → false", () => {
-    const entry = fakeCatalogEntry({ themes: ["periodic_table"] });
+  it("has_element + filterCategory 'adventures' → false (Elements wins)", () => {
+    const entry = fakeCatalogEntry({ has_element: true });
     expect(categorizeTemplate(entry, "adventures")).toBe(false);
   });
 
-  it("feelings theme + filterCategory 'feelings-friends' → true", () => {
+  // SWR Step 4 regression: a real element template carries ORDINARY themes
+  // (e.g. friendship/silly) and NO ``periodic_table`` theme (which is not a
+  // Theme enum member). It must still bucket to Elements via ``has_element``.
+  // The pre-fix code keyed on ``themes.includes("periodic_table")`` and would
+  // have (a) dropped this card from the Elements tab and (b) shown it under
+  // Adventures — silently emptying the Elements catalog tab.
+  it("element template with ordinary themes + no periodic_table → Elements", () => {
+    const entry = fakeCatalogEntry({
+      themes: ["friendship", "silly"],
+      has_element: true,
+    });
+    expect(categorizeTemplate(entry, "elements")).toBe(true);
+    expect(categorizeTemplate(entry, "adventures")).toBe(false);
+    expect(categorizeTemplate(entry, "feelings-friends")).toBe(false);
+  });
+
+  it("has_element precedence: beats a feelings theme", () => {
+    const entry = fakeCatalogEntry({ themes: ["feelings"], has_element: true });
+    expect(categorizeTemplate(entry, "elements")).toBe(true);
+    expect(categorizeTemplate(entry, "feelings-friends")).toBe(false);
+  });
+
+  it("feelings theme (no element) + filterCategory 'feelings-friends' → true", () => {
     const entry = fakeCatalogEntry({ themes: ["feelings", "friendship"] });
     expect(categorizeTemplate(entry, "feelings-friends")).toBe(true);
   });
 
-  it("feelings theme + filterCategory 'adventures' → false", () => {
+  it("feelings theme (no element) + filterCategory 'adventures' → false", () => {
     const entry = fakeCatalogEntry({ themes: ["feelings"] });
     expect(categorizeTemplate(entry, "adventures")).toBe(false);
   });
 
-  it("no special themes + filterCategory 'adventures' → true (default bucket)", () => {
-    const entry = fakeCatalogEntry({ themes: ["treasure", "exploration"] });
+  it("no special themes, no element + filterCategory 'adventures' → true (default bucket)", () => {
+    const entry = fakeCatalogEntry({ themes: ["adventure", "magic"] });
     expect(categorizeTemplate(entry, "adventures")).toBe(true);
   });
 
-  it("no special themes + filterCategory 'elements' → false", () => {
-    const entry = fakeCatalogEntry({ themes: ["treasure"] });
+  it("no special themes, no element + filterCategory 'elements' → false", () => {
+    const entry = fakeCatalogEntry({ themes: ["adventure"] });
     expect(categorizeTemplate(entry, "elements")).toBe(false);
   });
 });

@@ -72,3 +72,45 @@ def test_total_equals_len_entries() -> None:
     assert body["total"] == len(body["entries"]), (
         f"total={body['total']} != len(entries)={len(body['entries'])}"
     )
+
+
+def test_all_entries_have_has_element_bool() -> None:
+    """Every entry carries a boolean ``has_element`` flag.
+
+    SWR Step 4 wire-shape fix: the Elements bucket on the CatalogPanel is
+    driven by this field, not by a (non-existent) ``periodic_table`` theme.
+    """
+    client = _client()
+    body = client.get("/api/catalog").json()
+    for entry in body["entries"]:
+        assert "has_element" in entry, f"entry missing has_element: {entry['id']}"
+        assert isinstance(entry["has_element"], bool), (
+            f"has_element must be a bool for entry {entry['id']}, "
+            f"got {type(entry['has_element']).__name__}"
+        )
+
+
+def test_has_element_true_for_real_element_template() -> None:
+    """At least one shipped template flags ``has_element=True``.
+
+    SWR Step 4 regression: element templates (steps carrying ``element_id``)
+    must be discoverable as Elements off the wire. Pre-fix the response had no
+    element marker at all, so the CatalogPanel guessed from a ``periodic_table``
+    theme that the Theme enum does not define — silently emptying the Elements
+    catalog tab. This pins that the backend actually emits a True flag for the
+    element corpus, AND that such templates do NOT carry a ``periodic_table``
+    theme (proving the old theme-based proxy was structurally wrong).
+    """
+    client = _client()
+    body = client.get("/api/catalog").json()
+    element_entries = [e for e in body["entries"] if e["has_element"]]
+    assert element_entries, (
+        "Expected at least one catalog entry with has_element=True "
+        "(element corpus templates carry per-step element_id)."
+    )
+    for entry in element_entries:
+        assert "periodic_table" not in entry["themes"], (
+            f"{entry['id']} unexpectedly carries a periodic_table theme; "
+            "the Theme enum has no such member — element bucketing must use "
+            "has_element, not this theme."
+        )

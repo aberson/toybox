@@ -27,14 +27,20 @@ const ENTRY_ADVENTURES: CatalogEntry = {
   intent: "play",
   themes: ["adventure", "treasure"],
   step_count: 5,
+  has_element: false,
 };
 
+// SWR Step 4: an element template carries ORDINARY themes (real element
+// templates have e.g. friendship/silly) and is bucketed to Elements via the
+// ``has_element`` flag, NOT a ``periodic_table`` theme (which is not a Theme
+// enum member and never reaches the wire).
 const ENTRY_ELEMENTS: CatalogEntry = {
   id: "element_gold_001",
   title: "Gold Explorer",
   intent: "learn",
-  themes: ["periodic_table", "science"],
+  themes: ["science"],
   step_count: 4,
+  has_element: true,
 };
 
 const ENTRY_FEELINGS: CatalogEntry = {
@@ -43,6 +49,7 @@ const ENTRY_FEELINGS: CatalogEntry = {
   intent: "social",
   themes: ["feelings", "friendship"],
   step_count: 3,
+  has_element: false,
 };
 
 function makeCatalogResponse(

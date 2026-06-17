@@ -171,6 +171,12 @@ export interface Activity {
  * ``themes`` drives the theme chip filter UI; ``step_count`` is
  * displayed on each card ("N steps"). Both are derived from the
  * ``_Template`` dataclass in ``generator.py`` at request time.
+ *
+ * ``has_element`` is the authoritative Elements-bucket signal: true
+ * when any step carries an ``element_id`` (mirrors the backend
+ * ``generator._filter_by_category`` rule and the runtime
+ * ``categorize()`` helper). The CatalogPanel buckets templates by
+ * this flag, NOT by a theme — ``periodic_table`` is not a Theme.
  */
 export interface CatalogEntry {
   id: string;
@@ -178,6 +184,7 @@ export interface CatalogEntry {
   intent: string;
   themes: string[];
   step_count: number;
+  has_element: boolean;
 }
 
 export interface CatalogResponse {

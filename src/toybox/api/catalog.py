@@ -37,6 +37,15 @@ class CatalogEntry(BaseModel):
     intent: str
     themes: list[str]
     step_count: int
+    # SWR Step 4 wire-shape fix: the authoritative "Elements" discriminator
+    # is a per-step ``element_id`` (see ``generator._filter_by_category`` and
+    # the runtime ``categorize()`` helper), NOT a theme. ``periodic_table`` is
+    # not a member of the :class:`~toybox.activities.themes.Theme` enum, so it
+    # can never appear in ``themes``; element templates carry ordinary themes
+    # like ``friendship``/``silly``. Surface a boolean so the CatalogPanel can
+    # bucket Elements correctly off the wire instead of guessing from a theme
+    # that does not exist.
+    has_element: bool
 
 
 class CatalogResponse(BaseModel):
@@ -81,6 +90,9 @@ def get_catalog() -> CatalogResponse:
                     intent=intent,
                     themes=[t.value for t in tmpl.recommended_themes],
                     step_count=len(tmpl.steps),
+                    has_element=any(
+                        step.element_id is not None for step in tmpl.steps
+                    ),
                 )
             )
 

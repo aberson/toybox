@@ -40,14 +40,18 @@ import type { Activity } from "../api";
 
 export type ActivityCategory = "adventures" | "elements" | "feelings-friends";
 
-// Internal helper: bucket a theme list into a category.
+// Internal helper: bucket a theme list into a category, AFTER the
+// Elements rule has already been excluded by the caller.
 // Precedence: Elements > Feelings & Friends > Adventures.
 //
-// For Activities, the "elements" bucket is detected via per-step
-// ``element_id`` (see ``categorize()``). For CatalogEntry templates,
-// there is no per-step element_id on the wire; instead element templates
-// carry the ``"periodic_table"`` theme. This helper covers the theme
-// dimension that both code paths share.
+// The Elements bucket is detected via the per-step ``element_id`` signal,
+// which both code paths share: ``categorize()`` reads ``step.element_id``
+// off the Activity envelope, and ``categorizeTemplate()`` reads the
+// ``has_element`` boolean off the CatalogEntry wire (the backend derives
+// it from the same ``element_id``). ``periodic_table`` is NOT a member of
+// the Theme taxonomy, so it never appears in ``themes`` — this helper
+// only covers the Feelings/Adventures split that remains once Elements
+// has been handled.
 function categoryFromThemes(themes: readonly string[]): ActivityCategory {
   if (themes.includes("feelings")) {
     return "feelings-friends";
@@ -75,16 +79,19 @@ export function categorize(activity: Activity): ActivityCategory {
 // the supplied category. When ``filterCategory`` is ``undefined`` (the
 // "All" sub-tab), always returns true.
 //
-// Element templates carry the ``"periodic_table"`` theme by convention
-// (set by generator.py on every element_microgame template). The
-// ``"elements"`` bucket therefore matches on that theme — same
-// precedence as ``categorize()`` (Elements > Feelings > Adventures).
+// Element templates are detected via the ``has_element`` flag the backend
+// emits (true when any template step carries an ``element_id``) — the same
+// authoritative signal ``categorize()`` and ``generator._filter_by_category``
+// use. ``periodic_table`` is NOT a Theme enum member, so element templates
+// carry ordinary themes (e.g. ``friendship``/``silly``); bucketing them by a
+// non-existent theme silently emptied the Elements catalog tab (SWR Step 4).
+// Precedence matches ``categorize()``: Elements > Feelings > Adventures.
 export function categorizeTemplate(
   entry: CatalogEntry,
   filterCategory: ActivityCategory | undefined,
 ): boolean {
   if (filterCategory === undefined) return true;
-  const actual = entry.themes.includes("periodic_table")
+  const actual = entry.has_element
     ? "elements"
     : categoryFromThemes(entry.themes);
   return actual === filterCategory;

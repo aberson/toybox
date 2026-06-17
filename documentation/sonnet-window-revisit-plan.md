@@ -130,6 +130,7 @@ Row: `commit | verdict (OK | needs-fix | reverted) | note`.
 - **Files:** src/toybox/api/, frontend/src/shared/types.ts, frontend/src/parent/, documentation/sonnet-window-revisit-findings.md
 - **Done when:** the /api/catalog response shape asserted to match what CatalogPanel renders (not just "tests pass" — the dev who shipped it may have updated tests to match); categorizeTemplate correctness checked; verdicts appended; fixes applied where needed.
 - **Flags:** --reviewers code
+- **Status:** DONE (2026-06-17) — needs-fix FOUND + FIXED. Real wire-shape drift (code-quality.md §3): T2 CatalogEntry lacked an element discriminator, so T3 categorizeTemplate keyed Elements on `themes.includes("periodic_table")` — but `periodic_table` is NOT a Theme enum member, so the Browse Elements tab was silently empty (element templates fell into Adventures); the 10 vitest cases passed only because fixtures fabricated the non-existent theme. Fix: added `has_element: bool` to the wire (`any(step.element_id is not None ...)`, the backend's own elements rule) + codegen + categorize.ts keys on it + replaced fabricated fixtures with realistic ones + 2 backend + frontend regression tests. Post-merge gates GREEN in main project: pytest 2325 (+2), vitest 740 (+2), typecheck/ruff/mypy clean. Verified by orchestrator (read catalog.py + categorize.ts hunks, confirmed defect against themes.py).
 
 ### Step 5: Re-review Phase U/V animations + compare_animate.py
 
