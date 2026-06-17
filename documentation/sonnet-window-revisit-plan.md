@@ -140,6 +140,7 @@ Row: `commit | verdict (OK | needs-fix | reverted) | note`.
 - **Files:** scripts/compare_animate.py, scripts/batch_animate.py, src/toybox/ (ToyActionSprite / sprite state machine), frontend/src/child/, documentation/sonnet-window-revisit-findings.md
 - **Done when:** a25f4a1/7d12c20 (AnimateDiff), 4908131 (CSS intro + idle state machine), 241eaf0 (SVD), and 668c1b7/ce7e0a0 (compare_animate.py) diffs reviewed for pipeline + path/subprocess correctness; Phase V M1 iPad-UAT status confirmed (not silently skipped); verdicts appended; fixes applied where needed.
 - **Flags:** --reviewers code
+- **Status:** DONE (2026-06-17) — all commits OK; one production a11y fix applied. ToyActionSprite state machine sound (no stuck state, missing-WebP degrades png→hidden, unmount-safe). compare_animate.py: NO subprocess/shell, pathlib-confined paths, coherent SVD defaults; ce7e0a0 F401 clean. AnimateDiff (U1/U2/U3) dead/superseded by SVD (not a live defect). Fix: ToyActionSprite.module.css lacked prefers-reduced-motion (motion-sensitive children; M1 UAT #6) — naive `animation:none` would strand the animationend-gated idle png→webp transition, so used `fadeIn 0.01s` (no perceptible motion, animationend still fires) + regression test. M1 iPad UAT correctly PENDING (V3 #237 operator-bundle, NOT marked done). Post-merge frontend gates green: vitest 741 (+1), typecheck/lint clean.
 
 ## Notes
 

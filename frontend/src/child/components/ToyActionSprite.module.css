@@ -99,3 +99,18 @@ img[data-animating="sleeping"] {
 img[data-animating="confused"] {
   animation: wobbleIn 0.6s forwards;
 }
+
+/* Accessibility: honor prefers-reduced-motion for motion-sensitive children
+   (matches the ElementCard.tsx convention). IMPORTANT: we cannot use
+   `animation: none` here the way ElementCard does — the ToyActionSprite state
+   machine in ToyActionSprite.tsx transitions the idle slot from the static
+   .png to the steady-state .webp loop ONLY when the `animationend` DOM event
+   fires (see handleAnimationEnd). `animation: none` would never emit
+   `animationend`, stranding the idle slot on .png forever. Instead we collapse
+   every intro to a single near-instant fade so there is no perceptible motion
+   but `animationend` still fires and the webp transition still completes. */
+@media (prefers-reduced-motion: reduce) {
+  img[data-animating] {
+    animation: fadeIn 0.01s forwards;
+  }
+}

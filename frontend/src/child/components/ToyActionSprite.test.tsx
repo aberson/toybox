@@ -220,6 +220,32 @@ describe("ToyActionSprite", () => {
     );
   });
 
+  // Reduced-motion guard regression: ToyActionSprite.module.css collapses the
+  // intro to a 0.01s fade under `prefers-reduced-motion: reduce` rather than
+  // using `animation: none` (the ElementCard.tsx convention). `animation: none`
+  // would never emit `animationend`, stranding the idle slot on .png forever.
+  // This test pins the state-machine contract the CSS must preserve: the ONLY
+  // driver of the idle png→webp transition is the `animationend` event — so any
+  // reduced-motion treatment that still fires `animationend` keeps the steady
+  // state reachable. (JSDOM does not evaluate @media or run real CSS timing, so
+  // we assert the event-driven contract directly.)
+  it("reaches the idle webp steady state solely via animationend (reduced-motion-safe)", () => {
+    render(<ToyActionSprite toyId="toy-rm" slot="idle" />);
+    const img = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
+    // Before animationend the slot is stranded on png — this is exactly what a
+    // never-firing animation would leave forever.
+    expect(img.getAttribute("src")).toBe(
+      "/api/static/images/toy_actions/toy-rm/idle.png",
+    );
+    // animationend (which a 0.01s reduced-motion fade still emits) is what
+    // unlocks the webp loop.
+    fireEvent.animationEnd(img);
+    const imgAfter = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
+    expect(imgAfter.getAttribute("src")).toBe(
+      "/api/static/images/toy_actions/toy-rm/idle.webp",
+    );
+  });
+
   it("replays the intro animation when slot prop changes", () => {
     const { rerender } = render(
       <ToyActionSprite toyId="toy-1" slot="idle" />,
