@@ -120,6 +120,7 @@ Row: `commit | verdict (OK | needs-fix | reverted) | note`.
 - **Files:** frontend/src/child/, frontend/src/parent/, src/toybox/, documentation/sonnet-window-revisit-findings.md
 - **Done when:** 2e78fa4/e50a88e/c7b19e0/2040322 diffs reviewed for correctness; verdicts appended; fixes applied where needed.
 - **Flags:** --reviewers code
+- **Status:** DONE (2026-06-17) — all 3 commits OK. S2 verified: no anthropic SDK re-added (OAuth+urllib only), animator failure non-fatal to approve (try/except→{}→float fallback, approve 200 with no client), optimistic concurrency respected. S1 persona→gradient mapping total/crash-safe. Cross-cutting privacy finding (OFFLINE listening_mode bypassed by S2 animator + pre-existing judge background Claude calls) filed as #245 — operator decision on OFFLINE semantics; not changed unilaterally.
 
 ### Step 4: Re-review Phase T — catalog endpoint wire-shape
 
