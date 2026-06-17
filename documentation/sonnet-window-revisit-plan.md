@@ -95,17 +95,18 @@ Row: `commit | verdict (OK | needs-fix | reverted) | note`.
 
 - **Problem:** Phase R (Jun 5) changed child-facing UX under Sonnet, including **R3 Q&A gating for activity steps (#214)** — the logic deciding what a child is shown. A Sonnet error in gating is a child-safety risk; R2's spoken-text character limit and R4's search endpoint also need a pass.
 - **Type:** code
-- **Issue:** #
+- **Issue:** #239
 - **Files:** src/toybox/ (activities, api, ws), frontend/src/parent/, frontend/src/child/, documentation/sonnet-window-revisit-findings.md
 - **Done when:** a7ebf84 (R3 gating) reviewed FIRST for safety-correctness; c6d4816 (R2 limit) confirmed sane for kids; 222a804 (R1) + fafb9c5 (R4 search) reviewed; test suite green; verdicts appended; fixes applied where needed.
 - **Flags:** --reviewers code
 
+<!-- autofix-applied: 2026-06-17 -->
 ### Step 2: Re-review launcher LAN-bind security (02f8c76)
 
-- **Problem:** `02f8c76` (Jun 5) added a one-click launcher that binds the backend to `0.0.0.0` for the iPad child kiosk. The launcher only *comments* "LAN bind requires the parent PIN"; per `security.md`, documentation is not a control. The backend must enforce the PIN as a **startup invariant** (CLAUDE.md claims it does — verify), and the launcher must not be able to bypass it.
+- **Problem:** `02f8c76` (Jun 5) added a one-click launcher that binds the backend to `0.0.0.0` for the iPad child kiosk. The launcher only *comments* "LAN bind requires the parent PIN"; per `security.md`, documentation is not a control. The backend enforces the PIN as a **startup invariant** in `src/toybox/core/bind_guard.py` — verify that guard actually refuses a non-loopback host without a PIN, and that the launcher cannot bypass it.
 - **Type:** code
-- **Issue:** #
-- **Files:** scripts/launch-toybox.ps1, scripts/launch-toybox.cmd, src/toybox/main.py (or wherever the non-loopback PIN guard lives), documentation/sonnet-window-revisit-findings.md
+- **Issue:** #240
+- **Files:** scripts/launch-toybox.ps1, scripts/launch-toybox.cmd, src/toybox/core/bind_guard.py (non-loopback PIN startup guard), src/toybox/main.py (guard invocation), documentation/sonnet-window-revisit-findings.md
 - **Done when:** the backend startup guard is confirmed to refuse a non-loopback host when no parent PIN is set (stable error, not just a log line); the launcher's `$bindHost` logic defaults to `127.0.0.1` under `-LoopbackOnly` or no-LAN-IP and cannot inject a PIN bypass; verdict appended; any guard gap fixed in-step.
 - **Flags:** --reviewers code
 
@@ -113,7 +114,7 @@ Row: `commit | verdict (OK | needs-fix | reverted) | note`.
 
 - **Problem:** Phase S (Jun 5) added persona-keyed kiosk gradients, step-card prominence, and Claude approve-time avatar animations under Sonnet.
 - **Type:** code
-- **Issue:** #
+- **Issue:** #241
 - **Files:** frontend/src/child/, frontend/src/parent/, src/toybox/, documentation/sonnet-window-revisit-findings.md
 - **Done when:** 2e78fa4/e50a88e/c7b19e0/2040322 diffs reviewed for correctness; verdicts appended; fixes applied where needed.
 - **Flags:** --reviewers code
@@ -122,7 +123,7 @@ Row: `commit | verdict (OK | needs-fix | reverted) | note`.
 
 - **Problem:** Phase T (Jun 6) added GET /api/catalog + CatalogEntry/Response (601e329) and the CatalogPanel browse UI (45ab1f8). The catalog response is read directly by the frontend — a Sonnet wire-shape drift is exactly the class `code-quality.md` warns about.
 - **Type:** code
-- **Issue:** #
+- **Issue:** #242
 - **Files:** src/toybox/api/, frontend/src/shared/types.ts, frontend/src/parent/, documentation/sonnet-window-revisit-findings.md
 - **Done when:** the /api/catalog response shape asserted to match what CatalogPanel renders (not just "tests pass" — the dev who shipped it may have updated tests to match); categorizeTemplate correctness checked; verdicts appended; fixes applied where needed.
 - **Flags:** --reviewers code
@@ -131,7 +132,7 @@ Row: `commit | verdict (OK | needs-fix | reverted) | note`.
 
 - **Problem:** Phase U/V (Jun 6–7) built the AnimateDiff→SVD hybrid animation pipeline under Sonnet, including the **previously-unlisted** `scripts/compare_animate.py` (668c1b7, 341 lines, hidden behind a docs subject) and its F401 follow-up (ce7e0a0). Sonnet bugs could hide in SVD model loading, subprocess handling, or output-path construction.
 - **Type:** code
-- **Issue:** #
+- **Issue:** #243
 - **Files:** scripts/compare_animate.py, scripts/batch_animate.py, src/toybox/ (ToyActionSprite / sprite state machine), frontend/src/child/, documentation/sonnet-window-revisit-findings.md
 - **Done when:** a25f4a1/7d12c20 (AnimateDiff), 4908131 (CSS intro + idle state machine), 241eaf0 (SVD), and 668c1b7/ce7e0a0 (compare_animate.py) diffs reviewed for pipeline + path/subprocess correctness; Phase V M1 iPad-UAT status confirmed (not silently skipped); verdicts appended; fixes applied where needed.
 - **Flags:** --reviewers code
