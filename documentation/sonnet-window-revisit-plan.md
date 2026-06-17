@@ -110,6 +110,7 @@ Row: `commit | verdict (OK | needs-fix | reverted) | note`.
 - **Files:** scripts/launch-toybox.ps1, scripts/launch-toybox.cmd, src/toybox/core/bind_guard.py (non-loopback PIN startup guard), src/toybox/main.py (guard invocation), documentation/sonnet-window-revisit-findings.md
 - **Done when:** the backend startup guard is confirmed to refuse a non-loopback host when no parent PIN is set (stable error, not just a log line); the launcher's `$bindHost` logic defaults to `127.0.0.1` under `-LoopbackOnly` or no-LAN-IP and cannot inject a PIN bypass; verdict appended; any guard gap fixed in-step.
 - **Flags:** --reviewers code
+- **Status:** DONE (2026-06-17) — all 4 items OK, NO bypass. Guard aborts startup (`return 1`) on non-loopback+no-PIN before uvicorn.run; `args.host` single-source (`TOYBOX_HOST`→guard AND uvicorn, no divergence); launcher defaults to loopback under -LoopbackOnly/no-LAN-IP, seeds no PIN, injects no bypass. `_pin_is_set` fails closed (missing row→False; unopenable DB→exit non-zero). Verified by orchestrator independent read + dev agent adversarial bypass hunt.
 
 ### Step 3: Re-review Phase S — kiosk visual + avatar animation
 
