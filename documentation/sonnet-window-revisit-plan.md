@@ -1,6 +1,6 @@
 # Sonnet-Window Revisit Plan — toybox
 
-**Status:** Open — Opus diff re-review pending. **CORRECTED 2026-06-17:** window widened Jun 5–8 → Jun 4–16; added the missed `02f8c76` LAN-bind launcher (security) and `668c1b7` compare_animate.py (a 341-line ML script hidden behind a "docs" subject).
+**Status:** DONE 2026-06-17 — all 5 steps re-reviewed under Opus (issues #239–243 + umbrella #238 CLOSED) at master `f6db361`. Sonnet-window phases largely sound: no Sonnet regression in R/S/launcher; 2 fixes applied (Step 4 catalog wire-shape `c01b30a`, Step 5 ToyActionSprite a11y `f6db361`); 2 follow-ups filed (#244 kiosk parent-token, #245 OFFLINE Claude-call bypass). Per-commit verdicts: `documentation/sonnet-window-revisit-findings.md`. **CORRECTED 2026-06-17:** window widened Jun 5–8 → Jun 4–16; added the missed `02f8c76` LAN-bind launcher (security) and `668c1b7` compare_animate.py (a 341-line ML script hidden behind a "docs" subject).
 **Created:** 2026-06-16
 **Owner:** operator + Opus session
 

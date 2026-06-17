@@ -41,8 +41,8 @@ cd frontend; npm run typecheck; npm run lint; npm run test
 
 ## Directory layout
 
-- `src/toybox/` — backend (`api/`, `core/`, `db/migrations/`, `ai/`, `audio/`, `activities/`, `triggers/`, `ws/`)
-- `src/toybox/activities/templates/branching/` — 200 branching templates (~50 per intent)
+- `src/toybox/` — backend (`api/`, `core/`, `db/migrations/`, `ai/`, `audio/`, `activities/`, `triggers/`, `ws/`, `image_gen/`, `personas/`, `storage/`, `metrics/`)
+- `src/toybox/activities/templates/branching/` — branching templates, one JSON per intent (~1360 across 4 intents: request_play / request_story / request_activity / boredom)
 - `frontend/src/parent/` — Parent route (App, api, ws, store, components)
 - `frontend/src/child/` — Child kiosk route (PWA, persona avatar, step cards, sprites)
 - `frontend/src/shared/` — `types.ts`, `errors.ts` (pydantic→typescript codegen)
@@ -50,7 +50,7 @@ cd frontend; npm run typecheck; npm run lint; npm run test
 - `frontend/playwright/` — e2e smoke tests
 - `tests/` — pytest unit + integration
 - `documentation/plan.md` — canonical plan + status
-- `documentation/plan/` — sub-docs (architecture, data-model, api, runtime, activity-loop, how-to-run, risks)
+- `documentation/plan/` — sub-docs (architecture, data-model, api, runtime, activity-loop, how-to-run, risks, appendix)
 - `documentation/runs/` — phase verification artifacts (UAT pass docs, soak runs)
 - `data/` — runtime state (db, images, models, gitignored)
 
@@ -59,7 +59,7 @@ cd frontend; npm run typecheck; npm run lint; npm run test
 - **Single uvicorn worker required.** SQLite WAL is single-writer; `--workers >1` silently corrupts. Do not change.
 - **LAN binding requires parent PIN.** Startup guard refuses non-loopback host without one — that's intentional.
 - **Optimistic concurrency.** Every activity mutation requires `If-Match-Version`; mismatch returns 409.
-- **Capability gate.** Every Claude call goes through the capability gate for offline degradation.
+- **Capability gate.** The primary generation path goes through the async capability gate for offline degradation. Background calls (S2 step-animator, judge) intentionally bypass it and only fail-degrade on outage — see open #245 re: honoring the OFFLINE `listening_mode` setting.
 - **Frontend dev port is `:4000`** (proxies `/api` + `/ws` to `:8000`). NOT the typical `:3000`. See [`.claude/rules/frontend-ui.md`](.claude/rules/frontend-ui.md).
 - **Claude auth is OAuth-bearer + `urllib` only — no `anthropic` SDK, no API key.** See [`.claude/rules/claude-auth.md`](.claude/rules/claude-auth.md). The SDK was added once and reverted (`32e96f4` → `5bbdefb`); don't re-add it.
 - Migrate the DB before running the backend, or DB-backed routes return 500 with "unable to open database file".
@@ -68,7 +68,8 @@ cd frontend; npm run typecheck; npm run lint; npm run test
 
 - Plan: `documentation/plan.md` (12 KB index)
 - Plan sub-docs: `documentation/plan/architecture.md`, `data-model.md`, `api.md`, `runtime.md`, `activity-loop.md`, `how-to-run.md`, `risks.md`, `appendix.md`
-- Phase U plan (latest): `documentation/phase-u-plan.md` — U4 iPad UAT (#232) pending; AnimateDiff WebP approach deprecated in favour of Phase V hybrid (SVD idle + CSS slot-entry)
+- SWR re-review (latest, 2026-06-17): `documentation/sonnet-window-revisit-plan.md` + `sonnet-window-revisit-findings.md` — Opus re-review of the Sonnet-window phases (R/S/T/U/V + launcher) at master `f6db361`; #238-243 closed; open follow-ups #244 (kiosk parent-token) + #245 (OFFLINE Claude-call bypass)
+- Phase V plan: `documentation/phase-v-plan.md` — hybrid SVD-idle + CSS slot-entry; V1/V2 code DONE, V3 iPad UAT (#237) pending operator. (Phase U `phase-u-plan.md` superseded — AnimateDiff abandoned.)
 - Phase T plan: `documentation/phase-t-plan.md` — T1 bundled iPad UAT (#223) + T4 catalog UAT (#226) pending; umbrella #222 open
 - Operator runbooks: `documentation/operator/`
 - README: `README.md`

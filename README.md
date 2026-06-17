@@ -1,10 +1,10 @@
 # toybox
 
-![Python](https://img.shields.io/badge/python-3.12-blue) [![linux-tests](https://github.com/aberson/toybox/actions/workflows/linux-tests.yml/badge.svg?branch=master)](https://github.com/aberson/toybox/actions/workflows/linux-tests.yml) [![frontend-tests](https://github.com/aberson/toybox/actions/workflows/frontend-tests.yml/badge.svg?branch=master)](https://github.com/aberson/toybox/actions/workflows/frontend-tests.yml) ![pytest](https://img.shields.io/badge/pytest-2323%20passing-brightgreen) ![vitest](https://img.shields.io/badge/vitest-731%20passing-brightgreen) ![Local-first](https://img.shields.io/badge/local--first-family%20private-purple) ![License](https://img.shields.io/badge/license-MIT-blue)
+![Python](https://img.shields.io/badge/python-3.12-blue) [![linux-tests](https://github.com/aberson/toybox/actions/workflows/linux-tests.yml/badge.svg?branch=master)](https://github.com/aberson/toybox/actions/workflows/linux-tests.yml) [![frontend-tests](https://github.com/aberson/toybox/actions/workflows/frontend-tests.yml/badge.svg?branch=master)](https://github.com/aberson/toybox/actions/workflows/frontend-tests.yml) ![pytest](https://img.shields.io/badge/pytest-2325%20passing-brightgreen) ![vitest](https://img.shields.io/badge/vitest-741%20passing-brightgreen) ![Local-first](https://img.shields.io/badge/local--first-family%20private-purple) ![License](https://img.shields.io/badge/license-MIT-blue)
 
 A local-first home AI that watches for play opportunities, suggests structured activities to a parent, and runs the approved ones on a child kiosk featuring AI personas.
 
-The mic listens passively. A trigger NLP and Claude (when available) propose activity scripts on the parent's tab. Only what the parent taps **Approve** appears on the child's iPad — installed as a PWA, locked to one app via Guided Access, no app store, no cloud account. The activity loop is built on 1,243 branching templates across `request_play`, `request_activity`, `embedded`, and `ending` slot-fills, with songs, jokes, and 118-element periodic-table microgames as per-activity rewards.
+The mic listens passively. A trigger NLP and Claude (when available) propose activity scripts on the parent's tab. Only what the parent taps **Approve** appears on the child's iPad — installed as a PWA, locked to one app via Guided Access, no app store, no cloud account. The activity loop is built on 1,361 branching templates across `request_play`, `request_story`, `request_activity`, and `boredom` slot-fills, with songs, jokes, and 118-element periodic-table microgames as per-activity rewards.
 
 **Two complementary surfaces:**
 
@@ -35,9 +35,9 @@ Both share types, ws envelopes, and the same FastAPI backend — one async proce
 </tr>
 </table>
 
-> **25 → 1,243 activity templates** across 14 phases shipped, fully on-device. Catalog grows by parent approvals → labeled events → SFT corpus, waiting on ≥50 rows before LoRA fine-tune kicks in (Phase E).
+> **25 → 1,361 activity templates** across 14 phases shipped, fully on-device. Catalog grows by parent approvals → labeled events → SFT corpus, waiting on ≥50 rows before LoRA fine-tune kicks in (Phase E).
 >
-> **iPad UAT 11/12 PASS** at Phase M close (2026-05-18) — kiosk runs as a Guided Access app on a real iPad over Wi-Fi LAN. **2,323 pytest + 731 vitest** green at Phase U close (2026-06-07). Fully offline once whisper-small + persona avatars + element sprites are cached locally.
+> **iPad UAT 11/12 PASS** at Phase M close (2026-05-18) — kiosk runs as a Guided Access app on a real iPad over Wi-Fi LAN. **2,325 pytest + 741 vitest** green at the SWR Opus re-review close (2026-06-17). Fully offline once whisper-small + persona avatars + element sprites are cached locally.
 
 ## What makes this different
 
@@ -65,7 +65,7 @@ The architecture is family-agnostic — the test case happens to be two real kid
         │   │  HEAR   │───►│ TRIGGER │───►│ PROPOSE │───►│PARENT │ │
         │   │         │    │         │    │         │    │APPROVE│ │
         │   └─────────┘    └─────────┘    └─────────┘    └───┬───┘ │
-        │    silero VAD     NLP registry   1,243-template    │     │
+        │    silero VAD     NLP registry   1,361-template    │     │
         │    + faster-      + Claude       branching         │     │
         │      whisper      escalation     catalog +         │     │
         │      small        (offline OK)   persona slot      │     │
@@ -102,8 +102,8 @@ The mic loop and the activity loop are deliberately the same loop. Chatter while
               │  intent + slot hints
               ▼
    ┌─────────────────────┐
-   │ branching template  │   1,243 templates × 4 intents
-   │ catalog             │   (request_play / request_activity / embedded / ending)
+   │ branching template  │   1,361 templates × 4 intents
+   │ catalog             │   (request_play / request_story / request_activity / boredom)
    └──────────┬──────────┘
               │  template + slot-fill
               ▼
@@ -347,7 +347,7 @@ Backend `2,288 pytest pass / 6 skipped`, frontend `682 vitest pass`, 0 type erro
 - **Local-first, family-private.** All state stays on one home machine. Internet optional after first-run model downloads.
 - **Single FastAPI process for everything.** Mic capture, STT, NLP, AI calls, image-gen worker, TTS render, REST, ws — all one async process. Trade-off: a slow Claude call could starve the mic loop. Mitigated with `asyncio.to_thread` + circuit breaker.
 - **Claude via OAuth, not API key.** Aligns billing with the user's subscription; capability gate falls back to offline cleanly.
-- **Branching templates, not free-form generation, for v1+.** 1,243-template catalog with persona-role + theme + reward-type tagging. Free-form Claude generation is reserved for ambiguous-trigger escalation, never for kiosk-visible activity bodies.
+- **Branching templates, not free-form generation, for v1+.** 1,361-template catalog with persona-role + theme + reward-type tagging. Free-form Claude generation is reserved for ambiguous-trigger escalation, never for kiosk-visible activity bodies.
 - **Single Vite project, two routes.** Parent and child share types and rendering primitives; child loads the smaller chunk.
 - **Single-worker SQLite + WAL.** Multi-worker silently corrupts; one worker is fine for a household device.
 - **Optimistic concurrency on activities.** `If-Match-Version` on every mutation; multi-tab races resolve cleanly with 409.
@@ -376,11 +376,11 @@ toybox/
 │   ├── ai/                           # Claude OAuth client + circuit breaker + PII redactor
 │   ├── audio/                        # sounddevice capture + silero-VAD + faster-whisper STT
 │   ├── activities/                   # generator + content resolver + slot resolver + branching templates
-│   ├── activities/templates/branching/   # 1,243-template catalog (50+ per intent)
+│   ├── activities/templates/branching/   # 1,361-template catalog (~340 per intent)
 │   ├── image_gen/                    # SD 1.5 + LCM-LoRA worker + Pillow text overlay
 │   ├── personas/library/             # persona library + avatars (Wizard, Princess, Detective, Periodic-Table)
 │   ├── triggers/                     # curated NLP registry
-│   ├── db/migrations/                # forward-only SQL migrations (0001 → 0017+)
+│   ├── db/migrations/                # forward-only SQL migrations (0001 → 0023+)
 │   └── ws/                           # ws server + heartbeat + envelope + topics
 ├── frontend/
 │   ├── src/parent/                   # parent route (App + api + ws + store + components)
