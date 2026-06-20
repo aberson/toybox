@@ -7,9 +7,15 @@
 
 ## Next Action
 
-Run: `/build-phase --plan documentation/plan/phase-w-plan.md`
+Goal-ready handoff (build-phase is goal-driven). Paste the goal, then start the build:
 
-Builds Phase W steps W1–W7 in order. Spine: W2 → W4 → W5 → W6 → W7; W3 → W6; W1 before W7. All `--reviewers code` (parent UI is PIN-gated; UI verified in W7 iPad UAT).
+```
+/goal "Phase W steps W1-W6 are all marked Status: DONE in documentation/plan/phase-w-plan.md"
+
+/build-phase --plan documentation/plan/phase-w-plan.md
+```
+
+Goal is scoped to the agent-completable span (W1–W6); W7 is the operator iPad-UAT boundary — build-phase halts there and emits a fresh goal if there were a further span. Spine: W2 → W4 → W5 → W6 → W7; W3 → W6; W1 before W7. All `--reviewers code` (parent UI is PIN-gated; UI verified in W7 iPad UAT).
 
 ## WIP
 
