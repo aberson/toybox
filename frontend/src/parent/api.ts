@@ -696,6 +696,23 @@ export interface SpokenTextLimitResponse {
   value: SpokenTextLimit;
 }
 
+// Phase W Step W1: household-scoped true-stub dials. PERSIST ONLY — the
+// values are stored but wired to no behavior yet (a later phase consumes
+// them). The wire body is ``{value: "low"|"medium"|"high"}`` in both
+// directions, mirroring the GET/PUT pair on spoken-text-limit. The GET
+// is public (household read); the PUT requires parent scope.
+export type ParentInvolvement = "low" | "medium" | "high";
+
+export interface ParentInvolvementResponse {
+  value: ParentInvolvement;
+}
+
+export type GameComplexity = "low" | "medium" | "high";
+
+export interface GameComplexityResponse {
+  value: GameComplexity;
+}
+
 // Phase J step J1: play-queue target depth presets. The wire body is
 // ``{value: <preset>}`` in both directions, mirroring the GET/PUT
 // pair on transcript-retention.
@@ -1790,6 +1807,66 @@ export class ApiClient {
   ): Promise<SpokenTextLimitResponse> {
     return this.request<SpokenTextLimitResponse>(
       "/api/settings/spoken-text-limit",
+      {
+        method: "PUT",
+        body: JSON.stringify({ value }),
+        signal: opts.signal,
+      },
+    );
+  }
+
+  // Phase W Step W1: parent-involvement dial read-write pair. True-stub
+  // (PERSIST ONLY). The GET is unauthenticated (household read); the PUT
+  // requires parent scope. Body shape on both sides is ``{value: <dial>}``.
+  // Valid values: low / medium / high.
+  async getParentInvolvement(
+    opts: RequestOptions = {},
+  ): Promise<ParentInvolvementResponse> {
+    return this.request<ParentInvolvementResponse>(
+      "/api/settings/parent-involvement",
+      {
+        method: "GET",
+        signal: opts.signal,
+      },
+    );
+  }
+
+  async setParentInvolvement(
+    value: ParentInvolvement,
+    opts: RequestOptions = {},
+  ): Promise<ParentInvolvementResponse> {
+    return this.request<ParentInvolvementResponse>(
+      "/api/settings/parent-involvement",
+      {
+        method: "PUT",
+        body: JSON.stringify({ value }),
+        signal: opts.signal,
+      },
+    );
+  }
+
+  // Phase W Step W1: game-complexity dial read-write pair. True-stub
+  // (PERSIST ONLY). The GET is unauthenticated (household read); the PUT
+  // requires parent scope. Body shape on both sides is ``{value: <dial>}``.
+  // Valid values: low / medium / high.
+  async getGameComplexity(
+    opts: RequestOptions = {},
+  ): Promise<GameComplexityResponse> {
+    return this.request<GameComplexityResponse>(
+      "/api/settings/game-complexity",
+      {
+        method: "GET",
+        signal: opts.signal,
+      },
+    );
+  }
+
+  async setGameComplexity(
+    value: GameComplexity,
+    opts: RequestOptions = {},
+  ): Promise<GameComplexityResponse> {
+    return this.request<GameComplexityResponse>(
+      "/api/settings/game-complexity",
       {
         method: "PUT",
         body: JSON.stringify({ value }),

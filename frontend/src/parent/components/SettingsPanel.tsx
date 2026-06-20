@@ -21,15 +21,19 @@ import { useCallback, useEffect, useState } from "react";
 import { isAbortError } from "../api";
 import type {
   ApiClient,
+  GameComplexity,
   ImageGenMode,
   ListeningMode,
   MetricsSnapshot,
+  ParentInvolvement,
   PhaseKFeatureFlag,
   PhaseKFeatureFlags,
   PlayTargetDepth,
   SpokenTextLimit,
 } from "../api";
 import { BannedThemesSettings } from "./BannedThemesSettings";
+import { GameComplexityControl } from "./GameComplexityControl";
+import { ParentInvolvementControl } from "./ParentInvolvementControl";
 import { PlayFeaturesControls } from "./PlayFeaturesControls";
 import {
   PlayTargetDepthControl,
@@ -427,6 +431,8 @@ export interface SettingsPanelProps {
     | "setClickableWordsEnabled"
     | "setReadMeButtonEnabled"
     | "setSpokenTextLimit"
+    | "setParentInvolvement"
+    | "setGameComplexity"
   >;
   // Phase I step I3: transcript retention picker source-of-truth. The
   // value lives in App.tsx (fetched once on mount via the
@@ -454,6 +460,15 @@ export interface SettingsPanelProps {
   // up so the lifted state stays the source of truth.
   currentSpokenTextLimit: number;
   onSpokenTextLimitChanged: (value: SpokenTextLimit) => void;
+  // Phase W Step W1: two household-scoped true-stub dials (parent
+  // involvement + game complexity). Values live in App.tsx (seeded by
+  // the bootstrap parallel-fetch) and thread through here; the callbacks
+  // bubble a successful PUT response back up so the lifted state stays
+  // the source of truth. PERSIST ONLY — wired to no behavior yet.
+  currentParentInvolvement: string;
+  onParentInvolvementChanged: (value: ParentInvolvement) => void;
+  currentGameComplexity: string;
+  onGameComplexityChanged: (value: GameComplexity) => void;
 }
 
 // Settings sub-tab. Renders the three toggle cards + the global
@@ -472,6 +487,10 @@ export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
     onFeatureFlagChanged,
     currentSpokenTextLimit,
     onSpokenTextLimitChanged,
+    currentParentInvolvement,
+    onParentInvolvementChanged,
+    currentGameComplexity,
+    onGameComplexityChanged,
   } = props;
   const [listeningMode, setListeningMode] = useState<number>(3);
   const [micEnabled, setMicEnabled] = useState<boolean>(true);
@@ -552,6 +571,16 @@ export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
           api={api}
           currentValue={currentSpokenTextLimit}
           onValueChanged={onSpokenTextLimitChanged}
+        />
+        <ParentInvolvementControl
+          api={api}
+          currentValue={currentParentInvolvement}
+          onValueChanged={onParentInvolvementChanged}
+        />
+        <GameComplexityControl
+          api={api}
+          currentValue={currentGameComplexity}
+          onValueChanged={onGameComplexityChanged}
         />
       </div>
       <div style={{ marginTop: 12 }}>

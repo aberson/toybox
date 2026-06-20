@@ -92,6 +92,8 @@ interface StubApi {
   setClickableWordsEnabled: Mock;
   setReadMeButtonEnabled: Mock;
   setSpokenTextLimit: Mock;
+  setParentInvolvement: Mock;
+  setGameComplexity: Mock;
 }
 
 function buildStubApi(snapshot: MetricsSnapshot): StubApi {
@@ -137,6 +139,8 @@ function buildStubApi(snapshot: MetricsSnapshot): StubApi {
       async (value: boolean) => ({ value }),
     ) as Mock,
     setSpokenTextLimit: vi.fn(async (value: number) => ({ value })) as Mock,
+    setParentInvolvement: vi.fn(async (value: string) => ({ value })) as Mock,
+    setGameComplexity: vi.fn(async (value: string) => ({ value })) as Mock,
   };
 }
 
@@ -156,6 +160,10 @@ function renderSettingsPanel(
     onFeatureFlagChanged?: (key: PhaseKFeatureFlag, value: boolean) => void;
     currentSpokenTextLimit?: number;
     onSpokenTextLimitChanged?: (n: number) => void;
+    currentParentInvolvement?: string;
+    onParentInvolvementChanged?: (v: string) => void;
+    currentGameComplexity?: string;
+    onGameComplexityChanged?: (v: string) => void;
   } = {},
 ): void {
   render(
@@ -173,6 +181,16 @@ function renderSettingsPanel(
       onFeatureFlagChanged={overrides.onFeatureFlagChanged ?? (() => {})}
       currentSpokenTextLimit={overrides.currentSpokenTextLimit ?? 150}
       onSpokenTextLimitChanged={overrides.onSpokenTextLimitChanged ?? (() => {})}
+      currentParentInvolvement={
+        overrides.currentParentInvolvement ?? "medium"
+      }
+      onParentInvolvementChanged={
+        overrides.onParentInvolvementChanged ?? (() => {})
+      }
+      currentGameComplexity={overrides.currentGameComplexity ?? "medium"}
+      onGameComplexityChanged={
+        overrides.onGameComplexityChanged ?? (() => {})
+      }
     />,
   );
 }
@@ -244,6 +262,10 @@ describe("SettingsPanel", () => {
         onFeatureFlagChanged={() => {}}
         currentSpokenTextLimit={150}
         onSpokenTextLimitChanged={() => {}}
+        currentParentInvolvement="medium"
+        onParentInvolvementChanged={() => {}}
+        currentGameComplexity="medium"
+        onGameComplexityChanged={() => {}}
       />,
     );
     unmount();

@@ -9,8 +9,10 @@ import {
 } from "./api";
 import type {
   Activity,
+  GameComplexity,
   MetricsAudioStatus,
   ParentAuthStatus,
+  ParentInvolvement,
   ParentTokenResponse,
   PhaseKFeatureFlag,
   PhaseKFeatureFlags,
@@ -216,6 +218,15 @@ export function App(): JSX.Element {
   // values into the UI. SettingsPanel writes update this state via the
   // ``onSpokenTextLimitChanged`` callback.
   const [spokenTextLimit, setSpokenTextLimit] = useState<number>(150);
+  // Phase W Step W1: household-scoped true-stub dials. Seeded from
+  // ``GET /api/settings/parent-involvement`` + ``/game-complexity``
+  // during bootstrap (mirrors the spokenTextLimit plumbing). "medium" is
+  // the backend default; matching locally keeps a failed bootstrap fetch
+  // from flashing odd values into the UI. SettingsPanel writes update
+  // this state via the ``on*Changed`` callbacks. PERSIST ONLY.
+  const [parentInvolvement, setParentInvolvement] =
+    useState<string>("medium");
+  const [gameComplexity, setGameComplexity] = useState<string>("medium");
   // Phase R Step R4: activity + template search query. Non-empty string
   // renders SearchPanel above PlayQueueList on the Play tab; clearing it
   // restores the normal queue view. The state is top-level so the input
@@ -392,6 +403,8 @@ export function App(): JSX.Element {
         readMeButtonResult,
         rewardsListResult,
         spokenTextLimitResult,
+        parentInvolvementResult,
+        gameComplexityResult,
       ] = await Promise.allSettled([
         api.getTranscriptRetention({ signal: aborter.signal }),
         api.getPlayTargetDepth({ signal: aborter.signal }),
@@ -420,6 +433,9 @@ export function App(): JSX.Element {
         api.listRewards({ signal: aborter.signal }),
         // Phase R Step R2: seed the spoken text limit for SettingsPanel.
         api.getSpokenTextLimit({ signal: aborter.signal }),
+        // Phase W Step W1: seed the two true-stub dials for SettingsPanel.
+        api.getParentInvolvement({ signal: aborter.signal }),
+        api.getGameComplexity({ signal: aborter.signal }),
       ]);
       // ``Promise.allSettled`` swallows aborts as rejected results, so
       // a mid-bootstrap unmount (e.g. parent navigates away while these
@@ -546,6 +562,25 @@ export function App(): JSX.Element {
         console.warn(
           "spoken text limit initial fetch failed, using default",
           spokenTextLimitResult.reason,
+        );
+      }
+      // Phase W Step W1: seed the two true-stub dials from the bootstrap.
+      if (parentInvolvementResult.status === "fulfilled") {
+        setParentInvolvement(parentInvolvementResult.value.value);
+      } else if (!isAbortError(parentInvolvementResult.reason)) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          "parent involvement initial fetch failed, using default",
+          parentInvolvementResult.reason,
+        );
+      }
+      if (gameComplexityResult.status === "fulfilled") {
+        setGameComplexity(gameComplexityResult.value.value);
+      } else if (!isAbortError(gameComplexityResult.reason)) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          "game complexity initial fetch failed, using default",
+          gameComplexityResult.reason,
         );
       }
       const ws = new ParentWsClient({
@@ -1129,6 +1164,22 @@ export function App(): JSX.Element {
     [],
   );
 
+  // Phase W Step W1: SettingsPanel reconciliation callbacks for the two
+  // true-stub dials. Mirror handleSpokenTextLimitChanged.
+  const handleParentInvolvementChanged = useCallback(
+    (value: ParentInvolvement): void => {
+      setParentInvolvement(value);
+    },
+    [],
+  );
+
+  const handleGameComplexityChanged = useCallback(
+    (value: GameComplexity): void => {
+      setGameComplexity(value);
+    },
+    [],
+  );
+
   // Phase R Step R4: propose from search results. Calls the same propose
   // endpoint as the trigger button but with an optional template_id so
   // the backend picks that exact template rather than running the slot
@@ -1436,6 +1487,10 @@ export function App(): JSX.Element {
                     onFeatureFlagChanged={handleFeatureFlagChanged}
                     currentSpokenTextLimit={spokenTextLimit}
                     onSpokenTextLimitChanged={handleSpokenTextLimitChanged}
+                    currentParentInvolvement={parentInvolvement}
+                    onParentInvolvementChanged={handleParentInvolvementChanged}
+                    currentGameComplexity={gameComplexity}
+                    onGameComplexityChanged={handleGameComplexityChanged}
                   />
                 )}
                 {settingsTab.value === "stats" && (

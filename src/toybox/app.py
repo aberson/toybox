@@ -27,11 +27,15 @@ from .api.children import router as children_router
 from .api.clickable_words_enabled_settings import (
     router as clickable_words_enabled_settings_router,
 )
+from .api.game_complexity_settings import router as game_complexity_settings_router
 from .api.health import router as health_router
 from .api.image_gen_settings import router as image_gen_settings_router
 from .api.jokes_enabled_settings import router as jokes_enabled_settings_router
 from .api.listening import router as listening_router
 from .api.metrics import router as metrics_router
+from .api.parent_involvement_settings import (
+    router as parent_involvement_settings_router,
+)
 from .api.play_standalone_enabled_settings import (
     router as play_standalone_enabled_settings_router,
 )
@@ -76,6 +80,11 @@ def create_app() -> FastAPI:
     app.include_router(transcript_retention_settings_router)
     app.include_router(play_target_depth_settings_router)
     app.include_router(spoken_text_limit_settings_router)
+    # Phase W Step W1: two true-stub household dials (parent involvement +
+    # game complexity). PERSIST ONLY — wired to no behavior yet; a later
+    # phase consumes the values. GET is household-read, PUT is parent-scope.
+    app.include_router(parent_involvement_settings_router)
+    app.include_router(game_complexity_settings_router)
     # Phase K Step K2 + Phase L Step L5: five parent-controlled feature
     # flags (originally eight; L5 removed the three Phase K play-surface
     # flags as part of re-framing jokes/songs as per-activity reward

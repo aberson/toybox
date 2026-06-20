@@ -243,6 +243,7 @@ render), so a smoke gate (W6) is required before UAT.
   `test_spoken_text_limit*`); `npm run typecheck` + `npm run test` pass; both controls render in
   Settings and persist across reload; `python tools/gen_types_ts.py` leaves no diff
 - **Depends on:** none
+- **Status:** DONE (2026-06-19)
 
 ### Step W2: Linear ↔ non-linear games toggle
 - **Problem:** Add a `game_linearity` setting (`linear|nonlinear`, default `nonlinear`) as a
