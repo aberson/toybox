@@ -121,7 +121,7 @@ The mic loop and the activity loop are deliberately the same loop. Chatter while
 
 Every activity has a slot for a persona (Wizard / Princess / Detective / Periodic-Table Professor, plus parent-grown ones), a theme (from a 12-theme corpus), and a reward type (song / joke / element microgame). The branching templates encode two binary forks per script and tag each fork with the persona role taxonomy + theme allowlist so the resolver can pick a script that respects per-toy and per-child constraints.
 
-**Read the catalog mechanics:** [data-model.md](documentation/plan/data-model.md) · [phase-l-plan.md](documentation/phase-l-plan.md) (rewards as per-activity reward TYPES)
+**Read the catalog mechanics:** [data-model.md](documentation/plan/data-model.md) · [phase-l-plan.md](documentation/plan/archive/phase-l-plan.md) (rewards as per-activity reward TYPES)
 
 ---
 
@@ -354,7 +354,7 @@ Backend `2,288 pytest pass / 6 skipped`, frontend `682 vitest pass`, 0 type erro
 - **Default bind 127.0.0.1.** LAN binding requires a parent PIN; startup guard refuses non-loopback host without one (a startup invariant, not a documented convention).
 - **Mic-hot indicator as a first-class UI element.** Constant-on visual signal that mic capture is live, visible from across the room.
 
-Full design rationale, schema, and listening-pipeline data flow live in [documentation/plan.md](documentation/plan.md) and the per-topic deep dives under [documentation/plan/](documentation/plan/).
+Full design rationale, schema, and listening-pipeline data flow live in [documentation/master-plan.md](documentation/master-plan.md) and the per-topic deep dives under [documentation/plan/](documentation/plan/).
 
 </details>
 
@@ -365,9 +365,10 @@ Full design rationale, schema, and listening-pipeline data flow live in [documen
 ```
 toybox/
 ├── documentation/
-│   ├── plan.md                       # canonical plan + status
-│   ├── plan/                         # architecture / data-model / api / runtime / activity-loop / risks / phase-e
-│   ├── phase-{k,l,m,n,o,p,q}-plan.md # feature plans
+│   ├── master-plan.md                # canonical plan + status (only plan in root)
+│   ├── plan/                         # reference sub-docs + active phase plans (phase-e/w/x)
+│   ├── plan/awaiting-uat/            # code-shipped, operator UAT still open (O,P,Q,R,S,T,V)
+│   ├── plan/archive/                 # completed / superseded phase plans
 │   ├── operator/                     # iPad setup + Claude OAuth setup + recovery runbooks
 │   └── runs/                         # phase verification artifacts (UAT pass docs, soak runs)
 ├── src/toybox/

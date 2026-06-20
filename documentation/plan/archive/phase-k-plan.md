@@ -44,7 +44,7 @@ Phase K layers four play-enhancement features onto the post-Phase-J toybox:
 | 9 | Pydantic ↔ TypeScript codegen is a pre-commit hook; drift in `frontend/src/shared/types.ts` is a check failure. |
 | 10 | **Forward-only migrations.** v1 has no rollback path; abort + preserve DB on failure. |
 
-**`If-Match-Version` semantics.** Client sends header with the activity `version` it last saw. Server compares to current DB version: on match, executes mutation and increments version; on mismatch, returns 409 with the current `ActivityResponse` body. Frontend's [`withConflictHandler`](../frontend/src/parent/api.ts#L1689) wraps the round-trip — on 409 it refetches, fires an `onConflict` callback, then returns `null` so caller can no-op. Standard for every Phase K mutation endpoint.
+**`If-Match-Version` semantics.** Client sends header with the activity `version` it last saw. Server compares to current DB version: on match, executes mutation and increments version; on mismatch, returns 409 with the current `ActivityResponse` body. Frontend's [`withConflictHandler`](../../../frontend/src/parent/api.ts#L1689) wraps the round-trip — on 409 it refetches, fires an `onConflict` callback, then returns `null` so caller can no-op. Standard for every Phase K mutation endpoint.
 
 **Identifier formats.**
 
@@ -57,7 +57,7 @@ Phase K layers four play-enhancement features onto the post-Phase-J toybox:
 | Persona ID | Author-chosen lowercase snake | `princess`, `wizard`, `detective`, `periodic_table` |
 | Corpus entry ID (joke / song) | Author-chosen kebab-slug | `space-rhyme-01`, `why-chicken` |
 
-**Wire shape: `ActivityResponse`** ([api/activities.py:238](../src/toybox/api/activities.py#L238)). Full Pydantic class. Phase K adds the bold rows.
+**Wire shape: `ActivityResponse`** ([api/activities.py:238](../../../src/toybox/api/activities.py#L238)). Full Pydantic class. Phase K adds the bold rows.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -97,7 +97,7 @@ Phase K layers four play-enhancement features onto the post-Phase-J toybox:
 | `current` | `bool` | True when this is the active step (ws envelope only) |
 | `metadata` | `dict[str, Any]` | Carries `{"interjection": "embedded" \| "ending" \| "parent" \| "spontaneity", "source_id": <corpus_entry_id>}` on interjection steps; absent on regular template steps |
 
-**Code-quality rules** ([code-quality.md](../../.claude/rules/code-quality.md)) summarized inline so reviewers don't need to fetch them.
+**Code-quality rules** ([code-quality.md](../../../../.claude/rules/code-quality.md)) summarized inline so reviewers don't need to fetch them.
 
 | § | Rule | Phase K touch points |
 |---|---|---|
@@ -110,59 +110,59 @@ Phase K layers four play-enhancement features onto the post-Phase-J toybox:
 
 Background a fresh-context model needs to understand the impact.
 
-- **Toys today are single-slotted via `{toy}` substitution.** Slot substitution lives in `_substitute(text, slot_fills)` and is wrapped by the public `render_with_slot_fills(text: str, slot_fills: dict[str, str]) -> str` ([generator.py:654, :689](../src/toybox/activities/generator.py#L654)). The function is the lazy-advance entry point — Phase G persists step bodies for `steps[0]` at creation time and renders later step bodies on advance via `render_with_slot_fills(template_step_text, activities.slot_fills_json)`. Phase K's role placeholders (`{quest_giver}`, etc.) flow through this same dict.
+- **Toys today are single-slotted via `{toy}` substitution.** Slot substitution lives in `_substitute(text, slot_fills)` and is wrapped by the public `render_with_slot_fills(text: str, slot_fills: dict[str, str]) -> str` ([generator.py:654, :689](../../../src/toybox/activities/generator.py#L654)). The function is the lazy-advance entry point — Phase G persists step bodies for `steps[0]` at creation time and renders later step bodies on advance via `render_with_slot_fills(template_step_text, activities.slot_fills_json)`. Phase K's role placeholders (`{quest_giver}`, etc.) flow through this same dict.
 
-- **Activity slot fills are persisted as a JSON column, not a separate table.** Migration `0008_activity_slot_fills.sql` adds **`activities.slot_fills_json TEXT NOT NULL DEFAULT '{}'`** ([0008_activity_slot_fills.sql:38](../src/toybox/db/migrations/0008_activity_slot_fills.sql#L38)). The JSON object accepts arbitrary keys, so role placeholders (`quest_giver`, `hero`, etc.) join the existing `toy` / `room` / `slot` keys without altering the schema.
+- **Activity slot fills are persisted as a JSON column, not a separate table.** Migration `0008_activity_slot_fills.sql` adds **`activities.slot_fills_json TEXT NOT NULL DEFAULT '{}'`** ([0008_activity_slot_fills.sql:38](../../../src/toybox/db/migrations/0008_activity_slot_fills.sql#L38)). The JSON object accepts arbitrary keys, so role placeholders (`quest_giver`, `hero`, etc.) join the existing `toy` / `room` / `slot` keys without altering the schema.
 
-- **`_do_propose(body, conn, pubsub, judge_call)` is at [activities.py:1181](../src/toybox/api/activities.py#L1181).** Plan-K's recast endpoint + spontaneity hook + parent-insert endpoint are all built around this entry point. **Code-quality §4 ([code-quality.md](../../.claude/rules/code-quality.md)) requires** new components to be integration-tested through this caller, not in isolation.
+- **`_do_propose(body, conn, pubsub, judge_call)` is at [activities.py:1181](../../../src/toybox/api/activities.py#L1181).** Plan-K's recast endpoint + spontaneity hook + parent-insert endpoint are all built around this entry point. **Code-quality §4 ([code-quality.md](../../../../.claude/rules/code-quality.md)) requires** new components to be integration-tested through this caller, not in isolation.
 
-- **The wire-shape class is `ActivityResponse`** at [activities.py:238](../src/toybox/api/activities.py#L238). Plan refers to it as "Activity" for brevity but the Pydantic class is `ActivityResponse`. Same applies to `ActivityStepResponse` for steps.
+- **The wire-shape class is `ActivityResponse`** at [activities.py:238](../../../src/toybox/api/activities.py#L238). Plan refers to it as "Activity" for brevity but the Pydantic class is `ActivityResponse`. Same applies to `ActivityStepResponse` for steps.
 
-- **Personas are kiosk avatars, not toys.** [personas/library/_schema.json](../src/toybox/personas/library/_schema.json) currently has `id`, `display_name`, `archetype`, `system_prompt`, `avatar_image_path`, `behavior_tags`, age range. **No voice profile, no role weights, no spontaneity rates today.** All three are new in Phase K (K8 / K1 / K1). The `spontaneity_rates` field is a `{jokes, songs}` object pair, mirrored on roles in `roles.py` so the spontaneity engine has the same shape on both sides of the max-rate computation.
+- **Personas are kiosk avatars, not toys.** [personas/library/_schema.json](../../../src/toybox/personas/library/_schema.json) currently has `id`, `display_name`, `archetype`, `system_prompt`, `avatar_image_path`, `behavior_tags`, age range. **No voice profile, no role weights, no spontaneity rates today.** All three are new in Phase K (K8 / K1 / K1). The `spontaneity_rates` field is a `{jokes, songs}` object pair, mirrored on roles in `roles.py` so the spontaneity engine has the same shape on both sides of the max-rate computation.
 
-- **Branching templates have only three step kinds today.** Reading [request_play.json](../src/toybox/activities/templates/branching/request_play.json): each step is either a plain text step (`text`, optional `sfx`, optional `action_slot`), a `fork` step (`text` + `choices[]` with `next` ids), or a named end step. Phase K adds `kind: "song"` and `kind: "joke"`, plus `kind` defaults to `"text"` for legacy template entries.
+- **Branching templates have only three step kinds today.** Reading [request_play.json](../../../src/toybox/activities/templates/branching/request_play.json): each step is either a plain text step (`text`, optional `sfx`, optional `action_slot`), a `fork` step (`text` + `choices[]` with `next` ids), or a named end step. Phase K adds `kind: "song"` and `kind: "joke"`, plus `kind` defaults to `"text"` for legacy template entries.
 
-- **The trigger registry is JSON-driven + version-merged.** [triggers/registry.py:1-27](../src/toybox/triggers/registry.py#L1-L27) describes the merge semantics — shipped patterns in `src/toybox/triggers/defaults.json` are merged into the user-editable copy on load, keyed on `id` field, version-bumped patterns overwrite, user-only patterns survive. K13 adds new entries to `defaults.json` for `request_song` and `request_joke`, bumping the file's pattern versions monotonically.
+- **The trigger registry is JSON-driven + version-merged.** [triggers/registry.py:1-27](../../../src/toybox/triggers/registry.py#L1-L27) describes the merge semantics — shipped patterns in `src/toybox/triggers/defaults.json` are merged into the user-editable copy on load, keyed on `id` field, version-bumped patterns overwrite, user-only patterns survive. K13 adds new entries to `defaults.json` for `request_song` and `request_joke`, bumping the file's pattern versions monotonically.
 
 - **No TTS exists.** The `tts|speech|synthesize` grep across the repo only hits STT files (`faster-whisper`, `audio/stt.py`, `audio/vad.py`, `audio/pipeline.py`). The web kiosk has no `speechSynthesis` call site. K8 adds the first one.
 
-- **No `settings.changed` ws envelope exists.** A grep for `settings.changed|broadcast.*settings|emit.*settings` returns zero matches. Phase I's precedent is that **the backend** reads settings fresh per tick ([transcript_retention.py:12](../src/toybox/core/transcript_retention.py#L12)); the frontend gets new values on next API call. **Phase K does NOT introduce a live-propagation envelope** — flag changes take effect on the next kiosk bootstrap / refresh. This is the v1 contract; live propagation is a v2 idea.
+- **No `settings.changed` ws envelope exists.** A grep for `settings.changed|broadcast.*settings|emit.*settings` returns zero matches. Phase I's precedent is that **the backend** reads settings fresh per tick ([transcript_retention.py:12](../../../src/toybox/core/transcript_retention.py#L12)); the frontend gets new values on next API call. **Phase K does NOT introduce a live-propagation envelope** — flag changes take effect on the next kiosk bootstrap / refresh. This is the v1 contract; live propagation is a v2 idea.
 
-- **Kiosk renders steps via `StepCard.tsx`.** [StepCard.tsx](../frontend/src/child/components/StepCard.tsx) is the step renderer; choices via [ChoiceButton.tsx](../frontend/src/child/components/ChoiceButton.tsx); persona via [PersonaAvatar.tsx](../frontend/src/child/components/PersonaAvatar.tsx). Click-to-read handlers attach to step bubble + each word span in K9; voice profile is read from the resolved persona in K8.
+- **Kiosk renders steps via `StepCard.tsx`.** [StepCard.tsx](../../../frontend/src/child/components/StepCard.tsx) is the step renderer; choices via [ChoiceButton.tsx](../../../frontend/src/child/components/ChoiceButton.tsx); persona via [PersonaAvatar.tsx](../../../frontend/src/child/components/PersonaAvatar.tsx). Click-to-read handlers attach to step bubble + each word span in K9; voice profile is read from the resolved persona in K8.
 
-- **Suggestion card shows the cast.** [SuggestionCard.tsx](../frontend/src/parent/components/SuggestionCard.tsx) currently shows toy names as a flat list. K7 adds role labels next to each toy ("Quest Giver: Wise Owl") plus two re-roll buttons. Phase J shipped `PlayQueueSettingsControls.tsx` as a dedicated SettingsPanel sub-component ([SettingsPanel.tsx:35,524](../frontend/src/parent/components/SettingsPanel.tsx)); K2 mirrors this pattern with a new `PlayFeaturesControls.tsx` for the eight new flag controls.
+- **Suggestion card shows the cast.** [SuggestionCard.tsx](../../../frontend/src/parent/components/SuggestionCard.tsx) currently shows toy names as a flat list. K7 adds role labels next to each toy ("Quest Giver: Wise Owl") plus two re-roll buttons. Phase J shipped `PlayQueueSettingsControls.tsx` as a dedicated SettingsPanel sub-component ([SettingsPanel.tsx:35,524](../../../frontend/src/parent/components/SettingsPanel.tsx)); K2 mirrors this pattern with a new `PlayFeaturesControls.tsx` for the eight new flag controls.
 
 - **Phase J is partially-shipped (J1-J10) but J11 smoke + J12 iPad UAT have not yet been operator-run.** Phase K's SettingsPanel additions will sit alongside Phase J's `<PlayQueueSettingsControls>` and Phase I's `<TranscriptRetentionControl>`. If J11/J12 surface a defect in the settings pattern, K may need to absorb the fix. Recommend (out-of-band): operator runs J11 + J12 before K kicks off.
 
-- **Phase E is concurrently in flight.** Latest master commit at plan-time is `e90d027 Step 25c-pre (#112)` (E1c benchmark CLI). Phase E touches `api/activities.py` for env-var dispatch ([activities.py:1199-1203](../src/toybox/api/activities.py#L1199-L1203)). Phase K's recast + insert + spontaneity-hook endpoints will also touch this file. **Mitigation:** sequence Phase K to start after the next Phase E checkpoint merges to master, OR accept merge-resolution work in K6 (recast) and K15 (interjection endpoints).
+- **Phase E is concurrently in flight.** Latest master commit at plan-time is `e90d027 Step 25c-pre (#112)` (E1c benchmark CLI). Phase E touches `api/activities.py` for env-var dispatch ([activities.py:1199-1203](../../../src/toybox/api/activities.py#L1199-L1203)). Phase K's recast + insert + spontaneity-hook endpoints will also touch this file. **Mitigation:** sequence Phase K to start after the next Phase E checkpoint merges to master, OR accept merge-resolution work in K6 (recast) and K15 (interjection endpoints).
 
 - **`documentation/plan.md` status table is stale** — does not list Phase J or in-flight Phase E. A pre-K1 housekeeping task should update plan.md so `/repo-sync` (which mints fresh-context issue bodies straight from the plan) sees current truth.
 
-- **Code-quality landmines this phase is exposed to.** Three of the four rules in [`code-quality.md`](../../.claude/rules/code-quality.md) apply directly. K1 (single source of truth for role names + themes + interjection types), K5 (integration test through `_do_propose`), and K16's per-template validator all exist specifically to prevent these. See §10 for the explicit mapping.
+- **Code-quality landmines this phase is exposed to.** Three of the four rules in [`code-quality.md`](../../../../.claude/rules/code-quality.md) apply directly. K1 (single source of truth for role names + themes + interjection types), K5 (integration test through `_do_propose`), and K16's per-template validator all exist specifically to prevent these. See §10 for the explicit mapping.
 
 ### Existing primitives (one-line glosses)
 
 | Symbol | Where | What it does |
 |---|---|---|
-| `ActivityResponse` | [api/activities.py:238](../src/toybox/api/activities.py#L238) | Wire shape. K1 adds `roles: dict[str, RoleAssignment]` + `cast_summary: str`. K15 adds `interjection_pending: bool` for parent-UI gating. |
-| `_do_propose(body, conn, pubsub, judge_call)` | [api/activities.py:1181](../src/toybox/api/activities.py#L1181) | Shared propose-and-persist helper. **K5 integration-tests new role engine through this entry point**, per [code-quality.md §4](../../.claude/rules/code-quality.md). |
-| `render_with_slot_fills(text, slot_fills)` | [activities/generator.py:689](../src/toybox/activities/generator.py#L689) | Lazy slot substitution. K6 recast re-renders persisted `activity_steps.body` rows via this function (new `slot_fills_json` → new bodies). K14 + K15 reuse it for interjection step rendering. |
-| `ResolvedChildren` / `ResolvedToy` | [activities/content_resolver.py](../src/toybox/activities/content_resolver.py) | Single-seam cache for child + toy resolution per propose. K4 adds `resolve_role_slots(template, available_toys, persona, seed)` to the same module. |
-| `is_capable(breaker)` | [ai/capability.py](../src/toybox/ai/capability.py) | Capability gate. Songs / jokes / roles all work offline — corpus is bundled, role engine is deterministic. No new capability dependency. |
-| `withConflictHandler<T>` | [frontend/src/parent/api.ts:1689](../frontend/src/parent/api.ts#L1689) | 409 retry wrapper. K6's recast and K15's parent-insert endpoints both use this. |
-| `StepCard.tsx` props.step | [child/components/StepCard.tsx](../frontend/src/child/components/StepCard.tsx) | Step renderer. K12 switches on `step.kind` to render text/song/joke; K9 adds click-to-read affordances. |
-| `PersonaAvatar.tsx` props.personaId | [child/components/PersonaAvatar.tsx](../frontend/src/child/components/PersonaAvatar.tsx) | Maps persona id → avatar. K8 extends to map persona id → `VoiceProfile`. |
-| `triggers/defaults.json` | [src/toybox/triggers/defaults.json](../src/toybox/triggers/defaults.json) | Shipped trigger patterns, version-merged into user file on load. K13 adds `request_song` + `request_joke` entries. |
-| `transcript_retention_seconds` setting precedent | [core/transcript_retention.py](../src/toybox/core/transcript_retention.py) | Per-setting backend module pattern. K2's 8 flag modules mirror this. |
-| `play_target_depth` / `play_cadence_seconds` setting precedent | [core/play_target_depth.py](../src/toybox/core/play_target_depth.py) (Phase J) | Per-setting backend module with canonical-set validation. Mirror for boolean parsing in K2. |
-| `<PlayQueueSettingsControls>` / `<TranscriptRetentionControl>` | [SettingsPanel.tsx:35,524](../frontend/src/parent/components/SettingsPanel.tsx) | Dedicated sub-component pattern in SettingsPanel. K2 ships `<PlayFeaturesControls>` for the 8 new toggles. |
-| migrations `0001`-`0013` | [db/migrations/](../src/toybox/db/migrations/) | Latest is `0013_labeled_events_redact_for_sft.sql` (Phase E3 carve-out). K1 migration is `0014`; K2 migration is `0015`. |
+| `ActivityResponse` | [api/activities.py:238](../../../src/toybox/api/activities.py#L238) | Wire shape. K1 adds `roles: dict[str, RoleAssignment]` + `cast_summary: str`. K15 adds `interjection_pending: bool` for parent-UI gating. |
+| `_do_propose(body, conn, pubsub, judge_call)` | [api/activities.py:1181](../../../src/toybox/api/activities.py#L1181) | Shared propose-and-persist helper. **K5 integration-tests new role engine through this entry point**, per [code-quality.md §4](../../../../.claude/rules/code-quality.md). |
+| `render_with_slot_fills(text, slot_fills)` | [activities/generator.py:689](../../../src/toybox/activities/generator.py#L689) | Lazy slot substitution. K6 recast re-renders persisted `activity_steps.body` rows via this function (new `slot_fills_json` → new bodies). K14 + K15 reuse it for interjection step rendering. |
+| `ResolvedChildren` / `ResolvedToy` | [activities/content_resolver.py](../../../src/toybox/activities/content_resolver.py) | Single-seam cache for child + toy resolution per propose. K4 adds `resolve_role_slots(template, available_toys, persona, seed)` to the same module. |
+| `is_capable(breaker)` | [ai/capability.py](../../../src/toybox/ai/capability.py) | Capability gate. Songs / jokes / roles all work offline — corpus is bundled, role engine is deterministic. No new capability dependency. |
+| `withConflictHandler<T>` | [frontend/src/parent/api.ts:1689](../../../frontend/src/parent/api.ts#L1689) | 409 retry wrapper. K6's recast and K15's parent-insert endpoints both use this. |
+| `StepCard.tsx` props.step | [child/components/StepCard.tsx](../../../frontend/src/child/components/StepCard.tsx) | Step renderer. K12 switches on `step.kind` to render text/song/joke; K9 adds click-to-read affordances. |
+| `PersonaAvatar.tsx` props.personaId | [child/components/PersonaAvatar.tsx](../../../frontend/src/child/components/PersonaAvatar.tsx) | Maps persona id → avatar. K8 extends to map persona id → `VoiceProfile`. |
+| `triggers/defaults.json` | [src/toybox/triggers/defaults.json](../../../src/toybox/triggers/defaults.json) | Shipped trigger patterns, version-merged into user file on load. K13 adds `request_song` + `request_joke` entries. |
+| `transcript_retention_seconds` setting precedent | [core/transcript_retention.py](../../../src/toybox/core/transcript_retention.py) | Per-setting backend module pattern. K2's 8 flag modules mirror this. |
+| `play_target_depth` / `play_cadence_seconds` setting precedent | [core/play_target_depth.py](../../../src/toybox/core/play_target_depth.py) (Phase J) | Per-setting backend module with canonical-set validation. Mirror for boolean parsing in K2. |
+| `<PlayQueueSettingsControls>` / `<TranscriptRetentionControl>` | [SettingsPanel.tsx:35,524](../../../frontend/src/parent/components/SettingsPanel.tsx) | Dedicated sub-component pattern in SettingsPanel. K2 ships `<PlayFeaturesControls>` for the 8 new toggles. |
+| migrations `0001`-`0013` | [db/migrations/](../../../src/toybox/db/migrations/) | Latest is `0013_labeled_events_redact_for_sft.sql` (Phase E3 carve-out). K1 migration is `0014`; K2 migration is `0015`. |
 
 ## 3. Scope
 
 **In scope (V1):**
 
-- Single source of truth for the role taxonomy + theme taxonomy + interjection-type taxonomy. Python `Role`, `Theme`, `InterjectionKind` StrEnums in `src/toybox/activities/roles.py` + `themes.py` + `interjections.py`. Drive: Pydantic fields, TS codegen, JSON schema validators, descriptor tables. **Tests assert `is`, not `==`** per [code-quality.md §2](../../.claude/rules/code-quality.md).
+- Single source of truth for the role taxonomy + theme taxonomy + interjection-type taxonomy. Python `Role`, `Theme`, `InterjectionKind` StrEnums in `src/toybox/activities/roles.py` + `themes.py` + `interjections.py`. Drive: Pydantic fields, TS codegen, JSON schema validators, descriptor tables. **Tests assert `is`, not `==`** per [code-quality.md §2](../../../../.claude/rules/code-quality.md).
 - 10 roles: Friend, Quest Giver, Guide / Mentor, Needs Saving, Boss / Mini-Boss, Big Bad Boss, Frenemy, Sidekick, Trickster, Helper / Townsperson.
 - 12 themes: adventure, magic, space, animals, vehicles, food, friendship, pirates, knights, weather, music, silly.
 - 4 interjection kinds (metadata): `embedded`, `ending`, `parent`, `spontaneity`.
@@ -178,12 +178,12 @@ Background a fresh-context model needs to understand the impact.
 - Joke corpus: `data/jokes/jokes.json` — ~50 entries shaped `{id, setup, punchline, theme: <one of 12>, optional_toy_slot: bool, age_band: "3-5"|"6-8"|"9-12", persona_compat: [...]}`. When `optional_toy_slot` is true, joke uses `{toy}` substitution if a toy is available in the activity context, else degrades to a toy-free reading. Validator gate on load; cached after first read.
 - Song corpus: `data/songs/manifest.json` + bundled `.mp3` files under `data/songs/audio/`. Manifest entry `{id, title, audio_path, duration_seconds, theme: <one of 12>, age_band, persona_compat: [...], license, credit}`. License credits in `data/songs/_credits.md`.
 - New step kinds: `kind: "song"` (with `song_id` or `auto: true` for engine-pick) and `kind: "joke"` (same shape). Kiosk audio player surfaces playback state via existing `activity.state` envelope's `current` flag.
-- New standalone intents: `request_song` + `request_joke` triggers added to [src/toybox/triggers/defaults.json](../src/toybox/triggers/defaults.json) with monotonically-increasing pattern versions; generators select from corpus by age band / persona compat / seed; suggestion card surfaces them like any other activity. Gated on `(jokes_enabled OR songs_enabled) AND play_standalone_enabled`. When the surface is disabled, the trigger phrase classifies but the generator returns no activity (`HTTP 200` with `{state: "dismissed", reason: "surface_disabled"}` payload, kept consistent with the no-eligible-template flow today).
+- New standalone intents: `request_song` + `request_joke` triggers added to [src/toybox/triggers/defaults.json](../../../src/toybox/triggers/defaults.json) with monotonically-increasing pattern versions; generators select from corpus by age band / persona compat / seed; suggestion card surfaces them like any other activity. Gated on `(jokes_enabled OR songs_enabled) AND play_standalone_enabled`. When the surface is disabled, the trigger phrase classifies but the generator returns no activity (`HTTP 200` with `{state: "dismissed", reason: "surface_disabled"}` payload, kept consistent with the no-eligible-template flow today).
 - Theme-tagged embedded surface: when a template includes a step with `kind: "song"|"joke"` and `auto: true`, the engine (at activity-creation OR advance time) picks a corpus entry whose `theme ∈ recommended_themes`. Gated on `<content_master> AND play_embedded_enabled`. When the surface is disabled, the step silently auto-skips (kid never sees a "skipped" indicator — UX is "step doesn't exist").
 - Endings surface: when a template includes `ending_step: {...}` and the surface is enabled, the engine appends one themed interjection step after the template's last step at activity-creation time. Step metadata `interjection: "ending"`.
 - Parent-inserted surface: two new endpoints `POST /api/activities/{id}/insert-joke` and `POST /api/activities/{id}/insert-song`, both honoring `If-Match-Version`. Insert a themed interjection at `current_step+1` position with metadata `interjection: "parent"`. Valid in `running` and `paused` states only — rejected for `proposed` (parent would just dismiss + re-propose). New parent ActivityPanel sidebar component with two icon buttons. Each button is greyed out when its content master is OFF. Logs to `labeled_events` with `source: "parent_insert"` for the learning loop.
 - Spontaneity surface: each persona and each role carries `spontaneity_rates: {jokes, songs}` (both 0.0-1.0). On advance, engine computes per-content-type `effective_rate = max(persona.rate, max(role.rate for role in cast))`. Rolls combined: `r = random(advance_seed)`; if `r < effective_jokes` AND jokes-enabled AND surface-enabled → insert joke; elif `r < effective_jokes + effective_songs` AND songs-enabled AND surface-enabled → insert song; else no interjection (caps total at sum, prevents double-fire same advance). **Attribution:** the participant whose rate matched the chosen content type wins narration (display_name shown as speaker); ties broken by sorted toy_id then persona last. Pointer to template position NOT advanced.
-- Catalog backfill: all 200 templates in [src/toybox/activities/templates/branching/](../src/toybox/activities/templates/branching/) rewritten to declare `required_roles` + `recommended_themes` + reference role placeholders in step text + (where the soak agent decides appropriate) an `ending_step`. Soak runs after the engine is stable (K16, after K1-K15 land) — same overnight 4-agent pattern Phase G used.
+- Catalog backfill: all 200 templates in [src/toybox/activities/templates/branching/](../../../src/toybox/activities/templates/branching/) rewritten to declare `required_roles` + `recommended_themes` + reference role placeholders in step text + (where the soak agent decides appropriate) an `ending_step`. Soak runs after the engine is stable (K16, after K1-K15 land) — same overnight 4-agent pattern Phase G used.
 - Smoke gate: propose → recast → approve → kiosk plays activity with persona voice + an embedded song + an embedded joke + click-to-read on word and Read Me + parent inserts a joke mid-activity + 8 settings toggles round-trip.
 - iPad operator UAT (K18 / M1): verifies iOS Safari PWA Web Speech gesture-unlock works, `.mp3` plays, click-to-read responds, all 8 feature flags toggle correctly, parent-insert + spontaneity surfaces behave as specified.
 
@@ -282,7 +282,7 @@ INSERT OR IGNORE INTO settings (key, value) VALUES ('read_me_button_enabled', 't
 -- Defaults: all true except play_spontaneity_enabled (opt-in — interjections disruptive).
 ```
 
-No additions to `activities.slot_fills_json` (JSON column accepts new role-name keys without alter). No additions to `activity_steps` (interjection metadata fits in existing `metadata` JSON field). Confirm by reading [0008_activity_slot_fills.sql](../src/toybox/db/migrations/0008_activity_slot_fills.sql).
+No additions to `activities.slot_fills_json` (JSON column accepts new role-name keys without alter). No additions to `activity_steps` (interjection metadata fits in existing `metadata` JSON field). Confirm by reading [0008_activity_slot_fills.sql](../../../src/toybox/db/migrations/0008_activity_slot_fills.sql).
 
 ### Default persona attribute values (K1 ships these)
 
@@ -315,7 +315,7 @@ Engine logic at advance: `effective_jokes = max(persona.rate_jokes, max(role.rat
 
 ## 6. Build steps
 
-Per [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md), each step below is dispatched by `/build-phase --plan documentation/phase-k-plan.md`. Issue numbers populated by `/repo-sync` after `/plan-review` + `/plan-wrap`.
+Per [`plan-and-issue-flow.md`](../../../../.claude/rules/plan-and-issue-flow.md), each step below is dispatched by `/build-phase --plan documentation/phase-k-plan.md`. Issue numbers populated by `/repo-sync` after `/plan-review` + `/plan-wrap`.
 
 ### Build process (inline summary so a fresh-context model can execute)
 
@@ -332,7 +332,7 @@ Per [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md), each
 
 **`/repo-sync`** runs once before the first `/build-phase` invocation. It reads each `### Step KN:` block, creates a GitHub issue with the Problem text + flags + type, and writes the issue number back into the `**Issue:** #` line. Re-run after any plan edit that changes step shape or numbering.
 
-**Manual section** (here: K18 / M1). `/build-phase` does NOT dispatch these. They're operator-only — for a human to run at the end as the acceptance gate. Format follows [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md) §"Automated vs manual split": (1) copy-paste commands, (2) separate "what to look for" table, (3) explicit name (M1/M2/...) plus end-of-orchestration ask.
+**Manual section** (here: K18 / M1). `/build-phase` does NOT dispatch these. They're operator-only — for a human to run at the end as the acceptance gate. Format follows [`plan-and-issue-flow.md`](../../../../.claude/rules/plan-and-issue-flow.md) §"Automated vs manual split": (1) copy-paste commands, (2) separate "what to look for" table, (3) explicit name (M1/M2/...) plus end-of-orchestration ask.
 
 ### Automated section
 
@@ -386,7 +386,7 @@ Per [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md), each
 
 ### Step K5: Integration test through `_do_propose`
 
-**Problem:** End-to-end test asserting a role-aware template flows through the production propose path: `POST /api/activities/propose` → `_do_propose` → resolved roles persisted in `activities.slot_fills_json` → step bodies rendered via `render_with_slot_fills` → `activity.state` envelope carries the cast. **Required by [`code-quality.md`](../../.claude/rules/code-quality.md) §4** — covers the silent-wiring failure mode (engine builds, never called). Uses pytest-asyncio with `tests/fixtures/personas/role_weighted.json` fixture so the test is byte-deterministic.
+**Problem:** End-to-end test asserting a role-aware template flows through the production propose path: `POST /api/activities/propose` → `_do_propose` → resolved roles persisted in `activities.slot_fills_json` → step bodies rendered via `render_with_slot_fills` → `activity.state` envelope carries the cast. **Required by [`code-quality.md`](../../../../.claude/rules/code-quality.md) §4** — covers the silent-wiring failure mode (engine builds, never called). Uses pytest-asyncio with `tests/fixtures/personas/role_weighted.json` fixture so the test is byte-deterministic.
 
 **Type:** code
 
@@ -594,7 +594,7 @@ Per [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md), each
 
 **Tracking issue:** #131 (manual-section step — `/build-phase` does not dispatch; issue exists for operator tracking + audit trail)
 
-**Status:** DONE (2026-05-16) — bundled with post-K17 #135 toy-role-restriction patches + dispatcher trigger_phrase fix + per-toy active toggle. 12/14 checks PASS; 2 defects filed (cosmetic/UX, not data integrity, not ship-blockers for Phase K substrate): [#137](https://github.com/aberson/toybox/issues/137) (Read Me watermark drifts to mid-screen on fork pages — K9 absolute-positioning anchored to section instead of viewport) + [#138](https://github.com/aberson/toybox/issues/138) (embedded joke/song picker and ending picker can collide on a narrow corpus pool — kid sees the same entry twice in a row). Spontaneity check (#9) skipped per operator note. Full run doc: [`runs/2026-05-16-phase-k-uat.md`](runs/2026-05-16-phase-k-uat.md).
+**Status:** DONE (2026-05-16) — bundled with post-K17 #135 toy-role-restriction patches + dispatcher trigger_phrase fix + per-toy active toggle. 12/14 checks PASS; 2 defects filed (cosmetic/UX, not data integrity, not ship-blockers for Phase K substrate): [#137](https://github.com/aberson/toybox/issues/137) (Read Me watermark drifts to mid-screen on fork pages — K9 absolute-positioning anchored to section instead of viewport) + [#138](https://github.com/aberson/toybox/issues/138) (embedded joke/song picker and ending picker can collide on a narrow corpus pool — kid sees the same entry twice in a row). Spontaneity check (#9) skipped per operator note. Full run doc: [`runs/2026-05-16-phase-k-uat.md`](../../runs/2026-05-16-phase-k-uat.md).
 
 **Problem:** Operator-only step. Verifies on real iPad PWA hardware that:
 
@@ -632,7 +632,7 @@ cd frontend; npm run dev  # serves :4000
 # Open http://$env:TOYBOX_LAN_IP:4000/child on iPad
 ```
 
-**What to look for** (separate from commands per [`plan-and-issue-flow.md`](../../.claude/rules/plan-and-issue-flow.md)):
+**What to look for** (separate from commands per [`plan-and-issue-flow.md`](../../../../.claude/rules/plan-and-issue-flow.md)):
 
 | Check | Pass condition |
 |---|---|
@@ -689,27 +689,27 @@ The eight kebab keys: `jokes-enabled`, `songs-enabled`, `play-standalone-enabled
 
 ## 8. Risks
 
-1. **Single source of truth for role + theme + interjection names ([code-quality.md §2](../../.claude/rules/code-quality.md)).** Three taxonomies × multiple consumers each. **Mitigation:** K1 establishes 3 separate StrEnum modules (`roles.py`, `themes.py`, `interjections.py`). Tests assert `is`, not `==`. Pydantic-to-TS codegen carries to frontend. Any "let's just hardcode this string" comment in review is a yellow card.
+1. **Single source of truth for role + theme + interjection names ([code-quality.md §2](../../../../.claude/rules/code-quality.md)).** Three taxonomies × multiple consumers each. **Mitigation:** K1 establishes 3 separate StrEnum modules (`roles.py`, `themes.py`, `interjections.py`). Tests assert `is`, not `==`. Pydantic-to-TS codegen carries to frontend. Any "let's just hardcode this string" comment in review is a yellow card.
 
-2. **Producer-consumer grep on slot syntax change ([code-quality.md §1](../../.claude/rules/code-quality.md)).** Substitution grammar extends from `{toy}` to also accept `{role_name}` for 10 roles. Known consumers: `generator.py:_substitute`, `content_resolver.py` slot resolver, `_validator.py` placeholder checker, kiosk step renderer, image-gen action sprite lookup. **Mitigation:** K3 includes a grep-attachment for each call site with a pass/fail verdict.
+2. **Producer-consumer grep on slot syntax change ([code-quality.md §1](../../../../.claude/rules/code-quality.md)).** Substitution grammar extends from `{toy}` to also accept `{role_name}` for 10 roles. Known consumers: `generator.py:_substitute`, `content_resolver.py` slot resolver, `_validator.py` placeholder checker, kiosk step renderer, image-gen action sprite lookup. **Mitigation:** K3 includes a grep-attachment for each call site with a pass/fail verdict.
 
-3. **Integration test through `_do_propose` ([code-quality.md §4](../../.claude/rules/code-quality.md)).** Role engine + interjection builder are both silently-wiring-prone. **Mitigation:** K5 (role engine) and K15's integration test (interjection builders called from advance handler + insert endpoints) both required. K13 also integration-tests standalone intent → propose path.
+3. **Integration test through `_do_propose` ([code-quality.md §4](../../../../.claude/rules/code-quality.md)).** Role engine + interjection builder are both silently-wiring-prone. **Mitigation:** K5 (role engine) and K15's integration test (interjection builders called from advance handler + insert endpoints) both required. K13 also integration-tests standalone intent → propose path.
 
 4. **iOS Safari PWA Web Speech quirks.** `speechSynthesis.speak()` outside user gesture is silently no-op on iOS. Voice list takes ~200ms to populate on first load. **Mitigation:** K8 implements the unlock state machine; K18 verifies on real iPad. If unlock fails on iPad: fall back to a "tap to enable narration" prompt on first kiosk load.
 
-5. **K16 soak destabilization risk.** Per [Phase G postmortem](../runs/), the 4-agent backfill pattern relies on a stable engine — any schema change after the soak starts invalidates output. **Mitigation:** K16 explicitly blocks on K1-K15 landing green. If a K1-K15 hotfix is needed during/after the soak, re-soak.
+5. **K16 soak destabilization risk.** Per [Phase G postmortem](../../../runs/), the 4-agent backfill pattern relies on a stable engine — any schema change after the soak starts invalidates output. **Mitigation:** K16 explicitly blocks on K1-K15 landing green. If a K1-K15 hotfix is needed during/after the soak, re-soak.
 
 6. **Bundled audio repo size.** ~50 `.mp3` files × ~150 KB each at 64 kbps mono = ~7.5 MB. Manageable; if it grows past 50 MB across phases, move `data/songs/audio/` to a release asset pack downloaded by `scripts/fetch_assets.py`. **Mitigation:** K11 enforces mono+64 kbps+≤25s; K17 smoke gate asserts total size <50 MB.
 
 7. **Persona × role weight tuning.** Defaults in §5 are seed values. They will need iteration based on what activities feel right in family use. **Mitigation:** K1 ships the defaults; K18 UAT spot-checks tone (do Princess activities feel Princess-y?); tuning is operator-driven and lives in `personas/library/*.json` per the existing per-persona file pattern.
 
-8. **External-content prompt-injection ([security.md](../../.claude/rules/security.md)).** Corpus files are bundled in-repo and reviewed at PR time. **Mitigation:** loaders treat corpus content as data, not instructions; validator rejects entries containing `<system-reminder>` or "ignore prior instructions" as defense-in-depth.
+8. **External-content prompt-injection ([security.md](../../../../.claude/rules/security.md)).** Corpus files are bundled in-repo and reviewed at PR time. **Mitigation:** loaders treat corpus content as data, not instructions; validator rejects entries containing `<system-reminder>` or "ignore prior instructions" as defense-in-depth.
 
 9. **Feature flag refresh latency.** Kiosk reads flags on bootstrap (v1 contract). A parent toggling a flag mid-session must refresh the kiosk for it to take effect. **Mitigation:** documented in K18 UAT explicitly; live propagation is a v2 idea (would require building a `settings.changed` ws envelope — does not exist today).
 
 10. **Phase J pending UAT (J11/J12) coupling.** Phase K's SettingsPanel additions sit alongside Phase J's `<PlayQueueSettingsControls>`. If J11/J12 surface a defect in the per-setting precedent, Phase K may need to absorb the fix. **Mitigation:** recommend J11 + J12 operator UAT runs before K1 kicks off. Otherwise document any J-side defect found mid-K and reconcile.
 
-11. **Phase E concurrent merge surface.** Phase E touches [activities.py:1199-1203](../src/toybox/api/activities.py#L1199-L1203) (env-var dispatch in `_do_propose`); Phase K's recast + insert endpoints + spontaneity hook also touch `activities.py`. **Mitigation:** sequence Phase K1 to start after the next Phase E checkpoint merges to master; or absorb merge-resolution work in K6 + K15 + plan acknowledges the risk.
+11. **Phase E concurrent merge surface.** Phase E touches [activities.py:1199-1203](../../../src/toybox/api/activities.py#L1199-L1203) (env-var dispatch in `_do_propose`); Phase K's recast + insert endpoints + spontaneity hook also touch `activities.py`. **Mitigation:** sequence Phase K1 to start after the next Phase E checkpoint merges to master; or absorb merge-resolution work in K6 + K15 + plan acknowledges the risk.
 
 12. **Spontaneity validation flakiness.** With Wizard `{jokes:0.10}` + a Trickster toy in cast `{jokes:0.30}` → effective_jokes = 0.30. Over 5-advance activity ≈ 83% per activity ≈ 99.9% across 5 activities. Without a Trickster, effective rate drops to persona's. UAT step 9 needs a guaranteed Trickster in cast. **Mitigation:** K18 step 9 explicitly seeds a Trickster-cast activity (parent's toy library must include at least one toy; UAT prerequisites list this); if zero fires after 5 activities with Trickster in cast, surface the rate-multiplication bug rather than declaring pass.
 
@@ -729,7 +729,7 @@ Type + lint + format gates: `uv run mypy src`, `uv run ruff check .`, `uv run ru
 
 ## 10. Code-quality rule mapping
 
-Explicit map of which [`code-quality.md`](../../.claude/rules/code-quality.md) rules apply to which step:
+Explicit map of which [`code-quality.md`](../../../../.claude/rules/code-quality.md) rules apply to which step:
 
 | Rule | Step(s) that satisfy it |
 |---|---|
@@ -790,7 +790,7 @@ K1-K15 shipped via two `/build-phase` runs against this plan: K1-K3 in a prior s
 | K14 | `activities/interjection.py` defines `build_interjection_step` — single source of truth used by all four interjection surfaces; ending-step insertion deferred to advance-time after iter 1 P0 catch (eager `seq=4` insert bypassed intermediate template steps). |
 | K15 | `POST /api/activities/{id}/insert-{joke,song}` endpoints (running/paused only); spontaneity advance-hook (max-rate-across-cast, persona-or-character attribution, deterministic `id`-pinning test pattern); `ActivityPanel.tsx` sidebar `+ song` / `+ joke` buttons. |
 
-### Source-of-truth wiring (per [code-quality.md §2](../../.claude/rules/code-quality.md))
+### Source-of-truth wiring (per [code-quality.md §2](../../../../.claude/rules/code-quality.md))
 
 - **`Role` enum + `GENERIC_DESCRIPTORS`** (K1) — imported by K4 (`content_resolver`) and K5 (integration test); identity-locked via `is`-not-`==` regression assertions.
 - **`Theme` enum** (K1) — imported by K10 (`joke_corpus`), K11 (`song_corpus`), K14 (`interjection`); identity-locked.

@@ -49,7 +49,7 @@ Each `/build-step` runs the step's `Problem` against a fresh dev agent in a git 
 
 ### Step `action_slot` vocabulary
 
-Every `text` step may carry an optional `action_slot` field. Valid values come from `ACTION_SLOTS` at [`src/toybox/image_gen/models.py:37-48`](../src/toybox/image_gen/models.py#L37) — exactly 10 values:
+Every `text` step may carry an optional `action_slot` field. Valid values come from `ACTION_SLOTS` at [`src/toybox/image_gen/models.py:37-48`](../../../src/toybox/image_gen/models.py#L37) — exactly 10 values:
 
 ```
 idle, pointing, looking, jumping, cheering, thinking, waving, running, sleeping, confused
@@ -79,11 +79,11 @@ The 10 element family slugs that M1 ships as a `Family(StrEnum)` in `element_cor
 | Term | Definition |
 |---|---|
 | **Kiosk** | The `/child` route, run as an installed PWA on iPad. Renders one step at a time with a persona avatar. |
-| **Persona** | The kiosk's animated presenter. 4 personas ship today: Wizard ("Marvelous"), Princess ("Lyra"), Detective ("Inspector Pip"), Periodic Table Professor ("Iridia"). Each is a JSON file at [`src/toybox/personas/library/<id>.json`](../src/toybox/personas/library/) carrying `display_name, archetype, system_prompt, avatar_image_path, role_weights, voice_profile, spontaneity_rates`. Full JSONs for all 4 are inlined under Reference below. |
-| **Branching template** | A JSON activity script at [`src/toybox/activities/templates/branching/<intent>.json`](../src/toybox/activities/templates/branching/) declaring `id` (regex `^[a-z0-9][a-z0-9_]*$`, max 64 chars), `title`, `buckets`, `required_roles`, `optional_roles`, `recommended_themes`, `steps`, `ending_step` (optional). Steps can be `text | fork | song | joke`. |
-| **Intent** | One of four fixed values: `boredom | request_play | request_story | request_activity`. Locked in [`_schema.json`](../src/toybox/activities/templates/_schema.json). No new intents in Phase M. |
-| **Role** | One of the 10 canonical roles at [`src/toybox/activities/roles.py`](../src/toybox/activities/roles.py) (friend, quest_giver, guide_mentor, needs_saving, boss_mini_boss, big_bad_boss, frenemy, sidekick, trickster, helper_townsperson). |
-| **Theme** | One of the 12 canonical themes at [`src/toybox/activities/themes.py`](../src/toybox/activities/themes.py) (adventure, magic, space, animals, vehicles, food, friendship, pirates, knights, weather, music, silly). **Phase M adds a 13th: `feelings`.** |
+| **Persona** | The kiosk's animated presenter. 4 personas ship today: Wizard ("Marvelous"), Princess ("Lyra"), Detective ("Inspector Pip"), Periodic Table Professor ("Iridia"). Each is a JSON file at [`src/toybox/personas/library/<id>.json`](../../../src/toybox/personas/library/) carrying `display_name, archetype, system_prompt, avatar_image_path, role_weights, voice_profile, spontaneity_rates`. Full JSONs for all 4 are inlined under Reference below. |
+| **Branching template** | A JSON activity script at [`src/toybox/activities/templates/branching/<intent>.json`](../../../src/toybox/activities/templates/branching/) declaring `id` (regex `^[a-z0-9][a-z0-9_]*$`, max 64 chars), `title`, `buckets`, `required_roles`, `optional_roles`, `recommended_themes`, `steps`, `ending_step` (optional). Steps can be `text | fork | song | joke`. |
+| **Intent** | One of four fixed values: `boredom | request_play | request_story | request_activity`. Locked in [`_schema.json`](../../../src/toybox/activities/templates/_schema.json). No new intents in Phase M. |
+| **Role** | One of the 10 canonical roles at [`src/toybox/activities/roles.py`](../../../src/toybox/activities/roles.py) (friend, quest_giver, guide_mentor, needs_saving, boss_mini_boss, big_bad_boss, frenemy, sidekick, trickster, helper_townsperson). |
+| **Theme** | One of the 12 canonical themes at [`src/toybox/activities/themes.py`](../../../src/toybox/activities/themes.py) (adventure, magic, space, animals, vehicles, food, friendship, pirates, knights, weather, music, silly). **Phase M adds a 13th: `feelings`.** |
 | **Reward step** | Phase L's terminal step kind. Server resolves a concrete picture/joke/song reward by set-intersection of `activity_themes` and `reward.tags`. Element-themed songs from M7 become reward-eligible automatically once tagged. Wire shape inlined under Reference below. |
 | **Element corpus** | New in M1: bundled data at `data/elements/elements.json` (118 entries) + loader at `src/toybox/activities/element_corpus.py`. Mirrors the song_corpus / joke_corpus pattern (loader + Pydantic model + seeded picker + validator + injection guard). |
 | **Element card** | New in M3: kiosk-side component that renders an element's symbol + atomic number + name + sprite inline when a step carries `element_id`. |
@@ -105,7 +105,7 @@ Phase G shipped the branching template engine + 200 templates across the 4 inten
 
 ### Reference
 
-**Persona — Periodic Table Professor** ([`src/toybox/personas/library/periodic_table.json`](../src/toybox/personas/library/periodic_table.json)):
+**Persona — Periodic Table Professor** ([`src/toybox/personas/library/periodic_table.json`](../../../src/toybox/personas/library/periodic_table.json)):
 ```json
 {
   "id": "periodic_table",
@@ -121,7 +121,7 @@ Phase G shipped the branching template engine + 200 templates across the 4 inten
 }
 ```
 
-**Persona — Princess** ([`src/toybox/personas/library/princess.json`](../src/toybox/personas/library/princess.json)) — load-bearing for §6.5 / §6.9 / M9-M12 ("Princess weights social roles"):
+**Persona — Princess** ([`src/toybox/personas/library/princess.json`](../../../src/toybox/personas/library/princess.json)) — load-bearing for §6.5 / §6.9 / M9-M12 ("Princess weights social roles"):
 ```json
 {
   "id": "princess",
@@ -134,7 +134,7 @@ Phase G shipped the branching template engine + 200 templates across the 4 inten
 }
 ```
 
-**Persona — Detective** ([`src/toybox/personas/library/detective.json`](../src/toybox/personas/library/detective.json)) — load-bearing for §6.5 / §6.9 / M10 ("Detective weights perspective/observation roles + frenemy"):
+**Persona — Detective** ([`src/toybox/personas/library/detective.json`](../../../src/toybox/personas/library/detective.json)) — load-bearing for §6.5 / §6.9 / M10 ("Detective weights perspective/observation roles + frenemy"):
 ```json
 {
   "id": "detective",
@@ -147,7 +147,7 @@ Phase G shipped the branching template engine + 200 templates across the 4 inten
 }
 ```
 
-**Persona — Wizard** ([`src/toybox/personas/library/wizard.json`](../src/toybox/personas/library/wizard.json)) — informational; not biased toward by any Phase M template, but referenced as the "off-character fallback" in §6.9:
+**Persona — Wizard** ([`src/toybox/personas/library/wizard.json`](../../../src/toybox/personas/library/wizard.json)) — informational; not biased toward by any Phase M template, but referenced as the "off-character fallback" in §6.9:
 ```json
 {
   "id": "wizard",
@@ -166,7 +166,7 @@ Phase G shipped the branching template engine + 200 templates across the 4 inten
 - M10 declares `required_roles: ["friend", "frenemy"]`. Only **Detective** weights both (friend implicit at 0, frenemy 1.3). Princess + Iridia do not weight frenemy; Wizard weights frenemy 1.1. Detective will be the dominant pick; Wizard is the fallback.
 - M13 sub-test (h) asserts the bias empirically on M4 templates: Professor Iridia >50% across 20 seeded runs.
 
-**Phase L reward step shape** ([`src/toybox/api/activities.py`](../src/toybox/api/activities.py) — runtime `activity_steps` row, kind `"reward"`):
+**Phase L reward step shape** ([`src/toybox/api/activities.py`](../../../src/toybox/api/activities.py) — runtime `activity_steps` row, kind `"reward"`):
 ```jsonc
 // Inserted after the last regular step + ending_step, at most once per activity.
 // reward_type is chosen by parent at approve time, persisted on activities.reward_type.
@@ -187,7 +187,7 @@ Fall-back chain: if chosen reward type is empty (no active picture rewards uploa
 
 M4 templates' inline `ending_step: {kind: "song", auto: true}` fires the song picker (an ending-step song, NOT a reward step). The Phase L reward step then appends AFTER the ending_step — so a Phase M Meet-an-Element activity typically ends with: text-step → ending_step song → reward-step song (or picture/joke if parent overrode the reward_type).
 
-**Template schema** ([`src/toybox/activities/templates/_schema.json`](../src/toybox/activities/templates/_schema.json)) — Phase M extends `step.properties` with one optional field:
+**Template schema** ([`src/toybox/activities/templates/_schema.json`](../../../src/toybox/activities/templates/_schema.json)) — Phase M extends `step.properties` with one optional field:
 ```jsonc
 "element_id": {
   "type": ["string", "null"],
@@ -196,27 +196,27 @@ M4 templates' inline `ending_step: {kind: "song", auto: true}` fires the song pi
 }
 ```
 
-**Theme enum** ([`src/toybox/activities/themes.py`](../src/toybox/activities/themes.py)) — Phase M adds one value:
+**Theme enum** ([`src/toybox/activities/themes.py`](../../../src/toybox/activities/themes.py)) — Phase M adds one value:
 ```python
 class Theme(StrEnum):
     # ... existing 12 ...
     feelings = "feelings"  # Phase M
 ```
-And `THEME_DISPLAY_NAMES[Theme.feelings] = "Feelings"`. The single-source-of-truth pattern from [`code-quality.md`](../../.claude/rules/code-quality.md) §2 means [`_schema.json`](../src/toybox/activities/templates/_schema.json) `theme` enum array gains `"feelings"` in the same commit. Persona `role_weights` are unchanged — no persona is theme-tagged.
+And `THEME_DISPLAY_NAMES[Theme.feelings] = "Feelings"`. The single-source-of-truth pattern from [`code-quality.md`](../../../../.claude/rules/code-quality.md) §2 means [`_schema.json`](../../../src/toybox/activities/templates/_schema.json) `theme` enum array gains `"feelings"` in the same commit. Persona `role_weights` are unchanged — no persona is theme-tagged.
 
-**Song corpus shape** ([`src/toybox/activities/song_corpus.py`](../src/toybox/activities/song_corpus.py)) — Manifest at [`data/songs/manifest.json`](../data/songs/manifest.json), entries follow `{id, title, audio_path, duration_seconds, theme, age_band, persona_compat, license, credit, lyrics}`. M7 adds ~25 entries with `theme="silly"` or `theme="music"` (no science theme exists; we don't mint one in Phase M to limit theme drift) and `persona_compat=["periodic_table", "all"]` so reward matching surfaces them for activities with Professor Iridia in the persona slot.
+**Song corpus shape** ([`src/toybox/activities/song_corpus.py`](../../../src/toybox/activities/song_corpus.py)) — Manifest at [`data/songs/manifest.json`](../../../data/songs/manifest.json), entries follow `{id, title, audio_path, duration_seconds, theme, age_band, persona_compat, license, credit, lyrics}`. M7 adds ~25 entries with `theme="silly"` or `theme="music"` (no science theme exists; we don't mint one in Phase M to limit theme drift) and `persona_compat=["periodic_table", "all"]` so reward matching surfaces them for activities with Professor Iridia in the persona slot.
 
-**Reward matching** ([`src/toybox/api/activities.py` Phase L code](../src/toybox/api/activities.py)) — Set-intersection between `activity_themes` and `reward.tags`. Element-themed templates declare `recommended_themes: ["music", "silly"]` (or any 1-2 themes appropriate to the element's vibe); element-themed songs carry matching tags. The L-pattern means no special wiring — songs become rewards automatically once tagged.
+**Reward matching** ([`src/toybox/api/activities.py` Phase L code](../../../src/toybox/api/activities.py)) — Set-intersection between `activity_themes` and `reward.tags`. Element-themed templates declare `recommended_themes: ["music", "silly"]` (or any 1-2 themes appropriate to the element's vibe); element-themed songs carry matching tags. The L-pattern means no special wiring — songs become rewards automatically once tagged.
 
-**Validator** ([`src/toybox/activities/_validator.py`](../src/toybox/activities/_validator.py)) — Phase M extends:
+**Validator** ([`src/toybox/activities/_validator.py`](../../../src/toybox/activities/_validator.py)) — Phase M extends:
 - `element_id` references must resolve to a loaded element (cross-corpus validation).
-- *(No template-side persona gating.* Persona is chosen at propose time by the existing picker; binding to Professor Iridia happens via `role_weights` bias — see §6.9. Templates do not declare `persona_compat`; that field exists on corpus entries only — [`song_corpus.py:156`](../src/toybox/activities/song_corpus.py#L156), [`joke_corpus.py:15`](../src/toybox/activities/joke_corpus.py#L15) — not on templates.)
+- *(No template-side persona gating.* Persona is chosen at propose time by the existing picker; binding to Professor Iridia happens via `role_weights` bias — see §6.9. Templates do not declare `persona_compat`; that field exists on corpus entries only — [`song_corpus.py:156`](../../../src/toybox/activities/song_corpus.py#L156), [`joke_corpus.py:15`](../../../src/toybox/activities/joke_corpus.py#L15) — not on templates.)
 
-**Persona-template binding mechanism** ([`src/toybox/activities/content_resolver.py:854-932`](../src/toybox/activities/content_resolver.py#L854) `assign_role_slots`) — Personas declare `role_weights: {role_name: float}` in their library JSON. Templates declare `required_roles: [...]` and `optional_roles: [...]`. The proposer selects a persona partly by how well its role_weights align with a template's required_roles. Periodic Table Professor weights `guide_mentor: 1.5, helper_townsperson: 1.3, friend: 1.0`. A template declaring `required_roles: ["guide_mentor"]` will tend to receive her. This is the only Phase M persona-binding mechanism — no new template field.
+**Persona-template binding mechanism** ([`src/toybox/activities/content_resolver.py:854-932`](../../../src/toybox/activities/content_resolver.py#L854) `assign_role_slots`) — Personas declare `role_weights: {role_name: float}` in their library JSON. Templates declare `required_roles: [...]` and `optional_roles: [...]`. The proposer selects a persona partly by how well its role_weights align with a template's required_roles. Periodic Table Professor weights `guide_mentor: 1.5, helper_townsperson: 1.3, friend: 1.0`. A template declaring `required_roles: ["guide_mentor"]` will tend to receive her. This is the only Phase M persona-binding mechanism — no new template field.
 
-**Ending-step mechanism** ([`_validator.py:26,36-37`](../src/toybox/activities/_validator.py#L26)) — Templates carry a top-level `ending_step` field (NOT a step in the `steps` array): `{kind: "song" | "joke", auto: true | corpus_id: str}`. The engine renders ending_step after the last regular step. **Phase L's reward step appends AFTER `ending_step`** — they coexist (reward is a third terminal, not a replacement). Among existing templates, 227/250 boredom templates carry `ending_step: {kind: "song", auto: true}`; 66 use `{kind: "joke"}`; 23 omit. Phase M template authoring guidance below follows this precedent.
+**Ending-step mechanism** ([`_validator.py:26,36-37`](../../../src/toybox/activities/_validator.py#L26)) — Templates carry a top-level `ending_step` field (NOT a step in the `steps` array): `{kind: "song" | "joke", auto: true | corpus_id: str}`. The engine renders ending_step after the last regular step. **Phase L's reward step appends AFTER `ending_step`** — they coexist (reward is a third terminal, not a replacement). Among existing templates, 227/250 boredom templates carry `ending_step: {kind: "song", auto: true}`; 66 use `{kind: "joke"}`; 23 omit. Phase M template authoring guidance below follows this precedent.
 
-**Image-gen pipeline** ([`documentation/operator/image-gen-runtime.md`](operator/image-gen-runtime.md)) — Tier B (SD 1.5 cartoon at 512², 4-step LCM-LoRA). The active image-gen entry point is [`src/toybox/image_gen/worker.py`](../src/toybox/image_gen/worker.py) (job worker that renders per-toy action sprites). The F.5 setup scripts at [`scripts/f5_*.py`](../scripts/) (`f5_download_sd15.py`, `f5_download_lcm.py`, `f5_download_cartoon_checkpoint.py`, `f5_load_smoke.py`, `f5_generate_templates.py`) cover loader + smoke + the existing rendering path. M2's `scripts/generate_element_sprites.py` reuses `worker.py`'s pipeline plumbing + the F.5 SD1.5+LCM-LoRA loader pattern from `f5_load_smoke.py`, with a per-element prompt template (see §5.2).
+**Image-gen pipeline** ([`documentation/operator/image-gen-runtime.md`](operator/image-gen-runtime.md)) — Tier B (SD 1.5 cartoon at 512², 4-step LCM-LoRA). The active image-gen entry point is [`src/toybox/image_gen/worker.py`](../../../src/toybox/image_gen/worker.py) (job worker that renders per-toy action sprites). The F.5 setup scripts at [`scripts/f5_*.py`](../../../scripts/) (`f5_download_sd15.py`, `f5_download_lcm.py`, `f5_download_cartoon_checkpoint.py`, `f5_load_smoke.py`, `f5_generate_templates.py`) cover loader + smoke + the existing rendering path. M2's `scripts/generate_element_sprites.py` reuses `worker.py`'s pipeline plumbing + the F.5 SD1.5+LCM-LoRA loader pattern from `f5_load_smoke.py`, with a per-element prompt template (see §5.2).
 
 ### Open work and dependencies
 
@@ -250,7 +250,7 @@ And `THEME_DISPLAY_NAMES[Theme.feelings] = "Feelings"`. The single-source-of-tru
 - **New intents** — schema's 4-intent enum stays locked; all Phase M templates fit one of the existing four.
 - **New personas** — Professor Iridia is the only PT persona; no element-family sub-personas authored.
 - **Per-element safety framing** — relies on the existing `system_prompt`. No per-element "don't touch mercury" templates.
-- **New trigger phrases** — no Phase M edits to [`data/triggers.json`](../data/triggers.json) or [`src/toybox/triggers/defaults.json`](../src/toybox/triggers/defaults.json). Existing intent triggers cover the new content.
+- **New trigger phrases** — no Phase M edits to [`data/triggers.json`](../../../data/triggers.json) or [`src/toybox/triggers/defaults.json`](../../../src/toybox/triggers/defaults.json). Existing intent triggers cover the new content.
 - **Parent-facing element browser** — no parent UI to enumerate elements; templates surface via existing propose flow only.
 
 ## 4. Impact analysis
@@ -282,7 +282,7 @@ And `THEME_DISPLAY_NAMES[Theme.feelings] = "Feelings"`. The single-source-of-tru
 | `documentation/plan.md` | **MODIFY** — Status row for Phase M | post-M14 (in `/repo-update`) |
 | `documentation/runs/2026-MM-DD-phase-m-uat.md` | **NEW** — UAT run doc | M14 |
 
-**Downstream-consumer grep checklist** (per [`code-quality.md`](../../.claude/rules/code-quality.md) §1, mandatory before M8 ships):
+**Downstream-consumer grep checklist** (per [`code-quality.md`](../../../../.claude/rules/code-quality.md) §1, mandatory before M8 ships):
 
 - Every consumer of `Theme` enum members: `grep -rn "Theme\\." src/toybox/`. Likely hits: `song_corpus.py`, `joke_corpus.py`, `content_resolver.py`, `_validator.py`, frontend `types.ts` (codegen), reward matcher. Each must accept `feelings` without raising.
 - Every consumer of `THEME_DISPLAY_NAMES`: parent UI theme-picker (if any), suggestion-card render path.
@@ -322,12 +322,12 @@ And `THEME_DISPLAY_NAMES[Theme.feelings] = "Feelings"`. The single-source-of-tru
 - `pick_element(seed, *, family=None, age_band=None) -> Element | None` — deterministic seeded picker.
 - `get_element(element_id) -> Element | None` — direct lookup for validator.
 - `clear_element_cache()` — test hook.
-- Injection guard rejects `<system-reminder>` / `ignore prior instructions` in `name | fun_fact | story_seed_hooks` (defense-in-depth per [`security.md`](../../.claude/rules/security.md)).
-- `Family` `StrEnum` with the 10 family values — single source of truth, asserted `is` not `==` per [`code-quality.md`](../../.claude/rules/code-quality.md) §2.
+- Injection guard rejects `<system-reminder>` / `ignore prior instructions` in `name | fun_fact | story_seed_hooks` (defense-in-depth per [`security.md`](../../../../.claude/rules/security.md)).
+- `Family` `StrEnum` with the 10 family values — single source of truth, asserted `is` not `==` per [`code-quality.md`](../../../../.claude/rules/code-quality.md) §2.
 
 ### 5.2 Element sprite render script (M2)
 
-**`scripts/generate_element_sprites.py`** — Reuses the F.5 SD1.5+LCM-LoRA loader pattern from [`scripts/f5_load_smoke.py`](../scripts/f5_load_smoke.py) and the per-job rendering plumbing from [`src/toybox/image_gen/worker.py`](../src/toybox/image_gen/worker.py). Inputs: every element from `load_elements()`. For each, runs the F.5 Tier-B pipeline with prompt:
+**`scripts/generate_element_sprites.py`** — Reuses the F.5 SD1.5+LCM-LoRA loader pattern from [`scripts/f5_load_smoke.py`](../../../scripts/f5_load_smoke.py) and the per-job rendering plumbing from [`src/toybox/image_gen/worker.py`](../../../src/toybox/image_gen/worker.py). Inputs: every element from `load_elements()`. For each, runs the F.5 Tier-B pipeline with prompt:
 ```
 Professor Iridia, a friendly cartoon scientist with curly hair and round glasses, holding up a glowing card showing the element symbol "{symbol}" and the number {atomic_number}. The card glows in {color_description}. Soft watercolor background, friendly atmosphere, children's book illustration style.
 ```
@@ -413,11 +413,11 @@ Prettiest metal you've ever seen!
 ### 5.8 'feelings' theme (M8)
 
 Schema additions:
-- `Theme.feelings = "feelings"` in [`themes.py`](../src/toybox/activities/themes.py)
+- `Theme.feelings = "feelings"` in [`themes.py`](../../../src/toybox/activities/themes.py)
 - `THEME_DISPLAY_NAMES[Theme.feelings] = "Feelings"`
-- `"feelings"` added to the `theme` enum in [`_schema.json`](../src/toybox/activities/templates/_schema.json)
+- `"feelings"` added to the `theme` enum in [`_schema.json`](../../../src/toybox/activities/templates/_schema.json)
 
-Downstream-consumer audit (per [`code-quality.md`](../../.claude/rules/code-quality.md) §1) is part of M8's definition of done. Specifically: the build-step agent must `grep -rn "Theme\\." src/toybox/ frontend/` and confirm every site accepts the new value without modification, or document the modification.
+Downstream-consumer audit (per [`code-quality.md`](../../../../.claude/rules/code-quality.md) §1) is part of M8's definition of done. Specifically: the build-step agent must `grep -rn "Theme\\." src/toybox/ frontend/` and confirm every site accepts the new value without modification, or document the modification.
 
 ### 5.9 SEL templates (M9-M12)
 
@@ -488,9 +488,9 @@ Per the answered design question. Each content area is one build-step with `--re
 
 ### 6.9 Persona-template binding via `role_weights`, not a new template field
 
-Plan-review (2026-05-17) discovered that `persona_compat` does NOT exist on templates ([verified](../src/toybox/activities/models.py#L354) — zero of 1000 existing templates carry it; Template Pydantic model has no such field; no consumer reads it). It exists only on corpus entries (songs / jokes).
+Plan-review (2026-05-17) discovered that `persona_compat` does NOT exist on templates ([verified](../../../src/toybox/activities/models.py#L354) — zero of 1000 existing templates carry it; Template Pydantic model has no such field; no consumer reads it). It exists only on corpus entries (songs / jokes).
 
-Rather than introduce a new template field + validator + propose-time filter (which would break Phase M's "pure content; zero engine work" promise and require backfill across the existing 1000 templates), Phase M binds personas to templates via the **existing role_weights mechanism** ([content_resolver.py:854-932](../src/toybox/activities/content_resolver.py#L854) `assign_role_slots`):
+Rather than introduce a new template field + validator + propose-time filter (which would break Phase M's "pure content; zero engine work" promise and require backfill across the existing 1000 templates), Phase M binds personas to templates via the **existing role_weights mechanism** ([content_resolver.py:854-932](../../../src/toybox/activities/content_resolver.py#L854) `assign_role_slots`):
 
 - Templates declare `required_roles`.
 - Personas weight specific roles in `role_weights` (Professor Iridia: `guide_mentor: 1.5`).
@@ -530,7 +530,7 @@ Each step is `/build-phase`-compatible. `**Issue:** #` lines stay blank until `/
 - **Status:** DONE (2026-05-18) — 30/30 element tests green, full suite 1962/2 (was 1932/2; +30 as expected), mypy clean (125 src files), ruff check clean. Ships 118-element corpus + loader + injection guard + Family StrEnum; 104 entries carry pronunciation_guide (more aggressive than ~30 target — over-providing is safer for TTS). Age-band distribution skews 9-12 (15/21/82) because most of the periodic table is genuinely 9-12 territory; 3-5/6-8 buckets correctly hold elements a child actually encounters. data/elements/ un-ignored in .gitignore (matches songs/jokes pattern).
 
 ### Step M2: Element sprite render script
-- **Problem:** Build `scripts/generate_element_sprites.py` reusing the F.5 SD1.5+LCM-LoRA loader pattern from [`scripts/f5_load_smoke.py`](../scripts/f5_load_smoke.py) and the rendering plumbing from [`src/toybox/image_gen/worker.py`](../src/toybox/image_gen/worker.py). Renders one sprite per element via the F.5 Tier-B pipeline (SD 1.5 + LCM-LoRA + cartoon style at 512², 4-step), then composites a periodic-table-cell text overlay via Pillow (see overlay design below). Diffusion prompt: "Professor Iridia, a friendly cartoon scientist with curly hair and round glasses, smiling warmly, holding up a glowing orb of {name} in {color_description}. Soft watercolor background, friendly atmosphere, children's book illustration style." Negative prompt extends `DEFAULT_NEGATIVE_PROMPT` with `text, letters, numbers, writing, symbols, watermark` to suppress SD's tendency to scatter pseudo-glyphs across clothing/background. **Text overlay (Pillow post-render, kid-friendly font):** bottom-left rounded white panel (42% × 30%, drop-shadow), atomic number top-left in Comic Sans regular (no hash prefix), element symbol horizontally + vertically centered in Comic Sans Bold, element name bottom-centered in Comic Sans Bold. Layout matches the periodic-table-cell convention so a 4yo pre-reader can pattern-match symbols across screens. **Why text overlay vs. prompted text** (revised 2026-05-18 during M2b operator session): SD 1.5 + 4-step LCM at 512² cannot render legible glyphs; the original "card showing symbol + number" prompt reliably produced garbled mush plus pseudo-letter noise across the rest of the canvas. Pillow overlay separates concerns: SD draws the scene, Pillow renders the text deterministically. Operator A/B-compared three samples (h-1, au-79, u-92) under both designs; the overlay approach is the locked path. Output: `data/images/elements/<id>.png`. Skip existing files by default; `--force` re-renders; `--sample N` renders only the first N (for pre-validation). **Pre-render gate:** run `--ids h-1 au-79 u-92` first; visually confirm cartoon-style consistency + overlay legibility before launching the full 118-element soak. Then run the full script. Commit the script + the 14 "canonical" sprites (one per `Family` enum value + 4 popular individuals: gold, helium, oxygen, iron) to git as style references; gitignore the remaining 104.
+- **Problem:** Build `scripts/generate_element_sprites.py` reusing the F.5 SD1.5+LCM-LoRA loader pattern from [`scripts/f5_load_smoke.py`](../../../scripts/f5_load_smoke.py) and the rendering plumbing from [`src/toybox/image_gen/worker.py`](../../../src/toybox/image_gen/worker.py). Renders one sprite per element via the F.5 Tier-B pipeline (SD 1.5 + LCM-LoRA + cartoon style at 512², 4-step), then composites a periodic-table-cell text overlay via Pillow (see overlay design below). Diffusion prompt: "Professor Iridia, a friendly cartoon scientist with curly hair and round glasses, smiling warmly, holding up a glowing orb of {name} in {color_description}. Soft watercolor background, friendly atmosphere, children's book illustration style." Negative prompt extends `DEFAULT_NEGATIVE_PROMPT` with `text, letters, numbers, writing, symbols, watermark` to suppress SD's tendency to scatter pseudo-glyphs across clothing/background. **Text overlay (Pillow post-render, kid-friendly font):** bottom-left rounded white panel (42% × 30%, drop-shadow), atomic number top-left in Comic Sans regular (no hash prefix), element symbol horizontally + vertically centered in Comic Sans Bold, element name bottom-centered in Comic Sans Bold. Layout matches the periodic-table-cell convention so a 4yo pre-reader can pattern-match symbols across screens. **Why text overlay vs. prompted text** (revised 2026-05-18 during M2b operator session): SD 1.5 + 4-step LCM at 512² cannot render legible glyphs; the original "card showing symbol + number" prompt reliably produced garbled mush plus pseudo-letter noise across the rest of the canvas. Pillow overlay separates concerns: SD draws the scene, Pillow renders the text deterministically. Operator A/B-compared three samples (h-1, au-79, u-92) under both designs; the overlay approach is the locked path. Output: `data/images/elements/<id>.png`. Skip existing files by default; `--force` re-renders; `--sample N` renders only the first N (for pre-validation). **Pre-render gate:** run `--ids h-1 au-79 u-92` first; visually confirm cartoon-style consistency + overlay legibility before launching the full 118-element soak. Then run the full script. Commit the script + the 14 "canonical" sprites (one per `Family` enum value + 4 popular individuals: gold, helium, oxygen, iron) to git as style references; gitignore the remaining 104.
 - **Type:** operator (split — see Status)
 - **Issue:** #154
 - **Flags:** (none — operator step)
@@ -539,10 +539,10 @@ Each step is `/build-phase`-compatible. `**Issue:** #` lines stay blank until `/
 - **Depends on:** M1.
 - **Status:** SPLIT 2026-05-18 per `.claude/rules/plan-and-issue-flow.md` § "Operator-type steps must not produce code artifacts". Two subtasks:
   - **M2a (code, DONE 2026-05-18, commit `71e8eed`):** ships `scripts/generate_element_sprites.py` + `.gitignore` un-ignore block for 14 canonical sprite ids. Auto-authored as orchestrator prep so the operator brief is runtime-only. No mid-build halt.
-  - **M2b (operator, IN PROGRESS 2026-05-18):** the 118-sprite render soak + spot-check + canonical-sprite commit. **Prompt + overlay redesign landed mid-session** — the originally-frozen card-text prompt produced unreadable glyph mush (SD 1.5 + 4-step LCM cannot render legible text), so the operator approved a swap to (a) orb-of-element diffusion prompt with text suppressed via negative prompt, plus (b) Pillow text overlay (rounded white panel, Comic Sans Bold, periodic-table-cell layout) for the symbol + atomic number + name. Script updated accordingly; full 118 re-rendered with `--force`. **M3-M13 did NOT block on M2b** — [`ElementCard.tsx`](../frontend/src/child/components/ElementCard.tsx) renders a 404-fallback to the Professor Iridia persona avatar when a sprite is absent, and M3 vitest covers both render paths. The operator runs M2b alongside M14 (iPad UAT) in one session so manual gates bundle. Per-element fixed seed in the script (`sha256(element.id) % 2**31`) means M2b can re-render selectively without drift; specific outliers can be re-rolled via `--ids <id> --force` (sub-second per element after pipeline load).
+  - **M2b (operator, IN PROGRESS 2026-05-18):** the 118-sprite render soak + spot-check + canonical-sprite commit. **Prompt + overlay redesign landed mid-session** — the originally-frozen card-text prompt produced unreadable glyph mush (SD 1.5 + 4-step LCM cannot render legible text), so the operator approved a swap to (a) orb-of-element diffusion prompt with text suppressed via negative prompt, plus (b) Pillow text overlay (rounded white panel, Comic Sans Bold, periodic-table-cell layout) for the symbol + atomic number + name. Script updated accordingly; full 118 re-rendered with `--force`. **M3-M13 did NOT block on M2b** — [`ElementCard.tsx`](../../../frontend/src/child/components/ElementCard.tsx) renders a 404-fallback to the Professor Iridia persona avatar when a sprite is absent, and M3 vitest covers both render paths. The operator runs M2b alongside M14 (iPad UAT) in one session so manual gates bundle. Per-element fixed seed in the script (`sha256(element.id) % 2**31`) means M2b can re-render selectively without drift; specific outliers can be re-rolled via `--ids <id> --force` (sub-second per element after pipeline load).
 
 ### Step M3: ElementCard kiosk component + schema/validator wiring
-- **Problem:** Add `step.element_id` optional field to `_schema.json` (regex `^[a-z]{1,3}-[0-9]{1,3}$`); update `Step` + `ActivityStep` models in [`models.py`](../src/toybox/activities/models.py); extend `_validator.py` to confirm element_id resolves via `element_corpus.get_element()` (no persona-side gating per §6.9); add a FastAPI `StaticFiles` mount for `data/images/elements/` at `/api/static/elements/` following the [`app.py:103-104`](../src/toybox/app.py#L103) `images_root()` pattern and the [`app.py:119-120`](../src/toybox/app.py#L119) `songs_audio_root()` pattern; build `frontend/src/child/components/ElementCard.tsx` (sprite + symbol + name + atomic number, pulses on mount, falls back to `/api/static/personas/library/avatars/periodic_table.png` if the element sprite 404s); wire into [`StepCard.tsx`](../frontend/src/child/components/StepCard.tsx) to render above step text when `element_id` is present. Regenerate [`frontend/src/shared/types.ts`](../frontend/src/shared/types.ts) via the [`tools/gen_types_ts.py`](../tools/gen_types_ts.py) pre-commit hook.
+- **Problem:** Add `step.element_id` optional field to `_schema.json` (regex `^[a-z]{1,3}-[0-9]{1,3}$`); update `Step` + `ActivityStep` models in [`models.py`](../../../src/toybox/activities/models.py); extend `_validator.py` to confirm element_id resolves via `element_corpus.get_element()` (no persona-side gating per §6.9); add a FastAPI `StaticFiles` mount for `data/images/elements/` at `/api/static/elements/` following the [`app.py:103-104`](../../../src/toybox/app.py#L103) `images_root()` pattern and the [`app.py:119-120`](../../../src/toybox/app.py#L119) `songs_audio_root()` pattern; build `frontend/src/child/components/ElementCard.tsx` (sprite + symbol + name + atomic number, pulses on mount, falls back to `/api/static/personas/library/avatars/periodic_table.png` if the element sprite 404s); wire into [`StepCard.tsx`](../../../frontend/src/child/components/StepCard.tsx) to render above step text when `element_id` is present. Regenerate [`frontend/src/shared/types.ts`](../../../frontend/src/shared/types.ts) via the [`tools/gen_types_ts.py`](../../../tools/gen_types_ts.py) pre-commit hook.
 - **Type:** code
 - **Issue:** #155
 - **Flags:** --reviewers code
@@ -594,7 +594,7 @@ Each step is `/build-phase`-compatible. `**Issue:** #` lines stay blank until `/
   - **M7b (operator, DEFERRED):** the Coqui TTS XTTS-v2 audio render — ~25 `.mp3` files in `data/songs/audio/`. Operator-run via the existing `scripts/generate_song_corpus.py`. Deferred to alongside M2b + M14 (same operator session at phase end). M3-M13 do NOT block on M7b — kiosk graceful-degrades + the M13 smoke gate sub-test (g) covers the wire path with audio-absent fall-through.
 
 ### Step M8: Mint `Theme.feelings`
-- **Problem:** Add `Theme.feelings = "feelings"` to [`themes.py`](../src/toybox/activities/themes.py) + `THEME_DISPLAY_NAMES[Theme.feelings] = "Feelings"`; add `"feelings"` to the `theme` enum in [`_schema.json`](../src/toybox/activities/templates/_schema.json); regenerate frontend types. **Mandatory downstream-consumer audit per [`code-quality.md`](../../.claude/rules/code-quality.md) §1:** `grep -rn "Theme\\." src/toybox/ frontend/src/` and confirm every site accepts the new value without modification, or document the modification. Attach the grep result table to the PR description (one row per call site + verdict OK / needs-fix / handled). Add a regression test asserting `Theme("feelings") is Theme.feelings` (per [`code-quality.md`](../../.claude/rules/code-quality.md) §2 `is` not `==`).
+- **Problem:** Add `Theme.feelings = "feelings"` to [`themes.py`](../../../src/toybox/activities/themes.py) + `THEME_DISPLAY_NAMES[Theme.feelings] = "Feelings"`; add `"feelings"` to the `theme` enum in [`_schema.json`](../../../src/toybox/activities/templates/_schema.json); regenerate frontend types. **Mandatory downstream-consumer audit per [`code-quality.md`](../../../../.claude/rules/code-quality.md) §1:** `grep -rn "Theme\\." src/toybox/ frontend/src/` and confirm every site accepts the new value without modification, or document the modification. Attach the grep result table to the PR description (one row per call site + verdict OK / needs-fix / handled). Add a regression test asserting `Theme("feelings") is Theme.feelings` (per [`code-quality.md`](../../../../.claude/rules/code-quality.md) §2 `is` not `==`).
 - **Type:** code
 - **Issue:** #160
 - **Flags:** --reviewers code
@@ -614,7 +614,7 @@ Each step is `/build-phase`-compatible. `**Issue:** #` lines stay blank until `/
 - **Status:** DONE (2026-05-18) iter 1/3. 20 templates. Feelings vocabulary across 4 clusters: heavy (sad, worried, scared, embarrassed), hot (angry, frustrated, jealous), light (silly, proud, excited, curious), mixed (left-out, nervous, shy). 2 templates have 4-choice forks, 17 have 3-choice forks (no 2-choice). Every branch has body cue + coping move + non-judgmental framing. Persona-name audit: zero literal Princess/Detective/Iridia/Lyra/Pip/Marvelous in template content (only in module docstring). {friend} is the only role placeholder. `scripts/generate_feelings_naming_templates.py` (1142 LOC, mirrors M5/M6 generators). request_story.json 265 → 285. ending_step=joke (jokes deflate emotional weight per plan §5.9). Backend 1974 pass / 3 skipped (was 1976 + 3; 2 flaky ws tests pass on isolated rerun). mypy + ruff clean.
 
 ### Step M10: Perspective-taking templates (~20)
-- **Problem:** Author ~20 `request_play` branching templates with a two-act structure: act 1 plays a conflict from {friend1}'s view; act 2 replays the SAME scene from {friend2}'s view, revealing the other side's reasoning. Each template: 6-10 steps, 1-3 forks per act, `required_roles: ["friend", "frenemy"]` (frenemy carries the contrasting POV — see [`roles.py`](../src/toybox/activities/roles.py); persona bias via role_weights, no persona-side gating), recommended_themes `["feelings", "friendship"]`, `ending_step: {kind: "joke", auto: true}`.
+- **Problem:** Author ~20 `request_play` branching templates with a two-act structure: act 1 plays a conflict from {friend1}'s view; act 2 replays the SAME scene from {friend2}'s view, revealing the other side's reasoning. Each template: 6-10 steps, 1-3 forks per act, `required_roles: ["friend", "frenemy"]` (frenemy carries the contrasting POV — see [`roles.py`](../../../src/toybox/activities/roles.py); persona bias via role_weights, no persona-side gating), recommended_themes `["feelings", "friendship"]`, `ending_step: {kind: "joke", auto: true}`.
 - **Type:** code
 - **Issue:** #162
 - **Flags:** --reviewers code
@@ -654,7 +654,7 @@ Each step is `/build-phase`-compatible. `**Issue:** #` lines stay blank until `/
 - **Status:** DONE (2026-05-18) iter 1/3 + bundled M4 step-id fix. 8/8 sub-tests PASS in 1.65s (well under 60s budget). Manual verification confirmed: setting `element_id: "xx-999"` on `meet_element_au_79` triggers `TemplateGraphError: template 'meet_element_au_79': step 'index 0' references unknown element_id 'xx-999'` — informative + diagnostic. **Latent M4 bug caught + fixed inline:** dev sub-test (a) initially asserted element_id only at proposed/approved (M4's templates shipped without step `id` fields, which broke the M3 running-state resolution path that keys on `step.id == step_template_id`). Fixed M4 generator to author `id: "intro"|"fact"|"hook"` on every meet_element entry; regenerated 118 templates; extended sub-test (a) to assert element_id ALSO at running state. Net catch: a regression that would have surfaced only in M14 iPad UAT now lives in the smoke gate. `tests/integration/test_phase_m_smoke.py` (1006 LOC). Backend 1983 pass / 3 skipped (1 same flaky `test_ws_origin` order-sensitive test as previous steps; expected 1984 from baseline 1976+8). mypy + ruff clean.
 
 ### Step M14: iPad UAT
-- **Problem:** Run a curated UAT with both children. Curate ~12 activities: 4 from Track 1 (one "Meet an Element" for a familiar element like gold or helium, one element-family pretend-play, one shrink-down journey, one element-themed song reward — verify Child B recognizes elements + engages with cards) + 8 from Track 2 (2 feelings-naming, 2 perspective-taking, 2 conflict-resolution, 2 friendship-repair — verify Child A engages + understands the feelings vocabulary). Operator walks through each, captures kid reactions, files defects against any template that confuses / bores / mis-renders. Write a UAT run doc at `documentation/runs/<YYYY-MM-DD>-phase-m-uat.md` matching the [Phase K UAT run doc](runs/2026-05-16-phase-k-uat.md) format (per-activity row with: persona / template id / kid / engagement / observation / verdict).
+- **Problem:** Run a curated UAT with both children. Curate ~12 activities: 4 from Track 1 (one "Meet an Element" for a familiar element like gold or helium, one element-family pretend-play, one shrink-down journey, one element-themed song reward — verify Child B recognizes elements + engages with cards) + 8 from Track 2 (2 feelings-naming, 2 perspective-taking, 2 conflict-resolution, 2 friendship-repair — verify Child A engages + understands the feelings vocabulary). Operator walks through each, captures kid reactions, files defects against any template that confuses / bores / mis-renders. Write a UAT run doc at `documentation/runs/<YYYY-MM-DD>-phase-m-uat.md` matching the [Phase K UAT run doc](../../runs/2026-05-16-phase-k-uat.md) format (per-activity row with: persona / template id / kid / engagement / observation / verdict).
 - **Type:** operator
 - **Issue:** #166
 - **Flags:** (none — operator step)

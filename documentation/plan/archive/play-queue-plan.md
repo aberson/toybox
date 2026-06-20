@@ -727,7 +727,7 @@ to clarify the action's scope is the row, not the activity flow.
 - **Depends on:** J9.
 
 ### Step J11: End-to-end smoke gate (60s, real components, no mocks)
-- **Status:** PASS (2026-05-17 — retroactive acceptance after verbal PASS 2026-05-14 + 3 days of Phase K + L production use exercising the same code paths). Run doc: [`documentation/runs/2026-05-17-play-queue-j11-j12.md`](runs/2026-05-17-play-queue-j11-j12.md). #103 closed.
+- **Status:** PASS (2026-05-17 — retroactive acceptance after verbal PASS 2026-05-14 + 3 days of Phase K + L production use exercising the same code paths). Run doc: [`documentation/runs/2026-05-17-play-queue-j11-j12.md`](../../runs/2026-05-17-play-queue-j11-j12.md). #103 closed.
 - **Type:** operator
 - **Issue:** #103
 - **Problem:** Run the full play-queue pipeline for 60s and observe
@@ -779,7 +779,7 @@ cd frontend; npm run dev
 | (g) No errors | No console errors in browser DevTools; no 4xx/5xx in backend log; no failed envelopes (no `system` topic warnings). |
 
 ### Step J12: iPad UAT + close
-- **Status:** PASS (2026-05-17 — retroactive acceptance; same basis as J11). Run doc: [`documentation/runs/2026-05-17-play-queue-j11-j12.md`](runs/2026-05-17-play-queue-j11-j12.md). #104 closed. Phase J formally complete; umbrella #92 already closed 2026-05-15.
+- **Status:** PASS (2026-05-17 — retroactive acceptance; same basis as J11). Run doc: [`documentation/runs/2026-05-17-play-queue-j11-j12.md`](../../runs/2026-05-17-play-queue-j11-j12.md). #104 closed. Phase J formally complete; umbrella #92 already closed 2026-05-15.
 - **Type:** operator
 - **Issue:** #104
 - **Problem:** Repeat J11 on a real iPad over LAN — speech-driven

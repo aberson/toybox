@@ -33,8 +33,8 @@ Play
 
 ### Fresh-reader pointers
 
-For first-run setup + backend/frontend run commands: see [`toybox/CLAUDE.md`](../CLAUDE.md) and [`frontend-ui.md`](../.claude/rules/frontend-ui.md) (frontend on `:4000`, NOT `:3000`).
-Phase context: [`phase-h-plan.md`](phase-h-plan.md) established the tab substrate ([App.tsx:65-66](frontend/src/parent/App.tsx#L65)); [`phase-m-plan.md`](phase-m-plan.md) shipped the Element track (M1-M7) + SEL track (M8-M12); [`phase-n-plan.md`](phase-n-plan.md) ships the element_microgame template shape whose `template_type` Phase O consumes (sequencing detail below).
+For first-run setup + backend/frontend run commands: see [`toybox/CLAUDE.md`](../../../CLAUDE.md) and [`frontend-ui.md`](../../../.claude/rules/frontend-ui.md) (frontend on `:4000`, NOT `:3000`).
+Phase context: [`phase-h-plan.md`](../archive/phase-h-parent-ux-revamp.md) established the tab substrate ([App.tsx:65-66](frontend/src/parent/App.tsx#L65)); [`phase-m-plan.md`](../archive/phase-m-plan.md) shipped the Element track (M1-M7) + SEL track (M8-M12); [`phase-n-plan.md`](../archive/phase-n-plan.md) ships the element_microgame template shape whose `template_type` Phase O consumes (sequencing detail below).
 
 ### Acronyms and terms used in this plan
 
@@ -49,12 +49,12 @@ Phase context: [`phase-h-plan.md`](phase-h-plan.md) established the tab substrat
 | **TDD** | Test-Driven Development. The `--tdd` flag selects `/build-step-tdd` (tests-first, red-green-refactor). Fit for pure helpers + filter logic where the contract is the spec. |
 | `--reviewers code` | `/build-step` flag for the 4-parallel-reviewer mode (no runtime/UI-evidence reviewers). All Phase O code steps use this because toybox's PIN-gated parent UI blocks runtime reviewers (see memory `feedback_buildstep_pin_gate_blocks_ui_evidence`). |
 | **`/build-step` / `/build-phase`** | Workspace skills. `/build-phase` walks the steps in this plan and dispatches each to `/build-step` (or `/build-step-tdd` when `--tdd` is set). Operator-type steps halt orchestration. SKILL.md files at `dev/.claude/skills/`. |
-| **`useTabState`** | Custom hook in [`components/Tabs.tsx`](../frontend/src/parent/components/Tabs.tsx). Signature: `useTabState<K extends string>(key: string, defaultValue: K, validValues: readonly K[]): { value: K, setValue: (k: K) => void }`. Persists selected key in `localStorage` under `key`, reads lazily at mount, rewrites only on explicit `setValue` (no eager migration — invalid stored values fall back to defaultValue without overwriting). Phase H groundwork. |
+| **`useTabState`** | Custom hook in [`components/Tabs.tsx`](../../../frontend/src/parent/components/Tabs.tsx). Signature: `useTabState<K extends string>(key: string, defaultValue: K, validValues: readonly K[]): { value: K, setValue: (k: K) => void }`. Persists selected key in `localStorage` under `key`, reads lazily at mount, rewrites only on explicit `setValue` (no eager migration — invalid stored values fall back to defaultValue without overwriting). Phase H groundwork. |
 | **`<Tabs>` / `<SubTabs>`** | Controlled tab-renderer components in `Tabs.tsx`. `TabsProps<K>` shape: `{ items: readonly { key: K, label: string }[], value: K, onChange: (key: K) => void }`. Consumer owns the panel render outside the component. |
-| **`PlayQueueList`** | Phase J step J8 component at [`components/PlayQueueList.tsx`](../frontend/src/parent/components/PlayQueueList.tsx). Renders the pinned active card (as `ActivityPanel`) + each proposed activity as a `SuggestionCard`. Owns TTL-fade machinery + per-action busy flags. Phase O extends with an optional `filterCategory` prop. |
-| **`TranscriptsManager`** | Existing component at [`components/TranscriptsManager.tsx`](../frontend/src/parent/components/TranscriptsManager.tsx). Renders the passive-listening transcript log. The Transcriptions tab continues to render this unchanged. |
+| **`PlayQueueList`** | Phase J step J8 component at [`components/PlayQueueList.tsx`](../../../frontend/src/parent/components/PlayQueueList.tsx). Renders the pinned active card (as `ActivityPanel`) + each proposed activity as a `SuggestionCard`. Owns TTL-fade machinery + per-action busy flags. Phase O extends with an optional `filterCategory` prop. |
+| **`TranscriptsManager`** | Existing component at [`components/TranscriptsManager.tsx`](../../../frontend/src/parent/components/TranscriptsManager.tsx). Renders the passive-listening transcript log. The Transcriptions tab continues to render this unchanged. |
 | **pydantic→TS codegen** | `uv run python tools/gen_types_ts.py` — deterministic; pre-commit hook gates drift via `git diff --exit-code`. Walks pydantic models + StrEnums in `src/toybox/` and emits `frontend/src/shared/types.ts`. Per the script's own docs, the project does NOT use `pydantic2ts` (requires Node `json2ts` not on the dev machine); instead a hand-rolled deterministic emitter ships in `tools/gen_types_ts.py`. |
-| **`template_id` format** | Slug pattern `^[a-z0-9][a-z0-9_]*$` per [`_schema.json:28`](../src/toybox/activities/templates/_schema.json#L28). Examples: `meet_element_au-79`, `feelings_lost_blanket`, `noble_gas_party_floaters`. |
+| **`template_id` format** | Slug pattern `^[a-z0-9][a-z0-9_]*$` per [`_schema.json:28`](../../../src/toybox/activities/templates/_schema.json#L28). Examples: `meet_element_au-79`, `feelings_lost_blanket`, `noble_gas_party_floaters`. |
 
 ### Phase H tab substrate (already shipped)
 
@@ -110,7 +110,7 @@ Three typed-field additions; one pydantic regen via `uv run python tools/gen_typ
 - **WS topic `activity.proposed`** → carries `{ type: "proposed", activity: Activity }`. The Activity payload widens by the same three fields.
 - **WS topic `activity.state`** → state-change envelope carrying Activity; same fields ride along.
 
-(Route + topic details live in [`documentation/plan/api.md`](plan/api.md); Phase O reuses them as-is.)
+(Route + topic details live in [`documentation/plan/api.md`](../../plan/api.md); Phase O reuses them as-is.)
 
 ### Categorize() logic (where it lives + what it reads)
 
