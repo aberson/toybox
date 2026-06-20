@@ -1,9 +1,9 @@
 # Task State
 
 **Task:** Phase X (Room Import) — READY TO BUILD
-**Status:** BUILDING Phase X — X1 DONE (#255 closed); X2 next. Goal active (X1-X7 → Status: DONE). Phase W complete (W7 UAT in bundle #223).
+**Status:** BUILDING Phase X — X1+X2 DONE (#255,#256 closed); X3 next. Goal active (X1-X7 → DONE). Phase W complete (W7 UAT in bundle #223).
 **Last written:** 2026-06-20T06:00:00Z
-**Session SHA:** 2eec56c
+**Session SHA:** b9305c4
 
 ## Next Action
 
@@ -25,6 +25,7 @@ Goal scoped to X1-X7 (agent-completable); X8 is the operator UAT boundary. X1∥
 **Approach:** Six not-built items from operator notes, one combined plan. Decisions baked in: hybrid Claude/offline adventure gen via capability gate; boss fight = climax beat at 5th adventure beat; dials are true stubs; STT grading reads last-30s passive transcript, decoupled from transcript_retention.
 
 ## Completed (this session)
+- [b9305c4] Phase X Step X2 (listing_parser + room_naming + ROOM_TYPES SoT + MAX_ROOMS_PER_TYPE clamp): PASS iter2 — review caught unbounded-count DoS + URL-scheme leak. backend 2501, #256 closed.
 - [2eec56c] Phase X Step X1 (rooms room_type + active/stay-out; play-exclusion single seam resolve_rooms): PASS — backend 2473 / frontend 781, #255 closed.
 
 - Doc tree reorg: `plan.md` → `documentation/master-plan.md`; phase docs sorted into `plan/` (active: e/w/x), `plan/awaiting-uat/` (O,P,Q,R,S,T,V), `plan/archive/` (K,L,M,N,J,U,SWR,e3). Commit `f0ad1ee`. Pointers re-based in CLAUDE.md, README, phase-e.md, archive README; all links verified resolvable.
@@ -44,6 +45,7 @@ Goal scoped to X1-X7 (agent-completable); X8 is the operator UAT boundary. X1∥
 - Phase X migrations assume Phase W lands first (0029+); build X after W or renumber.
 
 ## Critical Gotchas
+- MERGE NOTE: build-step merge copy loop must handle untracked DIRS (git status lists `dir/` once) — use `cp -r dir/.`; X2's fixtures dir was missed first pass (7 test fails in main) until copied recursively.
 
 - Parent UI is PIN-gated → runtime/UI reviewers can't authenticate; every code step is `--reviewers code`, UI checked in W7 UAT.
 - 5 forward-only migrations 0024–0028 (one per code step); abort+preserve on failure.
