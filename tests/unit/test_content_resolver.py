@@ -102,12 +102,13 @@ def _insert_room(
     room_id: str,
     display_name: str | None,
     features: list[str] | None = None,
+    active: bool = True,
 ) -> None:
     with conn:
         conn.execute(
-            "INSERT INTO rooms (id, display_name, image_path, image_hash, notes) "
-            "VALUES (?, ?, NULL, NULL, NULL)",
-            (room_id, display_name),
+            "INSERT INTO rooms (id, display_name, image_path, image_hash, notes, active) "
+            "VALUES (?, ?, NULL, NULL, NULL, ?)",
+            (room_id, display_name, 1 if active else 0),
         )
         for i, feature in enumerate(features or []):
             conn.execute(
@@ -397,6 +398,15 @@ def test_resolve_rooms_skips_unnamed_rooms(conn: sqlite3.Connection) -> None:
     _insert_room(conn, room_id="r2", display_name="Kitchen")
     out = resolve_rooms(conn)
     assert [r.id for r in out] == ["r2"]
+
+
+def test_resolve_rooms_excludes_inactive_rooms(conn: sqlite3.Connection) -> None:
+    """Phase X X1: ``active = 0`` rooms are filtered from the play-time
+    selector — this is the single seam every propose-path consumer reads."""
+    _insert_room(conn, room_id="r-active", display_name="Living Room")
+    _insert_room(conn, room_id="r-inactive", display_name="Garage", active=False)
+    out = resolve_rooms(conn)
+    assert [r.id for r in out] == ["r-active"]
 
 
 def test_resolve_rooms_default_limit_from_env(

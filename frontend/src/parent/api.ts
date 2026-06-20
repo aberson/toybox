@@ -494,6 +494,12 @@ export interface Room {
   image_path: string | null;
   image_hash: string | null;
   notes: string | null;
+  // Phase X Step X1 (migration 0029). ``room_type`` is a free-form
+  // category label. ``active = false`` means "room exists but stay
+  // out" — the parent list still surfaces it, but every play-time
+  // selector excludes it (mirrors the toy ``active`` contract).
+  room_type: string | null;
+  active: boolean;
 }
 
 export interface RoomFeature {
@@ -560,6 +566,11 @@ export interface RoomFeatureListResponse {
 export interface RoomUpdateRequest {
   display_name?: string;
   notes?: string | null;
+  // Phase X Step X1 (migration 0029). ``room_type`` sets/clears the
+  // category (``null`` clears). ``active`` flips play-time inclusion;
+  // omitting a field leaves the existing value untouched.
+  room_type?: string | null;
+  active?: boolean;
 }
 
 // Body of the 409 returned by POST /api/rooms/confirm-bulk when a

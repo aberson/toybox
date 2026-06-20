@@ -47,6 +47,8 @@ function fakeRoom(overrides: Partial<Room> = {}): Room {
     image_path: "data/images/rooms/r-1.jpg",
     image_hash: "h",
     notes: null,
+    room_type: null,
+    active: true,
     ...overrides,
   };
 }
@@ -350,6 +352,51 @@ describe("RoomIngestBulk", () => {
     // Bedroom tab now appears (created on demand by partitionByTab).
     await waitFor(() => {
       expect(screen.getByTestId("room-tab-bedroom")).toBeTruthy();
+    });
+  });
+
+  it("renders the room-type field + active toggle and PATCHes both (Phase X X1)", async () => {
+    // The rooms-management list must surface the new room_type field in
+    // the edit form and an active/inactive toggle on each row, and fire
+    // updateRoom with the new fields. Mirrors the toy active-toggle UX.
+    const stub = buildStubApi([
+      fakeRoom({ id: "r-1", display_name: "Bedroom", active: true }),
+    ]);
+    const updateRoom = vi.fn(
+      async (id: string): Promise<Room> => fakeRoom({ id, active: false }),
+    );
+    const fullStub = { ...stub, updateRoom } as unknown as ApiClient;
+    render(<RoomIngestBulk api={fullStub} />);
+    await waitFor(() => {
+      expect(stub.listRooms).toHaveBeenCalled();
+    });
+
+    // The active toggle is present and reads "active" for an active room.
+    const toggle = screen.getByTestId(
+      "toggle-room-active-button",
+    ) as HTMLButtonElement;
+    expect(toggle.textContent).toContain("active");
+    fireEvent.click(toggle);
+    await waitFor(() => {
+      expect(updateRoom).toHaveBeenCalledWith(
+        "r-1",
+        { active: false },
+        expect.anything(),
+      );
+    });
+
+    // The edit form exposes a room-type input; setting it PATCHes
+    // room_type through.
+    fireEvent.click(screen.getByTestId("edit-room-button"));
+    const typeInput = screen.getByTestId("edit-room-type") as HTMLInputElement;
+    fireEvent.change(typeInput, { target: { value: "bedroom" } });
+    fireEvent.click(screen.getByTestId("save-room-edit-button"));
+    await waitFor(() => {
+      expect(updateRoom).toHaveBeenCalledWith(
+        "r-1",
+        expect.objectContaining({ room_type: "bedroom" }),
+        expect.anything(),
+      );
     });
   });
 

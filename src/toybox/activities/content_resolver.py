@@ -442,13 +442,20 @@ def resolve_rooms(
         Rooms sorted by ``display_name COLLATE NOCASE`` ASC. Each room
         carries its features in ``room_features.name`` order
         (ASC, NOCASE) as a tuple.
+
+    Phase X Step X1: rooms with ``active = 0`` are excluded — this is
+    the single play-time room selector, so the filter here covers every
+    downstream consumer (propose ``available_rooms``, the ``get_room``
+    tool, the generator-context room names). The parent-facing
+    ``GET /api/rooms`` listing does NOT route through this function and
+    still lists inactive rooms.
     """
     cap = limit if limit is not None else _rooms_limit()
     if cap <= 0:
         return []
     rows = conn.execute(
         "SELECT id, display_name FROM rooms "
-        "WHERE display_name IS NOT NULL "
+        "WHERE display_name IS NOT NULL AND active = 1 "
         "ORDER BY display_name COLLATE NOCASE ASC"
     ).fetchall()
     rooms: list[ResolvedRoom] = []

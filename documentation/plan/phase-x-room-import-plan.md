@@ -251,6 +251,7 @@ required before UAT.
   `grep -rn "FROM rooms" src/toybox` enumerated and each play-time selector confirmed to filter
   `active`; `npm run typecheck` + `npm run test` pass; the parent UI shows the type field + toggle
 - **Depends on:** none
+- **Status:** DONE (2026-06-20)
 
 ### Step X2: Listing parser + room-name generation
 - **Problem:** Add `core/listing_parser.py` (`parse_listing(content) -> {room_counts, photo_urls}`,

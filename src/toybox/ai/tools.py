@@ -327,8 +327,14 @@ def _resolve_room(conn: sqlite3.Connection, room_id: str) -> ToolResult:
         # Fall through to direct lookup so callers don't pay the
         # full-list cost when the id is known-good but the row is older
         # than the resolver's display-name filter.
+        #
+        # Phase X Step X1: this is a play-time selector (the ``get_room``
+        # tool the generator calls mid-propose), so it honours the same
+        # ``active = 1`` exclusion as ``resolve_rooms`` — an inactive
+        # room that the resolver filtered out must not be resurrectable
+        # via the by-id fallback.
         row = conn.execute(
-            "SELECT id, display_name, image_path FROM rooms WHERE id = ?",
+            "SELECT id, display_name, image_path FROM rooms WHERE id = ? AND active = 1",
             (room_id,),
         ).fetchone()
         if row is None:

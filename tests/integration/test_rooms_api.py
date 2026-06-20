@@ -526,6 +526,60 @@ def test_patch_room_updates_display_name(
     assert body["notes"] == "freshly painted"
 
 
+def test_room_list_and_get_serialize_room_type_and_active_defaults(
+    vc_client: TestClient,
+    parent_headers: dict[str, str],
+    db_path: Path,
+) -> None:
+    """Phase X X1: a freshly-inserted room serializes the migration-0029
+    defaults (room_type=None, active=True) on both list + get."""
+    _seed_room(db_path, "r-defaults", "Playroom")
+    list_resp = vc_client.get("/api/rooms", headers=parent_headers)
+    assert list_resp.status_code == 200, list_resp.text
+    room = next(r for r in list_resp.json()["rooms"] if r["id"] == "r-defaults")
+    assert room["room_type"] is None
+    assert room["active"] is True
+
+    get_resp = vc_client.get("/api/rooms/r-defaults", headers=parent_headers)
+    assert get_resp.status_code == 200, get_resp.text
+    assert get_resp.json()["room_type"] is None
+    assert get_resp.json()["active"] is True
+
+
+def test_patch_room_sets_and_returns_room_type_and_active(
+    vc_client: TestClient,
+    parent_headers: dict[str, str],
+    db_path: Path,
+) -> None:
+    """Phase X X1: PATCH persists + round-trips room_type + active."""
+    _seed_room(db_path, "r-x1", "Kitchen")
+    resp = vc_client.patch(
+        "/api/rooms/r-x1",
+        json={"room_type": "kitchen", "active": False},
+        headers=parent_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["room_type"] == "kitchen"
+    assert body["active"] is False
+
+    # Round-trip: a subsequent GET reflects the persisted values.
+    get_resp = vc_client.get("/api/rooms/r-x1", headers=parent_headers)
+    assert get_resp.json()["room_type"] == "kitchen"
+    assert get_resp.json()["active"] is False
+
+    # room_type can be cleared back to NULL with an explicit null.
+    clear_resp = vc_client.patch(
+        "/api/rooms/r-x1",
+        json={"room_type": None},
+        headers=parent_headers,
+    )
+    assert clear_resp.status_code == 200, clear_resp.text
+    assert clear_resp.json()["room_type"] is None
+    # active is untouched when not sent.
+    assert clear_resp.json()["active"] is False
+
+
 def test_delete_room_cascades_features(
     vc_client: TestClient,
     parent_headers: dict[str, str],

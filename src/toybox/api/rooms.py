@@ -211,6 +211,13 @@ class RoomResponse(BaseModel):
     image_path: str | None
     image_hash: str | None
     notes: str | None
+    # Phase X Step X1 — free-form category label (migration 0029).
+    room_type: str | None = None
+    # Phase X Step X1 — parent-controlled active/inactive toggle
+    # (migration 0029). ``False`` means "room exists but stay out": the
+    # parent list still surfaces it, but every play-time selector
+    # excludes it. Mirrors the toy ``active`` contract (migration 0018).
+    active: bool = True
 
 
 class RoomFeatureResponse(BaseModel):
@@ -348,6 +355,26 @@ class RoomUpdateRequest(BaseModel):
 
     display_name: str | None = None
     notes: str | None = None
+    # Phase X Step X1 (migration 0029). ``room_type`` is a free-form
+    # category; an explicit ``null`` clears it. ``active`` flips the
+    # play-time inclusion toggle — mirrors the toy PATCH ``active`` field.
+    room_type: str | None = None
+    active: bool | None = None
+
+    @field_validator("room_type")
+    @classmethod
+    def _strip_room_type(cls, value: str | None) -> str | None:
+        # ``room_type`` is nullable — an explicit ``null`` clears the
+        # category. A non-empty string is trimmed + length-capped.
+        if value is None:
+            return None
+        stripped = value.strip()
+        if not stripped:
+            # Whitespace-only is treated as "clear the category".
+            return None
+        if len(stripped) > 40:
+            raise ValueError("room_type must be at most 40 characters")
+        return stripped
 
     @field_validator("display_name")
     @classmethod
@@ -383,12 +410,27 @@ class DeleteResponse(BaseModel):
 def _row_to_room(row: sqlite3.Row | dict[str, Any]) -> RoomResponse:
     getter: Any = row.__getitem__
     name_raw = getter("display_name")
+    # ``room_type`` / ``active`` were added in migration 0029. Some
+    # Row-like inputs (e.g. a hand-built dict in a test) may omit the
+    # columns entirely; treat that as the post-migration defaults
+    # (no category / active) rather than crashing. Mirrors the toy
+    # ``_row_to_response`` defaulting for migration-0017/0018 columns.
+    try:
+        room_type_raw = getter("room_type")
+    except (KeyError, IndexError):
+        room_type_raw = None
+    try:
+        active_raw = getter("active")
+    except (KeyError, IndexError):
+        active_raw = 1
     return RoomResponse(
         id=str(getter("id")),
         display_name=str(name_raw) if name_raw is not None else "",
         image_path=getter("image_path"),
         image_hash=getter("image_hash"),
         notes=getter("notes"),
+        room_type=room_type_raw,
+        active=bool(active_raw),
     )
 
 
@@ -1099,9 +1141,18 @@ def patch_room(
                 },
             )
 
-    columns = list(data.keys())
-    set_clause = ", ".join(f"{col} = ?" for col in columns)
-    params: list[Any] = [data[col] for col in columns]
+    columns: list[str] = []
+    params: list[Any] = []
+    for col, value in data.items():
+        if col == "active":
+            # Persist the bool as INTEGER 0/1 to mirror the toy
+            # ``active`` column contract (migration 0018/0029).
+            columns.append("active = ?")
+            params.append(1 if value else 0)
+        else:
+            columns.append(f"{col} = ?")
+            params.append(value)
+    set_clause = ", ".join(columns)
     params.append(room_id)
     with conn:
         conn.execute(f"UPDATE rooms SET {set_clause} WHERE id = ?", params)

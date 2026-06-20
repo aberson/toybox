@@ -161,10 +161,15 @@ export function RoomIngestBulk(props: RoomIngestBulkProps): JSX.Element {
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
   const [editRoomName, setEditRoomName] = useState<string>("");
   const [editRoomNotes, setEditRoomNotes] = useState<string>("");
+  // Phase X Step X1: free-form category for the room being edited.
+  const [editRoomType, setEditRoomType] = useState<string>("");
   const [editRoomSubmitting, setEditRoomSubmitting] = useState<boolean>(false);
   const [editRoomError, setEditRoomError] = useState<string | null>(null);
   const [deletingRoomId, setDeletingRoomId] = useState<string | null>(null);
   const [roomRowError, setRoomRowError] = useState<string | null>(null);
+  // Phase X Step X1: id of the room whose active-toggle PATCH is in
+  // flight (so we disable just that control), mirroring the toy UX.
+  const [togglingActiveId, setTogglingActiveId] = useState<string | null>(null);
 
   // AbortController spanning one mount of the editor. Recreated on each
   // mount inside the useEffect below — under React 18 StrictMode the
@@ -348,6 +353,7 @@ export function RoomIngestBulk(props: RoomIngestBulkProps): JSX.Element {
     setEditingRoomId(room.id);
     setEditRoomName(room.display_name);
     setEditRoomNotes(room.notes ?? "");
+    setEditRoomType(room.room_type ?? "");
     setEditRoomError(null);
   }, []);
 
@@ -355,8 +361,38 @@ export function RoomIngestBulk(props: RoomIngestBulkProps): JSX.Element {
     setEditingRoomId(null);
     setEditRoomName("");
     setEditRoomNotes("");
+    setEditRoomType("");
     setEditRoomError(null);
   }, []);
+
+  // Phase X Step X1: flip a room's active flag. Mirrors the toy
+  // active-toggle UX — one PATCH, then refetch so the list re-renders
+  // with the new state (and dimmed styling for inactive rooms).
+  const toggleRoomActive = useCallback(
+    async (room: Room): Promise<void> => {
+      if (togglingActiveId !== null) return;
+      setTogglingActiveId(room.id);
+      setRoomRowError(null);
+      try {
+        await api.updateRoom(
+          room.id,
+          { active: !room.active },
+          { signal: aborterRef.current?.signal },
+        );
+        await refetchRooms();
+      } catch (err) {
+        if (isAbortError(err)) return;
+        if (err instanceof Error) {
+          setRoomRowError(`toggle failed: ${err.message}`);
+        } else {
+          setRoomRowError("toggle failed");
+        }
+      } finally {
+        setTogglingActiveId(null);
+      }
+    },
+    [api, refetchRooms, togglingActiveId],
+  );
 
   const replaceRoomPicture = useCallback(
     async (roomId: string, file: File): Promise<void> => {
@@ -425,11 +461,13 @@ export function RoomIngestBulk(props: RoomIngestBulkProps): JSX.Element {
     setEditRoomError(null);
     try {
       const trimmedNotes = editRoomNotes.trim();
+      const trimmedType = editRoomType.trim();
       await api.updateRoom(
         editingRoomId,
         {
           display_name: editRoomName,
           notes: trimmedNotes.length === 0 ? null : trimmedNotes,
+          room_type: trimmedType.length === 0 ? null : trimmedType,
         },
         { signal: aborterRef.current?.signal },
       );
@@ -447,7 +485,15 @@ export function RoomIngestBulk(props: RoomIngestBulkProps): JSX.Element {
     } finally {
       setEditRoomSubmitting(false);
     }
-  }, [api, cancelRoomEdit, editRoomName, editRoomNotes, editingRoomId, refetchRooms]);
+  }, [
+    api,
+    cancelRoomEdit,
+    editRoomName,
+    editRoomNotes,
+    editRoomType,
+    editingRoomId,
+    refetchRooms,
+  ]);
 
   return (
     <section
@@ -815,10 +861,12 @@ export function RoomIngestBulk(props: RoomIngestBulkProps): JSX.Element {
                 key={r.id}
                 data-testid="room-row"
                 data-room-id={r.id}
+                data-room-active={r.active ? "true" : "false"}
                 style={{
                   padding: "8px 0",
                   borderBottom: "1px solid #eee",
                   fontSize: 14,
+                  opacity: r.active ? 1 : 0.5,
                 }}
               >
                 {!isEditing && (
@@ -847,6 +895,21 @@ export function RoomIngestBulk(props: RoomIngestBulkProps): JSX.Element {
                     )}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <strong>{r.display_name}</strong>
+                      {r.room_type !== null && r.room_type.length > 0 && (
+                        <span
+                          data-testid="room-type-chip"
+                          style={{
+                            marginLeft: 6,
+                            fontSize: 11,
+                            color: "#1e40af",
+                            background: "#dbeafe",
+                            borderRadius: 10,
+                            padding: "1px 8px",
+                          }}
+                        >
+                          {r.room_type}
+                        </span>
+                      )}
                       {r.notes !== null && r.notes.length > 0 && (
                         <div
                           style={{
@@ -860,6 +923,26 @@ export function RoomIngestBulk(props: RoomIngestBulkProps): JSX.Element {
                       )}
                     </div>
                     <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        type="button"
+                        data-testid="toggle-room-active-button"
+                        aria-pressed={r.active}
+                        disabled={togglingActiveId === r.id}
+                        onClick={() => {
+                          void toggleRoomActive(r);
+                        }}
+                        title={
+                          r.active
+                            ? "Deactivate this room (exclude from play-time selection)"
+                            : "Activate this room"
+                        }
+                      >
+                        {togglingActiveId === r.id
+                          ? "..."
+                          : r.active
+                            ? "active"
+                            : "inactive"}
+                      </button>
                       <button
                         type="button"
                         data-testid="edit-room-button"
@@ -952,6 +1035,20 @@ export function RoomIngestBulk(props: RoomIngestBulkProps): JSX.Element {
                         maxLength={40}
                         value={editRoomName}
                         onChange={(e) => setEditRoomName(e.target.value)}
+                        style={{ width: "100%", padding: 4 }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: 12 }}>
+                        Type (category)
+                      </label>
+                      <input
+                        data-testid="edit-room-type"
+                        type="text"
+                        maxLength={40}
+                        placeholder="e.g. bedroom, kitchen"
+                        value={editRoomType}
+                        onChange={(e) => setEditRoomType(e.target.value)}
                         style={{ width: "100%", padding: 4 }}
                       />
                     </div>

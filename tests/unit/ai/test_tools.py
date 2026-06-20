@@ -391,6 +391,25 @@ async def test_get_room_happy(make_ctx: ToolContext) -> None:
     assert data["image_path"] == "rooms/kitchen.png"
 
 
+async def test_get_room_excludes_inactive_room(make_ctx: ToolContext) -> None:
+    """Phase X X1: an ``active = 0`` room is invisible to the play-time
+    ``get_room`` tool — both the resolver path and the by-id fallback
+    honour the exclusion, so the generator can't resurrect a stay-out
+    room mid-propose."""
+    conn = make_ctx.connection_factory()
+    try:
+        with conn:
+            conn.execute(
+                "INSERT INTO rooms (id, display_name, image_path, active) VALUES (?, ?, ?, 0)",
+                ("inactive-room-1", "Garage", "rooms/garage.png"),
+            )
+    finally:
+        conn.close()
+    result = await call_tool("get_room", {"room_id": "inactive-room-1"}, make_ctx)
+    # The tool returns a not-found ToolResult (data=None) rather than the row.
+    assert result["data"] is None
+
+
 async def test_get_inventory_happy(make_ctx: ToolContext) -> None:
     uuids = _seeded_uuids_via_ctx(make_ctx)
     result = await call_tool(
