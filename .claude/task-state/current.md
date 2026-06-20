@@ -1,9 +1,9 @@
 # Task State
 
 **Task:** Phase W (Play Depth) — build (in progress)
-**Status:** BUILDING — W1+W2 DONE (#247,#248 closed); W3 next. Goal active (W1–W6 → Status: DONE).
+**Status:** BUILDING — W1+W2+W3 DONE (#247-249 closed); W4 next (adventure engine, depends W2✅). Goal active (W1–W6 → Status: DONE).
 **Last written:** 2026-06-20T06:00:00Z
-**Session SHA:** a05572d
+**Session SHA:** e7bbb50
 
 ## Next Action
 
@@ -25,7 +25,8 @@ NOTE: `.git/info/exclude` in toybox has a TEMP block excluding `/data/images/com
 - Drafted `documentation/plan/phase-w-plan.md` (play depth) + `documentation/plan/phase-x-room-import-plan.md` (room import — NOT yet expedited/synced).
 - plan-expedite Phase W: plan-review (W4 entry-point fix) + plan-wrap (climax/window decisions) + repo-sync (#246–253). Commit `16201a0`.
 - [22326e9] Step W1 (stub dials): PASS — backend 2353 / frontend 753, #247 closed.
-- [a05572d] Step W2 (linear/non-linear toggle: game_linearity + generator linear_only filter): PASS — 4 reviewers clean (5 low, non-blocking), backend 2378 (+25) / frontend 759 (+6), #248 closed.
+- [a05572d] Step W2 (linear/non-linear toggle): PASS — backend 2378 / frontend 759, #248 closed.
+- [e7bbb50] Step W3 (Whisper/STT Q&A auto-grading): PASS after 2 iters — REVIEW CAUGHT latent R3 bug (question/expected_answer never wired template→activity_steps; _schema.json additionalProperties:false rejected them); fixed full 8-hop chain + judge 8s-timeout (finally shutdown wait=False) + shared breaker. backend 2409 (+31) / frontend 767 (+8), #249 closed.
 
 ## Dead Ends / Decisions
 
