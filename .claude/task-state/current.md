@@ -1,15 +1,21 @@
 # Task State
 
-**Task:** Phase W (Play Depth) — CODE COMPLETE
-**Status:** CODE COMPLETE — W1-W6 all DONE + pushed (origin/master 2f2b053); #247-252 closed. Goal MET (auto-cleared). ONLY W7 iPad UAT (#253, operator) remains.
+**Task:** Phase X (Room Import) — READY TO BUILD
+**Status:** READY TO BUILD — Phase X plan-expedited (issues #254-262); local-CLIP matching. Phase W CODE COMPLETE (#247-252, W7 UAT in bundle #223).
 **Last written:** 2026-06-20T06:00:00Z
-**Session SHA:** 2f2b053
+**Session SHA:** 8092d85
 
 ## Next Action
 
-OPERATOR: run the Phase W iPad UAT (issue #253 / plan §"Manual UAT" M1) — validate the 6 surfaces (stub dials, linear toggle, STT grading, adventure, boss fight, no console errors) on the iPad kiosk + parent UI. All code is shipped + pushed. After UAT passes, close #253 and (optionally) /repo-update.
+Build Phase X. Goal-ready handoff (build-phase is goal-driven) — paste the goal, then start:
 
-NOTE: plan-expedite SKILL.md edits (goal-ready handoff) are restored + UNCOMMITTED in coding-root (c:/Users/abero/dev) — commit there if wanted. Phase X (room import) still drafted/un-synced at documentation/plan/phase-x-room-import-plan.md.
+```
+/goal "Phase X steps X1-X7 are all marked Status: DONE in documentation/plan/phase-x-room-import-plan.md"
+
+/build-phase --plan documentation/plan/phase-x-room-import-plan.md
+```
+
+Goal scoped to X1-X7 (agent-completable); X8 is the operator UAT boundary. X1∥X2∥X3∥X4 parallel-safe; spine X{1-4}→X5→X6/X7→X8. Local-CLIP matching: tests run model-free (injected fake encoder); the real CLIP model is downloaded at X8 (`uv run python -m toybox.ai.room_classifier --download`). All `--reviewers code` (PIN-gated UI → verified in X8). Migrations 0029+.
 
 
 ## WIP
