@@ -1,9 +1,9 @@
 # Task State
 
 **Task:** Phase W (Play Depth) — build (in progress)
-**Status:** BUILDING — W1 DONE (#247 closed); W2 next. Goal active (W1–W6 → Status: DONE).
+**Status:** BUILDING — W1+W2 DONE (#247,#248 closed); W3 next. Goal active (W1–W6 → Status: DONE).
 **Last written:** 2026-06-20T06:00:00Z
-**Session SHA:** 22326e9
+**Session SHA:** a05572d
 
 ## Next Action
 
@@ -24,7 +24,8 @@ NOTE: `.git/info/exclude` in toybox has a TEMP block excluding `/data/images/com
 - Doc tree reorg: `plan.md` → `documentation/master-plan.md`; phase docs sorted into `plan/` (active: e/w/x), `plan/awaiting-uat/` (O,P,Q,R,S,T,V), `plan/archive/` (K,L,M,N,J,U,SWR,e3). Commit `f0ad1ee`. Pointers re-based in CLAUDE.md, README, phase-e.md, archive README; all links verified resolvable.
 - Drafted `documentation/plan/phase-w-plan.md` (play depth) + `documentation/plan/phase-x-room-import-plan.md` (room import — NOT yet expedited/synced).
 - plan-expedite Phase W: plan-review (W4 entry-point fix) + plan-wrap (climax/window decisions) + repo-sync (#246–253). Commit `16201a0`.
-- [22326e9] Step W1 (stub dials: parent_involvement + game_complexity): PASS — 4 reviewers clean, backend 2353 (+28) / frontend 753 (+12), #247 closed.
+- [22326e9] Step W1 (stub dials): PASS — backend 2353 / frontend 753, #247 closed.
+- [a05572d] Step W2 (linear/non-linear toggle: game_linearity + generator linear_only filter): PASS — 4 reviewers clean (5 low, non-blocking), backend 2378 (+25) / frontend 759 (+6), #248 closed.
 
 ## Dead Ends / Decisions
 
