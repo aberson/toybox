@@ -72,7 +72,9 @@ export interface StepCardProps {
 // we read ``step.kind`` defensively from the wire envelope as a
 // string and default to "text" when absent, matching the plan's
 // "text is the implicit default kind" contract.
-const READ_ME_ELIGIBLE_KINDS = new Set<string>(["text", "fork", "joke"]);
+// Phase W Step W4: "adventure_beat" renders through the default text/fork
+// path (body + choices + Next), so it is Read-Me eligible like text steps.
+const READ_ME_ELIGIBLE_KINDS = new Set<string>(["text", "fork", "joke", "adventure_beat"]);
 
 function resolvePersonaMetadata(activity: Activity): PersonaMetadata | null {
   // Defensive: ``activity.metadata`` is ``Record<string, unknown>`` on

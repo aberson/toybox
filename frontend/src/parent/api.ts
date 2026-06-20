@@ -190,6 +190,12 @@ export interface ProposePayload {
   // bypasses the slot-picker and uses this template directly. Supplied
   // by the search UI's "Play again"/"Try this" buttons.
   template_id?: string | null;
+  // Phase W Step W4: dynamic adventure mode. When true, the backend
+  // creates the activity with adventure=1 and seeds the first beat via
+  // the adventure engine (generated, not template-driven); subsequent
+  // beats are generated at advance time. Omitted/false → ordinary
+  // template-driven propose (byte-identical to today).
+  adventure?: boolean;
 }
 
 // Step 18: child-profile editor wire shapes. Mirror the Pydantic

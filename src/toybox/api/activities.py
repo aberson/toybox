@@ -32,6 +32,12 @@ from typing import Annotated, Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from ..activities.adventure import (
+    MAX_ADVENTURE_BEATS,
+    GeneratedBeat,
+    generate_next_beat,
+    stable_index,
+)
 from ..activities.content_resolver import (
     GenericDescriptor,
     ResolvedReward,
@@ -531,6 +537,13 @@ class ProposeRequest(BaseModel):
     # unknown (template deleted/renamed), generate() falls back to the
     # normal picker and logs a warning.
     template_id: str | None = None
+    # Phase W Step W4: dynamic adventure mode. When True, the propose
+    # handler creates the activity with ``activities.adventure=1`` and
+    # seeds the FIRST beat via the adventure engine
+    # (:mod:`toybox.activities.adventure`) instead of selecting + persisting
+    # a template; subsequent beats are generated at advance time. Default
+    # ``False`` so a normal propose is byte-identical to today.
+    adventure: bool = False
 
 
 class ApproveRequest(BaseModel):
@@ -1350,8 +1363,14 @@ def _persist_activity(
     state: str,
     toy_ids: Sequence[str] = (),
     slot_fills: dict[str, str] | None = None,
+    adventure: bool = False,
 ) -> None:
     """Insert one ``activities`` row plus ONLY the first step row.
+
+    Phase W Step W4: ``adventure`` sets ``activities.adventure=1`` so the
+    advance handler generates each subsequent step as a beat instead of
+    reading a template row. Default ``False`` keeps a normal propose
+    byte-identical.
 
     Phase G G2: this is the lazy-insertion path. ``steps`` is the
     full list of template steps (so the propose flow can keep
@@ -1386,8 +1405,9 @@ def _persist_activity(
         conn.execute(
             "INSERT INTO activities "
             "(id, session_id, state, version, summary, persona_id, child_ids, room_ids, "
-            " toy_ids, intent_source, created_at, started_at, ended_at, slot_fills_json) "
-            "VALUES (?, ?, ?, 1, ?, ?, ?, NULL, ?, ?, ?, NULL, NULL, ?)",
+            " toy_ids, intent_source, created_at, started_at, ended_at, slot_fills_json, "
+            " adventure) "
+            "VALUES (?, ?, ?, 1, ?, ?, ?, NULL, ?, ?, ?, NULL, NULL, ?, ?)",
             (
                 activity_id,
                 session_id,
@@ -1399,6 +1419,7 @@ def _persist_activity(
                 intent_source,
                 created_at,
                 slot_fills_blob,
+                1 if adventure else 0,
             ),
         )
         # Phase G G2 — lazy step insertion. We INSERT only ``steps[0]``;
@@ -2146,13 +2167,155 @@ def _do_propose_standalone(
     return response
 
 
+def _do_propose_adventure(
+    body: ProposeRequest,
+    conn: sqlite3.Connection,
+    pubsub: PubSub,
+    *,
+    sync_client: Any = None,
+) -> ActivityResponse:
+    """Phase W Step W4: propose flow for a dynamic adventure.
+
+    Creates the activity with ``activities.adventure=1`` and seeds the
+    FIRST beat via :func:`toybox.activities.adventure.generate_next_beat`
+    instead of selecting + persisting a template. Mirrors
+    :func:`_do_propose_standalone` for persona pick / session / eviction /
+    persistence so the wire envelope is shaped identically; the only
+    differences are ``adventure=True`` on the activities row and the
+    beat-shaped step.
+
+    Beat 0 is generated ONLINE when the capability gate is green (the
+    Claude path), else OFFLINE. The household ``game_linearity`` dial
+    decides whether the beat emits choices. ``summary.template_id`` is
+    ``None`` so the GET path falls back to ``_fetch_steps`` (the persisted
+    beat row is the source of truth — same as the standalone surface).
+    """
+    effective_persona_id = body.persona_id
+    persona_meta: dict[str, Any] | None = None
+    if effective_persona_id is None:
+        picked = _pick_random_library_persona(conn)
+        if picked is not None:
+            effective_persona_id = picked["id"]
+            persona_meta = picked
+
+    # Resolve the cast (toy display names) best-effort — a corrupt toy row
+    # must not break propose; the engine falls back to generic descriptors
+    # when the cast is empty.
+    resolved_toys: list[ResolvedToy] = []
+    try:
+        resolved_toys = resolve_toys(conn)
+    except sqlite3.Error:
+        _logger.warning(
+            "content_resolver.resolve_toys failed on adventure propose; "
+            "the engine will use generic descriptors",
+            exc_info=True,
+        )
+    cast = _build_adventure_cast(resolved_toys)
+
+    # Linearity dial (W2): linear adventures emit no choices. Read fresh so
+    # a parent UI change takes effect on the next propose.
+    linear = get_game_linearity(conn) == "linear"
+
+    # MEDIUM-2 fix: beat 0 MUST share the SAME seed every later beat uses, or
+    # the offline theme disagrees between the opener and the rest. Advance
+    # derives its seed from the activity id (``_adventure_seed_for``), so we
+    # mint the id FIRST and seed beat 0 the same way — ``body.seed`` is no
+    # longer used for adventures.
+    activity_id = str(uuid.uuid4())
+    seed = _adventure_seed_from_id(activity_id)
+
+    # Online iff a sync client is wired. The inner capability gate inside
+    # ``_make_adventure_online_call`` is authoritative and degrades to offline
+    # on any non-green gate, so a separate probe here would be redundant
+    # (LOW-4) — mirror the advance path's ``online = sync_client is not None``.
+    online = sync_client is not None
+
+    beat = _generate_adventure_beat(
+        conn,
+        sync_client,
+        history=(),
+        cast=cast,
+        beat_index=0,
+        linear=linear,
+        seed=seed,
+        online=online,
+    )
+
+    session_id = _ensure_session(conn, body.session_id)
+
+    evicted_ids = evict_oldest_for_capacity(conn, cap=play_target_depth.get(conn))
+    for eid in evicted_ids:
+        evicted_row = _fetch_activity_row(conn, eid)
+        _emit_state(pubsub, _row_to_response(conn, evicted_row))
+
+    metadata_envelope: dict[str, Any] = {}
+    if persona_meta is not None:
+        metadata_envelope["persona"] = persona_meta
+    if body.trigger_phrase is not None and body.trigger_phrase.strip():
+        metadata_envelope["trigger_phrase"] = body.trigger_phrase.strip()
+    metadata_envelope["persona_reasoning"] = _build_persona_reasoning(
+        caller_supplied=body.persona_reasoning,
+        intent=body.intent,
+        persona_meta=persona_meta,
+    )
+
+    summary_payload = {
+        "title": "Adventure",
+        "metadata": metadata_envelope,
+        # No template — the beats are generated. ``_render_template_plan_steps``
+        # short-circuits on a missing template_id, so the GET path falls
+        # back to ``_fetch_steps`` which reads the persisted beat rows.
+        "template_id": None,
+    }
+    steps_persist = [
+        {
+            "seq": 1,
+            "body": beat.body,
+            "sfx": None,
+            "expected_action": None,
+            "current": False,  # _persist_activity forces current=1 on insert
+            "action_slot": None,
+            "step_id": None,
+            "choices_rendered": beat.choices,
+            "kind": beat.kind,
+            "metadata": None,
+            "question": None,
+            "expected_answer": None,
+        }
+    ]
+    _persist_activity(
+        conn,
+        activity_id=activity_id,
+        session_id=session_id,
+        persona_id=effective_persona_id,
+        intent_source=body.intent,
+        summary_payload=summary_payload,
+        steps=steps_persist,
+        state=PROPOSED_STATE,
+        toy_ids=[t.id for t in resolved_toys],
+        slot_fills={},
+        adventure=True,
+    )
+
+    row = _fetch_activity_row(conn, activity_id)
+    response = _row_to_response(conn, row)
+    _emit_state(pubsub, response)
+    return response
+
+
 def _do_propose(
     body: ProposeRequest,
     conn: sqlite3.Connection,
     pubsub: PubSub,
     judge_call: JudgeCall = None,
+    sync_client: Any = None,
 ) -> ActivityResponse:
     """Shared propose-and-persist helper.
+
+    Phase W Step W4: ``sync_client`` is the FastAPI-injected sync AI client
+    used ONLY by the adventure branch to seed the first beat online when
+    the capability gate is green (offline fallback otherwise). ``None``
+    for the regular template path.
 
     Carries no auth — both ``post_propose`` and ``post_regenerate``
     funnel through here and keep the auth check on the route handler.
@@ -2185,6 +2348,14 @@ def _do_propose(
         if not _standalone_surface_enabled(conn, body.intent):
             return _dismissed_surface_disabled_response()
         return _do_propose_standalone(body, conn, pubsub)
+
+    # Phase W Step W4: dynamic adventure mode. When the parent requests an
+    # adventure, seed the first beat via the engine instead of selecting +
+    # persisting a template. Runs BEFORE the template-generator setup so an
+    # adventure never touches the catalog picker. A normal propose
+    # (``adventure`` false) skips this entirely and is byte-identical.
+    if body.adventure:
+        return _do_propose_adventure(body, conn, pubsub, sync_client=sync_client)
 
     # Caller-pinned persona wins; otherwise pick a fresh library one
     # so the kiosk avatar varies across propose calls. Falls through to
@@ -2696,6 +2867,7 @@ def post_propose(
     pubsub: Annotated[PubSub, Depends(get_pubsub)],
     judge_call: Annotated[JudgeCall, Depends(get_judge_call)],
     _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
+    sync_client: Annotated[Any, Depends(get_sync_ai_client)],  # Phase W W4
 ) -> ActivityResponse:
     """Generate a new activity at ``proposed``. Drops oldest if cap reached.
 
@@ -2705,7 +2877,7 @@ def post_propose(
     up a short-lived daemon thread to host an event loop for the
     detached coroutine (the kid-facing path stays sync).
     """
-    return _do_propose(body, conn, pubsub, judge_call=judge_call)
+    return _do_propose(body, conn, pubsub, judge_call=judge_call, sync_client=sync_client)
 
 
 @router.post("/{activity_id}/approve", response_model=ActivityResponse)
@@ -3842,7 +4014,7 @@ def post_advance(
 
     steps = conn.execute(
         "SELECT id, seq, current, choices_json, step_template_id, kind, "
-        " question, question_approved, expected_answer "
+        " question, question_approved, expected_answer, chosen_label "
         "FROM activity_steps WHERE activity_id = ? ORDER BY seq ASC",
         (activity_id,),
     ).fetchall()
@@ -3918,6 +4090,29 @@ def post_advance(
             detail={"code": "no_current_step", "id": activity_id},
         )
     current_row = steps[current_index]
+
+    # Phase W Step W4: dynamic adventure advance. When the activity is an
+    # adventure, generate the NEXT beat (from the prior choices + recent
+    # transcript) and insert it via the lazy-insert seam — NOT a template
+    # row. After ``MAX_ADVENTURE_BEATS`` route to the normal
+    # reward/terminal/end path. Handled before the template lazy-insert
+    # path below so an adventure never touches ``find_template_by_id``.
+    activity_is_adventure = (
+        "adventure" in row.keys() and row["adventure"] is not None and int(row["adventure"]) == 1
+    )
+    if activity_is_adventure:
+        return _advance_adventure(
+            conn,
+            pubsub,
+            sync_client,
+            activity_id=activity_id,
+            expected_version=expected_version,
+            target=target,
+            steps=steps,
+            current_row=current_row,
+            advance_body=advance_body,
+            seed_seed=_adventure_seed_for(row),
+        )
 
     # Phase R Step R3: Q&A gating. If the current step has a ``question``
     # that has not yet been approved or skipped (question_approved IS
@@ -4205,6 +4400,348 @@ _QA_JUDGE_MAX_TOKENS: int = 16
 # not-capable when the breaker is open) and updated by the outcome
 # recorders below.
 _QA_JUDGE_BREAKER: CircuitBreaker = CircuitBreaker()
+
+
+# Phase W Step W4: how far back the adventure online beat reads recent
+# speech. Same 30s window the W3 grader uses — the child's reaction to the
+# previous beat lands in the last few seconds.
+_ADVENTURE_TRANSCRIPT_WINDOW_SECONDS: int = 30
+
+# Phase W Step W4: kid-facing budget for the online beat call. Like the W3
+# judge, the child is waiting synchronously at the kiosk so a slow Claude
+# call must fall back to the deterministic offline assembly fast rather
+# than stall the advance.
+_ADVENTURE_BEAT_TIMEOUT_SEC: float = 8.0
+_ADVENTURE_BEAT_MAX_TOKENS: int = 256
+
+# Phase W Step W4: module-singleton circuit breaker for the adventure beat
+# Claude call (mirrors :data:`_QA_JUDGE_BREAKER`). One in-process breaker
+# per call site so a 429 burst / outage seen by THIS call is remembered
+# across advances and short-circuits subsequent beats to offline.
+_ADVENTURE_BEAT_BREAKER: CircuitBreaker = CircuitBreaker()
+
+
+def _build_adventure_cast(resolved_toys: Sequence[ResolvedToy]) -> tuple[str, ...]:
+    """Phase W Step W4: build the adventure cast from resolved toys.
+
+    Returns the toy display names (a deterministic, NOCASE-sorted order
+    comes straight from :func:`resolve_toys`). The adventure engine treats
+    ``cast[0]`` as the hero and ``cast[1]`` as the ally, falling back to
+    generic descriptors when the household has fewer than two toys — so
+    this can return an empty tuple safely.
+    """
+    return tuple(t.display_name for t in resolved_toys if t.display_name)
+
+
+def _adventure_history_from_steps(rows: Sequence[sqlite3.Row]) -> tuple[str, ...]:
+    """Phase W Step W4: extract the child's choice history from beat rows.
+
+    Reads each beat row's ``chosen_label`` (the label the child picked at
+    that beat, recorded on the previous step by the lazy-insert seam),
+    oldest-first, skipping NULLs. This is the ``history`` the adventure
+    engine echoes into the next beat's transition text.
+    """
+    history: list[str] = []
+    for r in rows:
+        label = r["chosen_label"] if "chosen_label" in r.keys() else None
+        if isinstance(label, str) and label:
+            history.append(label)
+    return tuple(history)
+
+
+def _make_adventure_online_call(sync_client: Any) -> Any:
+    """Phase W Step W4: build the ``online_call`` for the adventure engine.
+
+    Returns a callable ``(system, user) -> str`` that performs the Claude
+    transport under the SAME capability gate + 8s timeout + shared-breaker
+    pattern as W3's :func:`_grade_via_claude`. The returned callable raises
+    on ANY failure (gate not green, no client, transport error, timeout)
+    so :func:`toybox.activities.adventure.generate_next_beat` degrades to
+    the deterministic offline assembly.
+
+    Returns ``None`` when no sync client is available — the engine then
+    uses the offline assembly directly (never attempts a call).
+    """
+    if sync_client is None:
+        return None
+
+    def _online_call(system: str, user: str) -> str:
+        from ..ai.capability import is_capable  # noqa: PLC0415
+        from ..ai.client import AIMessage  # noqa: PLC0415
+
+        capable, reason = asyncio.run(is_capable(_ADVENTURE_BEAT_BREAKER))
+        if not capable:
+            raise RuntimeError(f"capability gate not green for adventure beat: {reason}")
+
+        def _call() -> Any:
+            return sync_client.complete_text_sync(
+                [AIMessage(role="user", content=user)],
+                system=system,
+                max_tokens=_ADVENTURE_BEAT_MAX_TOKENS,
+            )
+
+        # 8s budget independent of the client's 60s transport timeout —
+        # same ``finally: pool.shutdown(wait=False)`` discipline as W3 so a
+        # ``with`` block's ``shutdown(wait=True)`` can't re-block on the
+        # orphaned worker for the full transport timeout.
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        try:
+            future = pool.submit(_call)
+            try:
+                response = future.result(timeout=_ADVENTURE_BEAT_TIMEOUT_SEC)
+            except concurrent.futures.TimeoutError as exc:
+                _ADVENTURE_BEAT_BREAKER.record_failure()
+                raise RuntimeError(
+                    f"adventure beat exceeded {_ADVENTURE_BEAT_TIMEOUT_SEC}s budget"
+                ) from exc
+            except Exception:
+                _ADVENTURE_BEAT_BREAKER.record_failure()
+                raise
+        finally:
+            pool.shutdown(wait=False)
+
+        _ADVENTURE_BEAT_BREAKER.record_success()
+        return str(response.text)
+
+    return _online_call
+
+
+def _generate_adventure_beat(
+    conn: sqlite3.Connection,
+    sync_client: Any,
+    *,
+    history: tuple[str, ...],
+    cast: tuple[str, ...],
+    beat_index: int,
+    linear: bool,
+    seed: int,
+    online: bool,
+) -> GeneratedBeat:
+    """Phase W Step W4: generate one adventure beat, never raising.
+
+    Reads the recent transcript window (best-effort), then drives the pure
+    adventure engine. ``online`` requests the Claude path (degrades to
+    offline on any failure via ``generate_next_beat``). The WHOLE call is
+    wrapped so a generation fault NEVER 500s the advance — on an
+    unexpected error it falls back to a final offline assembly, and if even
+    that raises the caller is responsible for ending the adventure
+    gracefully.
+    """
+    transcript_window = ""
+    if online:
+        try:
+            transcript_window = _read_transcript_window(
+                conn, window_seconds=_ADVENTURE_TRANSCRIPT_WINDOW_SECONDS
+            )
+        except Exception:  # noqa: BLE001 -- transcript read must never break advance
+            _logger.warning("adventure: transcript-window read failed", exc_info=True)
+            transcript_window = ""
+
+    online_call = _make_adventure_online_call(sync_client) if online else None
+    return generate_next_beat(
+        history,
+        transcript_window,
+        cast,
+        online=online,
+        beat_index=beat_index,
+        linear=linear,
+        seed=seed,
+        online_call=online_call,
+    )
+
+
+# Phase W Step W4: bound for the per-adventure determinism seed derived from
+# the activity id. Well within ProposeRequest.seed's range.
+_ADVENTURE_SEED_MODULO: int = 1_000_000
+
+
+def _adventure_seed_from_id(activity_id: str) -> int:
+    """Phase W Step W4: derive a stable per-adventure determinism seed.
+
+    Beat 0 (propose) and every later beat (advance) MUST share ONE seed so
+    the offline ``_theme_for(seed)`` keeps a single theme across the whole
+    adventure (adventure.py's "one theme across all beats" contract). The
+    seed is keyed on the activity id alone — stable across the run and across
+    processes — and reuses the adventure module's SHA-256-mod algorithm via
+    :func:`toybox.activities.adventure.stable_index` (single source of truth,
+    code-quality.md §2) rather than re-implementing the hash here.
+    """
+    return stable_index(0, 0, activity_id, _ADVENTURE_SEED_MODULO)
+
+
+def _adventure_seed_for(row: sqlite3.Row) -> int:
+    """Phase W Step W4: per-adventure determinism seed for an activities row."""
+    return _adventure_seed_from_id(str(row["id"]))
+
+
+def _insert_adventure_beat(
+    conn: sqlite3.Connection,
+    *,
+    activity_id: str,
+    beat: GeneratedBeat,
+    new_seq: int,
+    previous_step_id: str,
+    chosen_label: str | None,
+) -> None:
+    """Phase W Step W4: lazily INSERT a generated adventure beat row.
+
+    Mirrors :func:`_insert_next_step` (the G3 lazy-insert seam) but writes
+    a generated beat instead of a rendered template step: it marks the
+    previous step ``current=0`` (recording ``chosen_label`` when the child
+    picked a choice), then INSERTs the new beat with ``kind`` set to
+    :data:`toybox.activities.adventure.ADVENTURE_BEAT_KIND`. ``choices_json``
+    holds the beat's choice labels (NULL on a linear beat). No
+    ``step_template_id`` (adventures have no template) and no Q&A fields.
+
+    Caller MUST be inside the version-bumped transaction so a stale retry
+    cannot double-insert.
+    """
+    choices_blob: str | None = None
+    if beat.choices is not None:
+        choices_blob = json.dumps(list(beat.choices))
+
+    prev_set_clauses = ["current = 0"]
+    prev_params: list[Any] = []
+    if chosen_label is not None:
+        prev_set_clauses.append("chosen_label = ?")
+        prev_params.append(chosen_label)
+    prev_params.extend([activity_id, previous_step_id])
+    conn.execute(
+        f"UPDATE activity_steps SET {', '.join(prev_set_clauses)} WHERE activity_id = ? AND id = ?",
+        prev_params,
+    )
+    conn.execute(
+        "INSERT INTO activity_steps "
+        "(id, activity_id, seq, body, sfx, expected_action, current, action_slot, "
+        " choices_json, step_template_id, kind, metadata_json, question, expected_answer) "
+        "VALUES (?, ?, ?, ?, NULL, NULL, 1, NULL, ?, NULL, ?, NULL, NULL, NULL)",
+        (
+            str(uuid.uuid4()),
+            activity_id,
+            new_seq,
+            beat.body,
+            choices_blob,
+            beat.kind,
+        ),
+    )
+
+
+def _advance_adventure(
+    conn: sqlite3.Connection,
+    pubsub: PubSub,
+    sync_client: Any,
+    *,
+    activity_id: str,
+    expected_version: int,
+    target: str,
+    steps: Sequence[sqlite3.Row],
+    current_row: sqlite3.Row,
+    advance_body: AdvanceRequest,
+    seed_seed: int,
+) -> ActivityResponse:
+    """Phase W Step W4: advance one beat of a running adventure.
+
+    Resolves the child's choice on the current beat (recording the picked
+    label), then either generates + inserts the NEXT beat or — once the
+    adventure has reached :data:`MAX_ADVENTURE_BEATS` — routes to the normal
+    reward/terminal/end path (the SAME path a template activity uses; we do
+    NOT invent a new terminal path). Generation NEVER 500s the advance:
+    :func:`_generate_adventure_beat` degrades to the deterministic offline
+    assembly, and if even that raised we end the adventure gracefully.
+    """
+    # Resolve the choice on the current beat. A beat with choices REQUIRES a
+    # choice_index (mirrors the G3 rule 1); a linear beat must NOT carry one.
+    current_choices = _decode_choices_json(current_row["choices_json"])
+    chosen_label: str | None = None
+    if current_choices is not None and len(current_choices) > 0:
+        ci = advance_body.choice_index
+        if ci is None:
+            raise _bad_advance("choice_required", choice_count=len(current_choices))
+        if ci < 0 or ci >= len(current_choices):
+            raise _bad_advance(
+                "invalid_choice_index",
+                choice_index=ci,
+                choice_count=len(current_choices),
+            )
+        chosen_label = current_choices[ci].label
+    elif advance_body.choice_index is not None:
+        raise _bad_advance("choice_not_allowed", reason="current_beat_is_linear")
+
+    # Beat count so far == number of persisted steps. The next beat is
+    # 0-based index ``len(steps)``. Terminate once we have already shown
+    # MAX_ADVENTURE_BEATS beats — route to the normal terminal path.
+    next_beat_index = len(steps)
+    linear = get_game_linearity(conn) == "linear"
+
+    if next_beat_index >= MAX_ADVENTURE_BEATS:
+        # Record the child's final choice on the last beat (so the played
+        # path is complete) before handing off to the terminal/reward path.
+        if chosen_label is not None:
+            with conn:
+                conn.execute(
+                    "UPDATE activity_steps SET chosen_label = ? WHERE activity_id = ? AND id = ?",
+                    (chosen_label, activity_id, str(current_row["id"])),
+                )
+        return _terminal_advance(conn, pubsub, activity_id, expected_version)
+
+    # Build the choice history + cast, then generate the next beat. Online
+    # when the gate is green (decided inside _generate_adventure_beat via
+    # the online_call's own is_capable check); we pass online=True so the
+    # engine attempts Claude and degrades to offline on any failure.
+    history = _adventure_history_from_steps(steps)
+    if chosen_label is not None:
+        history = (*history, chosen_label)
+    resolved_toys: list[ResolvedToy] = []
+    try:
+        resolved_toys = resolve_toys(conn)
+    except sqlite3.Error:
+        _logger.warning(
+            "adventure advance: resolve_toys failed; using generic descriptors",
+            exc_info=True,
+        )
+    cast = _build_adventure_cast(resolved_toys)
+
+    try:
+        beat = _generate_adventure_beat(
+            conn,
+            sync_client,
+            history=history,
+            cast=cast,
+            beat_index=next_beat_index,
+            linear=linear,
+            seed=seed_seed,
+            online=sync_client is not None,
+        )
+    except Exception:  # noqa: BLE001 -- generation must NEVER 500 the advance
+        _logger.warning(
+            "adventure advance: beat generation failed for %s; ending adventure",
+            activity_id,
+            exc_info=True,
+        )
+        return _terminal_advance(conn, pubsub, activity_id, expected_version)
+
+    new_seq = int(current_row["seq"]) + 1
+    ok, row = _attempt_transition(
+        conn,
+        activity_id=activity_id,
+        expected_version=expected_version,
+        new_state=target,
+    )
+    if not ok:
+        raise VersionConflictError(int(row["version"]), str(row["state"]))
+    with conn:
+        _insert_adventure_beat(
+            conn,
+            activity_id=activity_id,
+            beat=beat,
+            new_seq=new_seq,
+            previous_step_id=str(current_row["id"]),
+            chosen_label=chosen_label,
+        )
+
+    response = _row_to_response(conn, row)
+    _emit_state(pubsub, response)
+    return response
 
 
 def _read_transcript_window(conn: sqlite3.Connection, *, window_seconds: int) -> str:

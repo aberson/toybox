@@ -39,7 +39,7 @@ import { SubTabs, Tabs, useTabState } from "./components/Tabs";
 import { ToastList } from "./components/ToastList";
 import { ToyIngest } from "./components/ToyIngest";
 import { TranscriptsManager } from "./components/TranscriptsManager";
-import { TriggerButton } from "./components/TriggerButton";
+import { AdventureButton, TriggerButton } from "./components/TriggerButton";
 import { useParentStore } from "./store";
 import type { Envelope } from "./ws";
 import { ParentWsClient } from "./ws";
@@ -840,6 +840,30 @@ export function App(): JSX.Element {
     }
   }, [api, playTab.value]);
 
+  // Phase W Step W4: seed a dynamic adventure. Unlike handleTrigger this
+  // sets ``adventure: true`` so the backend generates the activity beat-by-
+  // beat (online via Claude when capable, else a deterministic offline
+  // assembly) instead of picking a template. No category filter — an
+  // adventure is its own kind of activity.
+  const handleStartAdventure = useCallback(async (): Promise<void> => {
+    try {
+      const now = new Date();
+      const seed = Math.floor(Math.random() * 1_000_000);
+      const activity = await api.propose({
+        intent: "request_play",
+        slot: "freeplay",
+        hour: now.getHours(),
+        seed,
+        adventure: true,
+        use_recent_transcripts: true,
+      });
+      useParentStore.getState().applyMutationResult(activity);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "adventure failed";
+      useParentStore.getState().pushToast("error", `adventure: ${message}`);
+    }
+  }, [api]);
+
   // Phase J step J8: per-row action handlers. Each takes the target
   // ``Activity`` directly so ``PlayQueueList`` can route per-row
   // (multiple proposed cards on screen + a pinned active) without
@@ -1446,8 +1470,16 @@ export function App(): JSX.Element {
                           activeRewards={activeRewards}
                           qaGradingActive={qaGrading !== "off"}
                         />
-                        <div style={{ marginTop: 12, textAlign: "right" }}>
+                        <div
+                          style={{
+                            marginTop: 12,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 8,
+                          }}
+                        >
                           <TriggerButton onTrigger={handleTrigger} />
+                          <AdventureButton onStart={handleStartAdventure} />
                         </div>
                       </>
                     )}

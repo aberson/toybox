@@ -312,6 +312,7 @@ render), so a smoke gate (W6) is required before UAT.
   `is_capable()` and falls back to template-assembled when False); `npm run typecheck` + `npm run
   test` pass
 - **Depends on:** W2 (linearity filter feeds beat generation)
+- **Status:** DONE (2026-06-20)
 
 ### Step W5: Interactive boss-fight climax beat
 - **Problem:** Add a `boss_fights_enabled` flag (settings quartet, default on) and extend the
