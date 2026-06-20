@@ -112,19 +112,17 @@ Completed phase docs (A, B, C, D, iPad-Kiosk, F.5, G, H, I) are in [`plan/archiv
 
 ## Awaiting UAT
 
-Phases whose **code is merged on master** but whose **operator iPad UAT is still open**. The plans live in [`plan/awaiting-uat/`](plan/awaiting-uat/); the residual work is a human-run acceptance pass tracked by the GitHub issues below. Most were deferred into **bundled** iPad sessions rather than run per-phase — clearing one session can close several rows.
+Phases whose **code is merged on master** but whose **operator iPad UAT is still open**. The plans live in [`plan/awaiting-uat/`](plan/awaiting-uat/).
 
-| Phase | Plan | Open UAT issue(s) | Bundled into |
-|-------|------|-------------------|--------------|
-| O — parent UX 5-tab refresh | [phase-o-plan.md](plan/awaiting-uat/phase-o-plan.md) | #178, #179, #180 (O3) | T1 (#223) |
-| P — toy image-gen IP-Adapter redo | [phase-p-plan.md](plan/awaiting-uat/phase-p-plan.md) | #189 (P7 smoke), #191 (P8 UAT) | hardware-bound render session |
-| Q — element-specific rewards | [phase-q-plan.md](plan/awaiting-uat/phase-q-plan.md) | #202 (Q7), Q8 | operator generators + Coqui render |
-| R — UX refinements | [phase-r-plan.md](plan/awaiting-uat/phase-r-plan.md) | #216 (R5) | Phase S UAT |
-| S — kiosk visual refresh + animation | [phase-s-plan.md](plan/awaiting-uat/phase-s-plan.md) | #220 (S3) | Phase T UAT |
-| T — catalog browse + bundled UAT clearance | [phase-t-plan.md](plan/awaiting-uat/phase-t-plan.md) | #223 (T1 bundles R5+S3+O1-O3), #226 (T4) | umbrella #222 |
-| V — hybrid toy action animation | [phase-v-plan.md](plan/awaiting-uat/phase-v-plan.md) | #237 (V3) | bundled also clears T1/#223, T4/#226, U4/#232 |
+**All iPad UAT is collapsed into ONE bundle: [#223](https://github.com/aberson/toybox/issues/223)** (decided 2026-06-20). Per-phase UAT gates were ceremony — the code is shipped + gate-green and de-facto exercised in daily family use. The former per-phase UAT issues (R5 #216, S3 #220, O3 #178-180, T4 #226, V3 #237, W7 #253) are **closed as covered**; U4 #232 closed as **superseded** by V. Run #223 once to validate R/S/O/T/V/W together, then move those plans to `archive/`.
 
-When a phase's UAT passes, move its plan from `awaiting-uat/` to `archive/`, close the issue(s), and update its Status-table row above.
+| Phase | Plan | iPad UAT | Non-UAT operator work |
+|-------|------|----------|------------------------|
+| O / R / S / T / V / W | (R/S/T/V in `awaiting-uat/`; W in `plan/`) | **bundle #223** | — |
+| P — toy image-gen IP-Adapter redo | [phase-p-plan.md](plan/awaiting-uat/phase-p-plan.md) | (covered by #223 kiosk checks) | #189 (P7 smoke), #191 (P8) — hardware-bound render, **separate** |
+| Q — element-specific rewards | [phase-q-plan.md](plan/awaiting-uat/phase-q-plan.md) | — | #202 (Q7), Q8 — operator generators + Coqui render, **separate** |
+
+When the #223 bundle passes, move the validated plans from `awaiting-uat/` to `archive/` and update their Status-table rows above. P/Q render/generator steps are tracked separately (not iPad UAT).
 
 ## Key invariants (must respect on every edit)
 
