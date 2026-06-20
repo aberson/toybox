@@ -1,63 +1,44 @@
 # Task State
 
-**Task:** Phase X (Room Import) — READY TO BUILD
-**Status:** BUILDING Phase X — X1-X6 DONE (#255-260 closed); X7 next = LAST code step, then goal met. X8 operator (boundary).
-**Last written:** 2026-06-20T06:00:00Z
-**Session SHA:** 0050efa
+**Task:** Phase X (Room Import) — CODE COMPLETE
+**Status:** Phase X X1-X7 all DONE + merged + pushed (master `87af523`). Goal "X1-X7 Status: DONE" met → cleared. X8 operator UAT folded into bundle #223. Phase W also code-complete (`3b5df17`). Both plans moved to `plan/awaiting-uat/`.
+**Last written:** 2026-06-20T07:30:00Z
+**Session SHA:** 87af523
 
 ## Next Action
 
-Build Phase X. Goal-ready handoff (build-phase is goal-driven) — paste the goal, then start:
-
-```
-/goal "Phase X steps X1-X7 are all marked Status: DONE in documentation/plan/phase-x-room-import-plan.md"
-
-/build-phase --plan documentation/plan/phase-x-room-import-plan.md
-```
-
-Goal scoped to X1-X7 (agent-completable); X8 is the operator UAT boundary. X1∥X2∥X3∥X4 parallel-safe; spine X{1-4}→X5→X6/X7→X8. Local-CLIP matching: tests run model-free (injected fake encoder); the real CLIP model is downloaded at X8 (`uv run python -m toybox.ai.room_classifier --download`). All `--reviewers code` (PIN-gated UI → verified in X8). Migrations 0029+.
-
+No active build. Phase W + X are code-shipped, UAT-pending in bundle #223. Options:
+- Operator runs the bundled iPad UAT #223 (R/S/O/T/V/W/X) — needs `uv run python -m toybox.ai.room_classifier --download` first for the X (CLIP) checks.
+- Or pick the next phase to plan/build (Phase E Step 27 is the open in-flight code track; follow-ups #244 kiosk parent-token, #245 OFFLINE Claude-call bypass).
 
 ## WIP
 
-**Current:** Phase W plan-expedited and ready for `/build-phase`. Umbrella #246; steps #247(W1 stub dials) #248(W2 linear toggle) #249(W3 STT grading) #250(W4 adventure engine) #251(W5 boss fight) #252(W6 smoke gate) #253(W7 iPad UAT). Plan `**Issue:**` lines backfilled.
-
-**Approach:** Six not-built items from operator notes, one combined plan. Decisions baked in: hybrid Claude/offline adventure gen via capability gate; boss fight = climax beat at 5th adventure beat; dials are true stubs; STT grading reads last-30s passive transcript, decoupled from transcript_retention.
+Nothing in flight. Phase X build run finished this session:
+- X1 #255 room schema (type + stay-out) — `2eec56c`
+- X2 #256 listing parser + room naming + ROOM_TYPES SoT — `b9305c4`
+- X3 #257 SSRF-guarded photo fetch (IP-pinning anti-rebinding) — `11255bc`
+- X4 #258 local ONNX CLIP matcher (by-name output selection) — `767c37e`
+- X5 #259 import API parse+commit (injectable fetcher/classifier, one-tx, dedup, cap) — `b32d59b`
+- X6 #260 parent RoomImportPanel UI + api.ts — `0050efa`
+- X7 #261 no-mock pipeline smoke gate — `87af523`
+- X8 #262 operator UAT → folded into bundle #223 (incl. real-CLIP `--download`).
 
 ## Completed (this session)
-- [0050efa] Phase X Step X6 (parent RoomImportPanel UI + api.ts methods + wiring): PASS iter1. frontend 787, #260 closed.
-- [b32d59b] Phase X Step X5 (import API parse+commit, injectable fetcher+classifier, one-tx, dedup, cap): PASS iter2 — review caught uncapped list (DoS) + missing rollback test + hero-photo-twice 422. backend 2584, #259 closed.
-- [767c37e] Phase X Step X4 (local ONNX CLIP matcher: room_classifier + room_match, by-name output selection, model-free tests): PASS iter2 — review caught silent-dead-path (outputs[0] vs projected image_embeds). backend 2570, #258 closed.
-- [11255bc] Phase X Step X3 (SSRF-guarded photo_fetch: scheme/allowlist/non-global-IP/redirect/size-cap/timeout + IP-pinning anti-rebinding): PASS iter2 — review caught exception-escape (HIGH) + DNS-rebinding TOCTOU. backend 2543, #257 closed.
-- [b9305c4] Phase X Step X2 (listing_parser + room_naming + ROOM_TYPES SoT + MAX_ROOMS_PER_TYPE clamp): PASS iter2 — review caught unbounded-count DoS + URL-scheme leak. backend 2501, #256 closed.
-- [2eec56c] Phase X Step X1 (rooms room_type + active/stay-out; play-exclusion single seam resolve_rooms): PASS — backend 2473 / frontend 781, #255 closed.
-
-- Doc tree reorg: `plan.md` → `documentation/master-plan.md`; phase docs sorted into `plan/` (active: e/w/x), `plan/awaiting-uat/` (O,P,Q,R,S,T,V), `plan/archive/` (K,L,M,N,J,U,SWR,e3). Commit `f0ad1ee`. Pointers re-based in CLAUDE.md, README, phase-e.md, archive README; all links verified resolvable.
-- Drafted `documentation/plan/phase-w-plan.md` (play depth) + `documentation/plan/phase-x-room-import-plan.md` (room import — NOT yet expedited/synced).
-- plan-expedite Phase W: plan-review (W4 entry-point fix) + plan-wrap (climax/window decisions) + repo-sync (#246–253). Commit `16201a0`.
-- [22326e9] Step W1 (stub dials): PASS — backend 2353 / frontend 753, #247 closed.
-- [a05572d] Step W2 (linear/non-linear toggle): PASS — backend 2378 / frontend 759, #248 closed.
-- [e7bbb50] Step W3 (Whisper/STT Q&A auto-grading): PASS after 2 iters — caught+fixed latent R3 wiring bug + judge timeout. backend 2409 / frontend 767, #249 closed.
-- [866e0c4] Step W4 (dynamic adventure engine): PASS after 2 iters. backend 2430 / frontend 771, #250 closed.
-- [95b482d] Step W5 (boss-fight climax beat): PASS after 2 iters. backend 2463 / frontend 780, #251 closed.
-- [cb27890] Step W6 (Phase W pipeline smoke gate, 6 no-mock scenarios): PASS iter 1. backend 2469 (+6), #252 closed.
-- Phase W CODE COMPLETE: all 6 code steps pushed (fb069b0..2f2b053); goal met+cleared; W7 iPad UAT (#253) deferred to operator (plan Manual UAT M1).
+- Phase X CODE COMPLETE: X1-X7 merged + pushed (`9d329c8..87af523`); umbrella #254 + steps #255-261 closed; X8 #262 folded into #223.
+- Doc updates: master-plan build-log W/X rows → CODE-SHIPPED; Awaiting-UAT section + bundle #223 now covers R/S/O/T/V/W/X; W + X plans moved `plan/` → `plan/awaiting-uat/` (relative src refs re-depthed `../../` → `../../../`); CLAUDE.md pointers updated.
+- (Earlier this session) Phase W CODE COMPLETE: W1-W6 merged (`fb069b0..3b5df17`); #246-252 closed; W7 folded into #223.
 
 ## Dead Ends / Decisions
-
-- Room-import matching: operator chose reusing existing Claude vision over a net-new local CLIP (deferred follow-up); paste-HTML/URLs over live Redfin scrape.
-- Phase X migrations assume Phase W lands first (0029+); build X after W or renumber.
+- Room-import matching: LOCAL ONNX CLIP (operator changed from Claude-vision); paste-HTML/URLs over live Redfin scrape; SSRF-guarded photo fetch; no playroom auto-guess.
+- X tests run model-free (injected fake classifier); real CLIP first exercised at X8 (#223) via `--download`.
 
 ## Critical Gotchas
-- MERGE NOTE: build-step merge copy loop must handle untracked DIRS (git status lists `dir/` once) — use `cp -r dir/.`; X2's fixtures dir was missed first pass (7 test fails in main) until copied recursively.
-
-- Parent UI is PIN-gated → runtime/UI reviewers can't authenticate; every code step is `--reviewers code`, UI checked in W7 UAT.
-- 5 forward-only migrations 0024–0028 (one per code step); abort+preserve on failure.
-- W2 changes `generate()` signature — grep all callers (code-quality §1).
+- MERGE NOTE: build-step merge copy loop must handle untracked DIRS — use `cp -r dir/.`; X2's fixtures dir was missed first pass.
+- CRLF churn on frontend/src/shared/errors.ts + types.ts in nearly every merge — revert before commit.
+- Parent UI is PIN-gated → every code step was `--reviewers code`; UI validated in #223 UAT.
 
 ## Key Files
-
-- Plan: `documentation/plan/phase-w-plan.md`
-- Next plan (drafted, not synced): `documentation/plan/phase-x-room-import-plan.md`
 - Master index: `documentation/master-plan.md`
-- Resume state: `.plan-expedite-state` (Phase W complete)
+- Phase X plan: `documentation/plan/awaiting-uat/phase-x-room-import-plan.md`
+- Phase W plan: `documentation/plan/awaiting-uat/phase-w-plan.md`
+- Bundled UAT: GH #223

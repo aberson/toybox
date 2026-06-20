@@ -21,23 +21,23 @@ Confirmed against source (via an Explore sweep), not docs:
 
 - **Rooms exist but are thin.** `rooms(id, display_name, image_path, image_hash, notes)` +
   `room_features(id, room_id, name, tags)` — both in
-  [`0001_initial.sql`](../../src/toybox/db/migrations/0001_initial.sql) (rooms at lines 44-50). Rooms
+  [`0001_initial.sql`](../../../src/toybox/db/migrations/0001_initial.sql) (rooms at lines 44-50). Rooms
   have **no `type`/category** and **no `active`/"stay out" flag** — both must be added this phase.
-- **A bulk-photo room pipeline already ships.** [`api/rooms.py`](../../src/toybox/api/rooms.py)
+- **A bulk-photo room pipeline already ships.** [`api/rooms.py`](../../../src/toybox/api/rooms.py)
   exposes `POST /api/rooms/upload-bulk` (≤50 files, per-file vision suggestion) + atomic
   `POST /api/rooms/confirm-bulk`, plus `GET /api/rooms`, `GET /api/rooms/{id}`,
   `PATCH /api/rooms/{id}` (today only `display_name` + `notes`), `DELETE`, and
   `POST /api/rooms/{id}/image`. The staged-then-confirm shape is the template Phase X's import
   flow copies.
 - **Image validation/storage is centralized and mandatory.**
-  [`storage/images.py`](../../src/toybox/storage/images.py) is the only place `Image.open` may run
+  [`storage/images.py`](../../../src/toybox/storage/images.py) is the only place `Image.open` may run
   (invariant #5). It magic-byte-sniffs MIME (jpeg/png/webp; HEIC rejected without pillow-heif),
   caps size (`TOYBOX_MAX_UPLOAD_BYTES`, default 15 MB) and dimensions (8000×8000, downscaled to
   ≤1600 for vision), SHA-256 dedups via `find_dedup(conn, "rooms", hash)`, stages to
   `data/images/.staging/`, and commits to `data/images/rooms/`. **Any photo the importer
   downloads MUST pass through `validate_upload` → `stage` → `commit_staging` — never a raw write.**
 - **Existing room vision is Claude-based (left untouched).**
-  [`ai/house_vision.py`](../../src/toybox/ai/house_vision.py) (Claude Haiku, cloud) backs the
+  [`ai/house_vision.py`](../../../src/toybox/ai/house_vision.py) (Claude Haiku, cloud) backs the
   existing `upload-bulk` flow — Phase X does **not** use or change it. **No local image classifier
   exists anywhere in the repo** — Phase X builds one (net-new): a local CLIP zero-shot classifier
   exported to ONNX, run on the **existing `onnxruntime` core dep** (already used by faster-whisper
@@ -46,15 +46,15 @@ Confirmed against source (via an Explore sweep), not docs:
   (gitignored), fetched once via a `--download` setup entrypoint — same pattern as the whisper
   model download.
 - **HTTP fetch = `urllib` only.** The canonical external-HTTP pattern is stdlib `urllib.request`
-  (see [`ai/client.py`](../../src/toybox/ai/client.py)); the `anthropic` SDK and `requests` are
+  (see [`ai/client.py`](../../../src/toybox/ai/client.py)); the `anthropic` SDK and `requests` are
   banned (`.claude/rules/claude-auth.md`). **No HTML parser (BeautifulSoup/lxml) is installed** —
   listing parsing is regex/stdlib-`html.parser` based.
 - **Rooms feed play.** Rooms surface to generation as `available_rooms` (room names) in
-  `_do_propose` and to Claude via the `get_room` tool ([`ai/tools.py`](../../src/toybox/ai/tools.py));
-  `ResolvedRoom` lives in [`activities/content_resolver.py`](../../src/toybox/activities/content_resolver.py).
+  `_do_propose` and to Claude via the `get_room` tool ([`ai/tools.py`](../../../src/toybox/ai/tools.py));
+  `ResolvedRoom` lives in [`activities/content_resolver.py`](../../../src/toybox/activities/content_resolver.py).
   The "stay out" toggle must exclude `active = 0` rooms from these play paths while the parent UI
   still lists them — mirroring the toy `active` contract in
-  [`0018_toy_active.sql`](../../src/toybox/db/migrations/0018_toy_active.sql).
+  [`0018_toy_active.sql`](../../../src/toybox/db/migrations/0018_toy_active.sql).
 - **Toy `active` is the exact pattern to copy.** `toys.active INTEGER NOT NULL DEFAULT 1`; parent
   UI shows inactive toys; mention-triggers + role-casting exclude `active = 0`. Rooms replicate
   this for "stay out".

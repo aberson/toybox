@@ -5,7 +5,7 @@ AI assistant for play with children. Passive-listening home device that watches 
 > **This file is the master plan and index** — the only plan file in `documentation/` root. It carries the elevator pitch, current status, and pointers into the `plan/` tree for the rest. Each sub-doc opens with a one-line "scope" hint so you can decide whether to load it.
 >
 > **Plan-doc layout:**
-> - [`plan/`](plan/) — reference sub-docs (architecture, data-model, …) + **active/unbuilt** phase plans: [`phase-e.md`](plan/phase-e.md) (in flight), [`phase-w-plan.md`](plan/phase-w-plan.md), [`phase-x-room-import-plan.md`](plan/phase-x-room-import-plan.md).
+> - [`plan/`](plan/) — reference sub-docs (architecture, data-model, …) + **active/unbuilt** phase plans: [`phase-e.md`](plan/phase-e.md) (in flight).
 > - [`plan/awaiting-uat/`](plan/awaiting-uat/) — phases whose **code shipped but operator UAT is still open** (O, P, Q, R, S, T, V). See the [Awaiting UAT](#awaiting-uat) section.
 > - [`plan/archive/`](plan/archive/) — **completed / superseded** phase plans (snapshots; not canonical — this file is).
 
@@ -101,8 +101,8 @@ Each phase doc carries the per-step `**Problem:**/**Type:**/**Issue:**/**Flags:*
 | [phase-u-plan.md](plan/archive/phase-u-plan.md) — AnimateDiff toy action animations | CODE + BATCH COMPLETE 2026-06-07 at master `7d12c20` — U1 (AnimateDiff pipeline + ToyActionSprite WebP-first fallback) + U2 (batch_animate.py) merged; U3 overnight batch complete (140/140 WebPs, 0 failed); U4 iPad UAT ([#232](https://github.com/aberson/toybox/issues/232)) pending. **Note:** AnimateDiff-from-scratch approach produces poor identity preservation; Phase V replaces with SVD-idle + CSS-slot-entry hybrid. 2,323 pytest + 731 vitest. |
 | [phase-v-plan.md](plan/awaiting-uat/phase-v-plan.md) — Hybrid toy action animation (SVD idle + CSS slot-entry) | 📋 PLANNED 2026-06-07 — 3 steps (V1 CSS state machine, V2 SVD idle batch, V3 iPad UAT); issues to be minted via /repo-sync. Replaces Phase U AnimateDiff approach with SVD-for-idle + CSS-for-actions hybrid. |
 | [plan/phase-e.md](plan/phase-e.md) — local model + tool-loop | IN FLIGHT — Step 28 carve-out shipped 2026-05-05; Step 27 (E3) carve-out shipped 2026-05-13; ≥50 SFT-filter-row gate cut 2026-05-21; Step 27 free to resume |
-| [phase-w-plan.md](plan/phase-w-plan.md) — play depth (stub dials, linear toggle, STT Q&A grading, dynamic adventures + boss fights) | 📝 DRAFTED 2026-06-19 — 7 steps (W1-W7); not yet plan-reviewed. Next: `/plan-expedite --plan documentation/plan/phase-w-plan.md`. |
-| [phase-x-room-import-plan.md](plan/phase-x-room-import-plan.md) — room import from a real-estate listing (paste HTML/URLs → named rooms + photo match) + room type/"stay out" toggle | 📝 DRAFTED 2026-06-19 — 8 steps (X1-X8); not yet plan-reviewed. Migrations assume Phase W lands first (0029+). Next: `/plan-expedite --plan documentation/plan/phase-x-room-import-plan.md`. |
+| [phase-w-plan.md](plan/awaiting-uat/phase-w-plan.md) — play depth (stub dials, linear toggle, STT Q&A grading, dynamic adventures + boss fights) | CODE-SHIPPED 2026-06-20 at master `3b5df17` — W1-W6 merged (migrations 0024-0028); umbrella [#246](https://github.com/aberson/toybox/issues/246), steps [#247-#252](https://github.com/aberson/toybox/issues/246) closed. Reviewers caught + fixed a latent R3 wiring bug (question/expected_answer never copied template→activity_steps) on W3. W7 iPad UAT ([#253](https://github.com/aberson/toybox/issues/253)) folded into bundle [#223](https://github.com/aberson/toybox/issues/223). 2,469 pytest + 780 vitest. |
+| [phase-x-room-import-plan.md](plan/awaiting-uat/phase-x-room-import-plan.md) — room import from a real-estate listing (paste HTML/URLs → named rooms + local-CLIP photo match) + room type/"stay out" toggle | CODE-SHIPPED 2026-06-20 at master `87af523` — X1-X7 merged (migration 0029, local ONNX CLIP matcher, SSRF-guarded photo fetch); umbrella [#254](https://github.com/aberson/toybox/issues/254), steps [#255-#261](https://github.com/aberson/toybox/issues/254) closed. X8 operator UAT ([#262](https://github.com/aberson/toybox/issues/262)) folded into bundle [#223](https://github.com/aberson/toybox/issues/223) (incl. first real-CLIP `--download` run). 2,586 pytest + 787 vitest. |
 
 Completed phase docs (A, B, C, D, iPad-Kiosk, F.5, G, H, I) are in [`plan/archive/`](plan/archive/) — see the archive [README](plan/archive/README.md) for the per-doc index. The Status table above is the authoritative completion record.
 
@@ -114,11 +114,11 @@ Completed phase docs (A, B, C, D, iPad-Kiosk, F.5, G, H, I) are in [`plan/archiv
 
 Phases whose **code is merged on master** but whose **operator iPad UAT is still open**. The plans live in [`plan/awaiting-uat/`](plan/awaiting-uat/).
 
-**All iPad UAT is collapsed into ONE bundle: [#223](https://github.com/aberson/toybox/issues/223)** (decided 2026-06-20). Per-phase UAT gates were ceremony — the code is shipped + gate-green and de-facto exercised in daily family use. The former per-phase UAT issues (R5 #216, S3 #220, O3 #178-180, T4 #226, V3 #237, W7 #253) are **closed as covered**; U4 #232 closed as **superseded** by V. Run #223 once to validate R/S/O/T/V/W together, then move those plans to `archive/`.
+**All iPad UAT is collapsed into ONE bundle: [#223](https://github.com/aberson/toybox/issues/223)** (decided 2026-06-20). Two classes fold in: **retroactive** (shipped + gate-green + de-facto exercised in daily family use) for R/S/O/T/V, and **first-validation** (brand-new code, not yet exercised) for W (play depth) + X (room import, incl. the first real-CLIP `--download` run). The former per-phase UAT issues (R5 #216, S3 #220, O3 #178-180, T4 #226, V3 #237, W7 #253, X8 #262) are **closed as covered/folded**; U4 #232 closed as **superseded** by V. Run #223 once to validate R/S/O/T/V/W/X together, then move those plans to `archive/`.
 
 | Phase | Plan | iPad UAT | Non-UAT operator work |
 |-------|------|----------|------------------------|
-| O / R / S / T / V / W | (R/S/T/V in `awaiting-uat/`; W in `plan/`) | **bundle #223** | — |
+| O / R / S / T / V / W / X | all in `awaiting-uat/` | **bundle #223** | X prereq: `room_classifier --download` (in #223) |
 | P — toy image-gen IP-Adapter redo | [phase-p-plan.md](plan/awaiting-uat/phase-p-plan.md) | (covered by #223 kiosk checks) | #189 (P7 smoke), #191 (P8) — hardware-bound render, **separate** |
 | Q — element-specific rewards | [phase-q-plan.md](plan/awaiting-uat/phase-q-plan.md) | — | #202 (Q7), Q8 — operator generators + Coqui render, **separate** |
 

@@ -24,39 +24,39 @@ A fresh-context model needs these load-bearing facts (all confirmed against sour
   + `PUT` parent-scope router under prefix `/api/settings`), a migration that seeds the
   `settings` row, and a parent-UI segmented control mirroring `SpokenTextLimitControl.tsx` /
   `TranscriptRetentionControl.tsx`. Verified in
-  [`spoken_text_limit.py`](../../src/toybox/core/spoken_text_limit.py) +
-  [`spoken_text_limit_settings.py`](../../src/toybox/api/spoken_text_limit_settings.py). There
+  [`spoken_text_limit.py`](../../../src/toybox/core/spoken_text_limit.py) +
+  [`spoken_text_limit_settings.py`](../../../src/toybox/api/spoken_text_limit_settings.py). There
   are 10 existing settings routers under `src/toybox/api/*_settings.py`.
 - **Settings store.** A single `settings(key TEXT PRIMARY KEY, value TEXT)` table; values are
   TEXT and parsed in the `get_*` helper (`int(raw)` with fallback-on-unparseable). No WS
   broadcast — single-parent kiosk model; the next `App.tsx` mount re-fetches.
 - **Next migration number is `0024`** (highest on disk is
-  [`0023_activity_step_question.sql`](../../src/toybox/db/migrations/0023_activity_step_question.sql)).
+  [`0023_activity_step_question.sql`](../../../src/toybox/db/migrations/0023_activity_step_question.sql)).
 - **Q&A gating (Phase R Step R3) already exists.** `activity_steps.question TEXT NULL` +
   `question_approved INTEGER NULL` (migration 0023); `question_approved` is `1`=approved,
   `2`=skipped, `NULL`=pending. The advance handler returns `409 {"code":"question_pending"}`
   when `question IS NOT NULL AND question_approved IS NULL`
-  ([`activities.py:3868`](../../src/toybox/api/activities.py)). `POST /api/activities/{id}/approve-question`
+  ([`activities.py:3868`](../../../src/toybox/api/activities.py)). `POST /api/activities/{id}/approve-question`
   resolves it, bumps `activities.version`, and emits an `activity.state` WS envelope
-  (handler at [`activities.py:~4100`](../../src/toybox/api/activities.py)). `Step.question` /
+  (handler at [`activities.py:~4100`](../../../src/toybox/api/activities.py)). `Step.question` /
   `ActivityStep.question` are Pydantic fields in
-  [`models.py`](../../src/toybox/activities/models.py).
-- **STT is already in the stack.** [`audio/stt.py`](../../src/toybox/audio/stt.py) wraps
+  [`models.py`](../../../src/toybox/activities/models.py).
+- **STT is already in the stack.** [`audio/stt.py`](../../../src/toybox/audio/stt.py) wraps
   faster-whisper; the home passive mic streams VAD-gated chunks → transcripts persisted with
   retention (default 1m). The child kiosk (iPad PWA) is display-only — it does **not** capture
   audio. Any "hear the answer" path must read the recent passive-transcript window, not kiosk
   audio.
-- **Capability gate.** [`core/capability.py`](../../src/toybox/core/capability.py) `compose_capability`
+- **Capability gate.** [`core/capability.py`](../../../src/toybox/core/capability.py) `compose_capability`
   + the live `is_capable()` decide whether a Claude call may run; on `False` the system uses the
   offline path with a stable `capability_reason`. Every Claude call goes through it
   (invariant #4 in `plan.md`).
 - **Activity step shape + advance.** Steps persist to `activity_steps`; `kind` on the runtime
   `ActivityStep` is a **free-form string** (existing values: `text`, `fork`, `song`, `joke`,
   `reward`, `element_microgame`) — new runtime kinds need **no migration**. The advance handler
-  (`post_advance`, [`activities.py:3736`](../../src/toybox/api/activities.py)) lazily inserts the
+  (`post_advance`, [`activities.py:3736`](../../../src/toybox/api/activities.py)) lazily inserts the
   next step on each `POST /api/activities/{id}/advance`; branching steps post
   `{"choice_index": N}`. This lazy-insert seam is where the adventure engine plugs in.
-- **Template selection.** [`generator.py`](../../src/toybox/activities/generator.py) `generate()`
+- **Template selection.** [`generator.py`](../../../src/toybox/activities/generator.py) `generate()`
   loads one JSON library per intent, filters by `buckets`, sorts by `template_id`, and picks one
   with a seeded RNG. Branching templates carry `choices`; linear ones don't. This is where the
   linearity toggle filters.
@@ -134,7 +134,7 @@ A fresh-context model needs these load-bearing facts (all confirmed against sour
 **Downstream consumers of the changed shapes (grep-verified):**
 - `Step` / `ActivityStep` gain `expected_answer` (additive, defaults `None`) — no existing
   consumer breaks. Serializer `_row_to_response` / `_fetch_steps`
-  ([`activities.py:942`](../../src/toybox/api/activities.py)) must read the new column; the kiosk
+  ([`activities.py:942`](../../../src/toybox/api/activities.py)) must read the new column; the kiosk
   and parent panels ignore it (parent-only field used by the grader).
 - New `kind` values `adventure_beat` / `boss_fight` flow through `_fetch_steps` (already reads
   `r["kind"]` generically) and `StepCard` dispatch (must add cases; default render is a safe
