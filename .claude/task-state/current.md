@@ -1,9 +1,9 @@
 # Task State
 
 **Task:** Phase X (Room Import) — READY TO BUILD
-**Status:** READY TO BUILD — Phase X plan-expedited (issues #254-262); local-CLIP matching. Phase W CODE COMPLETE (#247-252, W7 UAT in bundle #223).
+**Status:** BUILDING Phase X — X1 DONE (#255 closed); X2 next. Goal active (X1-X7 → Status: DONE). Phase W complete (W7 UAT in bundle #223).
 **Last written:** 2026-06-20T06:00:00Z
-**Session SHA:** 8092d85
+**Session SHA:** 2eec56c
 
 ## Next Action
 
@@ -25,6 +25,7 @@ Goal scoped to X1-X7 (agent-completable); X8 is the operator UAT boundary. X1∥
 **Approach:** Six not-built items from operator notes, one combined plan. Decisions baked in: hybrid Claude/offline adventure gen via capability gate; boss fight = climax beat at 5th adventure beat; dials are true stubs; STT grading reads last-30s passive transcript, decoupled from transcript_retention.
 
 ## Completed (this session)
+- [2eec56c] Phase X Step X1 (rooms room_type + active/stay-out; play-exclusion single seam resolve_rooms): PASS — backend 2473 / frontend 781, #255 closed.
 
 - Doc tree reorg: `plan.md` → `documentation/master-plan.md`; phase docs sorted into `plan/` (active: e/w/x), `plan/awaiting-uat/` (O,P,Q,R,S,T,V), `plan/archive/` (K,L,M,N,J,U,SWR,e3). Commit `f0ad1ee`. Pointers re-based in CLAUDE.md, README, phase-e.md, archive README; all links verified resolvable.
 - Drafted `documentation/plan/phase-w-plan.md` (play depth) + `documentation/plan/phase-x-room-import-plan.md` (room import — NOT yet expedited/synced).
