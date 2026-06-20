@@ -195,6 +195,22 @@ first use, and the encoder is injectable so the test suite + `/build-phase` run 
 **deferring local matching** (the operator explicitly wants it now). Aligns with the project's
 local-first posture (CLAUDE.md: "All on-device by default").
 
+**CLIP model = ViT-B/32 ONNX, fetched via `urllib` (chosen).** The `--download` entrypoint pulls a
+pre-exported ONNX CLIP — default **`Xenova/clip-vit-base-patch32`** (ONNX image encoder + text
+encoder + tokenizer, purpose-built for `onnxruntime`, CPU-sized ~350 MB, permissive license) — via
+`urllib` from pinned HuggingFace `resolve/main/...` URLs into `data/models/clip/` (no new pip dep;
+matches the `urllib`-only rule; env-overridable `TOYBOX_CLIP_MODEL_URLS`). No CLIP→ONNX export is
+shipped or run by toybox — we consume an already-exported ONNX model. *Operator may swap the model
+via the env override if a different CLIP is preferred.* Rejected: `open_clip`/`transformers` runtime
+export (heavy, needs torch); `huggingface-hub` dep (urllib suffices for pinned files).
+
+**Room-type label set is one source of truth (chosen).** The room-type vocabulary (bedroom,
+bathroom, kitchen, living room, garage, yard, playroom, dining room, office) is defined **once** —
+`ROOM_TYPES` in a leaf module (e.g. `core/room_types.py`) — and imported by (a) the filename keyword
+map, (b) the CLIP zero-shot label set, and (c) the `room_type` column's accepted values. Per
+code-quality.md §2 (one source of truth for data-shape constants); a regression test asserts the
+three consumers reference the same constant, so they can't drift.
+
 **"Stay out" = `rooms.active = 0`, copying the toy contract (chosen).** Rather than a new
 "excluded" concept, reuse the proven toy `active` semantics: the room stays in the catalog and the
 parent UI, but every play-time selector filters `active = 0`. Consistent mental model, and the toy
@@ -225,7 +241,7 @@ required before UAT.
   from every play-time selector (generation `available_rooms`, `get_room` tool, `content_resolver`
   room query) while the parent UI still lists them. Add the room-type field + "stay out" toggle to
   the parent rooms management UI.
-- **Issue:** #
+- **Issue:** #255#
 - **Flags:** --reviewers code
 - **Produces:** `db/migrations/0029_room_type_active.sql`, modified `api/rooms.py`,
   `activities/content_resolver.py`, `ai/tools.py`, `api/activities.py` (room-name builder),
@@ -240,7 +256,7 @@ required before UAT.
 - **Problem:** Add `core/listing_parser.py` (`parse_listing(content) -> {room_counts, photo_urls}`,
   regex/stdlib only, treats HTML strictly as data) and `core/room_naming.py`
   (`propose_rooms(counts) -> [ProposedRoom]` with per-type numbering). Pure, offline, no network.
-- **Issue:** #
+- **Issue:** #256#
 - **Flags:** --reviewers code
 - **Produces:** `core/listing_parser.py`, `core/room_naming.py`
 - **Done when:** `uv run pytest` passes against a saved Redfin HTML fixture (asserts bed/bath
@@ -254,7 +270,7 @@ required before UAT.
   scheme ∈ {http,https}, host allowlist (`TOYBOX_PHOTO_FETCH_ALLOWLIST`, default Redfin CDN),
   reject private/loopback/link-local IPs, byte cap = image size cap, timeout. Raises a typed error
   with stable code `photo_fetch_blocked`. Returns bytes ready for `storage/images.validate_upload`.
-- **Issue:** #
+- **Issue:** #257#
 - **Flags:** --reviewers code
 - **Produces:** `core/photo_fetch.py`
 - **Done when:** `uv run pytest` passes (allowed host returns bytes via a stubbed opener;
@@ -267,16 +283,20 @@ required before UAT.
   classifier `classify(image_bytes) -> dict[label, score]` over the room-type label set, computed
   on the existing `onnxruntime` (image↔text cosine similarity). Lazy-load the model from
   `data/models/clip/` on first call; expose the ONNX session(s) + tokenizer as **injectable** deps
-  so tests use a fake encoder with NO model file. Add a `--download` CLI entrypoint that vendors the
-  CLIP image+text encoder ONNX + BPE vocab into `data/models/clip/` (mirror `audio/stt.py`'s
-  `--download`); ensure `data/models/clip/` is gitignored. (b) `core/room_match.py`
+  so tests use a fake encoder with NO model file. Add a `--download` CLI entrypoint that fetches the
+  pinned ONNX CLIP (default `Xenova/clip-vit-base-patch32`, via `urllib` from HuggingFace
+  `resolve/main/...` URLs, env-overridable `TOYBOX_CLIP_MODEL_URLS`) into `data/models/clip/`
+  (mirror `audio/stt.py`'s `--download`); ensure `data/models/clip/` is gitignored. Define the
+  room-type vocabulary ONCE as `ROOM_TYPES` in a leaf module (e.g. `core/room_types.py`) and import
+  it from the filename map + the CLIP label set + the `room_type` validator (code-quality.md §2;
+  add a regression test asserting all three reference the same constant). (b) `core/room_match.py`
   (`match_photo(filename, image_bytes, *, classifier) -> RoomGuess`): filename keyword heuristic
   first; on a weak filename, call `classifier` and take the top label iff its score ≥ a confidence
   threshold, else `source="none"` → N/A. Classifier injected for testing.
-- **Issue:** #
+- **Issue:** #258#
 - **Flags:** --reviewers code
-- **Produces:** `ai/room_classifier.py` (+ `--download` entrypoint), `core/room_match.py`, gitignore
-  entry for `data/models/clip/`
+- **Produces:** `core/room_types.py` (`ROOM_TYPES` single source of truth), `ai/room_classifier.py`
+  (+ `--download` entrypoint), `core/room_match.py`, gitignore entry for `data/models/clip/`
 - **Done when:** `uv run pytest` passes WITHOUT any model download — using an injected fake
   classifier: `master-bedroom.jpg` → bedroom via filename (classifier not called); ambiguous
   filename + fake classifier returning a high score for "bathroom" → bathroom (`source="clip"`);
@@ -291,7 +311,7 @@ required before UAT.
   commit via `storage/images.py`, match via `room_match`, insert the named rooms in one
   transaction; honor edited names/types/photo assignments/N/A and `active`). Parent-scope. Wires
   X2–X4 + X1's columns.
-- **Issue:** #
+- **Issue:** #259#
 - **Flags:** --reviewers code
 - **Produces:** modified `api/rooms.py`, regenerated `shared/types.ts`
 - **Done when:** `uv run pytest` passes (integration: parse a fixture → commit with stubbed
@@ -305,7 +325,7 @@ required before UAT.
 - **Problem:** Add `RoomImportPanel.tsx`: paste textarea → call parse → editable proposed-rooms
   table (name, room-type dropdown, matched-photo thumbnail with reassign/clear→N/A, "stay out"
   toggle) → commit → refresh rooms list. Reachable from the rooms management tab.
-- **Issue:** #
+- **Issue:** #260#
 - **Flags:** --reviewers code
 - **Produces:** `RoomImportPanel.tsx`, modified rooms-management component + `App.tsx` + `api.ts`
 - **Done when:** `npm run typecheck` + `npm run test` pass (component test: paste → render proposed
@@ -323,7 +343,7 @@ required before UAT.
   a named room set is created with matched photos, one N/A room, correct `room_type`/`active`; then
   assert an `active = 0` room is excluded from `available_rooms`/`get_room`. Surfaces
   parser→fetch→validate→match→persist→play-selection drift.
-- **Issue:** #
+- **Issue:** #261#
 - **Flags:** --reviewers code
 - **Produces:** `tests/integration/test_phase_x_room_import_smoke.py` (+ fixture HTML + fixture
   images)
@@ -335,7 +355,7 @@ required before UAT.
 - **Type:** operator
 - **Problem:** Validate room import end-to-end in the real parent UI — including the **real local
   CLIP model** (the test suite ran model-free; this is the first exercise of the actual classifier).
-- **Issue:** #
+- **Issue:** #262#
 - **Prereq:** run the model download once: `uv run python -m toybox.ai.room_classifier --download`
   (vendors the CLIP ONNX model into `data/models/clip/`). Confirm `data/models/clip/` populated.
 - **Done when:** UAT checklist passes:
@@ -364,11 +384,14 @@ required before UAT.
 | Photo dedup across import + manual uploads | The same photo imported twice creates duplicate rooms | Reuse `find_dedup(conn, "rooms", hash)`; on a dedup hit, skip the photo (room still created as N/A or linked to existing) |
 | Offline at commit time | n/a for matching — CLIP is **local/offline** (the whole point of the local-CLIP choice). Only concern is the model not yet vendored (see "model not downloaded" above) | Filename heuristic + N/A still work model-less; CLIP works fully offline once downloaded |
 
-**Open questions (resolve in plan-review):**
-- Allowlist contents: exact Redfin CDN host patterns (e.g. `ssl.cdn-redfin.com`,
-  `*.cdn-redfin.com`) — confirm current hosts; keep env-overridable.
-- Playroom heuristic: should surplus bedrooms auto-propose a "Playroom", or leave all as
-  "Bedroom #n" and let the parent rename? Defaulting to rename-only unless confirmed.
+**Resolved decisions (were open; committed at plan-wrap):**
+- **Photo-fetch allowlist default:** `ssl.cdn-redfin.com` + `*.cdn-redfin.com` (Redfin's photo
+  CDN), env-overridable via `TOYBOX_PHOTO_FETCH_ALLOWLIST` (comma-separated host patterns). X3
+  ships this default; the operator widens it via the env var if Redfin changes CDN hosts.
+- **Playroom heuristic:** none — `room_naming` names every bedroom `Bedroom #n` and the parent
+  renames one to "Playroom" in the review table if they want one. No surplus-bedroom guessing (it
+  was guesswork; the editable table makes a rename trivial). "Playroom" stays a valid `ROOM_TYPES`
+  value for manual selection.
 
 ## 9. Testing Strategy
 
