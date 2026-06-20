@@ -232,7 +232,7 @@ render), so a smoke gate (W6) is required before UAT.
   each `low|medium|high` defaulting to `medium`, following the `spoken_text_limit` quartet
   exactly (core module + GET/PUT router + migration seed + parent-UI segmented control + App
   state/fetch/callback + api.ts). Persist only — wire to no behavior.
-- **Issue:** #
+- **Issue:** #247#
 - **Flags:** --reviewers code
 - **Produces:** `core/parent_involvement.py`, `api/parent_involvement_settings.py`,
   `core/game_complexity.py`, `api/game_complexity_settings.py`,
@@ -249,7 +249,7 @@ render), so a smoke gate (W6) is required before UAT.
   settings quartet, then wire it: `generate()` gains a `linear_only: bool` keyword that excludes
   templates carrying `choices` (with a linear-eligible fallback), and `_do_propose` /
   `_do_propose_standalone` read the setting and pass it through. Parent UI gets a toggle control.
-- **Issue:** #
+- **Issue:** #248#
 - **Flags:** --reviewers code
 - **Produces:** `core/game_linearity.py`, `api/game_linearity_settings.py`,
   `db/migrations/0025_game_linearity.sql`, modified `generator.py` (+`linear_only`),
@@ -270,7 +270,7 @@ render), so a smoke gate (W6) is required before UAT.
   A confident match resolves the gate (`question_approved=1`, version bump, WS envelope — reuse
   the approve-question internals). No match leaves it pending for the parent. ActivityPanel shows
   "listening for answer…" when grading is active and pending.
-- **Issue:** #
+- **Issue:** #249#
 - **Flags:** --reviewers code
 - **Produces:** `core/qa_grading.py` (setting + offline grader), `api/qa_grading_settings.py`,
   `db/migrations/0026_qa_grading.sql`, modified `models.py` (`expected_answer`), modified
@@ -287,17 +287,22 @@ render), so a smoke gate (W6) is required before UAT.
 ### Step W4: Dynamic adventure engine (hybrid generation)
 - **Problem:** Add `activities/adventure.py` with `generate_next_beat(...)` — Claude-online via
   the capability gate, deterministic template-assembled offline — and an `activities.adventure`
-  flag (migration). When proposing an adventure (`adventure=1`) the activity advances by
-  generating the next beat from prior choices + the recent transcript window instead of reading a
-  template row; persist each beat as an `activity_steps` row via the existing lazy-insert seam.
-  Honor the W2 linearity toggle (linear adventures emit no `choices`). Kiosk renders generated
-  beats generically.
-- **Issue:** #
+  flag (migration). **Entry point:** add an `adventure: bool = False` field to `ProposeRequest`;
+  `_do_propose` persists `activities.adventure = 1` when set, and a parent **"Start an Adventure"**
+  trigger (a variant of `TriggerButton`, or a sibling button on the Play tab) POSTs propose with
+  `adventure: true`. A normal propose (`adventure` omitted/false) behaves exactly as today. When
+  `adventure = 1` the activity advances by generating the next beat from prior choices + the recent
+  transcript window instead of reading a template row; persist each beat as an `activity_steps` row
+  via the existing lazy-insert seam. Honor the W2 linearity toggle (linear adventures emit no
+  `choices`). Kiosk renders generated beats generically.
+- **Issue:** #250#
 - **Flags:** --reviewers code
 - **Produces:** `activities/adventure.py`, `db/migrations/0027_activity_adventure_mode.sql`,
-  modified `activities.py` (propose sets `adventure`; advance branches to `generate_next_beat`),
-  modified `models.py` (document `adventure_beat` kind), modified `StepCard.tsx` (generic beat
-  render), regenerated `shared/types.ts`
+  modified `activities.py` (`ProposeRequest.adventure` field; `_do_propose` persists the flag;
+  advance branches to `generate_next_beat`), modified `models.py` (document `adventure_beat`
+  kind), modified `StepCard.tsx` (generic beat render), parent **"Start an Adventure"** trigger
+  control + `App.tsx` wiring + `api.ts` (propose with `adventure: true`), regenerated
+  `shared/types.ts`
 - **Done when:** `uv run pytest` passes (unit: offline `generate_next_beat` is deterministic for
   a fixed seed and reflects the prior choice; integration: an adventure activity advances through
   ≥3 generated beats offline; with the gate green, the Claude path is invoked through
@@ -311,7 +316,7 @@ render), so a smoke gate (W6) is required before UAT.
   a Phase K `boss_mini_boss` / `big_bad_boss` role. Kiosk renders a boss-fight step variant
   (distinct styling, choice-driven resolution, no flashing). Resolution advances to the reward/end
   path.
-- **Issue:** #
+- **Issue:** #251#
 - **Flags:** --reviewers code
 - **Produces:** `core/boss_fights_enabled.py`, `api/boss_fights_enabled_settings.py`,
   `db/migrations/0028_boss_fights_enabled.sql`, modified `adventure.py` (boss emission),
@@ -332,7 +337,7 @@ render), so a smoke gate (W6) is required before UAT.
   with `qa_grading=lenient` and assert the gate auto-resolves; assert no exception and the
   activity reaches the reward/end path. Surfaces producer→consumer drift across
   generator→advance→serializer→kiosk-shape that mocked unit tests miss.
-- **Issue:** #
+- **Issue:** #252#
 - **Flags:** --reviewers code
 - **Produces:** `tests/integration/test_phase_w_smoke.py`
 - **Done when:** the smoke test completes one real cycle without exception and asserts: an
@@ -344,7 +349,7 @@ render), so a smoke gate (W6) is required before UAT.
 ### Step W7: iPad UAT
 - **Type:** operator
 - **Problem:** Validate all six Phase W features end-to-end on the iPad kiosk + parent UI.
-- **Issue:** #
+- **Issue:** #253#
 - **Done when:** UAT checklist passes:
   1. Settings shows Parent-Involvement and Game-Complexity dials; both persist across reload (no
      behavior expected — stubs)
@@ -373,11 +378,14 @@ render), so a smoke gate (W6) is required before UAT.
 | Offline "builds on spoken words" is weak | Template-assembled beats can't truly incorporate arbitrary speech | Accept reduced fidelity offline (documented in Scope); the spoken-word richness is the online path's value; offline still threads the prior *choice* |
 | Migration count (0024–0028) in one phase | A mid-phase failure leaves the DB partway forward (forward-only) | Each step ships exactly one migration and is independently testable; abort+preserve per invariant #10; steps ordered so each migration is self-contained |
 
-**Open questions (resolve in plan-review if needed):**
-- Climax threshold for boss fights: fixed beat-count (e.g. beat 5) vs. complexity-dial-driven?
-  Defaulting to a fixed count this phase since the complexity dial is a stub.
-- Transcript window length for grading (seconds after question becomes current): default to a
-  small fixed window (e.g. last 30s) reusing retention; confirm against retention default (1m).
+**Resolved decisions (were open; committed at plan-wrap):**
+- **Boss-fight climax:** the engine emits exactly one `boss_fight` beat after the **5th** adventure
+  beat (fixed count this phase). The complexity dial is a stub, so it does not drive this yet; a
+  later phase can make the threshold complexity-driven without touching the emission mechanism.
+- **Grading transcript window:** the grader reads the transcript rows from the **last 30 seconds**
+  before the question step became `current`. This is independent of the `transcript_retention`
+  setting (which only governs deletion of old rows, not the grading lookback) — W3 must not couple
+  the two.
 
 ## 9. Testing Strategy
 
