@@ -1,9 +1,9 @@
 # Task State
 
 **Task:** Phase X (Room Import) — READY TO BUILD
-**Status:** BUILDING Phase X — X1-X5 DONE (#255-259 closed); X6 next (parent import UI). Goal active (X1-X7 → DONE); X7 (smoke) then goal met.
+**Status:** BUILDING Phase X — X1-X6 DONE (#255-260 closed); X7 next = LAST code step, then goal met. X8 operator (boundary).
 **Last written:** 2026-06-20T06:00:00Z
-**Session SHA:** b32d59b
+**Session SHA:** 0050efa
 
 ## Next Action
 
@@ -25,6 +25,7 @@ Goal scoped to X1-X7 (agent-completable); X8 is the operator UAT boundary. X1∥
 **Approach:** Six not-built items from operator notes, one combined plan. Decisions baked in: hybrid Claude/offline adventure gen via capability gate; boss fight = climax beat at 5th adventure beat; dials are true stubs; STT grading reads last-30s passive transcript, decoupled from transcript_retention.
 
 ## Completed (this session)
+- [0050efa] Phase X Step X6 (parent RoomImportPanel UI + api.ts methods + wiring): PASS iter1. frontend 787, #260 closed.
 - [b32d59b] Phase X Step X5 (import API parse+commit, injectable fetcher+classifier, one-tx, dedup, cap): PASS iter2 — review caught uncapped list (DoS) + missing rollback test + hero-photo-twice 422. backend 2584, #259 closed.
 - [767c37e] Phase X Step X4 (local ONNX CLIP matcher: room_classifier + room_match, by-name output selection, model-free tests): PASS iter2 — review caught silent-dead-path (outputs[0] vs projected image_embeds). backend 2570, #258 closed.
 - [11255bc] Phase X Step X3 (SSRF-guarded photo_fetch: scheme/allowlist/non-global-IP/redirect/size-cap/timeout + IP-pinning anti-rebinding): PASS iter2 — review caught exception-escape (HIGH) + DNS-rebinding TOCTOU. backend 2543, #257 closed.
