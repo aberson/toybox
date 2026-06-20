@@ -1,17 +1,16 @@
 # Task State
 
-**Task:** Phase W (Play Depth) — build (in progress)
-**Status:** BUILDING — W1-W5 DONE (#247-251 closed); W6 next (pipeline smoke gate, depends W3/W4/W5✅) — LAST code step, then goal met. Goal active (W1–W6 → Status: DONE).
+**Task:** Phase W (Play Depth) — CODE COMPLETE
+**Status:** CODE COMPLETE — W1-W6 all DONE + pushed (origin/master 2f2b053); #247-252 closed. Goal MET (auto-cleared). ONLY W7 iPad UAT (#253, operator) remains.
 **Last written:** 2026-06-20T06:00:00Z
-**Session SHA:** 95b482d
+**Session SHA:** 2f2b053
 
 ## Next Action
 
-Continue build-phase at W2 (`/build-phase --plan documentation/plan/phase-w-plan.md --resume 2` if resuming fresh). Goal is armed on "Phase W steps W1-W6 all Status: DONE". Per-step flow: worktree → dev agent → 4 code reviewers → post-merge gates in MAIN project → mark plan Status: DONE → checkpoint commit → close issue → remove worktree. All `--reviewers code` (PIN-gated UI; verified in W7 UAT). Baseline gates: backend 2353 pytest, frontend 753 vitest, mypy+ruff clean.
+OPERATOR: run the Phase W iPad UAT (issue #253 / plan §"Manual UAT" M1) — validate the 6 surfaces (stub dials, linear toggle, STT grading, adventure, boss fight, no console errors) on the iPad kiosk + parent UI. All code is shipped + pushed. After UAT passes, close #253 and (optionally) /repo-update.
 
-Remaining: W2 #248 (linear toggle, touches generator.py — grep all `generate(` callers), W4 #250 (adventure engine, depends W2), W5 #251 (boss fight, depends W4), W3 #249 (STT grading), W6 #252 (smoke gate, depends W3/4/5), W7 #253 (operator UAT — deferred bundle, the goal's boundary). Spine: W2→W4→W5→W6; W3→W6; W1✅ before W7.
+NOTE: plan-expedite SKILL.md edits (goal-ready handoff) are restored + UNCOMMITTED in coding-root (c:/Users/abero/dev) — commit there if wanted. Phase X (room import) still drafted/un-synced at documentation/plan/phase-x-room-import-plan.md.
 
-NOTE: `.git/info/exclude` in toybox has a TEMP block excluding `/data/images/compare/` (sprite-compare artifacts, not Phase W) so build-phase's `git add -A` stays clean — remove after Phase W. Also: my plan-expedite SKILL.md edits are stashed in the coding-root repo (`c:/Users/abero/dev`, `git stash list`) — restore after.
 
 ## WIP
 
@@ -28,7 +27,9 @@ NOTE: `.git/info/exclude` in toybox has a TEMP block excluding `/data/images/com
 - [a05572d] Step W2 (linear/non-linear toggle): PASS — backend 2378 / frontend 759, #248 closed.
 - [e7bbb50] Step W3 (Whisper/STT Q&A auto-grading): PASS after 2 iters — caught+fixed latent R3 wiring bug + judge timeout. backend 2409 / frontend 767, #249 closed.
 - [866e0c4] Step W4 (dynamic adventure engine): PASS after 2 iters. backend 2430 / frontend 771, #250 closed.
-- [95b482d] Step W5 (boss-fight climax beat: boss_fights_enabled + boss beat at climax casting boss role + kiosk no-flash banner): PASS after 2 iters — review caught hero-cast-as-boss (_select_boss_name ignored explicit tag); fixed (hero-excluded 3-tier). backend 2463 (+33) / frontend 780 (+9), #251 closed.
+- [95b482d] Step W5 (boss-fight climax beat): PASS after 2 iters. backend 2463 / frontend 780, #251 closed.
+- [cb27890] Step W6 (Phase W pipeline smoke gate, 6 no-mock scenarios): PASS iter 1. backend 2469 (+6), #252 closed.
+- Phase W CODE COMPLETE: all 6 code steps pushed (fb069b0..2f2b053); goal met+cleared; W7 iPad UAT (#253) deferred to operator (plan Manual UAT M1).
 
 ## Dead Ends / Decisions
 
