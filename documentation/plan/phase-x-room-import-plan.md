@@ -340,6 +340,7 @@ required before UAT.
 - **Status:** DONE (2026-06-20)
 
 ### Step X7: Pipeline smoke gate
+- **Status:** DONE (2026-06-20)
 - **Type:** code
 - **Problem:** No-mock end-to-end: migrate a fresh DB; parse a saved Redfin HTML fixture; commit
   with `photo_fetch` pointed at local fixture image files (real `storage/images.py` validation, no
