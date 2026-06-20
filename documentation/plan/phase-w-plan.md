@@ -350,6 +350,7 @@ render), so a smoke gate (W6) is required before UAT.
   without a parent call, and the activity terminated cleanly; `uv run pytest
   tests/integration/test_phase_w_smoke.py` passes
 - **Depends on:** W3, W4, W5
+- **Status:** DONE (2026-06-20)
 
 ### Step W7: iPad UAT
 - **Type:** operator
