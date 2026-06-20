@@ -1,9 +1,9 @@
 # Task State
 
 **Task:** Phase W (Play Depth) — build (in progress)
-**Status:** BUILDING — W1+W2+W3 DONE (#247-249 closed); W4 next (adventure engine, depends W2✅). Goal active (W1–W6 → Status: DONE).
+**Status:** BUILDING — W1-W4 DONE (#247-250 closed); W5 next (boss-fight climax beat, depends W4✅, extends adventure.py). Goal active (W1–W6 → Status: DONE).
 **Last written:** 2026-06-20T06:00:00Z
-**Session SHA:** e7bbb50
+**Session SHA:** 866e0c4
 
 ## Next Action
 
@@ -26,7 +26,8 @@ NOTE: `.git/info/exclude` in toybox has a TEMP block excluding `/data/images/com
 - plan-expedite Phase W: plan-review (W4 entry-point fix) + plan-wrap (climax/window decisions) + repo-sync (#246–253). Commit `16201a0`.
 - [22326e9] Step W1 (stub dials): PASS — backend 2353 / frontend 753, #247 closed.
 - [a05572d] Step W2 (linear/non-linear toggle): PASS — backend 2378 / frontend 759, #248 closed.
-- [e7bbb50] Step W3 (Whisper/STT Q&A auto-grading): PASS after 2 iters — REVIEW CAUGHT latent R3 bug (question/expected_answer never wired template→activity_steps; _schema.json additionalProperties:false rejected them); fixed full 8-hop chain + judge 8s-timeout (finally shutdown wait=False) + shared breaker. backend 2409 (+31) / frontend 767 (+8), #249 closed.
+- [e7bbb50] Step W3 (Whisper/STT Q&A auto-grading): PASS after 2 iters — caught+fixed latent R3 wiring bug + judge timeout. backend 2409 / frontend 767, #249 closed.
+- [866e0c4] Step W4 (dynamic adventure engine: adventure.py hybrid Claude/offline, _do_propose_adventure/_advance_adventure, MAX_ADVENTURE_BEATS=6→reward, AdventureButton): PASS after 2 iters — review caught dropped multi-beat history (chosen_label not SELECTed) + offline theme seed mismatch; fixed (single id-derived seed). backend 2430 (+21) / frontend 771 (+4), #250 closed.
 
 ## Dead Ends / Decisions
 
