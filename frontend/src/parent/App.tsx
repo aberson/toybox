@@ -10,6 +10,7 @@ import {
 import type {
   Activity,
   GameComplexity,
+  GameLinearity,
   MetricsAudioStatus,
   ParentAuthStatus,
   ParentInvolvement,
@@ -227,6 +228,12 @@ export function App(): JSX.Element {
   const [parentInvolvement, setParentInvolvement] =
     useState<string>("medium");
   const [gameComplexity, setGameComplexity] = useState<string>("medium");
+  // Phase W Step W2: household game-linearity dial. WIRED — the propose
+  // path excludes branching templates when set to "linear". Seeded from
+  // ``GET /api/settings/game-linearity`` during bootstrap. "nonlinear" is
+  // the backend default; matching locally keeps a failed bootstrap fetch
+  // from flashing an odd value into the UI.
+  const [gameLinearity, setGameLinearity] = useState<string>("nonlinear");
   // Phase R Step R4: activity + template search query. Non-empty string
   // renders SearchPanel above PlayQueueList on the Play tab; clearing it
   // restores the normal queue view. The state is top-level so the input
@@ -405,6 +412,7 @@ export function App(): JSX.Element {
         spokenTextLimitResult,
         parentInvolvementResult,
         gameComplexityResult,
+        gameLinearityResult,
       ] = await Promise.allSettled([
         api.getTranscriptRetention({ signal: aborter.signal }),
         api.getPlayTargetDepth({ signal: aborter.signal }),
@@ -436,6 +444,8 @@ export function App(): JSX.Element {
         // Phase W Step W1: seed the two true-stub dials for SettingsPanel.
         api.getParentInvolvement({ signal: aborter.signal }),
         api.getGameComplexity({ signal: aborter.signal }),
+        // Phase W Step W2: seed the wired game-linearity dial.
+        api.getGameLinearity({ signal: aborter.signal }),
       ]);
       // ``Promise.allSettled`` swallows aborts as rejected results, so
       // a mid-bootstrap unmount (e.g. parent navigates away while these
@@ -581,6 +591,16 @@ export function App(): JSX.Element {
         console.warn(
           "game complexity initial fetch failed, using default",
           gameComplexityResult.reason,
+        );
+      }
+      // Phase W Step W2: seed the wired game-linearity dial from bootstrap.
+      if (gameLinearityResult.status === "fulfilled") {
+        setGameLinearity(gameLinearityResult.value.value);
+      } else if (!isAbortError(gameLinearityResult.reason)) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          "game linearity initial fetch failed, using default",
+          gameLinearityResult.reason,
         );
       }
       const ws = new ParentWsClient({
@@ -1180,6 +1200,15 @@ export function App(): JSX.Element {
     [],
   );
 
+  // Phase W Step W2: SettingsPanel reconciliation callback for the wired
+  // game-linearity dial. Mirror handleGameComplexityChanged.
+  const handleGameLinearityChanged = useCallback(
+    (value: GameLinearity): void => {
+      setGameLinearity(value);
+    },
+    [],
+  );
+
   // Phase R Step R4: propose from search results. Calls the same propose
   // endpoint as the trigger button but with an optional template_id so
   // the backend picks that exact template rather than running the slot
@@ -1491,6 +1520,8 @@ export function App(): JSX.Element {
                     onParentInvolvementChanged={handleParentInvolvementChanged}
                     currentGameComplexity={gameComplexity}
                     onGameComplexityChanged={handleGameComplexityChanged}
+                    currentGameLinearity={gameLinearity}
+                    onGameLinearityChanged={handleGameLinearityChanged}
                   />
                 )}
                 {settingsTab.value === "stats" && (

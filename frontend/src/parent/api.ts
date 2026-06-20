@@ -713,6 +713,16 @@ export interface GameComplexityResponse {
   value: GameComplexity;
 }
 
+// Phase W Step W2: game-linearity dial. WIRED (not a stub) — the propose
+// path reads it and excludes branching templates when set to "linear".
+// The wire body is ``{value: "linear"|"nonlinear"}`` in both directions.
+// The GET is public (household read); the PUT requires parent scope.
+export type GameLinearity = "linear" | "nonlinear";
+
+export interface GameLinearityResponse {
+  value: GameLinearity;
+}
+
 // Phase J step J1: play-queue target depth presets. The wire body is
 // ``{value: <preset>}`` in both directions, mirroring the GET/PUT
 // pair on transcript-retention.
@@ -1873,6 +1883,31 @@ export class ApiClient {
         signal: opts.signal,
       },
     );
+  }
+
+  // Phase W Step W2: game-linearity dial read-write pair. WIRED — the
+  // propose path excludes branching templates when this is "linear". The
+  // GET is unauthenticated (household read); the PUT requires parent
+  // scope. Body shape on both sides is ``{value: <dial>}``. Valid values:
+  // linear / nonlinear.
+  async getGameLinearity(
+    opts: RequestOptions = {},
+  ): Promise<GameLinearityResponse> {
+    return this.request<GameLinearityResponse>("/api/settings/game-linearity", {
+      method: "GET",
+      signal: opts.signal,
+    });
+  }
+
+  async setGameLinearity(
+    value: GameLinearity,
+    opts: RequestOptions = {},
+  ): Promise<GameLinearityResponse> {
+    return this.request<GameLinearityResponse>("/api/settings/game-linearity", {
+      method: "PUT",
+      body: JSON.stringify({ value }),
+      signal: opts.signal,
+    });
   }
 
   // Phase J step J1: play-queue target depth read-write pair. The GET

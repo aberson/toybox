@@ -94,6 +94,7 @@ interface StubApi {
   setSpokenTextLimit: Mock;
   setParentInvolvement: Mock;
   setGameComplexity: Mock;
+  setGameLinearity: Mock;
 }
 
 function buildStubApi(snapshot: MetricsSnapshot): StubApi {
@@ -141,6 +142,7 @@ function buildStubApi(snapshot: MetricsSnapshot): StubApi {
     setSpokenTextLimit: vi.fn(async (value: number) => ({ value })) as Mock,
     setParentInvolvement: vi.fn(async (value: string) => ({ value })) as Mock,
     setGameComplexity: vi.fn(async (value: string) => ({ value })) as Mock,
+    setGameLinearity: vi.fn(async (value: string) => ({ value })) as Mock,
   };
 }
 
@@ -164,6 +166,8 @@ function renderSettingsPanel(
     onParentInvolvementChanged?: (v: string) => void;
     currentGameComplexity?: string;
     onGameComplexityChanged?: (v: string) => void;
+    currentGameLinearity?: string;
+    onGameLinearityChanged?: (v: string) => void;
   } = {},
 ): void {
   render(
@@ -191,6 +195,8 @@ function renderSettingsPanel(
       onGameComplexityChanged={
         overrides.onGameComplexityChanged ?? (() => {})
       }
+      currentGameLinearity={overrides.currentGameLinearity ?? "nonlinear"}
+      onGameLinearityChanged={overrides.onGameLinearityChanged ?? (() => {})}
     />,
   );
 }
@@ -266,6 +272,8 @@ describe("SettingsPanel", () => {
         onParentInvolvementChanged={() => {}}
         currentGameComplexity="medium"
         onGameComplexityChanged={() => {}}
+        currentGameLinearity="nonlinear"
+        onGameLinearityChanged={() => {}}
       />,
     );
     unmount();

@@ -28,6 +28,7 @@ from .api.clickable_words_enabled_settings import (
     router as clickable_words_enabled_settings_router,
 )
 from .api.game_complexity_settings import router as game_complexity_settings_router
+from .api.game_linearity_settings import router as game_linearity_settings_router
 from .api.health import router as health_router
 from .api.image_gen_settings import router as image_gen_settings_router
 from .api.jokes_enabled_settings import router as jokes_enabled_settings_router
@@ -85,6 +86,11 @@ def create_app() -> FastAPI:
     # phase consumes the values. GET is household-read, PUT is parent-scope.
     app.include_router(parent_involvement_settings_router)
     app.include_router(game_complexity_settings_router)
+    # Phase W Step W2: household game-linearity dial. WIRED (not a stub) —
+    # the propose path reads it and passes linear_only=(value=="linear")
+    # into the offline generator to exclude branching templates. GET is
+    # household-read, PUT is parent-scope.
+    app.include_router(game_linearity_settings_router)
     # Phase K Step K2 + Phase L Step L5: five parent-controlled feature
     # flags (originally eight; L5 removed the three Phase K play-surface
     # flags as part of re-framing jokes/songs as per-activity reward

@@ -22,6 +22,7 @@ import { isAbortError } from "../api";
 import type {
   ApiClient,
   GameComplexity,
+  GameLinearity,
   ImageGenMode,
   ListeningMode,
   MetricsSnapshot,
@@ -33,6 +34,7 @@ import type {
 } from "../api";
 import { BannedThemesSettings } from "./BannedThemesSettings";
 import { GameComplexityControl } from "./GameComplexityControl";
+import { GameLinearityControl } from "./GameLinearityControl";
 import { ParentInvolvementControl } from "./ParentInvolvementControl";
 import { PlayFeaturesControls } from "./PlayFeaturesControls";
 import {
@@ -433,6 +435,7 @@ export interface SettingsPanelProps {
     | "setSpokenTextLimit"
     | "setParentInvolvement"
     | "setGameComplexity"
+    | "setGameLinearity"
   >;
   // Phase I step I3: transcript retention picker source-of-truth. The
   // value lives in App.tsx (fetched once on mount via the
@@ -469,6 +472,12 @@ export interface SettingsPanelProps {
   onParentInvolvementChanged: (value: ParentInvolvement) => void;
   currentGameComplexity: string;
   onGameComplexityChanged: (value: GameComplexity) => void;
+  // Phase W Step W2: household game-linearity dial. WIRED — the propose
+  // path excludes branching templates when set to "linear". Value lives
+  // in App.tsx (seeded by the bootstrap parallel-fetch) and threads
+  // through here; the callback bubbles a successful PUT response back up.
+  currentGameLinearity: string;
+  onGameLinearityChanged: (value: GameLinearity) => void;
 }
 
 // Settings sub-tab. Renders the three toggle cards + the global
@@ -491,6 +500,8 @@ export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
     onParentInvolvementChanged,
     currentGameComplexity,
     onGameComplexityChanged,
+    currentGameLinearity,
+    onGameLinearityChanged,
   } = props;
   const [listeningMode, setListeningMode] = useState<number>(3);
   const [micEnabled, setMicEnabled] = useState<boolean>(true);
@@ -581,6 +592,11 @@ export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
           api={api}
           currentValue={currentGameComplexity}
           onValueChanged={onGameComplexityChanged}
+        />
+        <GameLinearityControl
+          api={api}
+          currentValue={currentGameLinearity}
+          onValueChanged={onGameLinearityChanged}
         />
       </div>
       <div style={{ marginTop: 12 }}>

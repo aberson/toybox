@@ -262,6 +262,7 @@ render), so a smoke gate (W6) is required before UAT.
   activity); `grep -n "generate(" src/toybox` shows every caller updated; `npm run typecheck` +
   `npm run test` pass; toggling the control changes the next proposed activity's shape
 - **Depends on:** none
+- **Status:** DONE (2026-06-20)
 
 ### Step W3: Whisper/STT Q&A answer-grading + tolerance toggle
 - **Problem:** Add a `qa_grading` setting (`off|lenient|strict`, default `off`) and an optional

@@ -444,6 +444,27 @@ def find_template_by_id(template_id: str) -> _Template | None:
     return None
 
 
+def _template_has_branching_step(template: _Template) -> bool:
+    """True iff ``template`` contains any step with ``choices``.
+
+    Phase W Step W2: a "branching" template is one where at least one
+    step exposes ``choices`` (the runtime renders choice buttons and the
+    kid steers the path). A "linear" template has no such step — every
+    step is a straight body that advances via ``next`` or sequence.
+    """
+    return any(step.choices is not None for step in template.steps)
+
+
+def _filter_choice_free(templates: list[_Template]) -> list[_Template]:
+    """Phase W Step W2: drop every template that has a branching step.
+
+    Used when the household ``game_linearity`` dial is ``"linear"`` —
+    the propose path threads ``linear_only=True`` and the picker must
+    never surface a choice-bearing activity.
+    """
+    return [t for t in templates if not _template_has_branching_step(t)]
+
+
 def _filter_eligible(templates: list[_Template], hour: int) -> list[_Template]:
     return [t for t in templates if is_eligible(set(t.buckets), hour)]
 
@@ -664,11 +685,22 @@ def _select_template(
     banned_themes: Sequence[str] = (),
     preferred_themes: Sequence[str] = (),
     category: str | None = None,
+    linear_only: bool = False,
 ) -> tuple[_Template, str]:
     """Pick one template. Returns ``(template, source_intent)``.
 
     ``source_intent`` is the intent whose template pool was actually
     used — usually equal to ``intent``, but distinct after a fallback.
+
+    When ``linear_only`` is True (household ``game_linearity == "linear"``)
+    every candidate pool — the primary intent pool AND each fallback
+    pool (intent ``always``, boredom ``always``) — is pre-filtered to
+    drop templates that contain a branching step (a step with
+    ``choices``). The choice-free filter is applied to the loaded pools
+    up-front so the entire existing fallback chain stays intact, just
+    operating over choice-free templates. When ``linear_only`` is False
+    (default) the pools are untouched and behavior is byte-identical to
+    pre-W2.
 
     When ``conn`` is provided, the picker consults the ``feedback``
     table per :mod:`toybox.activities.feedback` — ``didnt_work``
@@ -684,6 +716,8 @@ def _select_template(
     activity signature byte-for-byte.
     """
     primary = _load_intent_templates(intent)
+    if linear_only:
+        primary = _filter_choice_free(primary)
     eligible = _apply_preferred_themes(
         _apply_category_filter(
             _apply_banned_themes(_filter_eligible(primary, hour), banned_themes),
@@ -721,6 +755,8 @@ def _select_template(
     # Fallback 2: boredom intent's always pool (final safety net).
     if intent != FALLBACK_INTENT:
         boredom = _load_intent_templates(FALLBACK_INTENT)
+        if linear_only:
+            boredom = _filter_choice_free(boredom)
         always_boredom = _apply_preferred_themes(
             _apply_category_filter(
                 _apply_banned_themes(_filter_always(boredom), banned_themes),
@@ -984,6 +1020,7 @@ def generate(
     preferred_themes: Sequence[str] = (),
     category: str | None = None,
     pinned_template_id: str | None = None,
+    linear_only: bool = False,
 ) -> Activity:
     """Generate a deterministic :class:`Activity`.
 
@@ -1039,6 +1076,13 @@ def generate(
             :func:`toybox.activities.content_resolver.resolve_child_profiles`.
             Drives the offline banned-themes filter — Claude-only
             reading-level guidance is appended at the call site.
+        linear_only: Phase W Step W2. When True (household
+            ``game_linearity == "linear"``) the picker excludes any
+            template that contains a branching step (a step with
+            ``choices``). The existing fallback chain is preserved but
+            filtered to choice-free templates: primary intent pool →
+            intent ``always`` pool → boredom ``always`` pool. When False
+            (default) behavior is byte-identical to pre-W2.
 
     Returns:
         An immutable :class:`Activity` whose ``steps`` length matches
@@ -1099,6 +1143,7 @@ def generate(
                 banned_themes=banned_themes,
                 preferred_themes=preferred_themes,
                 category=category,
+                linear_only=linear_only,
             )
     else:
         template, _source_intent = _select_template(
@@ -1111,6 +1156,7 @@ def generate(
             banned_themes=banned_themes,
             preferred_themes=preferred_themes,
             category=category,
+            linear_only=linear_only,
         )
 
     # Resolve every parametric slot (``{room}``, ``{action_verb}``,

@@ -88,6 +88,7 @@ from ..core import (
     songs_enabled,
 )
 from ..core.auth import TokenScope
+from ..core.game_linearity import get_game_linearity
 from ..core.pubsub import PubSub
 from ..core.queue import (
     DISMISSED_STATE,
@@ -2244,6 +2245,13 @@ def _do_propose(
                 "propose: recent-transcript read failed; falling back to no-bias",
                 exc_info=True,
             )
+    # Phase W Step W2: read the household game-linearity dial once per
+    # propose. When set to "linear", the offline generator excludes any
+    # template with a branching step. Read fresh per call so a parent UI
+    # change takes effect on the next propose without a restart. The
+    # getter degrades to the "nonlinear" default if the row is missing or
+    # corrupt, so this never breaks propose.
+    linear_only = get_game_linearity(conn) == "linear"
     if dispatch.adapter == ADAPTER_LOCAL:
         # is_local_capable returned True -- route through the local
         # adapter. Pre-Step-26 this raises NotImplementedError; the
@@ -2315,6 +2323,7 @@ def _do_propose(
                 preferred_themes=preferred_themes,
                 category=body.category,
                 pinned_template_id=body.template_id,
+                linear_only=linear_only,
             )
             loop_tool_calls = None
     else:
@@ -2338,6 +2347,7 @@ def _do_propose(
             preferred_themes=preferred_themes,
             category=body.category,
             pinned_template_id=body.template_id,
+            linear_only=linear_only,
         )
     # Phase K K5: role-slot resolution. When the picked template
     # declared ``required_roles`` or ``optional_roles`` at K3 schema
