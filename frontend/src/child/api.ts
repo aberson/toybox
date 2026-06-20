@@ -72,7 +72,20 @@ export interface ActivityStep {
   // ``_terminal_advance`` when an activity ends — the kiosk's
   // RewardStep dispatches on ``metadata.reward_kind`` to render the
   // picture / joke / song reward.
-  kind?: "text" | "fork" | "song" | "joke" | "reward" | null;
+  // Phase W Step W4: ``"adventure_beat"`` is a dynamically generated
+  // adventure beat (body + choices + Next via the default text/fork path).
+  // Phase W Step W5: ``"boss_fight"`` is the interactive climax beat — the
+  // kiosk renders a distinct, STATIC "BOSS" banner above the default
+  // body + defeat-choices path.
+  kind?:
+    | "text"
+    | "fork"
+    | "song"
+    | "joke"
+    | "reward"
+    | "adventure_beat"
+    | "boss_fight"
+    | null;
   // Phase K K12: arbitrary per-step metadata. Today's known keys:
   //   * ``audio_url`` (string) — absolute or backend-relative URL for
   //     a song step's mp3. Read by SongPlayer when present.

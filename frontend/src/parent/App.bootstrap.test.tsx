@@ -236,6 +236,10 @@ function stubFullAuthFetch(opts: FetchOpts = {}): Mock {
         return respondWithDelay({ value });
       }
     }
+    // Phase W Step W5: boss-fights flag bootstrap GET (default true).
+    if (url.endsWith("/api/settings/boss-fights-enabled")) {
+      return respondWithDelay({ value: true });
+    }
     // Catch-all for any other initial fetch the bootstrap fires.
     return new Response(JSON.stringify({ items: [], next: null }), {
       status: 200,

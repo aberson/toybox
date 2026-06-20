@@ -740,6 +740,16 @@ export interface GameLinearityResponse {
   value: GameLinearity;
 }
 
+// Phase W Step W5: boss-fights flag. WIRED — when true (the default), a
+// dynamic adventure emits a distinct ``kind="boss_fight"`` climax beat
+// casting a boss-role toy; when false the climax is an ordinary
+// adventure_beat (W4 behavior). The wire body is ``{value: boolean}`` in
+// both directions. The GET is public (household read); the PUT requires
+// parent scope. Standalone setting (NOT part of the Phase K flag cohort).
+export interface BossFightsEnabledResponse {
+  value: boolean;
+}
+
 // Phase J step J1: play-queue target depth presets. The wire body is
 // ``{value: <preset>}`` in both directions, mirroring the GET/PUT
 // pair on transcript-retention.
@@ -1948,6 +1958,36 @@ export class ApiClient {
       body: JSON.stringify({ value }),
       signal: opts.signal,
     });
+  }
+
+  // Phase W Step W5: boss-fights flag read-write pair. WIRED — the
+  // adventure engine emits a distinct boss_fight climax beat when this is
+  // true. The GET is unauthenticated (household read); the PUT requires
+  // parent scope. Body shape on both sides is ``{value: boolean}``.
+  async getBossFightsEnabled(
+    opts: RequestOptions = {},
+  ): Promise<BossFightsEnabledResponse> {
+    return this.request<BossFightsEnabledResponse>(
+      "/api/settings/boss-fights-enabled",
+      {
+        method: "GET",
+        signal: opts.signal,
+      },
+    );
+  }
+
+  async setBossFightsEnabled(
+    value: boolean,
+    opts: RequestOptions = {},
+  ): Promise<BossFightsEnabledResponse> {
+    return this.request<BossFightsEnabledResponse>(
+      "/api/settings/boss-fights-enabled",
+      {
+        method: "PUT",
+        body: JSON.stringify({ value }),
+        signal: opts.signal,
+      },
+    );
   }
 
   // Phase J step J1: play-queue target depth read-write pair. The GET

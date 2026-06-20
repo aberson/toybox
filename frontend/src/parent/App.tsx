@@ -242,6 +242,12 @@ export function App(): JSX.Element {
   // default; matching locally keeps a failed bootstrap fetch from flashing
   // an odd value into the UI.
   const [qaGrading, setQaGrading] = useState<string>("off");
+  // Phase W Step W5: household boss-fights flag. WIRED — the adventure
+  // engine emits a distinct boss_fight climax beat when on. Seeded from
+  // ``GET /api/settings/boss-fights-enabled`` during bootstrap. ``true`` is
+  // the backend default; matching locally keeps a failed bootstrap fetch
+  // from flashing an odd value into the UI.
+  const [bossFightsEnabled, setBossFightsEnabled] = useState<boolean>(true);
   // Phase R Step R4: activity + template search query. Non-empty string
   // renders SearchPanel above PlayQueueList on the Play tab; clearing it
   // restores the normal queue view. The state is top-level so the input
@@ -422,6 +428,7 @@ export function App(): JSX.Element {
         gameComplexityResult,
         gameLinearityResult,
         qaGradingResult,
+        bossFightsResult,
       ] = await Promise.allSettled([
         api.getTranscriptRetention({ signal: aborter.signal }),
         api.getPlayTargetDepth({ signal: aborter.signal }),
@@ -457,6 +464,8 @@ export function App(): JSX.Element {
         api.getGameLinearity({ signal: aborter.signal }),
         // Phase W Step W3: seed the wired Q&A grading dial.
         api.getQaGrading({ signal: aborter.signal }),
+        // Phase W Step W5: seed the wired boss-fights flag.
+        api.getBossFightsEnabled({ signal: aborter.signal }),
       ]);
       // ``Promise.allSettled`` swallows aborts as rejected results, so
       // a mid-bootstrap unmount (e.g. parent navigates away while these
@@ -622,6 +631,16 @@ export function App(): JSX.Element {
         console.warn(
           "qa grading initial fetch failed, using default",
           qaGradingResult.reason,
+        );
+      }
+      // Phase W Step W5: seed the wired boss-fights flag from bootstrap.
+      if (bossFightsResult.status === "fulfilled") {
+        setBossFightsEnabled(bossFightsResult.value.value);
+      } else if (!isAbortError(bossFightsResult.reason)) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          "boss fights initial fetch failed, using default",
+          bossFightsResult.reason,
         );
       }
       const ws = new ParentWsClient({
@@ -1260,6 +1279,12 @@ export function App(): JSX.Element {
     setQaGrading(value);
   }, []);
 
+  // Phase W Step W5: SettingsPanel reconciliation callback for the wired
+  // boss-fights flag. Mirror handleQaGradingChanged.
+  const handleBossFightsEnabledChanged = useCallback((value: boolean): void => {
+    setBossFightsEnabled(value);
+  }, []);
+
   // Phase R Step R4: propose from search results. Calls the same propose
   // endpoint as the trigger button but with an optional template_id so
   // the backend picks that exact template rather than running the slot
@@ -1584,6 +1609,8 @@ export function App(): JSX.Element {
                     onGameLinearityChanged={handleGameLinearityChanged}
                     currentQaGrading={qaGrading}
                     onQaGradingChanged={handleQaGradingChanged}
+                    currentBossFightsEnabled={bossFightsEnabled}
+                    onBossFightsEnabledChanged={handleBossFightsEnabledChanged}
                   />
                 )}
                 {settingsTab.value === "stats" && (

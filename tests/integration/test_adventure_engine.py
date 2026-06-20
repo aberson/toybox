@@ -26,6 +26,7 @@ from fastapi.testclient import TestClient
 
 from toybox.activities.adventure import MAX_ADVENTURE_BEATS, _theme_for
 from toybox.api.activities import _adventure_seed_from_id, get_sync_ai_client
+from toybox.core.boss_fights_enabled import set as set_boss_fights_enabled
 from toybox.core.game_linearity import set_game_linearity
 from toybox.db.connection import connect
 
@@ -41,6 +42,20 @@ def _set_linearity(db_path: Path, value: str) -> None:
     conn = connect(db_path, check_same_thread=False)
     try:
         set_game_linearity(conn, value)
+    finally:
+        conn.close()
+
+
+def _set_boss_fights(db_path: Path, value: bool) -> None:
+    """Phase W Step W5: toggle the boss-fights flag for a test.
+
+    The W4 tests below pin this OFF so they assert the W4-unchanged path
+    (no boss climax beat); the W5 tests in test_boss_fight_engine.py drive
+    it ON.
+    """
+    conn = connect(db_path, check_same_thread=False)
+    try:
+        set_boss_fights_enabled(conn, value)
     finally:
         conn.close()
 
@@ -199,6 +214,7 @@ def test_offline_adventure_generates_beats_through_advance_to_terminal(
     adventure_beat with a fresh body) → reaches terminal/reward.
     """
     _set_linearity(db_path, "nonlinear")
+    _set_boss_fights(db_path, False)
 
     body = _propose_adventure(offline_client, parent_headers, seed=99)
     activity_id = body["id"]
@@ -284,6 +300,7 @@ def test_linear_adventure_beats_have_no_choices(
 ) -> None:
     """With game_linearity=linear, generated beats carry no choices."""
     _set_linearity(db_path, "linear")
+    _set_boss_fights(db_path, False)
 
     body = _propose_adventure(offline_client, parent_headers, seed=33)
     activity_id = body["id"]
@@ -316,6 +333,7 @@ def test_gate_green_invokes_claude_for_adventure(
     client, stub = client_with_stub_ai
     monkeypatch.setattr("toybox.ai.capability.is_capable", _capable_true)
     _set_linearity(db_path, "nonlinear")
+    _set_boss_fights(db_path, False)
 
     body = _propose_adventure(client, parent_headers, seed=77)
     activity_id = body["id"]
@@ -354,6 +372,7 @@ def test_gate_not_green_uses_offline_no_client_call(
     client, stub = client_with_stub_ai
     monkeypatch.setattr("toybox.ai.capability.is_capable", _capable_false)
     _set_linearity(db_path, "nonlinear")
+    _set_boss_fights(db_path, False)
 
     body = _propose_adventure(client, parent_headers, seed=55)
     activity_id = body["id"]
@@ -458,6 +477,7 @@ def test_online_history_chains_earlier_choices_into_later_beats(
     client, stub = client_with_recording_ai
     monkeypatch.setattr("toybox.ai.capability.is_capable", _capable_true)
     _set_linearity(db_path, "nonlinear")
+    _set_boss_fights(db_path, False)
 
     body = _propose_adventure(client, parent_headers, seed=123)
     activity_id = body["id"]
@@ -511,6 +531,7 @@ def test_offline_adventure_keeps_one_theme_across_all_beats(
     in beat 0 AND survives through the final beat.
     """
     _set_linearity(db_path, "nonlinear")
+    _set_boss_fights(db_path, False)
 
     body = _propose_adventure(offline_client, parent_headers, seed=4242)
     activity_id = body["id"]

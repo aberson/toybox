@@ -22,6 +22,9 @@ from .api.activities import router as activities_router
 from .api.audio import router as audio_router
 from .api.auth import router as auth_router
 from .api.banned_themes_settings import router as banned_themes_settings_router
+from .api.boss_fights_enabled_settings import (
+    router as boss_fights_enabled_settings_router,
+)
 from .api.catalog import router as catalog_router
 from .api.children import router as children_router
 from .api.clickable_words_enabled_settings import (
@@ -97,6 +100,12 @@ def create_app() -> FastAPI:
     # transcript window when this is not "off". GET is household-read, PUT
     # is parent-scope.
     app.include_router(qa_grading_settings_router)
+    # Phase W Step W5: household boss-fights flag. WIRED — the adventure
+    # engine emits a distinct ``kind="boss_fight"`` climax beat (casting a
+    # boss-role toy) as the adventure's final beat when this is true; when
+    # false the climax is an ordinary adventure_beat (W4 behavior). GET is
+    # household-read, PUT is parent-scope.
+    app.include_router(boss_fights_enabled_settings_router)
     # Phase K Step K2 + Phase L Step L5: five parent-controlled feature
     # flags (originally eight; L5 removed the three Phase K play-surface
     # flags as part of re-framing jokes/songs as per-activity reward

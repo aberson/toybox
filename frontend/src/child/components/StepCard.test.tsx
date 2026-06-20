@@ -1369,3 +1369,99 @@ describe("StepCard Q&A gating", () => {
   });
 });
 
+
+describe("StepCard boss-fight variant (Phase W Step W5)", () => {
+  it("renders a static BOSS banner + body + defeat choices for kind=boss_fight", () => {
+    const onChoose = vi.fn();
+    const activity = fakeActivity({
+      steps: [
+        fakeStep({
+          kind: "boss_fight",
+          body: "The boss blocks the way!",
+          choices: [
+            { label: "Outsmart the boss", choice_index: 0 },
+            { label: "Be brave", choice_index: 1 },
+          ],
+        }),
+      ],
+    });
+    render(<StepCard activity={activity} onChoose={onChoose} />);
+
+    // Distinct boss framing (static — no animation/strobe).
+    const banner = screen.getByTestId("boss-fight-banner");
+    expect(banner).toBeTruthy();
+    expect(banner.getAttribute("data-boss-fight")).toBe("true");
+
+    // The step card advertises the boss kind.
+    const card = screen.getByTestId("step-card");
+    expect(card.getAttribute("data-step-kind")).toBe("boss_fight");
+
+    // Body renders through the default text path.
+    expect(screen.getByTestId("step-text").textContent).toContain(
+      "The boss blocks the way!",
+    );
+
+    // The defeat options render as choice buttons.
+    expect(screen.getByTestId("choice-button-stack")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /outsmart the boss/i }),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: /be brave/i })).toBeTruthy();
+  });
+
+  it("boss banner uses no animation/transition styling (no-flashing a11y)", () => {
+    const activity = fakeActivity({
+      steps: [
+        fakeStep({
+          kind: "boss_fight",
+          body: "Final challenge!",
+          choices: [{ label: "Win", choice_index: 0 }],
+        }),
+      ],
+    });
+    render(<StepCard activity={activity} onChoose={vi.fn()} />);
+    const banner = screen.getByTestId("boss-fight-banner");
+    const inner = banner.querySelector("span");
+    expect(inner).not.toBeNull();
+    const style = (inner as HTMLElement).style;
+    // No flashing: the banner must not declare any animation/transition.
+    expect(style.animation === "" || style.animation === undefined).toBe(true);
+    expect(style.transition === "" || style.transition === undefined).toBe(
+      true,
+    );
+  });
+
+  it("does NOT render the boss banner for an ordinary adventure_beat", () => {
+    const activity = fakeActivity({
+      steps: [
+        fakeStep({
+          kind: "adventure_beat",
+          body: "An ordinary beat",
+          choices: [{ label: "Go on", choice_index: 0 }],
+        }),
+      ],
+    });
+    render(<StepCard activity={activity} onChoose={vi.fn()} />);
+    expect(screen.queryByTestId("boss-fight-banner")).toBeNull();
+  });
+
+  it("mounts the Read Me button on a boss_fight step (Read-Me eligible)", () => {
+    const activity = fakeActivity({
+      steps: [
+        fakeStep({
+          kind: "boss_fight",
+          body: "Defeat the boss with kindness!",
+          choices: [{ label: "Be kind", choice_index: 0 }],
+        }),
+      ],
+    });
+    render(
+      <StepCard
+        activity={activity}
+        onChoose={vi.fn()}
+        readMeButtonEnabled={true}
+      />,
+    );
+    expect(screen.getByTestId("read-me-button")).toBeTruthy();
+  });
+});

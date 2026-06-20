@@ -44,6 +44,14 @@ from .themes import Theme
 # this kind through its default text/fork path (body + choices + Next).
 ADVENTURE_BEAT_KIND: str = "adventure_beat"
 
+# Phase W Step W5: the kind discriminator for the interactive boss-fight
+# CLIMAX beat. The kiosk StepCard renders a distinct, STATIC (no-flashing)
+# boss variant for this kind. Like ``adventure_beat`` it is free-form (no
+# migration for the kind itself) and Read-Me eligible. It is emitted as the
+# adventure's FINAL generated beat (index ``MAX_ADVENTURE_BEATS - 1``) only
+# when the ``boss_fights_enabled`` household flag is on.
+BOSS_FIGHT_KIND: str = "boss_fight"
+
 # Termination bound. After this many beats the adventure routes to the
 # normal reward/terminal/end path (the API layer enforces this). Six keeps
 # a hybrid online/offline adventure short enough to hold a young child's
@@ -58,8 +66,10 @@ class GeneratedBeat:
     * ``body`` — the rendered beat text shown to the child.
     * ``choices`` — 2-3 choice labels for a non-linear beat, or ``None``
       when the adventure is linear (no branching buttons).
-    * ``kind`` — always :data:`ADVENTURE_BEAT_KIND`; carried on the object
-      so the API layer can persist it verbatim onto ``activity_steps.kind``.
+    * ``kind`` — :data:`ADVENTURE_BEAT_KIND` for an ordinary beat, or
+      :data:`BOSS_FIGHT_KIND` for the W5 climax boss-fight beat; carried on
+      the object so the API layer can persist it verbatim onto
+      ``activity_steps.kind``.
     """
 
     body: str
@@ -99,6 +109,44 @@ _CHOICE_FRAGMENTS: tuple[str, ...] = (
 # generic-descriptor table so we never invent a new corpus.
 _DEFAULT_HERO: str = GENERIC_DESCRIPTORS["friend"]
 _DEFAULT_ALLY: str = GENERIC_DESCRIPTORS["sidekick"]
+
+# Phase W Step W5: fallback boss name when the cast has no boss-role toy.
+# Drawn from the generic-descriptor table (NOT a new corpus) so the boss
+# beat stays coherent for a household with no boss-tagged toys.
+_DEFAULT_BOSS: str = GENERIC_DESCRIPTORS["big_bad_boss"]
+
+# Phase W Step W5: boss-fight CLIMAX phrasing. Deterministic per
+# (seed, beat_index) so a replay is byte-identical, same discipline as the
+# ordinary beat templates. ``boss`` is the cast's boss-role name (or the
+# generic fallback); ``hero`` / ``theme`` splice in the same way.
+_BOSS_OPENERS: tuple[str, ...] = (
+    "The final challenge! {boss} blocks the way as {hero}'s {theme} "
+    "adventure reaches its biggest moment.",
+    "Here it is — the boss! {boss} stands before {hero}, and the whole "
+    "{theme} adventure comes down to this.",
+    "{hero} takes a deep breath. {boss} is the last thing between them and "
+    "the end of the {theme} adventure!",
+)
+
+# Phase W Step W5: deterministic "how do you defeat/outsmart the boss"
+# choice fragments. Kept distinct from the ordinary beat fragments so the
+# boss beat reads as a climax. ``boss`` is spliced in for flavor.
+_BOSS_CHOICE_FRAGMENTS: tuple[str, ...] = (
+    "Outsmart {boss} with a clever plan",
+    "Be brave and face {boss} head-on",
+    "Find {boss}'s weak spot",
+    "Make friends with {boss} instead",
+    "Use teamwork to beat {boss}",
+    "Trick {boss} into giving up",
+)
+
+# Phase W Step W5: single resolution sentence for a LINEAR boss beat (no
+# choices). The kid reads it and advances straight to the reward path.
+_BOSS_LINEAR_RESOLUTION: tuple[str, ...] = (
+    "With one last burst of courage, {hero} outsmarts {boss} and wins the day!",
+    "{hero} stands tall, and {boss} is no match for so much heart. The adventure is won!",
+    "Together, {hero} and friends overcome {boss} — the {theme} adventure ends in triumph!",
+)
 
 
 def _stable_index(seed: int, beat_index: int, salt: str, modulo: int) -> int:
@@ -204,6 +252,68 @@ def _assemble_offline_beat(
     return GeneratedBeat(body=body, choices=choices, kind=ADVENTURE_BEAT_KIND)
 
 
+def _offline_boss_choices(seed: int, beat_index: int, theme: str, boss: str) -> tuple[str, ...]:
+    """Phase W Step W5: deterministically pick 2-3 "defeat the boss" labels.
+
+    Same determinism discipline as :func:`_offline_choices` (count + the
+    specific fragments derive from ``(seed, beat_index)``) but draws from
+    the boss-specific fragment table so the climax reads distinctly.
+    """
+    count = 2 + _stable_index(seed, beat_index, "boss_choice_count", 2)  # 2 or 3
+    labels: list[str] = []
+    used: set[int] = set()
+    offset = 0
+    while len(labels) < count and offset < len(_BOSS_CHOICE_FRAGMENTS) * 2:
+        idx = _stable_index(seed, beat_index, f"boss_choice_{offset}", len(_BOSS_CHOICE_FRAGMENTS))
+        if idx not in used:
+            used.add(idx)
+            labels.append(_BOSS_CHOICE_FRAGMENTS[idx].format(theme=theme, boss=boss))
+        offset += 1
+    for frag in _BOSS_CHOICE_FRAGMENTS:
+        if len(labels) >= count:
+            break
+        rendered = frag.format(theme=theme, boss=boss)
+        if rendered not in labels:
+            labels.append(rendered)
+    return tuple(labels[:count])
+
+
+def _assemble_offline_boss_beat(
+    history: tuple[str, ...],
+    cast: tuple[str, ...],
+    boss_name: str | None,
+    *,
+    beat_index: int,
+    linear: bool,
+    seed: int,
+) -> GeneratedBeat:
+    """Phase W Step W5: deterministic offline boss-fight climax assembly.
+
+    Same inputs → same beat. The body frames a clear BOSS encounter naming
+    the boss (``boss_name`` — the cast's boss-role toy, or
+    :data:`_DEFAULT_BOSS` when the cast has none). A non-linear boss beat
+    carries 2-3 "how do you defeat/outsmart the boss" choices; a linear one
+    carries no choices and a single resolution sentence (consistent with
+    W4's linear handling). The prior choice is folded into the body via the
+    hero/theme so the climax still builds on what the child picked.
+    """
+    theme = _theme_for(seed)
+    hero, _ally = _cast_names(cast)
+    boss = boss_name if boss_name else _DEFAULT_BOSS
+
+    if linear:
+        template = _BOSS_LINEAR_RESOLUTION[
+            _stable_index(seed, beat_index, "boss_resolution", len(_BOSS_LINEAR_RESOLUTION))
+        ]
+        body = template.format(theme=theme, hero=hero, boss=boss)
+        return GeneratedBeat(body=body, choices=None, kind=BOSS_FIGHT_KIND)
+
+    template = _BOSS_OPENERS[_stable_index(seed, beat_index, "boss_opener", len(_BOSS_OPENERS))]
+    body = template.format(theme=theme, hero=hero, boss=boss)
+    choices = _offline_boss_choices(seed, beat_index, theme, boss)
+    return GeneratedBeat(body=body, choices=choices, kind=BOSS_FIGHT_KIND)
+
+
 # ---------------------------------------------------------------------------
 # Online prompt build + parse. These live here (NOT in the API layer) so the
 # engine is unit-testable; the API layer performs the actual transport using
@@ -285,6 +395,68 @@ def parse_online_beat(raw: str, *, linear: bool) -> GeneratedBeat:
     return GeneratedBeat(body=body, choices=choices[:3], kind=ADVENTURE_BEAT_KIND)
 
 
+_ONLINE_BOSS_SYSTEM: str = (
+    "You are a gentle storyteller writing the CLIMAX 'boss' beat of an "
+    "interactive adventure for a young child (ages 4-7). This is the final, "
+    "biggest moment: the child meets a boss character and must overcome them. "
+    "Keep it to 1-3 simple sentences, exciting but NEVER scary or violent — "
+    "the boss is defeated by cleverness, courage, teamwork, or kindness. You "
+    "will be given the story so far (the child's prior choices), the boss's "
+    "name, and a few words the child recently said out loud. "
+    "Reply with STRICT JSON only: "
+    '{"body": "<the boss beat text>", "choices": ["<defeat option 1>", "<defeat option 2>"]}. '
+    "Provide 2 or 3 short 'how do you defeat/outsmart the boss' choice labels "
+    "when choices are requested, or an empty list when they are not. No prose "
+    "outside the JSON."
+)
+
+
+def build_boss_prompt(
+    history: tuple[str, ...],
+    transcript_window: str,
+    cast: tuple[str, ...],
+    boss_name: str | None,
+    *,
+    beat_index: int,
+    linear: bool,
+    seed: int,
+) -> tuple[str, str]:
+    """Phase W Step W5: build the (system, user) prompt for the boss beat.
+
+    Mirrors :func:`build_online_prompt` but uses the boss system prompt and
+    surfaces the resolved boss name so the model writes the encounter around
+    it. ``linear`` is surfaced so the model knows whether to emit choices.
+    """
+    theme = _theme_for(seed)
+    user = json.dumps(
+        {
+            "theme": theme,
+            "cast": list(cast),
+            "boss": boss_name if boss_name else _DEFAULT_BOSS,
+            "story_so_far": list(history),
+            "child_recently_said": transcript_window,
+            "beat_number": beat_index + 1,
+            "max_beats": MAX_ADVENTURE_BEATS,
+            "is_boss_fight": True,
+            "wants_choices": not linear,
+        },
+        ensure_ascii=False,
+    )
+    return _ONLINE_BOSS_SYSTEM, user
+
+
+def parse_online_boss_beat(raw: str, *, linear: bool) -> GeneratedBeat:
+    """Phase W Step W5: parse a model reply into a boss-fight beat.
+
+    Identical validation contract to :func:`parse_online_beat` (raises
+    :class:`ValueError` on any malformed reply so the caller degrades to the
+    offline boss assembly) but stamps the beat with :data:`BOSS_FIGHT_KIND`.
+    """
+    beat = parse_online_beat(raw, linear=linear)
+    # Re-stamp the kind — parse_online_beat returns ADVENTURE_BEAT_KIND.
+    return GeneratedBeat(body=beat.body, choices=beat.choices, kind=BOSS_FIGHT_KIND)
+
+
 def generate_next_beat(
     history: tuple[str, ...],
     transcript_window: str,
@@ -349,6 +521,60 @@ def generate_next_beat(
     )
 
 
+def generate_boss_beat(
+    history: tuple[str, ...],
+    transcript_window: str,
+    cast: tuple[str, ...],
+    boss_name: str | None,
+    *,
+    online: bool,
+    beat_index: int,
+    linear: bool,
+    seed: int,
+    online_call: Any = None,
+) -> GeneratedBeat:
+    """Phase W Step W5: generate the CLIMAX boss-fight beat.
+
+    Same online/offline contract as :func:`generate_next_beat` but produces
+    a beat stamped :data:`BOSS_FIGHT_KIND`:
+
+    * ``boss_name`` is the resolved boss-role toy display name (the API
+      layer prefers a :class:`~toybox.activities.roles.Role.big_bad_boss`
+      cast member, else ``boss_mini_boss``); ``None`` when the cast has no
+      boss role, in which case the assembly falls back to the generic boss
+      descriptor (never crashes).
+    * ``linear`` → a single resolution beat with NO choices (consistent with
+      W4's linear handling); non-linear → 2-3 "defeat/outsmart the boss"
+      choices.
+    * online attempts the Claude path via ``online_call`` (degrading to the
+      deterministic offline boss assembly on ANY failure); offline assembles
+      deterministically from ``(seed, beat_index, history, cast, boss)``.
+    """
+    if online and online_call is not None:
+        try:
+            system, user = build_boss_prompt(
+                history,
+                transcript_window,
+                cast,
+                boss_name,
+                beat_index=beat_index,
+                linear=linear,
+                seed=seed,
+            )
+            raw = online_call(system, user)
+            return parse_online_boss_beat(raw, linear=linear)
+        except Exception:  # noqa: BLE001 -- ANY online failure degrades to offline
+            pass
+    return _assemble_offline_boss_beat(
+        history,
+        cast,
+        boss_name,
+        beat_index=beat_index,
+        linear=linear,
+        seed=seed,
+    )
+
+
 def stable_index(seed: int, beat_index: int, salt: str, modulo: int) -> int:
     """Public wrapper over :func:`_stable_index`.
 
@@ -361,10 +587,14 @@ def stable_index(seed: int, beat_index: int, salt: str, modulo: int) -> int:
 
 __all__ = [
     "ADVENTURE_BEAT_KIND",
+    "BOSS_FIGHT_KIND",
     "MAX_ADVENTURE_BEATS",
     "GeneratedBeat",
+    "build_boss_prompt",
     "build_online_prompt",
+    "generate_boss_beat",
     "generate_next_beat",
     "parse_online_beat",
+    "parse_online_boss_beat",
     "stable_index",
 ]

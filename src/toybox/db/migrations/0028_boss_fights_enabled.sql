@@ -1,0 +1,23 @@
+-- Phase W Step W5 — seed the household-scoped ``boss_fights_enabled`` flag.
+--
+-- When 'true' (the default), a dynamic adventure's CLIMAX beat (the final
+-- generated beat, index MAX_ADVENTURE_BEATS - 1) is emitted as a distinct
+-- ``kind="boss_fight"`` encounter casting a boss-role toy, instead of an
+-- ordinary ``adventure_beat``. When 'false' the climax is an ordinary
+-- adventure_beat and the adventure runs W4-identical to termination.
+--
+-- Boolean flag stored as 'true'/'false' TEXT, matching the eight Phase K
+-- feature flags seeded by migration 0015. The helper at
+-- :mod:`toybox.core.boss_fights_enabled` enforces the canonical set and
+-- falls back to its default on a missing / unparseable value.
+--
+-- ``INSERT OR IGNORE`` is idempotent — re-running the migration is a no-op
+-- when the key already exists, preserving an operator's chosen value across
+-- re-runs.
+--
+-- NOTE: The migration runner at ``db/migrations/__init__.py`` wraps the
+-- whole file in a single BEGIN/COMMIT transaction and splits statements
+-- via ``sqlite3.complete_statement``; this file MUST NOT contain its
+-- own BEGIN/COMMIT/ROLLBACK and every statement must end with ``;``.
+
+INSERT OR IGNORE INTO settings (key, value) VALUES ('boss_fights_enabled', 'true');

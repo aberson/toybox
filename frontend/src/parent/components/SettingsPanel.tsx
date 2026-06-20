@@ -34,6 +34,7 @@ import type {
   SpokenTextLimit,
 } from "../api";
 import { BannedThemesSettings } from "./BannedThemesSettings";
+import { BossFightsControl } from "./BossFightsControl";
 import { GameComplexityControl } from "./GameComplexityControl";
 import { GameLinearityControl } from "./GameLinearityControl";
 import { ParentInvolvementControl } from "./ParentInvolvementControl";
@@ -439,6 +440,7 @@ export interface SettingsPanelProps {
     | "setGameComplexity"
     | "setGameLinearity"
     | "setQaGrading"
+    | "setBossFightsEnabled"
   >;
   // Phase I step I3: transcript retention picker source-of-truth. The
   // value lives in App.tsx (fetched once on mount via the
@@ -488,6 +490,13 @@ export interface SettingsPanelProps {
   // callback bubbles a successful PUT response back up.
   currentQaGrading: string;
   onQaGradingChanged: (value: QaGrading) => void;
+  // Phase W Step W5: household boss-fights flag. WIRED — the adventure
+  // engine emits a distinct boss_fight climax beat when this is on. Value
+  // lives in App.tsx (seeded by the bootstrap parallel-fetch) and threads
+  // through here; the callback bubbles a successful PUT response back up so
+  // the lifted state stays the source of truth.
+  currentBossFightsEnabled: boolean;
+  onBossFightsEnabledChanged: (value: boolean) => void;
 }
 
 // Settings sub-tab. Renders the three toggle cards + the global
@@ -514,6 +523,8 @@ export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
     onGameLinearityChanged,
     currentQaGrading,
     onQaGradingChanged,
+    currentBossFightsEnabled,
+    onBossFightsEnabledChanged,
   } = props;
   const [listeningMode, setListeningMode] = useState<number>(3);
   const [micEnabled, setMicEnabled] = useState<boolean>(true);
@@ -614,6 +625,11 @@ export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
           api={api}
           currentValue={currentQaGrading}
           onValueChanged={onQaGradingChanged}
+        />
+        <BossFightsControl
+          api={api}
+          currentValue={currentBossFightsEnabled}
+          onValueChanged={onBossFightsEnabledChanged}
         />
       </div>
       <div style={{ marginTop: 12 }}>

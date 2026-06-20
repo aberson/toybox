@@ -35,6 +35,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from ..activities.adventure import (
     MAX_ADVENTURE_BEATS,
     GeneratedBeat,
+    generate_boss_beat,
     generate_next_beat,
     stable_index,
 )
@@ -90,6 +91,7 @@ from ..ai.labeled_events import (
     update_parent_signal,
 )
 from ..core import (
+    boss_fights_enabled,
     jokes_enabled,
     play_standalone_enabled,
     play_target_depth,
@@ -4424,13 +4426,68 @@ _ADVENTURE_BEAT_BREAKER: CircuitBreaker = CircuitBreaker()
 def _build_adventure_cast(resolved_toys: Sequence[ResolvedToy]) -> tuple[str, ...]:
     """Phase W Step W4: build the adventure cast from resolved toys.
 
-    Returns the toy display names (a deterministic, NOCASE-sorted order
-    comes straight from :func:`resolve_toys`). The adventure engine treats
+    Returns the toy display names in :func:`resolve_toys`'s deterministic
+    order (``last_used_at DESC`` then ``id COLLATE BINARY ASC`` — NOT a
+    NOCASE sort). The adventure engine treats
     ``cast[0]`` as the hero and ``cast[1]`` as the ally, falling back to
     generic descriptors when the household has fewer than two toys — so
     this can return an empty tuple safely.
     """
     return tuple(t.display_name for t in resolved_toys if t.display_name)
+
+
+def _select_boss_name(resolved_toys: Sequence[ResolvedToy]) -> str | None:
+    """Phase W Step W5: pick a boss-role toy display name from the cast.
+
+    The protagonist/hero is ``cast[0]`` — the FIRST resolved toy with a
+    display name (see :func:`_build_adventure_cast`). The hero is NEVER cast
+    as its own boss, so it is excluded from candidacy here.
+
+    Among the NON-hero cast a three-tier preference applies, so an explicit
+    boss tag genuinely beats an untagged toy (the COMMON case is
+    ``allowed_roles == ()`` "unrestricted", which would otherwise win on
+    sort order alone and defeat the tag):
+
+    1. a toy that EXPLICITLY lists
+       :class:`~toybox.activities.roles.Role.big_bad_boss` in its
+       :attr:`ResolvedToy.allowed_roles`;
+    2. else a toy that EXPLICITLY lists
+       :class:`~toybox.activities.roles.Role.boss_mini_boss`;
+    3. else an unrestricted (``allowed_roles == ()``) non-hero toy may fill
+       the role (Phase K soft-fallback).
+
+    Returns ``None`` when no non-hero cast member qualifies under any tier —
+    the adventure engine then falls back to a generic boss descriptor
+    (never crashes).
+
+    Within each tier the resolver's deterministic order wins so the boss is
+    stable across a replay. :func:`resolve_toys` orders by ``last_used_at
+    DESC`` (NULLs last) then ``id COLLATE BINARY ASC`` — NOT a NOCASE sort.
+    """
+    # The hero is cast[0]: the first toy carrying a display name. Exclude it.
+    non_hero: list[ResolvedToy] = []
+    hero_seen = False
+    for toy in resolved_toys:
+        if not toy.display_name:
+            continue
+        if not hero_seen:
+            hero_seen = True
+            continue
+        non_hero.append(toy)
+
+    # Tier 1: an EXPLICIT big_bad_boss tag.
+    for toy in non_hero:
+        if Role.big_bad_boss.value in toy.allowed_roles:
+            return toy.display_name
+    # Tier 2: an EXPLICIT boss_mini_boss tag.
+    for toy in non_hero:
+        if Role.boss_mini_boss.value in toy.allowed_roles:
+            return toy.display_name
+    # Tier 3: a soft-fallback unrestricted non-hero toy.
+    for toy in non_hero:
+        if not toy.allowed_roles:
+            return toy.display_name
+    return None
 
 
 def _adventure_history_from_steps(rows: Sequence[sqlite3.Row]) -> tuple[str, ...]:
@@ -4550,6 +4607,52 @@ def _generate_adventure_beat(
     )
 
 
+def _generate_adventure_boss_beat(
+    conn: sqlite3.Connection,
+    sync_client: Any,
+    *,
+    history: tuple[str, ...],
+    cast: tuple[str, ...],
+    boss_name: str | None,
+    beat_index: int,
+    linear: bool,
+    seed: int,
+    online: bool,
+) -> GeneratedBeat:
+    """Phase W Step W5: generate the CLIMAX boss-fight beat, never raising.
+
+    Mirrors :func:`_generate_adventure_beat` (best-effort transcript read +
+    the same online_call / capability-gate / breaker path) but drives the
+    pure engine's :func:`toybox.activities.adventure.generate_boss_beat` so
+    the result is stamped ``kind="boss_fight"`` and casts ``boss_name``
+    (falling back to a generic boss descriptor inside the engine when it is
+    ``None``). Degrades to the deterministic offline boss assembly on any
+    Claude failure.
+    """
+    transcript_window = ""
+    if online:
+        try:
+            transcript_window = _read_transcript_window(
+                conn, window_seconds=_ADVENTURE_TRANSCRIPT_WINDOW_SECONDS
+            )
+        except Exception:  # noqa: BLE001 -- transcript read must never break advance
+            _logger.warning("adventure: boss transcript-window read failed", exc_info=True)
+            transcript_window = ""
+
+    online_call = _make_adventure_online_call(sync_client) if online else None
+    return generate_boss_beat(
+        history,
+        transcript_window,
+        cast,
+        boss_name,
+        online=online,
+        beat_index=beat_index,
+        linear=linear,
+        seed=seed,
+        online_call=online_call,
+    )
+
+
 # Phase W Step W4: bound for the per-adventure determinism seed derived from
 # the activity id. Well within ProposeRequest.seed's range.
 _ADVENTURE_SEED_MODULO: int = 1_000_000
@@ -4588,8 +4691,10 @@ def _insert_adventure_beat(
     Mirrors :func:`_insert_next_step` (the G3 lazy-insert seam) but writes
     a generated beat instead of a rendered template step: it marks the
     previous step ``current=0`` (recording ``chosen_label`` when the child
-    picked a choice), then INSERTs the new beat with ``kind`` set to
-    :data:`toybox.activities.adventure.ADVENTURE_BEAT_KIND`. ``choices_json``
+    picked a choice), then INSERTs the new beat writing ``beat.kind``
+    verbatim — normally
+    :data:`toybox.activities.adventure.ADVENTURE_BEAT_KIND`, but ``"boss_fight"``
+    persists unchanged for a W5 climax beat. ``choices_json``
     holds the beat's choice labels (NULL on a linear beat). No
     ``step_template_id`` (adventures have no template) and no Q&A fields.
 
@@ -4701,17 +4806,42 @@ def _advance_adventure(
         )
     cast = _build_adventure_cast(resolved_toys)
 
+    # Phase W Step W5: the CLIMAX beat is the LAST generated beat (index
+    # MAX_ADVENTURE_BEATS - 1). When the boss-fights flag is on, emit a
+    # distinct kind="boss_fight" beat casting a boss-role toy from the cast
+    # (generic boss descriptor when none) instead of an ordinary beat. The
+    # boss beat IS the final beat — the NEXT advance crosses the cap and
+    # routes to the terminal/reward path (no 7th beat). When the flag is off
+    # the climax is an ordinary adventure_beat (W4 behavior unchanged).
+    is_climax = next_beat_index == MAX_ADVENTURE_BEATS - 1
+    boss_enabled = boss_fights_enabled.get(conn)
+    emit_boss = is_climax and boss_enabled
+
     try:
-        beat = _generate_adventure_beat(
-            conn,
-            sync_client,
-            history=history,
-            cast=cast,
-            beat_index=next_beat_index,
-            linear=linear,
-            seed=seed_seed,
-            online=sync_client is not None,
-        )
+        if emit_boss:
+            boss_name = _select_boss_name(resolved_toys)
+            beat = _generate_adventure_boss_beat(
+                conn,
+                sync_client,
+                history=history,
+                cast=cast,
+                boss_name=boss_name,
+                beat_index=next_beat_index,
+                linear=linear,
+                seed=seed_seed,
+                online=sync_client is not None,
+            )
+        else:
+            beat = _generate_adventure_beat(
+                conn,
+                sync_client,
+                history=history,
+                cast=cast,
+                beat_index=next_beat_index,
+                linear=linear,
+                seed=seed_seed,
+                online=sync_client is not None,
+            )
     except Exception:  # noqa: BLE001 -- generation must NEVER 500 the advance
         _logger.warning(
             "adventure advance: beat generation failed for %s; ending adventure",

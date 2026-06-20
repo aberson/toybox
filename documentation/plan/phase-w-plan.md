@@ -331,6 +331,7 @@ render), so a smoke gate (W6) is required before UAT.
   typecheck` + `npm run test` pass; the boss beat renders distinctly on the kiosk and resolves to
   the reward step
 - **Depends on:** W4
+- **Status:** DONE (2026-06-20)
 
 ### Step W6: Pipeline smoke gate
 - **Type:** code

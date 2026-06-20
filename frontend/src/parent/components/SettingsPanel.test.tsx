@@ -96,6 +96,7 @@ interface StubApi {
   setGameComplexity: Mock;
   setGameLinearity: Mock;
   setQaGrading: Mock;
+  setBossFightsEnabled: Mock;
 }
 
 function buildStubApi(snapshot: MetricsSnapshot): StubApi {
@@ -145,6 +146,7 @@ function buildStubApi(snapshot: MetricsSnapshot): StubApi {
     setGameComplexity: vi.fn(async (value: string) => ({ value })) as Mock,
     setGameLinearity: vi.fn(async (value: string) => ({ value })) as Mock,
     setQaGrading: vi.fn(async (value: string) => ({ value })) as Mock,
+    setBossFightsEnabled: vi.fn(async (value: boolean) => ({ value })) as Mock,
   };
 }
 
@@ -172,6 +174,8 @@ function renderSettingsPanel(
     onGameLinearityChanged?: (v: string) => void;
     currentQaGrading?: string;
     onQaGradingChanged?: (v: string) => void;
+    currentBossFightsEnabled?: boolean;
+    onBossFightsEnabledChanged?: (v: boolean) => void;
   } = {},
 ): void {
   render(
@@ -203,6 +207,10 @@ function renderSettingsPanel(
       onGameLinearityChanged={overrides.onGameLinearityChanged ?? (() => {})}
       currentQaGrading={overrides.currentQaGrading ?? "off"}
       onQaGradingChanged={overrides.onQaGradingChanged ?? (() => {})}
+      currentBossFightsEnabled={overrides.currentBossFightsEnabled ?? true}
+      onBossFightsEnabledChanged={
+        overrides.onBossFightsEnabledChanged ?? (() => {})
+      }
     />,
   );
 }
@@ -282,6 +290,8 @@ describe("SettingsPanel", () => {
         onGameLinearityChanged={() => {}}
         currentQaGrading="off"
         onQaGradingChanged={() => {}}
+        currentBossFightsEnabled={true}
+        onBossFightsEnabledChanged={() => {}}
       />,
     );
     unmount();

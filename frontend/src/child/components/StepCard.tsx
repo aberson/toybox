@@ -74,7 +74,41 @@ export interface StepCardProps {
 // "text is the implicit default kind" contract.
 // Phase W Step W4: "adventure_beat" renders through the default text/fork
 // path (body + choices + Next), so it is Read-Me eligible like text steps.
-const READ_ME_ELIGIBLE_KINDS = new Set<string>(["text", "fork", "joke", "adventure_beat"]);
+// Phase W Step W5: "boss_fight" is the interactive climax beat — it renders
+// through the SAME default body + choices path (plus a static "BOSS" banner),
+// so its body should be read aloud like an adventure_beat.
+const READ_ME_ELIGIBLE_KINDS = new Set<string>([
+  "text",
+  "fork",
+  "joke",
+  "adventure_beat",
+  "boss_fight",
+]);
+
+// Phase W Step W5: the kiosk step.kind for the boss-fight climax beat. The
+// backend (adventure engine) stamps this on the final generated beat when
+// the household ``boss_fights_enabled`` flag is on. Kept as a constant so
+// the render branch + the test target the same literal.
+const BOSS_FIGHT_KIND = "boss_fight";
+
+// Phase W Step W5: STATIC boss-fight banner styling. Deliberately uses NO
+// animation / transition / strobe — a darker, bold, high-contrast framing
+// only — so it cannot flash for motion- or photosensitive children. The
+// no-flashing requirement (Phase S / SWR a11y convention) is satisfied
+// structurally: there is nothing here for prefers-reduced-motion to disable.
+const BOSS_BANNER_STYLE = {
+  display: "inline-block",
+  padding: "6px 18px",
+  borderRadius: 12,
+  background: "#2a1245",
+  color: "#ffd166",
+  fontSize: "clamp(1rem, min(3vw, 3.5vh), 1.6rem)",
+  fontWeight: 900,
+  letterSpacing: 3,
+  textTransform: "uppercase",
+  border: "2px solid #ffd166",
+  boxShadow: "0 4px 16px rgba(0,0,0,0.35)",
+} as const;
 
 function resolvePersonaMetadata(activity: Activity): PersonaMetadata | null {
   // Defensive: ``activity.metadata`` is ``Record<string, unknown>`` on
@@ -583,6 +617,23 @@ export function StepCard(props: StepCardProps): JSX.Element {
           />
         );
       })()}
+      {/*
+        Phase W Step W5: boss-fight CLIMAX banner. Renders a clear, STATIC
+        "BOSS" frame above the beat body so the kid knows this is the big
+        moment. No animation/strobe (a11y: nothing for
+        prefers-reduced-motion to disable). The beat body + the "how do you
+        defeat the boss" choices render below through the SAME default
+        body-row + choice-stack path the adventure_beat uses.
+      */}
+      {stepKind === BOSS_FIGHT_KIND && (
+        <div
+          data-testid="boss-fight-banner"
+          data-boss-fight="true"
+          style={{ textAlign: "center" }}
+        >
+          <span style={BOSS_BANNER_STYLE}>⚔ Boss Fight ⚔</span>
+        </div>
+      )}
       {stepKind !== "song" && stepKind !== "joke" && stepKind !== "reward" && (
         <div
           data-testid="step-body-row"
