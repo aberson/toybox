@@ -307,6 +307,7 @@ required before UAT.
   load path is exercised with a stubbed `onnxruntime` session (no real model). `uv run mypy src` +
   `uv run ruff check .` clean. (The real model is downloaded + exercised at X8 UAT.)
 - **Depends on:** none
+- **Status:** DONE (2026-06-20)
 
 ### Step X5: Import API (parse → review → commit)
 - **Problem:** Add `POST /api/rooms/import/parse` (pasted content → `{proposed_rooms, photo_urls}`,
