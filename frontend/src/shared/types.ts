@@ -47,6 +47,8 @@ export interface Step {
   next?: string | null;
   choices?: Choice[] | null;
   element_id?: string | null;
+  question?: string | null;
+  expected_answer?: string | null;
 }
 
 /**

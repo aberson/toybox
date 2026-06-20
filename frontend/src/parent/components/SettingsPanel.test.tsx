@@ -95,6 +95,7 @@ interface StubApi {
   setParentInvolvement: Mock;
   setGameComplexity: Mock;
   setGameLinearity: Mock;
+  setQaGrading: Mock;
 }
 
 function buildStubApi(snapshot: MetricsSnapshot): StubApi {
@@ -143,6 +144,7 @@ function buildStubApi(snapshot: MetricsSnapshot): StubApi {
     setParentInvolvement: vi.fn(async (value: string) => ({ value })) as Mock,
     setGameComplexity: vi.fn(async (value: string) => ({ value })) as Mock,
     setGameLinearity: vi.fn(async (value: string) => ({ value })) as Mock,
+    setQaGrading: vi.fn(async (value: string) => ({ value })) as Mock,
   };
 }
 
@@ -168,6 +170,8 @@ function renderSettingsPanel(
     onGameComplexityChanged?: (v: string) => void;
     currentGameLinearity?: string;
     onGameLinearityChanged?: (v: string) => void;
+    currentQaGrading?: string;
+    onQaGradingChanged?: (v: string) => void;
   } = {},
 ): void {
   render(
@@ -197,6 +201,8 @@ function renderSettingsPanel(
       }
       currentGameLinearity={overrides.currentGameLinearity ?? "nonlinear"}
       onGameLinearityChanged={overrides.onGameLinearityChanged ?? (() => {})}
+      currentQaGrading={overrides.currentQaGrading ?? "off"}
+      onQaGradingChanged={overrides.onQaGradingChanged ?? (() => {})}
     />,
   );
 }
@@ -274,6 +280,8 @@ describe("SettingsPanel", () => {
         onGameComplexityChanged={() => {}}
         currentGameLinearity="nonlinear"
         onGameLinearityChanged={() => {}}
+        currentQaGrading="off"
+        onQaGradingChanged={() => {}}
       />,
     );
     unmount();

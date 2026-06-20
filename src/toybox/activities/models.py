@@ -216,6 +216,14 @@ class Step(BaseModel):
     # shows the question + approve/skip buttons. The advance endpoint
     # gates on question_approved (NULL = pending).
     question: str | None = None
+    # Phase W Step W3: optional expected answer for Q&A auto-grading.
+    # When BOTH ``question`` and ``expected_answer`` are set AND the
+    # household ``qa_grading`` dial is not ``"off"``, the advance handler
+    # auto-grades the recent transcript window against this text and, on a
+    # confident match, resolves the R3 gate without a parent tap. NULL
+    # opts the step out of auto-grading (falls back to the R3 parent-tap
+    # 409). Additive + nullable — every pre-W3 template parses unchanged.
+    expected_answer: str | None = None
 
     @model_validator(mode="after")
     def _check_next_xor_choices(self) -> Step:
@@ -346,6 +354,12 @@ class ActivityStep(BaseModel):
     # resolution (NULL = pending, 1 = approved, 2 = skipped).
     question: str | None = None
     question_approved: int | None = None
+    # Phase W Step W3: runtime expected-answer text carried through from
+    # the template-time :attr:`Step.expected_answer` (persisted to
+    # ``activity_steps.expected_answer`` via migration 0026). Consumed by
+    # the advance handler's auto-grade path; NULL on non-Q&A steps and on
+    # Q&A steps that opt out of auto-grading.
+    expected_answer: str | None = None
 
 
 class Activity(BaseModel):

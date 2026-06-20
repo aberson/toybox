@@ -146,6 +146,17 @@ class _StepTemplate:
     # the overwhelming majority of templates that don't reference an
     # element (pre-M3 templates parse unchanged).
     element_id: str | None = None
+    # Phase R Step R3 / Phase W Step W3: optional Q&A gating carried
+    # through from the template JSON. ``question`` (R3) makes the step
+    # block advance until resolved; ``expected_answer`` (W3) lets the
+    # advance handler auto-grade the recent transcript window. BOTH are
+    # ``None`` for the overwhelming majority of templates. Threading them
+    # onto the internal step dataclass is what lets the propose-time and
+    # lazy-advance INSERTs populate the ``activity_steps.question`` /
+    # ``activity_steps.expected_answer`` columns — without this hop the
+    # gate is unreachable for real (template-authored) activities.
+    question: str | None = None
+    expected_answer: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -266,6 +277,13 @@ def _parse_template(raw: dict[str, Any], *, source: str = "<inline>") -> _Templa
                 # below have already gated the regex shape and resolved
                 # the id to a real entry.
                 element_id=step_model.element_id,
+                # Phase R Step R3 / Phase W Step W3: carry the optional
+                # Q&A gating fields through. Without this hop the
+                # propose / lazy-advance INSERTs have no source for the
+                # ``activity_steps.question`` / ``expected_answer``
+                # columns and the auto-grade gate is unreachable.
+                question=step_model.question,
+                expected_answer=step_model.expected_answer,
             )
         )
     # Phase G graph validation. Raises TemplateGraphError on any
@@ -1218,6 +1236,13 @@ def generate(
                 # id on the WS envelope. ``None`` for the overwhelming
                 # majority of steps (non-Periodic-Table content).
                 element_id=step_tpl.element_id,
+                # Phase R Step R3 / Phase W Step W3: thread the optional
+                # Q&A gating fields onto the runtime step so the
+                # persistence layer can populate the
+                # ``activity_steps.question`` / ``expected_answer``
+                # columns from the template.
+                question=step_tpl.question,
+                expected_answer=step_tpl.expected_answer,
             )
         )
 

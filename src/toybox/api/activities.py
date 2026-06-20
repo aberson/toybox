@@ -17,6 +17,7 @@ is stored in ``activity_steps.body``; the response uses the same
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import functools
 import json
 import logging
@@ -68,6 +69,7 @@ from ..activities.roles import (
 )
 from ..activities.song_corpus import Song, pick_song
 from ..activities.topic_extract import extract_themes
+from ..ai.breaker import CircuitBreaker
 from ..ai.judge import judge_and_persist
 from ..ai.labeled_events import (
     GENERATOR_PATH_CLAUDE,
@@ -1054,6 +1056,15 @@ def _render_template_plan_steps(
                 chosen_label=None,
                 element_id=step.element_id,
                 metadata=preview_metadata,
+                # Phase R Step R3: surface the template-time question on
+                # the preview wire so the parent's suggestion card shows
+                # a Q&A step before approval. ``question_pending`` is True
+                # on the preview because no row exists yet to record a
+                # resolution (mirrors the freshly-inserted runtime row's
+                # NULL ``question_approved``). ``None`` question →
+                # not pending, byte-identical for non-Q&A templates.
+                question=step.question,
+                question_pending=step.question is not None,
             )
         )
     return rendered
@@ -1419,8 +1430,8 @@ def _persist_activity(
             conn.execute(
                 "INSERT INTO activity_steps "
                 "(id, activity_id, seq, body, sfx, expected_action, current, action_slot, "
-                " choices_json, step_template_id, kind, metadata_json) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " choices_json, step_template_id, kind, metadata_json, question, expected_answer) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     str(uuid.uuid4()),
                     activity_id,
@@ -1444,6 +1455,14 @@ def _persist_activity(
                     # rows (current default = "text" implied).
                     first.get("kind"),
                     metadata_blob,
+                    # Phase R Step R3 / Phase W Step W3: thread the Q&A
+                    # gating fields from the template step onto the row.
+                    # ``None`` for every step that doesn't author a
+                    # question / expected_answer (the overwhelming
+                    # majority), so this INSERT stays byte-identical to
+                    # the pre-W3 behavior for existing templates.
+                    first.get("question"),
+                    first.get("expected_answer"),
                 ),
             )
 
@@ -2100,6 +2119,12 @@ def _do_propose_standalone(
             "choices_rendered": None,
             "kind": step_kind,
             "metadata": step_metadata,
+            # Standalone song/joke steps never carry a Q&A gate; keep the
+            # keys present (defaulting to None) so the persistence layer's
+            # ``first.get("question")`` reads NULL symmetrically with the
+            # template path.
+            "question": None,
+            "expected_answer": None,
         }
     ]
     _persist_activity(
@@ -2500,6 +2525,13 @@ def _do_propose(
             # linear templates.
             "step_id": step.step_id,
             "choices_rendered": step.choices_rendered,
+            # Phase R Step R3 / Phase W Step W3: thread the Q&A gating
+            # fields from the generated runtime step through to the
+            # persistence layer so the first-step INSERT populates the
+            # ``activity_steps.question`` / ``expected_answer`` columns.
+            # ``None`` on every non-Q&A step (the overwhelming majority).
+            "question": step.question,
+            "expected_answer": step.expected_answer,
         }
         for idx, step in enumerate(activity.steps)
     ]
@@ -3724,11 +3756,20 @@ def _insert_next_step(
         f"UPDATE activity_steps SET {', '.join(prev_set_clauses)} WHERE activity_id = ? AND id = ?",
         prev_params,
     )
+    # Phase R Step R3 / Phase W Step W3: carry the template step's Q&A
+    # gating fields onto the lazily-inserted row so a question step
+    # reached mid-activity gates (R3) and can auto-grade (W3). ``_Template``
+    # internal steps always carry both attrs (default None); guard with
+    # ``getattr`` so a non-_StepTemplate ``template_step`` (e.g. a future
+    # caller passing a different shape) degrades to None rather than
+    # raising.
+    step_question = getattr(template_step, "question", None)
+    step_expected_answer = getattr(template_step, "expected_answer", None)
     conn.execute(
         "INSERT INTO activity_steps "
         "(id, activity_id, seq, body, sfx, expected_action, current, action_slot, "
-        " choices_json, step_template_id) "
-        "VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)",
+        " choices_json, step_template_id, question, expected_answer) "
+        "VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)",
         (
             str(uuid.uuid4()),
             activity_id,
@@ -3739,6 +3780,8 @@ def _insert_next_step(
             template_step.action_slot,
             choices_blob,
             template_step.id,
+            step_question,
+            step_expected_answer,
         ),
     )
 
@@ -3750,6 +3793,7 @@ def post_advance(
     pubsub: Annotated[PubSub, Depends(get_pubsub)],
     expected_version: Annotated[int, Depends(if_match_version_dependency)],
     _: Annotated[Any, Depends(RequireScope({TokenScope.parent, TokenScope.child}))],
+    sync_client: Annotated[Any, Depends(get_sync_ai_client)],  # Phase W W3
     body: AdvanceRequest | None = None,
 ) -> ActivityResponse:
     """Advance one step. approved → running on first call; running → running/completed otherwise.
@@ -3798,7 +3842,7 @@ def post_advance(
 
     steps = conn.execute(
         "SELECT id, seq, current, choices_json, step_template_id, kind, "
-        " question, question_approved "
+        " question, question_approved, expected_answer "
         "FROM activity_steps WHERE activity_id = ? ORDER BY seq ASC",
         (activity_id,),
     ).fetchall()
@@ -3878,19 +3922,57 @@ def post_advance(
     # Phase R Step R3: Q&A gating. If the current step has a ``question``
     # that has not yet been approved or skipped (question_approved IS
     # NULL), block the advance so the parent must resolve it first.
-    current_question = (
-        current_row["question"] if "question" in current_row.keys() else None
-    )
+    current_question = current_row["question"] if "question" in current_row.keys() else None
     current_q_approved = (
-        current_row["question_approved"]
-        if "question_approved" in current_row.keys()
-        else None
+        current_row["question_approved"] if "question_approved" in current_row.keys() else None
     )
     if current_question is not None and current_q_approved is None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={"code": "question_pending"},
+        # Phase W Step W3: optional Q&A auto-grading. When the household
+        # ``qa_grading`` dial is not "off" AND the current step carries an
+        # ``expected_answer``, attempt an auto-grade against the recent
+        # transcript window BEFORE falling back to the R3 parent-tap 409.
+        # On a confident match we resolve the gate via the SAME path the
+        # parent's approve-question uses (set question_approved=1, bump
+        # version, emit the WS envelope) and let advance proceed. On no
+        # confident match — or with grading off, or any grading fault —
+        # we fall through to the existing 409 unchanged (byte-identical R3
+        # behavior when grading is off).
+        from ..core.qa_grading import get_qa_grading  # noqa: PLC0415
+
+        tolerance = get_qa_grading(conn)
+        current_expected = (
+            current_row["expected_answer"] if "expected_answer" in current_row.keys() else None
         )
+        auto_resolved = False
+        if tolerance != "off" and current_expected:
+            if _attempt_auto_grade(
+                conn,
+                sync_client,
+                tolerance=tolerance,
+                question=str(current_question),
+                expected=str(current_expected),
+            ):
+                # Confident match → resolve the gate exactly like an
+                # approve-question "approved" (question_approved=1).
+                _resolve_question_gate(
+                    conn,
+                    pubsub,
+                    activity_id=activity_id,
+                    step_id=str(current_row["id"]),
+                    approved_value=1,
+                )
+                # The gate bumped activities.version; re-fetch so the
+                # advance below uses the fresh version for its
+                # optimistic-concurrency UPDATE.
+                row = _fetch_activity_row(conn, activity_id)
+                current_version = int(row["version"])
+                expected_version = current_version
+                auto_resolved = True
+        if not auto_resolved:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"code": "question_pending"},
+            )
 
     # Pre-G2 path: the next row already exists in activity_steps.
     # This holds for in-flight activities created BEFORE G2 (all 5 rows
@@ -4099,6 +4181,247 @@ def post_advance(
     return response
 
 
+# Phase W Step W3: how far back the auto-grader reads transcript text.
+# 30 seconds is the spec window — the kid's spoken answer to the current
+# step's question lands in the last few seconds. Read INDEPENDENTLY of the
+# transcript_retention setting (that only governs deletion); a household
+# on the 60s retention floor still has the last 30s available.
+_QA_GRADING_WINDOW_SECONDS: int = 30
+
+# Phase W Step W3: judge-call budget. The kid is waiting at the kiosk, so
+# this is much tighter than the background judge's 30s — a slow judge must
+# fall back to the offline grader fast rather than stall the advance.
+_QA_JUDGE_TIMEOUT_SEC: float = 8.0
+_QA_JUDGE_MAX_TOKENS: int = 16
+
+# Phase W Step W3: module-singleton circuit breaker for the kid-facing Q&A
+# judge call. Mirrors the ``_VISION_BREAKER`` pattern in
+# :mod:`toybox.api.toys` / :mod:`toybox.api.rooms`: one in-process breaker
+# per call site so a 429 burst / outage seen by THIS gate is remembered
+# across advances. A throwaway ``CircuitBreaker()`` per call (the prior
+# bug) made the breaker state invisible — every advance paid the full
+# timeout during an outage instead of being short-circuited by an already-
+# open breaker. Shared breaker state is read by ``is_capable`` (it returns
+# not-capable when the breaker is open) and updated by the outcome
+# recorders below.
+_QA_JUDGE_BREAKER: CircuitBreaker = CircuitBreaker()
+
+
+def _read_transcript_window(conn: sqlite3.Connection, *, window_seconds: int) -> str:
+    """Return the concatenated transcript text from the last ``window_seconds``.
+
+    Phase W Step W3. Reads ``transcripts.text`` for rows whose ``ended_at``
+    falls within the window, most-recent first, and joins them with
+    newlines. The cutoff is formatted byte-identically to the pipeline's
+    ``ended_at`` via :func:`toybox.core.transcript_retention._format_ended_at_cutoff`
+    so the lexicographic ``ended_at >= ?`` comparison matches numeric
+    comparison against the underlying instant.
+
+    Deliberately INDEPENDENT of the household transcript-retention setting:
+    retention governs DELETION (the sweep loop), not how far back the
+    grader may look. Rows already swept are simply absent.
+
+    Returns ``""`` when no rows fall in the window — the offline grader
+    then returns False (no confident match) and the gate stays pending.
+    """
+    from datetime import timedelta  # noqa: PLC0415
+
+    from ..core.transcript_retention import _format_ended_at_cutoff  # noqa: PLC0415
+
+    # ``UTC`` and ``datetime`` are module-top imports; only ``timedelta``
+    # is needed locally.
+    cutoff = _format_ended_at_cutoff(datetime.now(UTC) - timedelta(seconds=window_seconds))
+    rows = conn.execute(
+        "SELECT text FROM transcripts "
+        "WHERE text IS NOT NULL AND ended_at IS NOT NULL AND ended_at >= ? "
+        "ORDER BY ended_at DESC, id DESC",
+        (cutoff,),
+    ).fetchall()
+    return "\n".join(str(r["text"]) for r in rows if r["text"])
+
+
+def _grade_via_claude(
+    sync_client: Any,
+    *,
+    question: str,
+    expected: str,
+    transcript_window: str,
+) -> bool:
+    """Phase W Step W3: capability-gated Claude judge for one Q&A answer.
+
+    Returns True only on a confident "correct" verdict. On ANY failure
+    path — gate not green, no client, transport error, malformed reply,
+    timeout — raises so the caller falls back to the deterministic offline
+    grader. A clean "incorrect" verdict returns False (the gate stays
+    pending for the parent to resolve).
+
+    The capability gate is :func:`toybox.ai.capability.is_capable`, the
+    SAME gate every kid-facing Claude call site goes through, driven with
+    the SHARED module-singleton :data:`_QA_JUDGE_BREAKER` (Phase W Step W3
+    fix — a throwaway breaker per call hid outage state, so every advance
+    paid the full timeout during an outage). It is async; we drive it from
+    this sync route via ``asyncio.run`` (mirrors
+    :func:`_resolve_local_dispatch`). When the gate is not green we raise
+    so the offline grader takes over.
+
+    The Claude call itself runs under a hard :data:`_QA_JUDGE_TIMEOUT_SEC`
+    deadline (Phase W Step W3 fix): ``complete_text_sync`` uses the client's
+    60s transport timeout, but the kid is waiting synchronously at the
+    kiosk, so we cap the wait at 8s via a single-shot thread + ``.result``
+    deadline. A timeout records a breaker failure and raises so the caller
+    falls back to the offline grader fast rather than stalling advance.
+    """
+    if sync_client is None:
+        raise RuntimeError("no sync AI client available for Q&A judge")
+
+    from ..ai.capability import is_capable  # noqa: PLC0415
+    from ..ai.client import AIMessage  # noqa: PLC0415
+
+    capable, reason = asyncio.run(is_capable(_QA_JUDGE_BREAKER))
+    if not capable:
+        raise RuntimeError(f"capability gate not green for Q&A judge: {reason}")
+
+    system = (
+        "You are grading whether a young child's spoken answer to a "
+        "question is correct. Reply with EXACTLY one word: CORRECT or "
+        "INCORRECT. No other text. Be lenient about phrasing, spelling, "
+        "and extra words — judge the meaning."
+    )
+    user = json.dumps(
+        {
+            "question": question,
+            "expected_answer": expected,
+            "child_said": transcript_window,
+        },
+        ensure_ascii=False,
+    )
+
+    def _call() -> Any:
+        return sync_client.complete_text_sync(
+            [AIMessage(role="user", content=user)],
+            system=system,
+            max_tokens=_QA_JUDGE_MAX_TOKENS,
+        )
+
+    # Enforce the 8s budget independently of the client's 60s transport
+    # timeout. A single worker thread runs the blocking call; ``.result``
+    # raises ``TimeoutError`` if it overruns. CRITICAL: shut the pool down
+    # with ``wait=False`` in a ``finally`` (NOT a ``with`` block, whose
+    # ``__exit__`` does ``shutdown(wait=True)`` and would re-block on the
+    # orphaned worker for the client's full 60s — defeating the 8s budget).
+    # We cannot forcibly kill the worker thread, so it drains in the
+    # background; the kid-facing advance returns at the 8s deadline.
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    try:
+        future = pool.submit(_call)
+        try:
+            response = future.result(timeout=_QA_JUDGE_TIMEOUT_SEC)
+        except concurrent.futures.TimeoutError as exc:
+            # A slow/hung judge is an outage signal — trip the shared
+            # breaker so subsequent advances short-circuit instead of each
+            # paying the full 8s.
+            _QA_JUDGE_BREAKER.record_failure()
+            raise RuntimeError(f"Q&A judge exceeded {_QA_JUDGE_TIMEOUT_SEC}s budget") from exc
+        except Exception:
+            # Transport error / malformed call — record a failure and let
+            # the caller fall back to the offline grader.
+            _QA_JUDGE_BREAKER.record_failure()
+            raise
+    finally:
+        pool.shutdown(wait=False)
+
+    _QA_JUDGE_BREAKER.record_success()
+    verdict = str(response.text).strip().upper()
+    return verdict.startswith("CORRECT")
+
+
+def _attempt_auto_grade(
+    conn: sqlite3.Connection,
+    sync_client: Any,
+    *,
+    tolerance: str,
+    question: str,
+    expected: str,
+) -> bool:
+    """Phase W Step W3: decide whether the current Q&A gate auto-resolves.
+
+    Reads the last 30 seconds of transcript text, then grades it — via the
+    capability-gated Claude judge when the gate is green, else via the
+    deterministic offline :func:`toybox.core.qa_grading.grade_answer`. Any
+    Claude-path failure (gate not green, transport error, timeout,
+    malformed reply) degrades to the offline grader.
+
+    The WHOLE attempt is best-effort: an unexpected error (e.g. a transient
+    DB read failure on the transcript window) is swallowed and reported as
+    "no confident match" so a grading fault NEVER breaks advance — the
+    caller falls through to the existing R3 parent-tap 409.
+
+    Returns True only on a confident match.
+    """
+    from ..core.qa_grading import grade_answer  # noqa: PLC0415
+
+    try:
+        window = _read_transcript_window(conn, window_seconds=_QA_GRADING_WINDOW_SECONDS)
+    except Exception:  # noqa: BLE001 -- grading must never break advance
+        _logger.warning("qa auto-grade: transcript-window read failed", exc_info=True)
+        return False
+
+    # Try the capability-gated Claude judge first; fall back to the offline
+    # grader on any failure or when the gate is not green.
+    try:
+        return _grade_via_claude(
+            sync_client,
+            question=question,
+            expected=expected,
+            transcript_window=window,
+        )
+    except Exception as exc:  # noqa: BLE001 -- fall back to offline grader
+        _logger.debug("qa auto-grade: claude judge unavailable (%s); using offline grader", exc)
+
+    try:
+        return grade_answer(window, expected, tolerance)
+    except Exception:  # noqa: BLE001 -- grading must never break advance
+        _logger.warning("qa auto-grade: offline grader raised", exc_info=True)
+        return False
+
+
+def _resolve_question_gate(
+    conn: sqlite3.Connection,
+    pubsub: PubSub,
+    *,
+    activity_id: str,
+    step_id: str,
+    approved_value: int,
+) -> sqlite3.Row:
+    """Resolve a step's R3 Q&A gate and broadcast the new state.
+
+    Single source of truth for the approve-question resolution path,
+    shared by :func:`post_approve_question` (parent tap) and the Phase W
+    Step W3 auto-grade path in :func:`post_advance`. Both must produce a
+    byte-identical effect: set ``question_approved`` on the step row +
+    bump ``activities.version`` atomically, then emit the same
+    ``activity.state`` WS envelope so the child kiosk receives
+    ``question_pending=False`` and unhides the Next button.
+
+    ``approved_value`` is 1 (approved) or 2 (skipped); the auto-grade path
+    always passes 1 (a confident match is an approval). Returns the
+    re-read activity row so callers can read the bumped version.
+    """
+    with conn:
+        conn.execute(
+            "UPDATE activity_steps SET question_approved = ? WHERE id = ?",
+            (approved_value, step_id),
+        )
+        conn.execute(
+            "UPDATE activities SET version = version + 1 WHERE id = ?",
+            (activity_id,),
+        )
+    updated_row = _fetch_activity_row(conn, activity_id)
+    response_obj = _row_to_response(conn, updated_row)
+    _emit_state(pubsub, response_obj)
+    return updated_row
+
+
 @router.post("/{activity_id}/approve-question", response_model=ApproveQuestionResponse)
 def post_approve_question(
     activity_id: str,
@@ -4153,11 +4476,7 @@ def post_approve_question(
             detail={"code": "no_current_step", "id": activity_id},
         )
 
-    question_val = (
-        current_step_row["question"]
-        if "question" in current_step_row.keys()
-        else None
-    )
+    question_val = current_step_row["question"] if "question" in current_step_row.keys() else None
     q_approved_val = (
         current_step_row["question_approved"]
         if "question_approved" in current_step_row.keys()
@@ -4177,27 +4496,14 @@ def post_approve_question(
     approved_value = 1 if body.result == "approved" else 2
     step_id = str(current_step_row["id"])
 
-    # Single transaction: set question_approved on the step row + bump
-    # activities.version. Both must be atomic so optimistic-concurrency
-    # clients see a consistent (version, question_approved) pair.
-    with conn:
-        conn.execute(
-            "UPDATE activity_steps SET question_approved = ? WHERE id = ?",
-            (approved_value, step_id),
-        )
-        conn.execute(
-            "UPDATE activities SET version = version + 1 WHERE id = ?",
-            (activity_id,),
-        )
-
-    # Re-read the updated row so the response and WS envelope carry the
-    # new version. ``_emit_state`` uses ``_row_to_response`` which re-reads
-    # activity_steps including the updated question_approved — the child
-    # kiosk receives question_pending=False and unhides the Next button.
-    updated_row = _fetch_activity_row(conn, activity_id)
+    updated_row = _resolve_question_gate(
+        conn,
+        pubsub,
+        activity_id=activity_id,
+        step_id=step_id,
+        approved_value=approved_value,
+    )
     new_version = int(updated_row["version"])
-    response_obj = _row_to_response(conn, updated_row)
-    _emit_state(pubsub, response_obj)
 
     _logger.info(
         "approve_question activity=%s result=%s version=%d->%d",

@@ -285,6 +285,7 @@ render), so a smoke gate (W6) is required before UAT.
   path is capability-gated and falls back offline when `is_capable()` is False); `npm run
   typecheck` + `npm run test` pass
 - **Depends on:** none (extends shipped R3)
+- **Status:** DONE (2026-06-20)
 
 ### Step W4: Dynamic adventure engine (hybrid generation)
 - **Problem:** Add `activities/adventure.py` with `generate_next_beat(...)` — Claude-online via

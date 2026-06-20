@@ -41,6 +41,7 @@ from .api.play_standalone_enabled_settings import (
     router as play_standalone_enabled_settings_router,
 )
 from .api.play_target_depth_settings import router as play_target_depth_settings_router
+from .api.qa_grading_settings import router as qa_grading_settings_router
 from .api.read_me_button_enabled_settings import (
     router as read_me_button_enabled_settings_router,
 )
@@ -91,6 +92,11 @@ def create_app() -> FastAPI:
     # into the offline generator to exclude branching templates. GET is
     # household-read, PUT is parent-scope.
     app.include_router(game_linearity_settings_router)
+    # Phase W Step W3: household Q&A answer-grading tolerance dial. WIRED —
+    # the advance handler auto-grades a Q&A step's answer against the recent
+    # transcript window when this is not "off". GET is household-read, PUT
+    # is parent-scope.
+    app.include_router(qa_grading_settings_router)
     # Phase K Step K2 + Phase L Step L5: five parent-controlled feature
     # flags (originally eight; L5 removed the three Phase K play-surface
     # flags as part of re-framing jokes/songs as per-activity reward

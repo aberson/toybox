@@ -108,6 +108,11 @@ export interface PlayQueueListProps {
   // copy, which differentiates "no play ideas at all" from
   // "no adventures suggested yet" etc. O2 will activate the row filter.
   filterCategory?: "adventures" | "elements" | "feelings-friends";
+  // Phase W Step W3: true when the household Q&A grading dial is on
+  // ("lenient" / "strict"). Threads into the ActivityPanel so its Q&A
+  // banner shows a "Listening for answer…" indicator while a question is
+  // pending. App-lifted from the bootstrap ``getQaGrading`` fetch.
+  qaGradingActive?: boolean;
 }
 
 // Phase O Step O1: empty-state copy keyed by the new ``filterCategory``
@@ -184,6 +189,7 @@ export function PlayQueueList(props: PlayQueueListProps): JSX.Element {
     activeRewardsCount,
     activeRewards,
     filterCategory,
+    qaGradingActive,
   } = props;
 
   const [busy, setBusy] = useState<BusyMap>(() => emptyBusy());
@@ -435,6 +441,7 @@ export function PlayQueueList(props: PlayQueueListProps): JSX.Element {
                   )
               : undefined
           }
+          gradingActive={qaGradingActive}
           busy={{
             regenerate: busy.regenerate.has(active.id),
             end: busy.end.has(active.id),

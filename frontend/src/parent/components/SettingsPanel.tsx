@@ -30,6 +30,7 @@ import type {
   PhaseKFeatureFlag,
   PhaseKFeatureFlags,
   PlayTargetDepth,
+  QaGrading,
   SpokenTextLimit,
 } from "../api";
 import { BannedThemesSettings } from "./BannedThemesSettings";
@@ -40,6 +41,7 @@ import { PlayFeaturesControls } from "./PlayFeaturesControls";
 import {
   PlayTargetDepthControl,
 } from "./PlayQueueSettingsControls";
+import { QaGradingControl } from "./QaGradingControl";
 import { SpokenTextLimitControl } from "./SpokenTextLimitControl";
 import { TranscriptRetentionControl } from "./TranscriptRetentionControl";
 
@@ -436,6 +438,7 @@ export interface SettingsPanelProps {
     | "setParentInvolvement"
     | "setGameComplexity"
     | "setGameLinearity"
+    | "setQaGrading"
   >;
   // Phase I step I3: transcript retention picker source-of-truth. The
   // value lives in App.tsx (fetched once on mount via the
@@ -478,6 +481,13 @@ export interface SettingsPanelProps {
   // through here; the callback bubbles a successful PUT response back up.
   currentGameLinearity: string;
   onGameLinearityChanged: (value: GameLinearity) => void;
+  // Phase W Step W3: household Q&A answer-grading dial. WIRED — the advance
+  // path auto-grades a Q&A step's answer against the recent transcript
+  // window when set to "lenient" / "strict". Value lives in App.tsx
+  // (seeded by the bootstrap parallel-fetch) and threads through here; the
+  // callback bubbles a successful PUT response back up.
+  currentQaGrading: string;
+  onQaGradingChanged: (value: QaGrading) => void;
 }
 
 // Settings sub-tab. Renders the three toggle cards + the global
@@ -502,6 +512,8 @@ export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
     onGameComplexityChanged,
     currentGameLinearity,
     onGameLinearityChanged,
+    currentQaGrading,
+    onQaGradingChanged,
   } = props;
   const [listeningMode, setListeningMode] = useState<number>(3);
   const [micEnabled, setMicEnabled] = useState<boolean>(true);
@@ -597,6 +609,11 @@ export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
           api={api}
           currentValue={currentGameLinearity}
           onValueChanged={onGameLinearityChanged}
+        />
+        <QaGradingControl
+          api={api}
+          currentValue={currentQaGrading}
+          onValueChanged={onQaGradingChanged}
         />
       </div>
       <div style={{ marginTop: 12 }}>

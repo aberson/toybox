@@ -162,6 +162,14 @@
           "pattern": "^[a-z]{1,3}-[0-9]{1,3}$",
           "description": "Phase M Step M3 — optional reference to a Periodic Table element corpus entry (``data/elements/elements.json``). Composite id ``<symbol-lower>-<atomic_number>`` (e.g. ``au-79``). When present, the kiosk renders an ElementCard above the step text. Cross-corpus resolution is gated by toybox.activities._validator (unknown ids fail at template load with the id in the message). No persona-side gating per phase-m-plan.md §6.9."
         },
+        "question": {
+          "type": ["string", "null"],
+          "description": "Phase R Step R3 — optional Q&A gate. When set, the kiosk displays the question text below the step body and replaces Next with 'Waiting for parent…' until the parent approves/skips (or, with Phase W qa_grading on + an expected_answer, the advance handler auto-grades the recent transcript). additionalProperties is false on this object, so the field MUST be declared here for a template to author it — without this entry the JSON-schema validator rejects the whole template and the gate is unreachable for real activities."
+        },
+        "expected_answer": {
+          "type": ["string", "null"],
+          "description": "Phase W Step W3 — optional canonical answer text for Q&A auto-grading. Only meaningful alongside `question`. When BOTH are set AND the household `qa_grading` dial is not 'off', the advance handler auto-grades the last ~30s of transcript against this text and, on a confident match, resolves the R3 gate without a parent tap. NULL opts the step out of auto-grading (falls back to the parent-tap path)."
+        },
         "id": {
           "type": "string",
           "pattern": "^[a-z0-9][a-z0-9_]*$",

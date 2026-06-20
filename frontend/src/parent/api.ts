@@ -713,6 +713,17 @@ export interface GameComplexityResponse {
   value: GameComplexity;
 }
 
+// Phase W Step W3: Q&A answer-grading tolerance dial. WIRED — the advance
+// path auto-grades a Q&A step's answer against the recent transcript
+// window when this is not "off". The wire body is
+// ``{value: "off"|"lenient"|"strict"}`` in both directions. The GET is
+// public (household read); the PUT requires parent scope.
+export type QaGrading = "off" | "lenient" | "strict";
+
+export interface QaGradingResponse {
+  value: QaGrading;
+}
+
 // Phase W Step W2: game-linearity dial. WIRED (not a stub) — the propose
 // path reads it and excludes branching templates when set to "linear".
 // The wire body is ``{value: "linear"|"nonlinear"}`` in both directions.
@@ -1883,6 +1894,29 @@ export class ApiClient {
         signal: opts.signal,
       },
     );
+  }
+
+  // Phase W Step W3: Q&A grading dial read-write pair. WIRED — the advance
+  // path auto-grades a Q&A answer against the recent transcript window when
+  // this is not "off". The GET is unauthenticated (household read); the PUT
+  // requires parent scope. Body shape on both sides is ``{value: <dial>}``.
+  // Valid values: off / lenient / strict.
+  async getQaGrading(opts: RequestOptions = {}): Promise<QaGradingResponse> {
+    return this.request<QaGradingResponse>("/api/settings/qa-grading", {
+      method: "GET",
+      signal: opts.signal,
+    });
+  }
+
+  async setQaGrading(
+    value: QaGrading,
+    opts: RequestOptions = {},
+  ): Promise<QaGradingResponse> {
+    return this.request<QaGradingResponse>("/api/settings/qa-grading", {
+      method: "PUT",
+      body: JSON.stringify({ value }),
+      signal: opts.signal,
+    });
   }
 
   // Phase W Step W2: game-linearity dial read-write pair. WIRED — the

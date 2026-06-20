@@ -18,6 +18,7 @@ import type {
   PhaseKFeatureFlag,
   PhaseKFeatureFlags,
   PlayTargetDepth,
+  QaGrading,
   RewardType,
   SpokenTextLimit,
 } from "./api";
@@ -234,6 +235,13 @@ export function App(): JSX.Element {
   // the backend default; matching locally keeps a failed bootstrap fetch
   // from flashing an odd value into the UI.
   const [gameLinearity, setGameLinearity] = useState<string>("nonlinear");
+  // Phase W Step W3: household Q&A answer-grading dial. WIRED — the advance
+  // path auto-grades a Q&A step's answer against the recent transcript
+  // window when set to "lenient" / "strict". Seeded from
+  // ``GET /api/settings/qa-grading`` during bootstrap. "off" is the backend
+  // default; matching locally keeps a failed bootstrap fetch from flashing
+  // an odd value into the UI.
+  const [qaGrading, setQaGrading] = useState<string>("off");
   // Phase R Step R4: activity + template search query. Non-empty string
   // renders SearchPanel above PlayQueueList on the Play tab; clearing it
   // restores the normal queue view. The state is top-level so the input
@@ -413,6 +421,7 @@ export function App(): JSX.Element {
         parentInvolvementResult,
         gameComplexityResult,
         gameLinearityResult,
+        qaGradingResult,
       ] = await Promise.allSettled([
         api.getTranscriptRetention({ signal: aborter.signal }),
         api.getPlayTargetDepth({ signal: aborter.signal }),
@@ -446,6 +455,8 @@ export function App(): JSX.Element {
         api.getGameComplexity({ signal: aborter.signal }),
         // Phase W Step W2: seed the wired game-linearity dial.
         api.getGameLinearity({ signal: aborter.signal }),
+        // Phase W Step W3: seed the wired Q&A grading dial.
+        api.getQaGrading({ signal: aborter.signal }),
       ]);
       // ``Promise.allSettled`` swallows aborts as rejected results, so
       // a mid-bootstrap unmount (e.g. parent navigates away while these
@@ -601,6 +612,16 @@ export function App(): JSX.Element {
         console.warn(
           "game linearity initial fetch failed, using default",
           gameLinearityResult.reason,
+        );
+      }
+      // Phase W Step W3: seed the wired Q&A grading dial from bootstrap.
+      if (qaGradingResult.status === "fulfilled") {
+        setQaGrading(qaGradingResult.value.value);
+      } else if (!isAbortError(qaGradingResult.reason)) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          "qa grading initial fetch failed, using default",
+          qaGradingResult.reason,
         );
       }
       const ws = new ParentWsClient({
@@ -1209,6 +1230,12 @@ export function App(): JSX.Element {
     [],
   );
 
+  // Phase W Step W3: SettingsPanel reconciliation callback for the wired
+  // Q&A grading dial. Mirror handleGameLinearityChanged.
+  const handleQaGradingChanged = useCallback((value: QaGrading): void => {
+    setQaGrading(value);
+  }, []);
+
   // Phase R Step R4: propose from search results. Calls the same propose
   // endpoint as the trigger button but with an optional template_id so
   // the backend picks that exact template rather than running the slot
@@ -1417,6 +1444,7 @@ export function App(): JSX.Element {
                           songsEnabled={featureFlags.songs_enabled}
                           activeRewardsCount={activeRewardsCount}
                           activeRewards={activeRewards}
+                          qaGradingActive={qaGrading !== "off"}
                         />
                         <div style={{ marginTop: 12, textAlign: "right" }}>
                           <TriggerButton onTrigger={handleTrigger} />
@@ -1522,6 +1550,8 @@ export function App(): JSX.Element {
                     onGameComplexityChanged={handleGameComplexityChanged}
                     currentGameLinearity={gameLinearity}
                     onGameLinearityChanged={handleGameLinearityChanged}
+                    currentQaGrading={qaGrading}
+                    onQaGradingChanged={handleQaGradingChanged}
                   />
                 )}
                 {settingsTab.value === "stats" && (

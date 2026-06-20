@@ -1,0 +1,31 @@
+{
+  "intent": "boredom",
+  "templates": [
+    {
+      "id": "fixture_qa_gate",
+      "title": "Colour quest in {room}",
+      "buckets": ["always"],
+      "steps": [
+        {
+          "id": "ask",
+          "text": "{toy} points at the sky in {room}. What colour is it on a clear day?",
+          "action_slot": "thinking",
+          "question": "What colour is the sky on a clear day?",
+          "expected_answer": "blue",
+          "next": "celebrate"
+        },
+        {
+          "id": "celebrate",
+          "text": "Yes! {toy} cheers and twirls around {room}.",
+          "action_slot": "cheering",
+          "next": "wave_goodbye"
+        },
+        {
+          "id": "wave_goodbye",
+          "text": "{toy} waves goodbye. The adventure is complete.",
+          "action_slot": "waving"
+        }
+      ]
+    }
+  ]
+}

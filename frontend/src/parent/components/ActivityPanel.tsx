@@ -45,6 +45,14 @@ export interface ActivityPanelProps {
   // so older callers compile; when absent the question banner is
   // read-only (no buttons shown, the question text still appears).
   onApproveQuestion?: (result: "approved" | "skipped") => Promise<void>;
+  // Phase W Step W3: when the household Q&A grading dial is on
+  // ("lenient" / "strict"), the kiosk is listening for the child's spoken
+  // answer and the advance handler may auto-resolve the gate. We surface a
+  // "Listening for answer…" indicator alongside the existing R3
+  // approve/skip buttons — the parent can still tap to resolve manually.
+  // When off / absent, the indicator is hidden and the banner is the
+  // unchanged R3 parent-tap UI.
+  gradingActive?: boolean;
   // Optional in-flight flags. Same idea as SuggestionCard's busy: keep
   // a rapid second click from racing the first with the same version.
   busy?: ActivityPanelBusy;
@@ -65,6 +73,7 @@ export function ActivityPanel(props: ActivityPanelProps): JSX.Element {
     jokesEnabled,
     songsEnabled,
     onApproveQuestion,
+    gradingActive,
   } = props;
   const busy: ActivityPanelBusy = props.busy ?? {
     regenerate: false,
@@ -214,6 +223,19 @@ export function ActivityPanel(props: ActivityPanelProps): JSX.Element {
           >
             Child Q&A: {pendingQuestion}
           </p>
+          {gradingActive === true && (
+            <p
+              data-testid="qa-listening-indicator"
+              style={{
+                margin: "0 0 8px 0",
+                fontSize: 12,
+                color: "#6d4c41",
+                fontStyle: "italic",
+              }}
+            >
+              Listening for answer…
+            </p>
+          )}
           {onApproveQuestion !== undefined && (
             <div style={{ display: "flex", gap: 8 }}>
               <button

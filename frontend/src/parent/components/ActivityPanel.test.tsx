@@ -550,4 +550,37 @@ describe("ActivityPanel Q&A gating", () => {
     expect(onApproveQuestion).toHaveBeenCalledOnce();
     expect(onApproveQuestion).toHaveBeenCalledWith("skipped");
   });
+
+  // Phase W Step W3: "Listening for answer…" indicator.
+  it("shows the listening indicator when grading is active and a question is pending", () => {
+    render(
+      <ActivityPanel
+        activity={fakeActivityWithQuestion("What colour?")}
+        onRegenerate={async () => undefined}
+        onEnd={async () => undefined}
+        onDidntWork={async () => undefined}
+        onApproveQuestion={async () => undefined}
+        gradingActive
+      />,
+    );
+    expect(screen.getByTestId("qa-listening-indicator").textContent).toContain(
+      "Listening for answer",
+    );
+    // The parent can STILL tap to resolve manually — the R3 buttons stay.
+    expect(screen.getByTestId("approve-question-button")).toBeTruthy();
+    expect(screen.getByTestId("skip-question-button")).toBeTruthy();
+  });
+
+  it("hides the listening indicator when grading is inactive", () => {
+    render(
+      <ActivityPanel
+        activity={fakeActivityWithQuestion("What colour?")}
+        onRegenerate={async () => undefined}
+        onEnd={async () => undefined}
+        onDidntWork={async () => undefined}
+        onApproveQuestion={async () => undefined}
+      />,
+    );
+    expect(screen.queryByTestId("qa-listening-indicator")).toBeNull();
+  });
 });
