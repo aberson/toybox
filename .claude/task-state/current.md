@@ -1,9 +1,9 @@
 # Task State
 
 **Task:** Phase W (Play Depth) — build (in progress)
-**Status:** BUILDING — W1-W4 DONE (#247-250 closed); W5 next (boss-fight climax beat, depends W4✅, extends adventure.py). Goal active (W1–W6 → Status: DONE).
+**Status:** BUILDING — W1-W5 DONE (#247-251 closed); W6 next (pipeline smoke gate, depends W3/W4/W5✅) — LAST code step, then goal met. Goal active (W1–W6 → Status: DONE).
 **Last written:** 2026-06-20T06:00:00Z
-**Session SHA:** 866e0c4
+**Session SHA:** 95b482d
 
 ## Next Action
 
@@ -27,7 +27,8 @@ NOTE: `.git/info/exclude` in toybox has a TEMP block excluding `/data/images/com
 - [22326e9] Step W1 (stub dials): PASS — backend 2353 / frontend 753, #247 closed.
 - [a05572d] Step W2 (linear/non-linear toggle): PASS — backend 2378 / frontend 759, #248 closed.
 - [e7bbb50] Step W3 (Whisper/STT Q&A auto-grading): PASS after 2 iters — caught+fixed latent R3 wiring bug + judge timeout. backend 2409 / frontend 767, #249 closed.
-- [866e0c4] Step W4 (dynamic adventure engine: adventure.py hybrid Claude/offline, _do_propose_adventure/_advance_adventure, MAX_ADVENTURE_BEATS=6→reward, AdventureButton): PASS after 2 iters — review caught dropped multi-beat history (chosen_label not SELECTed) + offline theme seed mismatch; fixed (single id-derived seed). backend 2430 (+21) / frontend 771 (+4), #250 closed.
+- [866e0c4] Step W4 (dynamic adventure engine): PASS after 2 iters. backend 2430 / frontend 771, #250 closed.
+- [95b482d] Step W5 (boss-fight climax beat: boss_fights_enabled + boss beat at climax casting boss role + kiosk no-flash banner): PASS after 2 iters — review caught hero-cast-as-boss (_select_boss_name ignored explicit tag); fixed (hero-excluded 3-tier). backend 2463 (+33) / frontend 780 (+9), #251 closed.
 
 ## Dead Ends / Decisions
 
