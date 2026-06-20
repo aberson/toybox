@@ -1,9 +1,9 @@
 # Task State
 
 **Task:** Phase X (Room Import) — READY TO BUILD
-**Status:** BUILDING Phase X — X1+X2+X3 DONE (#255-257 closed); X4 next (local ONNX CLIP, imports ROOM_TYPES from X2). Goal active (X1-X7 → DONE).
+**Status:** BUILDING Phase X — X1-X4 DONE (#255-258 closed); X5 next (import API, integrates X1-X4). Goal active (X1-X7 → DONE).
 **Last written:** 2026-06-20T06:00:00Z
-**Session SHA:** 11255bc
+**Session SHA:** 767c37e
 
 ## Next Action
 
@@ -25,6 +25,7 @@ Goal scoped to X1-X7 (agent-completable); X8 is the operator UAT boundary. X1∥
 **Approach:** Six not-built items from operator notes, one combined plan. Decisions baked in: hybrid Claude/offline adventure gen via capability gate; boss fight = climax beat at 5th adventure beat; dials are true stubs; STT grading reads last-30s passive transcript, decoupled from transcript_retention.
 
 ## Completed (this session)
+- [767c37e] Phase X Step X4 (local ONNX CLIP matcher: room_classifier + room_match, by-name output selection, model-free tests): PASS iter2 — review caught silent-dead-path (outputs[0] vs projected image_embeds). backend 2570, #258 closed.
 - [11255bc] Phase X Step X3 (SSRF-guarded photo_fetch: scheme/allowlist/non-global-IP/redirect/size-cap/timeout + IP-pinning anti-rebinding): PASS iter2 — review caught exception-escape (HIGH) + DNS-rebinding TOCTOU. backend 2543, #257 closed.
 - [b9305c4] Phase X Step X2 (listing_parser + room_naming + ROOM_TYPES SoT + MAX_ROOMS_PER_TYPE clamp): PASS iter2 — review caught unbounded-count DoS + URL-scheme leak. backend 2501, #256 closed.
 - [2eec56c] Phase X Step X1 (rooms room_type + active/stay-out; play-exclusion single seam resolve_rooms): PASS — backend 2473 / frontend 781, #255 closed.
