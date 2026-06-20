@@ -24,7 +24,12 @@ from PIL import Image
 from toybox.ai import capability as capability_mod
 from toybox.ai.client import AIResponse, StubClient
 from toybox.api import rooms as rooms_router_mod
-from toybox.api.rooms import get_vision_client
+from toybox.api.rooms import (
+    get_photo_fetcher,
+    get_room_classifier,
+    get_vision_client,
+)
+from toybox.core.photo_fetch import PhotoFetchBlocked
 from toybox.db.connection import connect
 
 # ---------------------------------------------------------------------
@@ -114,6 +119,12 @@ def _bulk_files(
 _PROTECTED_ENDPOINTS: list[tuple[str, str, dict[str, Any] | None]] = [
     ("POST", "/api/rooms/upload-bulk", None),
     ("POST", "/api/rooms/confirm-bulk", {"batch_id": "x", "assignments": []}),
+    ("POST", "/api/rooms/import/parse", {"content": "3 beds 2 baths"}),
+    (
+        "POST",
+        "/api/rooms/import/commit",
+        {"rooms": [{"display_name": "Den", "room_type": None, "active": True, "photo_url": None}]},
+    ),
     ("GET", "/api/rooms", None),
     ("GET", "/api/rooms/abc", None),
     ("GET", "/api/rooms/abc/features", None),
@@ -616,9 +627,7 @@ def test_delete_room_cascades_features(
     assert resp.json() == {"ok": True}
     conn = connect(db_path)
     try:
-        room_count = conn.execute(
-            "SELECT COUNT(*) FROM rooms WHERE id = 'r1'"
-        ).fetchone()[0]
+        room_count = conn.execute("SELECT COUNT(*) FROM rooms WHERE id = 'r1'").fetchone()[0]
         feature_count = conn.execute(
             "SELECT COUNT(*) FROM room_features WHERE room_id = 'r1'"
         ).fetchone()[0]
@@ -1294,3 +1303,516 @@ def test_confirm_bulk_existing_room_does_not_orphan_files(
             assert not list(rooms_dir.glob(f"{sid}.*")), (
                 f"{sid} should NOT have been committed to rooms dir for existing-room assignment"
             )
+
+
+# ---------------------------------------------------------------------
+# Phase X Step X5 — listing import (parse + commit)
+# ---------------------------------------------------------------------
+
+_REDFIN_FIXTURE = (
+    Path(__file__).resolve().parent.parent / "fixtures" / "listings" / "redfin_sample.html"
+)
+
+
+class _FakeClassifier:
+    """Model-free classifier stub satisfying room_match's _Classifier.
+
+    Records calls so a test can assert the injected classifier was reached
+    (advisory match). Returns a canned high-confidence score map.
+    """
+
+    def __init__(self, scores: dict[str, float] | None = None) -> None:
+        self.calls: list[bytes] = []
+        self._scores = scores or {"living_room": 0.9}
+
+    def classify(self, image_bytes: bytes) -> dict[str, float]:
+        self.calls.append(image_bytes)
+        return self._scores
+
+
+def _stub_fetcher(
+    by_url: dict[str, bytes] | None = None,
+    *,
+    blocked: set[str] | None = None,
+    default: bytes | None = None,
+) -> Any:
+    """Build a network-free fetch_photo stub.
+
+    ``blocked`` URLs raise :class:`PhotoFetchBlocked`; ``by_url`` maps a
+    URL to specific bytes; ``default`` is returned for any other URL.
+    """
+    by_url = by_url or {}
+    blocked = blocked or set()
+
+    def _fetch(url: str) -> bytes:
+        if url in blocked:
+            raise PhotoFetchBlocked("private_ip", f"blocked {url}")
+        if url in by_url:
+            return by_url[url]
+        if default is not None:
+            return default
+        raise PhotoFetchBlocked("host_not_allowlisted", f"no stub for {url}")
+
+    return _fetch
+
+
+def test_import_parse_redfin_fixture(
+    vc_client: TestClient,
+    parent_headers: dict[str, str],
+) -> None:
+    """The X2 Redfin HTML fixture → sensible proposed_rooms + photo_urls.
+
+    No DB write happens (pure/offline endpoint).
+    """
+    content = _REDFIN_FIXTURE.read_text(encoding="utf-8")
+    resp = vc_client.post(
+        "/api/rooms/import/parse",
+        json={"content": content},
+        headers=parent_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+
+    # 3 beds + 2 baths + mentions of kitchen/living/garage/yard/office/dining.
+    by_type: dict[str, int] = {}
+    for room in body["proposed_rooms"]:
+        by_type[room["room_type"]] = by_type.get(room["room_type"], 0) + 1
+    assert by_type["bedroom"] == 3
+    assert by_type["bathroom"] == 2
+    assert "kitchen" in by_type
+    assert "living_room" in by_type
+    # Display names are numbered.
+    bedrooms = [r["display_name"] for r in body["proposed_rooms"] if r["room_type"] == "bedroom"]
+    assert bedrooms == ["Bedroom #1", "Bedroom #2", "Bedroom #3"]
+
+    # Photo URLs extracted + de-duplicated (the hero appears twice in HTML).
+    urls = body["photo_urls"]
+    assert any("genMid.bedroom-1.jpg" in u for u in urls)
+    assert len(urls) == len(set(urls))
+
+
+def test_import_parse_no_db_write(
+    vc_client: TestClient,
+    parent_headers: dict[str, str],
+    db_path: Path,
+) -> None:
+    """parse must not insert any rooms."""
+    resp = vc_client.post(
+        "/api/rooms/import/parse",
+        json={"content": "3 beds 2 baths kitchen"},
+        headers=parent_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    conn = connect(db_path)
+    try:
+        assert conn.execute("SELECT COUNT(*) FROM rooms").fetchone()[0] == 0
+    finally:
+        conn.close()
+
+
+def _commit_app(
+    app: FastAPI,
+    fetcher: Any,
+    classifier: Any | None,
+) -> FastAPI:
+    """Override the import-commit injectable deps (no network, no model)."""
+    app.dependency_overrides[get_photo_fetcher] = lambda: fetcher
+    app.dependency_overrides[get_room_classifier] = lambda: classifier
+    return app
+
+
+def test_import_commit_creates_rooms_with_images_and_types(
+    app: FastAPI,
+    parent_headers: dict[str, str],
+    isolated_data_root: Path,
+    db_path: Path,
+) -> None:
+    """Two rooms with photo_urls → committed with names/types/images.
+
+    The injected fake classifier is reached (advisory match) but the
+    operator's explicit room_type wins.
+    """
+    img = _jpeg_bytes(color=(12, 34, 56))
+    img2 = _jpeg_bytes(color=(200, 10, 90))
+    fetcher = _stub_fetcher(
+        by_url={
+            "https://ssl.cdn-redfin.com/a.jpg": img,
+            "https://ssl.cdn-redfin.com/b.jpg": img2,
+        }
+    )
+    classifier = _FakeClassifier()
+    _commit_app(app, fetcher, classifier)
+
+    body = {
+        "rooms": [
+            {
+                "display_name": "Main Bedroom",
+                "room_type": "bedroom",
+                "active": True,
+                "photo_url": "https://ssl.cdn-redfin.com/a.jpg",
+            },
+            {
+                "display_name": "Cozy Den",
+                "room_type": "living_room",
+                "active": False,
+                "photo_url": "https://ssl.cdn-redfin.com/b.jpg",
+            },
+        ]
+    }
+    with TestClient(app) as client:
+        resp = client.post("/api/rooms/import/commit", json=body, headers=parent_headers)
+    assert resp.status_code == 201, resp.text
+    out = resp.json()
+    rooms = {r["display_name"]: r for r in out["rooms"]}
+    assert set(rooms) == {"Main Bedroom", "Cozy Den"}
+    assert rooms["Main Bedroom"]["room_type"] == "bedroom"
+    assert rooms["Main Bedroom"]["active"] is True
+    assert rooms["Cozy Den"]["room_type"] == "living_room"
+    assert rooms["Cozy Den"]["active"] is False
+    # Both rooms have an image_path; the files exist on disk.
+    for r in rooms.values():
+        assert r["image_path"] is not None
+        disk = isolated_data_root / r["image_path"].removeprefix("data/")
+        assert disk.is_file()
+
+    # Advisory classifier was invoked (injected dep reached end-to-end).
+    assert len(classifier.calls) == 2
+
+    # DB rows persisted.
+    conn = connect(db_path)
+    try:
+        assert conn.execute("SELECT COUNT(*) FROM rooms").fetchone()[0] == 2
+    finally:
+        conn.close()
+
+
+def test_import_commit_null_photo_url_creates_na_room(
+    app: FastAPI,
+    parent_headers: dict[str, str],
+    db_path: Path,
+) -> None:
+    """photo_url=null → room committed with NULL image_path (N/A)."""
+    _commit_app(app, _stub_fetcher(), _FakeClassifier())
+    body = {
+        "rooms": [
+            {"display_name": "Mud Room", "room_type": None, "active": True, "photo_url": None}
+        ]
+    }
+    with TestClient(app) as client:
+        resp = client.post("/api/rooms/import/commit", json=body, headers=parent_headers)
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["rooms"][0]["image_path"] is None
+
+    conn = connect(db_path)
+    try:
+        row = conn.execute("SELECT image_path FROM rooms").fetchone()
+        assert row["image_path"] is None
+    finally:
+        conn.close()
+
+
+def test_import_commit_blocked_fetch_creates_na_not_fatal(
+    app: FastAPI,
+    parent_headers: dict[str, str],
+    db_path: Path,
+) -> None:
+    """A photo_url whose fetch raises PhotoFetchBlocked → room still created (N/A).
+
+    The commit is NOT failed; the other (good) room commits with its image.
+    """
+    good = _jpeg_bytes(color=(5, 6, 7))
+    fetcher = _stub_fetcher(
+        by_url={"https://ssl.cdn-redfin.com/good.jpg": good},
+        blocked={"https://ssl.cdn-redfin.com/evil.jpg"},
+    )
+    _commit_app(app, fetcher, _FakeClassifier())
+    body = {
+        "rooms": [
+            {
+                "display_name": "Blocked Room",
+                "room_type": "office",
+                "active": True,
+                "photo_url": "https://ssl.cdn-redfin.com/evil.jpg",
+            },
+            {
+                "display_name": "Good Room",
+                "room_type": "kitchen",
+                "active": True,
+                "photo_url": "https://ssl.cdn-redfin.com/good.jpg",
+            },
+        ]
+    }
+    with TestClient(app) as client:
+        resp = client.post("/api/rooms/import/commit", json=body, headers=parent_headers)
+    assert resp.status_code == 201, resp.text
+    rooms = {r["display_name"]: r for r in resp.json()["rooms"]}
+    assert rooms["Blocked Room"]["image_path"] is None  # downgraded to N/A
+    assert rooms["Good Room"]["image_path"] is not None
+
+    conn = connect(db_path)
+    try:
+        assert conn.execute("SELECT COUNT(*) FROM rooms").fetchone()[0] == 2
+    finally:
+        conn.close()
+
+
+def test_import_commit_dedup_reuses_existing_path(
+    app: FastAPI,
+    parent_headers: dict[str, str],
+    isolated_data_root: Path,
+    db_path: Path,
+) -> None:
+    """Same image hash already in ``rooms`` → reuse the path, no re-commit.
+
+    The committed dir gains NO new file for the deduped room.
+    """
+    from toybox.storage.images import compute_hash  # noqa: PLC0415
+
+    photo = _jpeg_bytes(color=(77, 88, 99))
+    h = compute_hash(photo)
+    conn = connect(db_path)
+    try:
+        with conn:
+            conn.execute(
+                "INSERT INTO rooms (id, display_name, image_path, image_hash) VALUES (?, ?, ?, ?)",
+                ("seed-room", "Seed Room", "data/images/rooms/seed.jpg", h),
+            )
+    finally:
+        conn.close()
+
+    _commit_app(app, _stub_fetcher(default=photo), _FakeClassifier())
+    body = {
+        "rooms": [
+            {
+                "display_name": "Imported Dup",
+                "room_type": "bedroom",
+                "active": True,
+                "photo_url": "https://ssl.cdn-redfin.com/dup.jpg",
+            }
+        ]
+    }
+    rooms_dir = isolated_data_root / "images" / "rooms"
+    before = set(rooms_dir.glob("*")) if rooms_dir.exists() else set()
+    with TestClient(app) as client:
+        resp = client.post("/api/rooms/import/commit", json=body, headers=parent_headers)
+    assert resp.status_code == 201, resp.text
+    created = resp.json()["rooms"][0]
+    # Reuses the seed room's committed path rather than minting a new file.
+    assert created["image_path"] == "data/images/rooms/seed.jpg"
+    after = set(rooms_dir.glob("*")) if rooms_dir.exists() else set()
+    assert before == after, "dedup hit must not commit a new file"
+
+    conn = connect(db_path)
+    try:
+        # Both the seed room and the imported room exist (2 total).
+        assert conn.execute("SELECT COUNT(*) FROM rooms").fetchone()[0] == 2
+    finally:
+        conn.close()
+
+
+def test_import_commit_no_classifier_still_commits(
+    app: FastAPI,
+    parent_headers: dict[str, str],
+    isolated_data_root: Path,
+) -> None:
+    """classifier=None (model unavailable) → commit still succeeds with image."""
+    img = _jpeg_bytes(color=(1, 2, 3))
+    _commit_app(app, _stub_fetcher(default=img), None)
+    body = {
+        "rooms": [
+            {
+                "display_name": "No Model Room",
+                "room_type": "garage",
+                "active": True,
+                "photo_url": "https://ssl.cdn-redfin.com/x.jpg",
+            }
+        ]
+    }
+    with TestClient(app) as client:
+        resp = client.post("/api/rooms/import/commit", json=body, headers=parent_headers)
+    assert resp.status_code == 201, resp.text
+    created = resp.json()["rooms"][0]
+    assert created["image_path"] is not None
+    disk = isolated_data_root / created["image_path"].removeprefix("data/")
+    assert disk.is_file()
+
+
+def test_import_commit_empty_plan_rejected(
+    vc_client: TestClient,
+    parent_headers: dict[str, str],
+) -> None:
+    """An empty rooms list is a 422 (min_length=1)."""
+    resp = vc_client.post(
+        "/api/rooms/import/commit",
+        json={"rooms": []},
+        headers=parent_headers,
+    )
+    assert resp.status_code == 422, resp.text
+
+
+def test_import_commit_rolls_back_and_unlinks_on_db_failure(
+    app_with_vision: FastAPI,
+    parent_headers: dict[str, str],
+    isolated_data_root: Path,
+    db_path: Path,
+) -> None:
+    """MEDIUM-1: a Phase-2 INSERT failure AFTER ≥1 photo committed in
+    Phase 1 must (a) roll the whole transaction back (0 rooms persisted)
+    AND (b) unlink the Phase-1 committed file (no orphan on disk).
+
+    Technique mirrors ``test_confirm_bulk_rolls_back_on_feature_insert_failure``:
+    wrap the connection and raise a ``sqlite3.Error`` on the rooms INSERT.
+    """
+    img1 = _jpeg_bytes(color=(13, 24, 35))
+    img2 = _jpeg_bytes(color=(99, 88, 77))
+    fetcher = _stub_fetcher(
+        by_url={
+            "https://ssl.cdn-redfin.com/one.jpg": img1,
+            "https://ssl.cdn-redfin.com/two.jpg": img2,
+        }
+    )
+    app_with_vision.dependency_overrides[get_photo_fetcher] = lambda: fetcher
+    app_with_vision.dependency_overrides[get_room_classifier] = lambda: _FakeClassifier()
+
+    def intercept(real: sqlite3.Connection, sql: str, params: Any = ()) -> Any:
+        # Fail the FIRST rooms INSERT — by then Phase 1 has already
+        # committed both photo files to disk.
+        if sql.strip().upper().startswith("INSERT INTO ROOMS"):
+            raise sqlite3.Error("simulated rooms insert failure")
+        return real.execute(sql, params)
+
+    _override_with_intercept(app_with_vision, db_path, intercept)
+
+    body = {
+        "rooms": [
+            {
+                "display_name": "Room One",
+                "room_type": "bedroom",
+                "active": True,
+                "photo_url": "https://ssl.cdn-redfin.com/one.jpg",
+            },
+            {
+                "display_name": "Room Two",
+                "room_type": "kitchen",
+                "active": True,
+                "photo_url": "https://ssl.cdn-redfin.com/two.jpg",
+            },
+        ]
+    }
+    with TestClient(app_with_vision) as client:
+        resp = client.post("/api/rooms/import/commit", json=body, headers=parent_headers)
+    assert resp.status_code in {422, 500}, resp.text
+
+    # (a) Full rollback — 0 rooms persisted.
+    conn = connect(db_path)
+    try:
+        assert conn.execute("SELECT COUNT(*) FROM rooms").fetchone()[0] == 0
+    finally:
+        conn.close()
+
+    # (b) No leaked file — the committed dir is empty (the Phase-1
+    # commits were unlinked on rollback).
+    rooms_dir = isolated_data_root / "images" / "rooms"
+    leaked = list(rooms_dir.glob("*")) if rooms_dir.exists() else []
+    assert leaked == [], f"orphan file(s) leaked after rollback: {leaked}"
+
+
+def test_import_commit_rooms_over_cap_rejected_no_fetch(
+    vc_client: TestClient,
+    parent_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """MEDIUM-2: a rooms list over the bulk-upload cap → 422, and NO
+    fetch is performed (validation rejects the body before the handler
+    runs). Set a tiny cap so the test stays cheap.
+    """
+    monkeypatch.setenv("TOYBOX_BULK_UPLOAD_CAP", "3")
+
+    fetched: list[str] = []
+
+    def _tracking_fetch(url: str) -> bytes:
+        fetched.append(url)
+        return _jpeg_bytes()
+
+    vc_client.app.dependency_overrides[get_photo_fetcher] = lambda: _tracking_fetch
+    vc_client.app.dependency_overrides[get_room_classifier] = lambda: None
+
+    body = {
+        "rooms": [
+            {
+                "display_name": f"Room {i}",
+                "room_type": None,
+                "active": True,
+                "photo_url": f"https://ssl.cdn-redfin.com/{i}.jpg",
+            }
+            for i in range(4)  # 4 > cap of 3
+        ]
+    }
+    resp = vc_client.post("/api/rooms/import/commit", json=body, headers=parent_headers)
+    assert resp.status_code == 422, resp.text
+    # No fetch performed — request rejected at validation, before the
+    # serial fetch+stage+commit loop.
+    assert fetched == []
+
+
+def test_import_commit_same_photo_twice_one_file_no_422(
+    app: FastAPI,
+    parent_headers: dict[str, str],
+    isolated_data_root: Path,
+    db_path: Path,
+) -> None:
+    """LOW: the SAME (not-in-DB) photo_url on two rooms → both created,
+    ONE file on disk, no 422.
+
+    Without intra-payload dedup the second room's INSERT carries the
+    identical image_hash and trips the UNIQUE index, 422-ing the whole
+    import. The fix reuses the first room's committed path and stores
+    image_hash=NULL on the reuse row.
+    """
+    photo = _jpeg_bytes(color=(44, 55, 66))
+    fetcher = _stub_fetcher(default=photo)  # any URL returns the same bytes
+    _commit_app(app, fetcher, _FakeClassifier())
+
+    body = {
+        "rooms": [
+            {
+                "display_name": "Hero A",
+                "room_type": "living_room",
+                "active": True,
+                "photo_url": "https://ssl.cdn-redfin.com/hero.jpg",
+            },
+            {
+                "display_name": "Hero B",
+                "room_type": "bedroom",
+                "active": True,
+                "photo_url": "https://ssl.cdn-redfin.com/hero.jpg",
+            },
+        ]
+    }
+    rooms_dir = isolated_data_root / "images" / "rooms"
+    before = set(rooms_dir.glob("*")) if rooms_dir.exists() else set()
+    with TestClient(app) as client:
+        resp = client.post("/api/rooms/import/commit", json=body, headers=parent_headers)
+    assert resp.status_code == 201, resp.text
+    out = {r["display_name"]: r for r in resp.json()["rooms"]}
+    assert set(out) == {"Hero A", "Hero B"}
+    # Both rooms reference the SAME image_path.
+    assert out["Hero A"]["image_path"] is not None
+    assert out["Hero A"]["image_path"] == out["Hero B"]["image_path"]
+
+    # Exactly ONE new file landed on disk.
+    after = set(rooms_dir.glob("*")) if rooms_dir.exists() else set()
+    new_files = after - before
+    assert len(new_files) == 1, f"expected one committed file, found {new_files}"
+
+    # Both rooms persisted; exactly one carries the image_hash (the other
+    # stores NULL so the UNIQUE index isn't tripped).
+    conn = connect(db_path)
+    try:
+        rows = conn.execute("SELECT display_name, image_hash FROM rooms").fetchall()
+        assert len(rows) == 2
+        hashes = [r["image_hash"] for r in rows]
+        assert hashes.count(None) == 1
+        assert sum(1 for h in hashes if h is not None) == 1
+    finally:
+        conn.close()

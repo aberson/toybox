@@ -324,6 +324,7 @@ required before UAT.
   `photo_fetch_blocked` URL is skipped, not fatal; dedup via `find_dedup` honored); `npm run
   typecheck` passes
 - **Depends on:** X1, X2, X3, X4
+- **Status:** DONE (2026-06-20)
 
 ### Step X6: Parent import UI
 - **Problem:** Add `RoomImportPanel.tsx`: paste textarea → call parse → editable proposed-rooms

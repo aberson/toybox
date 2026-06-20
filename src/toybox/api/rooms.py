@@ -67,7 +67,8 @@ import os
 import sqlite3
 import time
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Any, Final
 
@@ -88,7 +89,12 @@ from ..ai.house_vision import (
     HouseVisionSuggestion,
     suggest_room,
 )
+from ..ai.room_classifier import RoomClassifierUnavailable, load_default_classifier
 from ..core.auth import TokenScope
+from ..core.listing_parser import parse_listing
+from ..core.photo_fetch import PhotoFetchBlocked, fetch_photo
+from ..core.room_match import match_photo
+from ..core.room_naming import propose_rooms
 from ..db import connect, resolve_db_path
 from ..storage.images import (
     StagingId,
@@ -194,6 +200,50 @@ def get_vision_client() -> AIClient | None:
 def get_vision_breaker() -> CircuitBreaker:
     """FastAPI dep returning the module-singleton breaker."""
     return _VISION_BREAKER
+
+
+# ---------------------------------------------------------------------
+# DI: import-commit injectable seams (photo fetch + room classifier)
+# ---------------------------------------------------------------------
+#
+# Both are FastAPI deps so the integration tests override them with a
+# network-free stub fetcher (returns fixture bytes) and a model-free fake
+# classifier (no ONNX). Production resolves the real
+# :func:`toybox.core.photo_fetch.fetch_photo` (SSRF-guarded) and the real
+# CLIP classifier (or ``None`` when the model isn't downloaded).
+
+
+# A classifier is anything with ``classify(bytes) -> {room_type: score}``
+# — the :class:`toybox.core.room_match._Classifier` Protocol. We type the
+# dep return as ``Any | None`` so a model-free fake satisfies it without
+# importing the heavy ONNX graph at type-check time.
+_RoomClassifier = Any
+
+
+def get_photo_fetcher() -> Callable[[str], bytes]:
+    """FastAPI dep: return the SSRF-guarded photo fetcher.
+
+    Defaults to :func:`toybox.core.photo_fetch.fetch_photo`. Tests
+    override this dep with a stub returning fixture bytes so the commit
+    path never touches the network.
+    """
+    return fetch_photo
+
+
+def get_room_classifier() -> _RoomClassifier | None:
+    """FastAPI dep: return the local CLIP room classifier, or ``None``.
+
+    Lazily builds the real classifier via
+    :func:`toybox.ai.room_classifier.load_default_classifier`. When the
+    model assets are missing (:class:`RoomClassifierUnavailable`) we return
+    ``None`` — the commit path then skips the advisory match rather than
+    failing. Tests override this dep with a model-free fake classifier.
+    """
+    try:
+        return load_default_classifier()
+    except RoomClassifierUnavailable as exc:
+        _logger.info("room classifier unavailable; import-commit match disabled (%s)", exc)
+        return None
 
 
 # ---------------------------------------------------------------------
@@ -346,6 +396,129 @@ class ConfirmBulkResponse(BaseModel):
 
     rooms: list[RoomResponse]
     features: list[RoomFeatureResponse]
+
+
+# ---------------------------------------------------------------------
+# Phase X Step X5 — listing-import wire shapes (parse + commit)
+# ---------------------------------------------------------------------
+
+
+class ImportParseRequest(BaseModel):
+    """Body for ``POST /api/rooms/import/parse``.
+
+    ``content`` is the pasted listing — Redfin-style HTML or a plain
+    newline/whitespace list of photo URLs. Treated strictly as data
+    (see :mod:`toybox.core.listing_parser`); embedded directives are
+    never executed.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    content: str
+
+
+class ProposedRoomWire(BaseModel):
+    """One proposed room in the parse response (mirror of
+    :class:`toybox.core.room_naming.ProposedRoom`)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    room_type: str
+    display_name: str
+
+
+class ImportParseResponse(BaseModel):
+    """Wire shape for ``POST /api/rooms/import/parse`` success.
+
+    Pure/offline: ``proposed_rooms`` are the numbered rooms expanded
+    from the parsed bed/bath/room-mention counts; ``photo_urls`` are the
+    de-duplicated image URLs the operator can attach to rooms before
+    committing. No network, no DB writes.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    proposed_rooms: list[ProposedRoomWire]
+    photo_urls: list[str]
+
+
+class ImportRoomPlan(BaseModel):
+    """One operator-reviewed room in an ``import/commit`` request.
+
+    ``photo_url`` is ``None`` for an N/A room (no image). When set it is
+    fetched through the SSRF-guarded :func:`toybox.core.photo_fetch.fetch_photo`
+    at commit time; a blocked fetch downgrades the room to N/A rather
+    than failing the whole commit. The operator's explicit ``room_type``
+    is authoritative — the CLIP match (when run) is advisory only.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    display_name: str = Field(min_length=1, max_length=40)
+    room_type: str | None = None
+    active: bool = True
+    photo_url: str | None = None
+
+    @field_validator("display_name")
+    @classmethod
+    def _strip_display_name(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("display_name must be non-empty after trimming")
+        if len(stripped) > 40:
+            raise ValueError("display_name must be at most 40 characters")
+        return stripped
+
+    @field_validator("room_type")
+    @classmethod
+    def _strip_room_type(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        if not stripped:
+            return None
+        if len(stripped) > 40:
+            raise ValueError("room_type must be at most 40 characters")
+        return stripped
+
+
+class ImportCommitRequest(BaseModel):
+    """Body for ``POST /api/rooms/import/commit``.
+
+    ``rooms`` is the operator-reviewed plan — each entry creates one
+    room (atomically, all-or-nothing). An empty list is rejected, and the
+    list is capped at :func:`bulk_upload_cap` (default 50) so an
+    authenticated parent can't post an arbitrarily long plan and force an
+    unbounded serial fetch+stage+commit before any DB write (the same
+    DoS-shaped guard the upload-bulk endpoint applies). The cap is read
+    once at class-build time via ``default_factory`` semantics — see the
+    field validator below, which enforces it against the live cap so an
+    env override at request time still applies.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    rooms: list[ImportRoomPlan] = Field(min_length=1)
+
+    @field_validator("rooms")
+    @classmethod
+    def _cap_rooms(cls, value: list[ImportRoomPlan]) -> list[ImportRoomPlan]:
+        # Enforce against the LIVE cap (env-overrideable) rather than a
+        # baked-in ``max_length``, so ``TOYBOX_BULK_UPLOAD_CAP`` set at
+        # request time is honoured. A pydantic ``max_length`` would freeze
+        # the value at import time.
+        cap = bulk_upload_cap()
+        if len(value) > cap:
+            raise ValueError(f"rooms list exceeds cap {cap} (received {len(value)})")
+        return value
+
+
+class ImportCommitResponse(BaseModel):
+    """Wire shape for ``POST /api/rooms/import/commit`` success."""
+
+    model_config = ConfigDict(frozen=True)
+
+    rooms: list[RoomResponse]
 
 
 class RoomUpdateRequest(BaseModel):
@@ -1072,6 +1245,272 @@ def post_confirm_bulk(
 
 
 # ---------------------------------------------------------------------
+# Phase X Step X5 — listing import (parse + commit)
+# ---------------------------------------------------------------------
+
+
+@router.post("/import/parse", response_model=ImportParseResponse)
+def post_import_parse(
+    body: ImportParseRequest,
+    _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
+) -> ImportParseResponse:
+    """Parse a pasted listing into proposed rooms + photo URLs.
+
+    Pure + offline: wires :func:`toybox.core.listing_parser.parse_listing`
+    (extracts bed/bath/room-mention counts + image URLs) into
+    :func:`toybox.core.room_naming.propose_rooms` (expands counts into
+    numbered, named rooms). NO network, NO download, NO DB writes — the
+    operator reviews/edits the result before calling ``import/commit``.
+
+    No DB dep is taken because nothing here reads or writes the DB; the
+    parent-scope guard still gates the endpoint.
+    """
+    parsed = parse_listing(body.content)
+    proposed = propose_rooms(parsed.room_counts)
+    return ImportParseResponse(
+        proposed_rooms=[
+            ProposedRoomWire(room_type=p["room_type"], display_name=p["display_name"])
+            for p in proposed
+        ],
+        photo_urls=list(parsed.photo_urls),
+    )
+
+
+def _filename_from_url(url: str) -> str:
+    """Best-effort filename for the URL (the last path segment).
+
+    Used only to feed :func:`toybox.core.room_match.match_photo`'s
+    filename-keyword heuristic — a missing/odd segment harmlessly yields
+    a blank filename (the matcher then falls back to the classifier).
+    """
+    import urllib.parse  # noqa: PLC0415
+
+    path = urllib.parse.urlsplit(url).path
+    return path.rsplit("/", 1)[-1]
+
+
+@router.post(
+    "/import/commit",
+    response_model=ImportCommitResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def post_import_commit(
+    body: ImportCommitRequest,
+    conn: Annotated[sqlite3.Connection, Depends(get_rooms_db)],
+    fetcher: Annotated[Callable[[str], bytes], Depends(get_photo_fetcher)],
+    classifier: Annotated[Any | None, Depends(get_room_classifier)],
+    _: Annotated[Any, Depends(RequireScope({TokenScope.parent}))],
+) -> ImportCommitResponse:
+    """Commit the operator-reviewed import plan — create every room atomically.
+
+    Per room:
+
+    * ``photo_url is None`` → N/A room (NULL ``image_path``).
+    * ``photo_url`` set → ``fetcher(url)`` (the injected SSRF-guarded
+      fetch). On :class:`PhotoFetchBlocked` the photo is skipped and the
+      room is created as N/A (logged, NOT fatal). Otherwise the bytes are
+      validated, hashed, deduped (``find_dedup`` — a hit REUSES the
+      existing committed path rather than re-committing, mirroring the
+      upload-bulk dedup convention), staged, and committed to ``rooms``.
+    * The CLIP match (:func:`toybox.core.room_match.match_photo`) is run
+      **advisory-only** when a classifier is injected: the operator's
+      explicit ``room_type`` always wins, so the match result is logged
+      for telemetry but never overrides the payload. (Authoritative
+      pre-commit matching lives in X6's preview; the commit honours the
+      reviewed plan.)
+
+    Atomicity: all rooms INSERT inside ONE ``with conn:`` transaction. A
+    mid-loop DB failure rolls the transaction back; any files committed
+    to disk before the failure are best-effort discarded so the committed
+    directory doesn't leak orphans. The cleanup fires on ANY exception
+    after a file was committed (not just mapped ``HTTPException``s) so an
+    unexpected raise in ``compute_hash`` / ``match_photo`` /
+    ``commit_staging`` of a later room can't strand earlier orphans.
+
+    Intra-payload dedup: if the SAME ``photo_url`` (or two URLs whose
+    bytes hash identically) appears on more than one room in this request,
+    only the FIRST room stages+commits a file. Subsequent rooms reuse the
+    first room's committed ``image_path`` and store ``image_hash = NULL``
+    (same convention as the cross-request dedup against existing rooms),
+    so the partial-unique index on ``rooms.image_hash`` never trips and
+    one hero photo on multiple rooms doesn't 422 the whole import.
+    """
+
+    # Phase 1 (no DB writes): fetch + validate + stage each photo. We
+    # collect per-room (display_name, room_type, active, image_path,
+    # image_hash, committed_handle). image_path is None for N/A rooms.
+    @dataclass
+    class _Prepared:
+        plan: ImportRoomPlan
+        image_path: str | None
+        image_hash: str | None
+        committed: Path | None  # the freshly committed file (for rollback)
+
+    prepared: list[_Prepared] = []
+    committed_files: list[Path] = []
+    # Intra-payload dedup map: image_hash -> committed image_path of the
+    # FIRST room in THIS request that staged it. The reuse rows store
+    # image_hash=NULL so the UNIQUE index isn't tripped by two rows
+    # carrying the identical hash.
+    hash_to_committed_path: dict[str, str] = {}
+
+    try:
+        for plan in body.rooms:
+            if plan.photo_url is None:
+                prepared.append(_Prepared(plan, None, None, None))
+                continue
+
+            try:
+                raw = fetcher(plan.photo_url)
+            except PhotoFetchBlocked as exc:
+                # Not fatal — the room is still created, just as N/A.
+                _logger.info(
+                    "import-commit: photo fetch blocked for %r (%s); creating room %r as N/A",
+                    plan.photo_url,
+                    exc.reason,
+                    plan.display_name,
+                )
+                prepared.append(_Prepared(plan, None, None, None))
+                continue
+
+            try:
+                validated = validate_upload(raw)
+            except UploadValidationError as exc:
+                # A fetched-but-invalid image is also non-fatal: the room
+                # is created as N/A (mirrors the blocked-fetch behaviour —
+                # one bad photo never fails the whole commit).
+                _logger.info(
+                    "import-commit: fetched photo for %r failed validation (%s); N/A",
+                    plan.display_name,
+                    exc.code,
+                )
+                prepared.append(_Prepared(plan, None, None, None))
+                continue
+
+            image_hash = compute_hash(raw)
+
+            # Intra-payload dedup — same photo attached to multiple rooms
+            # in THIS request. Reuse the first room's committed path and
+            # store image_hash=NULL (UNIQUE index would otherwise 422 the
+            # whole import on the second identical-hash INSERT). Checked
+            # BEFORE the DB dedup so a hero photo reused N times only ever
+            # stages one file.
+            if image_hash in hash_to_committed_path:
+                prepared.append(_Prepared(plan, hash_to_committed_path[image_hash], None, None))
+                continue
+
+            # Dedup vs existing rooms — reuse the existing committed path
+            # rather than re-committing the same bytes (upload-bulk
+            # convention). No new file lands on disk for a dedup hit. The
+            # new room references the SAME on-disk image as the existing
+            # one but stores ``image_hash = NULL``: ``rooms.image_hash`` is
+            # UNIQUE, so copying the existing hash onto the new row would
+            # 409 the whole commit. NULL lets the rooms share a file while
+            # keeping the existing row as the canonical dedup anchor.
+            existing = find_dedup(conn, "rooms", image_hash)
+            if existing is not None:
+                reused_path = existing.get("image_path")
+                reused_str = str(reused_path) if reused_path is not None else None
+                # Remember it so a SECOND in-payload occurrence of this
+                # hash also reuses the existing path (not the first reuse).
+                if reused_str is not None:
+                    hash_to_committed_path[image_hash] = reused_str
+                prepared.append(_Prepared(plan, reused_str, None, None))
+                continue
+
+            # Advisory match (operator's explicit room_type still wins).
+            if classifier is not None:
+                guess = match_photo(
+                    _filename_from_url(plan.photo_url),
+                    raw,
+                    classifier=classifier,
+                )
+                _logger.debug(
+                    "import-commit advisory match for %r: %s (operator chose %r)",
+                    plan.display_name,
+                    guess,
+                    plan.room_type,
+                )
+
+            handle = stage(raw, validated)
+            try:
+                committed = commit_staging(handle, target_subdir="rooms")
+            except FileNotFoundError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail={"code": "stage_lost"},
+                ) from exc
+            except StagingLockedError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail={"code": "staging_locked"},
+                ) from exc
+            except OSError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail={"code": "commit_failed", "reason": str(exc)},
+                ) from exc
+            committed_files.append(committed)
+            image_path = relative_committed_path("rooms", handle.filename)
+            # First room to carry this photo: record its committed path so
+            # later rooms in this payload dedup onto it.
+            hash_to_committed_path[image_hash] = image_path
+            prepared.append(_Prepared(plan, image_path, image_hash, committed))
+
+        # Phase 2: INSERT every room atomically.
+        new_room_ids: list[str] = []
+        try:
+            with conn:
+                for prep in prepared:
+                    room_id = uuid.uuid4().hex
+                    conn.execute(
+                        "INSERT INTO rooms (id, display_name, image_path, image_hash, "
+                        "notes, room_type, active) VALUES (?, ?, ?, ?, NULL, ?, ?)",
+                        (
+                            room_id,
+                            prep.plan.display_name,
+                            prep.image_path,
+                            prep.image_hash,
+                            prep.plan.room_type,
+                            1 if prep.plan.active else 0,
+                        ),
+                    )
+                    new_room_ids.append(room_id)
+        except sqlite3.IntegrityError as exc:
+            raise HTTPException(
+                status_code=422,
+                detail={"code": "db_constraint_violation", "reason": str(exc)},
+            ) from exc
+        except sqlite3.Error as exc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={"code": "rooms_insert_failed", "reason": str(exc)},
+            ) from exc
+    except BaseException:
+        # Rollback on ANY exception after a file was committed — not just
+        # the mapped ``HTTPException``s. An unexpected raise (e.g. in
+        # ``compute_hash`` / ``match_photo`` / ``commit_staging`` of a
+        # later room) would otherwise escape this handler and leave the
+        # files committed for earlier rooms as orphans. The DB transaction
+        # has already aborted on the ``with conn:`` exit (or was never
+        # opened). The original exception (HTTPException → its mapped
+        # status; anything else → FastAPI's 500) is re-raised unchanged.
+        for committed in committed_files:
+            try:
+                committed.unlink(missing_ok=True)
+            except OSError:
+                _logger.warning("import-commit rollback: could not unlink %s", committed)
+        raise
+
+    rooms_out: list[RoomResponse] = []
+    for rid in new_room_ids:
+        row = conn.execute("SELECT * FROM rooms WHERE id = ?", (rid,)).fetchone()
+        if row is not None:
+            rooms_out.append(_row_to_room(row))
+    return ImportCommitResponse(rooms=rooms_out)
+
+
+# ---------------------------------------------------------------------
 # CRUD (read / update / delete)
 # ---------------------------------------------------------------------
 
@@ -1309,6 +1748,12 @@ __all__ = [
     "DeleteResponse",
     "FeatureSuggestionWire",
     "HouseVisionSuggestionWire",
+    "ImportCommitRequest",
+    "ImportCommitResponse",
+    "ImportParseRequest",
+    "ImportParseResponse",
+    "ImportRoomPlan",
+    "ProposedRoomWire",
     "RoomFeatureListResponse",
     "RoomFeatureResponse",
     "RoomListResponse",
@@ -1316,6 +1761,8 @@ __all__ = [
     "RoomUpdateRequest",
     "VISION_CONCURRENCY_ENV",
     "bulk_upload_cap",
+    "get_photo_fetcher",
+    "get_room_classifier",
     "get_rooms_db",
     "get_vision_breaker",
     "get_vision_client",
