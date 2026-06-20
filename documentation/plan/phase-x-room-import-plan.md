@@ -7,8 +7,9 @@ uploading and naming each room photo by hand. The parent pastes a saved real-est
 (Redfin HTML or a list of photo URLs); the backend parses the room breakdown (e.g. 3 bedrooms /
 2 baths / garage / yard), generates a named room set ("Bedroom #1", "Bathroom #2", "Playroom #1"),
 downloads the listing photos through the existing image-validation pipeline, and best-guess
-matches each photo to a room — filename heuristic first, then the existing capability-gated Claude
-vision as a fallback — leaving any room as "N/A — no photo" when nothing fits. The parent reviews
+matches each photo to a room — filename heuristic first, then a **local CLIP zero-shot classifier**
+(ONNX, runs on the existing on-device `onnxruntime`; no cloud, no Claude) — leaving any room as
+"N/A — no photo" when nothing fits. The parent reviews
 the proposed set in an editable table (rename, set type, reassign/clear photo) and commits. It
 also adds the two missing room knobs: a **room type/category** and a **"room exists but stay out"**
 toggle that keeps a room in the catalog but excludes it from play. It's built because rooms are
@@ -35,13 +36,15 @@ Confirmed against source (via an Explore sweep), not docs:
   ≤1600 for vision), SHA-256 dedups via `find_dedup(conn, "rooms", hash)`, stages to
   `data/images/.staging/`, and commits to `data/images/rooms/`. **Any photo the importer
   downloads MUST pass through `validate_upload` → `stage` → `commit_staging` — never a raw write.**
-- **Room vision is Claude-based, capability-gated.**
-  [`ai/house_vision.py`](../../src/toybox/ai/house_vision.py) calls Claude Haiku
-  (`TOYBOX_CLAUDE_VISION_MODEL`, default `claude-haiku-4-5-20251001`), downscales to ≤1600,
-  returns `{suggested_room_label, features:[{name}]}`, per-photo timeout
-  `TOYBOX_VISION_TIMEOUT_SEC` (30s), concurrency-bounded by `TOYBOX_VISION_CONCURRENCY` (4). This
-  is the matching fallback. **No local image classifier exists anywhere in the repo** — building
-  one would be net-new; this phase reuses Claude vision per the operator's decision.
+- **Existing room vision is Claude-based (left untouched).**
+  [`ai/house_vision.py`](../../src/toybox/ai/house_vision.py) (Claude Haiku, cloud) backs the
+  existing `upload-bulk` flow — Phase X does **not** use or change it. **No local image classifier
+  exists anywhere in the repo** — Phase X builds one (net-new): a local CLIP zero-shot classifier
+  exported to ONNX, run on the **existing `onnxruntime` core dep** (already used by faster-whisper
+  + silero-vad), so matching is on-device + offline with no new heavy runtime dependency. The
+  CLIP model files (image+text encoders + BPE vocab) are vendored under `data/models/clip/`
+  (gitignored), fetched once via a `--download` setup entrypoint — same pattern as the whisper
+  model download.
 - **HTTP fetch = `urllib` only.** The canonical external-HTTP pattern is stdlib `urllib.request`
   (see [`ai/client.py`](../../src/toybox/ai/client.py)); the `anthropic` SDK and `requests` are
   banned (`.claude/rules/claude-auth.md`). **No HTML parser (BeautifulSoup/lxml) is installed** —
@@ -55,9 +58,8 @@ Confirmed against source (via an Explore sweep), not docs:
 - **Toy `active` is the exact pattern to copy.** `toys.active INTEGER NOT NULL DEFAULT 1`; parent
   UI shows inactive toys; mention-triggers + role-casting exclude `active = 0`. Rooms replicate
   this for "stay out".
-- **Next migration number.** Highest on disk is `0023`. **Phase W reserves 0024–0028**; if Phase W
-  lands first, Phase X starts at **0029**. If Phase X is built independently/first, renumber to the
-  next free slot at build time. This plan uses `0029` nominally.
+- **Next migration number.** Phase W shipped (migrations 0024–0028), so the highest on disk is now
+  `0028` and **Phase X's first migration is `0029`** (confirmed, no longer nominal).
 - **External-content safety (load-bearing).** Pasted listing HTML is untrusted external content —
   parse it as **data**, never act on embedded directives (`.claude/rules/security.md`). Downloading
   arbitrary photo URLs is an **SSRF** vector — the fetcher needs a hard host-allowlist guard, not a
@@ -76,8 +78,11 @@ Confirmed against source (via an Explore sweep), not docs:
   per-type numbering.
 - Safe photo fetch: download each photo URL with an SSRF host-allowlist guard, then push the
   bytes through `storage/images.py` validation/staging.
-- Photo→room matching: filename heuristic first (`master-bed-2.jpg` → bedroom), then capability-
-  gated Claude vision; assign best guess per room, leave **N/A** when nothing fits.
+- Photo→room matching: filename heuristic first (`master-bed-2.jpg` → bedroom), then a **local
+  CLIP zero-shot classifier** (ONNX on the existing `onnxruntime`, CPU, offline) scoring each photo
+  against the room-type label set; assign best guess per room, leave **N/A** when the top score is
+  below a confidence threshold. Includes the `--download` setup entrypoint that vendors the CLIP
+  model under `data/models/clip/`.
 - Import API: a staged parse → review → commit flow mirroring `upload-bulk`/`confirm-bulk`.
 - Parent UI: paste box + editable proposed-rooms table (rename, set type, reassign/clear photo,
   toggle "stay out") + commit.
@@ -85,9 +90,13 @@ Confirmed against source (via an Explore sweep), not docs:
 
 **Explicitly out of scope:**
 - Live Redfin URL scraping (bot-blocked + ToS gray area) — operator supplies saved HTML / URLs.
-- A **local** image classifier (CLIP/zero-shot) — deferred follow-up; this phase reuses Claude
-  vision per the operator's decision. The matching module is structured so a local backend can be
-  slotted in later behind the same interface.
+- Claude vision for import matching — Phase X matches with the **local** CLIP classifier only; the
+  existing `house_vision` Claude path (bulk-upload feature) is untouched, not reused here.
+- A new heavy ML runtime dep — the CLIP classifier runs on the **existing** `onnxruntime` (core
+  dep); no `torch`/`open_clip` added to the runtime path. The one-time CLIP→ONNX export is a
+  dev/setup concern, not a shipped dependency. CPU-only; GPU not required.
+- Fine-tuning the CLIP model or custom room taxonomy training — zero-shot over a fixed room-type
+  label set only.
 - Parsing non-Redfin listing formats (Zillow/MLS) — Redfin HTML + a generic photo-URL list only.
 - Room `features` auto-population beyond what `house_vision` already returns.
 - Editing/cropping downloaded photos; bulk re-matching after commit (re-run import instead).
@@ -106,7 +115,11 @@ Confirmed against source (via an Explore sweep), not docs:
 | `src/toybox/core/listing_parser.py` | create | pure: pasted HTML / URL list → `{room_counts, photo_urls}` (regex + stdlib `html.parser`) | n/a (new); no HTML-parser dep installed (use stdlib) |
 | `src/toybox/core/room_naming.py` | create | pure: `{type: n}` → ordered proposed room names with per-type numbering | n/a (new) |
 | `src/toybox/core/photo_fetch.py` | create | SSRF-guarded URL download → bytes; hard host allowlist + size cap, then hand to `storage/images.py` | n/a (new); `urllib` per `claude-auth.md` (no `requests`) |
-| `src/toybox/core/room_match.py` | create | filename heuristic → capability-gated Claude-vision fallback → best-guess room assignment (+ N/A) | n/a (new); reuses `house_vision.identify_room` |
+| `src/toybox/core/room_match.py` | create | filename heuristic → local CLIP zero-shot fallback → best-guess room assignment (+ N/A below threshold); classifier injected for testing | n/a (new) |
+| `src/toybox/ai/room_classifier.py` | create | local ONNX CLIP zero-shot classifier (`classify(image_bytes) -> {label: score}`) over the room-type label set, on the existing `onnxruntime`; lazy-loads model from `data/models/clip/`; `--download` CLI entrypoint vendors the model (mirror `audio/stt.py --download`) | confirmed `onnxruntime>=1.25` is a core dep (faster-whisper/silero); `audio/stt.py` is the lazy-load + `--download` precedent |
+| `pyproject.toml` | (no runtime change) | CLIP runs on existing `onnxruntime`; no new runtime dep. CLIP→ONNX export is dev/setup-only (not added to the shipped deps) | confirmed onnxruntime already present |
+| `data/models/clip/` | create (gitignored) | vendored ONNX CLIP image+text encoders + BPE vocab; fetched via `--download` | mirror `data/models/` (whisper) gitignore pattern |
+| `.gitignore` | (verify) | ensure `data/models/clip/` (or `data/` blanket) is ignored | confirm `data/` ignore covers it |
 | `src/toybox/storage/images.py` | (no change expected) | importer reuses `validate_upload`/`stage`/`commit_staging("rooms")` as-is | read confirmed: room subdir + dedup + sniff already support this |
 | `frontend/src/parent/components/RoomImportPanel.tsx` | create | paste box + editable proposed-rooms table + commit | n/a (new) |
 | `frontend/src/parent/components/RoomsManager.tsx` (or rooms tab) | modify | add room-type field + "stay out" toggle to room rows; entry point to import | grep the existing rooms management component before editing |
@@ -139,11 +152,20 @@ Confirmed against source (via an Explore sweep), not docs:
   rejects private/loopback/link-local IPs, caps response bytes at the image size cap, and times
   out. Returns bytes for `validate_upload`. Raises a typed error with a stable code
   (`photo_fetch_blocked`) on any guard failure.
-- **`core/room_match.py`** — `match_photo(filename, image_bytes, *, online) -> RoomGuess` where
-  `RoomGuess = {room_type, confidence, source: "filename"|"vision"|"none"}`. Tries the filename
+- **`ai/room_classifier.py`** — local CLIP zero-shot classifier. `classify(image_bytes) ->
+  dict[label, score]` scores a photo against the room-type label set (bedroom, bathroom, kitchen,
+  living room, garage, yard, playroom, dining room, office, …) via CLIP image↔text cosine
+  similarity, computed with ONNX sessions on the existing `onnxruntime`. Model (image encoder +
+  text encoder ONNX + CLIP BPE vocab) lazy-loads from `data/models/clip/` on first call (so import
+  is cheap); a `--download` CLI entrypoint vendors it once (mirrors `audio/stt.py`). The ONNX
+  session + tokenizer are injectable so unit tests run with a fake encoder — **no model download
+  needed for the test suite / `/build-phase`**. CPU-only, offline.
+- **`core/room_match.py`** — `match_photo(filename, image_bytes, *, classifier) -> RoomGuess` where
+  `RoomGuess = {room_type, confidence, source: "filename"|"clip"|"none"}`. Tries the filename
   heuristic first (keyword map: bed/bath/kitchen/living/garage/yard/play/dining/office); on a weak
-  filename and `online` (capability gate green) falls back to `house_vision`; otherwise returns
-  `none` → N/A. Pure assignment logic is unit-testable with the vision call injected.
+  filename, calls the injected `classifier` and takes the top label **if its score ≥ a confidence
+  threshold**, else returns `none` → N/A. Pure assignment logic is unit-testable with a fake
+  classifier injected (no model).
 - **Import endpoints (in `api/rooms.py`)** — `POST /api/rooms/import/parse` (paste content →
   `{proposed_rooms, photo_urls}`, no side effects) and `POST /api/rooms/import/commit` (downloads
   via `photo_fetch`, validates/stages via `storage/images.py`, matches via `room_match`, inserts
@@ -159,13 +181,19 @@ The parser accepts a saved page's HTML or a pasted photo-URL list; the only netw
 downloads of the explicitly-listed photo URLs (themselves SSRF-guarded). Rejected: backend URL
 scrape (brittle, ToS).
 
-**Matching reuses Claude vision, not a new local model (chosen, with a noted divergence).** The
-operator's note asked for a local model, but no local classifier exists and Claude vision already
-classifies room photos well and is capability-gated (degrades to manual when offline). For v1 we
-reuse it: filename heuristic first (cheap/offline/often sufficient), Claude vision only as a
-fallback when online. `room_match.py` is written behind a stable interface so a local CLIP backend
-can replace the vision call in a follow-up phase without touching callers. Rejected for now: net-new
-torch/open_clip dependency (heavy, GPU-optional, larger surface than this phase warrants).
+**Matching uses a local ONNX CLIP zero-shot classifier (chosen).** Per the operator's decision,
+photo→room matching is **on-device + offline**, not cloud. Implementation: a CLIP model exported to
+ONNX and run on toybox's **existing `onnxruntime`** core dep (already powering faster-whisper +
+silero-vad) — so no new heavy runtime dependency (no `torch`/`open_clip` in the shipped path; the
+CLIP→ONNX export is a one-time dev/setup step). Zero-shot scores each photo against a fixed
+room-type label set via image↔text cosine similarity; the filename heuristic runs first (cheap,
+often sufficient), CLIP is the fallback, and a confidence threshold gates N/A. The model is vendored
+under `data/models/clip/` via a `--download` entrypoint (the whisper-model pattern), lazy-loaded on
+first use, and the encoder is injectable so the test suite + `/build-phase` run without it. Rejected:
+**Claude vision** (not local, needs network — fails the operator's local-first requirement);
+**torch/open_clip runtime dep** (heavy, GPU-oriented, larger surface than onnxruntime-CLIP needs);
+**deferring local matching** (the operator explicitly wants it now). Aligns with the project's
+local-first posture (CLAUDE.md: "All on-device by default").
 
 **"Stay out" = `rooms.active = 0`, copying the toy contract (chosen).** Rather than a new
 "excluded" concept, reuse the proven toy `active` semantics: the room stays in the catalog and the
@@ -234,16 +262,27 @@ required before UAT.
   raise `photo_fetch_blocked`); no real network call in tests
 - **Depends on:** none
 
-### Step X4: Photo→room matching
-- **Problem:** Add `core/room_match.py` (`match_photo(filename, image_bytes, *, online) ->
-  RoomGuess`): filename keyword heuristic first; on weak filename + `online` (capability gate
-  green) fall back to `house_vision`; else `source="none"` → N/A. Vision call injected for testing.
+### Step X4: Photo→room matching (local CLIP)
+- **Problem:** Add the local CLIP matcher. (a) `ai/room_classifier.py` — an ONNX CLIP zero-shot
+  classifier `classify(image_bytes) -> dict[label, score]` over the room-type label set, computed
+  on the existing `onnxruntime` (image↔text cosine similarity). Lazy-load the model from
+  `data/models/clip/` on first call; expose the ONNX session(s) + tokenizer as **injectable** deps
+  so tests use a fake encoder with NO model file. Add a `--download` CLI entrypoint that vendors the
+  CLIP image+text encoder ONNX + BPE vocab into `data/models/clip/` (mirror `audio/stt.py`'s
+  `--download`); ensure `data/models/clip/` is gitignored. (b) `core/room_match.py`
+  (`match_photo(filename, image_bytes, *, classifier) -> RoomGuess`): filename keyword heuristic
+  first; on a weak filename, call `classifier` and take the top label iff its score ≥ a confidence
+  threshold, else `source="none"` → N/A. Classifier injected for testing.
 - **Issue:** #
 - **Flags:** --reviewers code
-- **Produces:** `core/room_match.py`
-- **Done when:** `uv run pytest` passes (`master-bedroom.jpg` → bedroom via filename, no vision
-  call; an ambiguous filename + online stub → vision-sourced guess; offline ambiguous → N/A;
-  capability-gated so `is_capable()` False never calls vision)
+- **Produces:** `ai/room_classifier.py` (+ `--download` entrypoint), `core/room_match.py`, gitignore
+  entry for `data/models/clip/`
+- **Done when:** `uv run pytest` passes WITHOUT any model download — using an injected fake
+  classifier: `master-bedroom.jpg` → bedroom via filename (classifier not called); ambiguous
+  filename + fake classifier returning a high score for "bathroom" → bathroom (`source="clip"`);
+  ambiguous + all-scores-below-threshold → N/A (`source="none"`); the `room_classifier` ONNX
+  load path is exercised with a stubbed `onnxruntime` session (no real model). `uv run mypy src` +
+  `uv run ruff check .` clean. (The real model is downloaded + exercised at X8 UAT.)
 - **Depends on:** none
 
 ### Step X5: Import API (parse → review → commit)
@@ -256,9 +295,10 @@ required before UAT.
 - **Flags:** --reviewers code
 - **Produces:** modified `api/rooms.py`, regenerated `shared/types.ts`
 - **Done when:** `uv run pytest` passes (integration: parse a fixture → commit with stubbed
-  `photo_fetch` returning local fixture bytes → rooms created with names/types/images; an N/A room
-  commits with NULL `image_path`; a `photo_fetch_blocked` URL is skipped, not fatal; dedup via
-  `find_dedup` honored); `npm run typecheck` passes
+  `photo_fetch` returning local fixture bytes + an **injected fake `room_classifier`** (no model
+  download) → rooms created with names/types/images; an N/A room commits with NULL `image_path`; a
+  `photo_fetch_blocked` URL is skipped, not fatal; dedup via `find_dedup` honored); `npm run
+  typecheck` passes
 - **Depends on:** X1, X2, X3, X4
 
 ### Step X6: Parent import UI
@@ -277,9 +317,12 @@ required before UAT.
 - **Type:** code
 - **Problem:** No-mock end-to-end: migrate a fresh DB; parse a saved Redfin HTML fixture; commit
   with `photo_fetch` pointed at local fixture image files (real `storage/images.py` validation, no
-  network); assert a named room set is created with matched photos, one N/A room, correct
-  `room_type`/`active`; then assert an `active = 0` room is excluded from `available_rooms`/
-  `get_room`. Surfaces parser→fetch→validate→match→persist→play-selection drift.
+  network). To stay model-free + autonomous, the fixture photos are named so the **filename
+  heuristic** resolves them (e.g. `bedroom-1.jpg`), and one is named ambiguously to exercise the
+  classifier path via an **injected fake `room_classifier`** (real CLIP model NOT required). Assert
+  a named room set is created with matched photos, one N/A room, correct `room_type`/`active`; then
+  assert an `active = 0` room is excluded from `available_rooms`/`get_room`. Surfaces
+  parser→fetch→validate→match→persist→play-selection drift.
 - **Issue:** #
 - **Flags:** --reviewers code
 - **Produces:** `tests/integration/test_phase_x_room_import_smoke.py` (+ fixture HTML + fixture
@@ -290,8 +333,11 @@ required before UAT.
 
 ### Step X8: Operator UAT
 - **Type:** operator
-- **Problem:** Validate room import end-to-end in the real parent UI.
+- **Problem:** Validate room import end-to-end in the real parent UI — including the **real local
+  CLIP model** (the test suite ran model-free; this is the first exercise of the actual classifier).
 - **Issue:** #
+- **Prereq:** run the model download once: `uv run python -m toybox.ai.room_classifier --download`
+  (vendors the CLIP ONNX model into `data/models/clip/`). Confirm `data/models/clip/` populated.
 - **Done when:** UAT checklist passes:
   1. Save a Redfin listing page (or copy its photo URLs); paste into the import panel; parse shows
      a sensible room breakdown + photo count
@@ -310,11 +356,13 @@ required before UAT.
 |---|---|---|
 | Redfin markup drift | The HTML parser breaks when Redfin restructures the page | Parser is best-effort + returns partial results; the URL-list paste path is a stable fallback; counts/photos are operator-editable before commit |
 | SSRF via pasted photo URLs | A crafted page points the fetcher at an internal/cloud-metadata URL | Hard allowlist + private-IP rejection + scheme check in `photo_fetch`, stable `photo_fetch_blocked` code, unit-tested with malicious URLs (X3) |
-| Prompt injection in pasted HTML | Embedded `<system-reminder>`/"ignore instructions" text reaches the parser or vision | Parser treats HTML purely as data (regex/extract only); vision only ever sees downscaled image bytes, never the page text (`security.md`) |
-| Vision misclassifies rooms | Photos land on the wrong room | Filename heuristic first; vision is a fallback; every assignment is operator-reviewed + reassignable + N/A-able before commit |
+| Prompt injection in pasted HTML | Embedded `<system-reminder>`/"ignore instructions" text reaches the parser | Parser treats HTML purely as data (regex/extract only); the CLIP classifier only ever sees downscaled image bytes, never the page text (`security.md`) |
+| CLIP misclassifies rooms | Photos land on the wrong room | Filename heuristic first; CLIP is a thresholded fallback (low score → N/A, not a wrong guess); every assignment is operator-reviewed + reassignable + N/A-able before commit |
+| CLIP model not downloaded | `room_classifier` can't run; matching degrades | Code lazy-loads + raises a clear "run --download" error; matcher catches it → falls back to filename-only + N/A (never 500s commit). X8 prereq runs `--download`; test suite is model-free (injected fake) |
+| CLIP model size / CPU latency | ONNX CLIP adds disk + per-photo CPU cost on an 8 GB box | Use a CPU-sized CLIP export (e.g. ViT-B/32 ONNX, ~hundreds of MB); classify the already-downscaled (≤1600) bytes; bounded by the ≤50-photo import cap; runs in the request, not a loop |
 | Migration number collision with Phase W | Both phases unbuilt; numbers 0024–0028 reserved by W | This plan uses 0029; renumber to next free slot at build time if W hasn't landed (note in X1) |
 | Photo dedup across import + manual uploads | The same photo imported twice creates duplicate rooms | Reuse `find_dedup(conn, "rooms", hash)`; on a dedup hit, skip the photo (room still created as N/A or linked to existing) |
-| Offline at commit time | Vision fallback unavailable; many rooms land N/A | Filename heuristic still runs offline; N/A rooms are valid + photo-assignable later; surfaced in the review table |
+| Offline at commit time | n/a for matching — CLIP is **local/offline** (the whole point of the local-CLIP choice). Only concern is the model not yet vendored (see "model not downloaded" above) | Filename heuristic + N/A still work model-less; CLIP works fully offline once downloaded |
 
 **Open questions (resolve in plan-review):**
 - Allowlist contents: exact Redfin CDN host patterns (e.g. `ssl.cdn-redfin.com`,
@@ -331,8 +379,10 @@ required before UAT.
   malformed/empty input; `room_naming` numbering tests.
 - **X3:** SSRF guard table (allowed host ok; loopback / private IP / non-allowlisted host /
   `file://` / oversize all raise `photo_fetch_blocked`) using a stubbed opener — no real network.
-- **X4:** matching tests (filename hit skips vision; ambiguous+online uses injected vision;
-  ambiguous+offline → N/A; capability-gated).
+- **X4:** matching tests, all model-free via an injected fake classifier (filename hit skips the
+  classifier; ambiguous + fake high-score → `clip` guess; ambiguous + below-threshold → N/A); the
+  `room_classifier` ONNX load/score path exercised with a stubbed `onnxruntime` session. No model
+  download in CI.
 - **X5:** integration parse→commit with stubbed `photo_fetch` (local fixture bytes through real
   `storage/images.py`); N/A commit → NULL image_path; blocked URL skipped; dedup honored.
 - **X6:** component test (paste → edit → commit payload shape).
