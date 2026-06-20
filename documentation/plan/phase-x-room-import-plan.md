@@ -265,6 +265,7 @@ required before UAT.
   "bathroom":2})` yields `Bedroom #1..#3` + `Bathroom #1..#2`; malformed/empty input returns an
   empty parse without raising
 - **Depends on:** none
+- **Status:** DONE (2026-06-20)
 
 ### Step X3: Safe photo fetcher
 - **Problem:** Add `core/photo_fetch.py` (`fetch_photo(url) -> bytes`) with a hard SSRF guard:
