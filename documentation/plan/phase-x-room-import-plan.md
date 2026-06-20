@@ -279,6 +279,7 @@ required before UAT.
   `http://127.0.0.1/...`, a non-allowlisted host, a `file://` URL, and an oversize response each
   raise `photo_fetch_blocked`); no real network call in tests
 - **Depends on:** none
+- **Status:** DONE (2026-06-20)
 
 ### Step X4: Photo→room matching (local CLIP)
 - **Problem:** Add the local CLIP matcher. (a) `ai/room_classifier.py` — an ONNX CLIP zero-shot
