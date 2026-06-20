@@ -16,6 +16,7 @@ import type {
   RoomConfirmBulkRequest,
   RoomNameCollisionDetail,
 } from "../api";
+import { RoomImportPanel } from "./RoomImportPanel";
 
 // Step 17: parent-facing bulk room-photo ingest UI. Two phases.
 //
@@ -513,6 +514,12 @@ export function RoomIngestBulk(props: RoomIngestBulkProps): JSX.Element {
         to Claude AI for naming. Once saved, the images stay on this
         device.
       </p>
+
+      {/* Phase X Step X6 — import rooms from a pasted listing. Shares
+          this surface's rooms list: a successful import fires
+          ``refetchRooms`` so the list below repaints with the new
+          rooms. */}
+      <RoomImportPanel api={api} onImported={refetchRooms} />
 
       {/* Phase A — file picker. */}
       {batch === null && (

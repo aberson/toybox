@@ -591,6 +591,66 @@ export interface RoomInUseDetail {
   feature_count: number;
 }
 
+// Phase X Step X5/X6 — listing-import wire shapes. Mirror the Pydantic
+// models in src/toybox/api/rooms.py (ProposedRoomWire /
+// ImportParseResponse / ImportRoomPlan / ImportCommitResponse). The
+// parse endpoint is pure/offline: it turns a pasted listing into
+// numbered proposed rooms + a de-duplicated list of photo URLs the
+// parent attaches before committing. Commit creates every room
+// atomically (all-or-nothing).
+export interface ProposedRoom {
+  room_type: string;
+  display_name: string;
+}
+
+export interface ImportParseResponse {
+  proposed_rooms: ProposedRoom[];
+  photo_urls: string[];
+}
+
+// One operator-reviewed room in an import/commit request. ``photo_url``
+// is ``null`` for an N/A room (no image). ``room_type`` is ``null`` when
+// the parent leaves the dropdown on the "(no type)" option.
+export interface ImportRoomPlan {
+  display_name: string;
+  room_type: string | null;
+  active: boolean;
+  photo_url: string | null;
+}
+
+export interface ImportCommitRequest {
+  rooms: ImportRoomPlan[];
+}
+
+export interface ImportCommitResponse {
+  rooms: Room[];
+}
+
+// Room-type vocabulary for the import-panel dropdown. MIRRORS the
+// backend single-source-of-truth ``ROOM_TYPES`` + ``ROOM_TYPE_DISPLAY_NAMES``
+// in src/toybox/core/room_types.py — keep in sync (declaration order is
+// load-bearing on the backend; we preserve it here). ``value`` is the
+// stored string written to ``rooms.room_type``; ``label`` is the
+// title-cased rendering for the <option>. A future tenth room type is a
+// single edit on both sides; the backend regression test guards the
+// Python side, the X6 vitest test pins this list.
+export interface RoomTypeOption {
+  value: string;
+  label: string;
+}
+
+export const ROOM_TYPE_OPTIONS: readonly RoomTypeOption[] = [
+  { value: "bedroom", label: "Bedroom" },
+  { value: "bathroom", label: "Bathroom" },
+  { value: "kitchen", label: "Kitchen" },
+  { value: "living_room", label: "Living Room" },
+  { value: "garage", label: "Garage" },
+  { value: "yard", label: "Yard" },
+  { value: "playroom", label: "Playroom" },
+  { value: "dining_room", label: "Dining Room" },
+  { value: "office", label: "Office" },
+];
+
 // Step 13/22: transcripts wire shapes. Mirror the Pydantic models in
 // src/toybox/api/transcripts.py.
 export interface TranscriptRow {
@@ -1650,6 +1710,39 @@ export class ApiClient {
     opts: RequestOptions = {},
   ): Promise<RoomConfirmBulkResponse> {
     return this.request<RoomConfirmBulkResponse>("/api/rooms/confirm-bulk", {
+      method: "POST",
+      body: JSON.stringify(body),
+      signal: opts.signal,
+    });
+  }
+
+  // Phase X Step X5/X6: parse a pasted real-estate listing (Redfin-style
+  // HTML or a plain photo-URL list) into proposed rooms + de-duplicated
+  // photo URLs. Pure/offline server-side — no DB write, no network — so
+  // the parent can review/edit before committing.
+  async parseListing(
+    content: string,
+    opts: RequestOptions = {},
+  ): Promise<ImportParseResponse> {
+    return this.request<ImportParseResponse>("/api/rooms/import/parse", {
+      method: "POST",
+      body: JSON.stringify({ content }),
+      signal: opts.signal,
+    });
+  }
+
+  // Phase X Step X5/X6: commit the operator-reviewed import plan — create
+  // every room atomically. ``photo_url: null`` makes the room N/A (no
+  // image). A blocked/invalid fetch downgrades that single room to N/A
+  // server-side rather than failing the whole commit. On any DB
+  // constraint failure the backend rolls the transaction back (422
+  // ``db_constraint_violation``).
+  async commitRoomImport(
+    rooms: ImportRoomPlan[],
+    opts: RequestOptions = {},
+  ): Promise<ImportCommitResponse> {
+    const body: ImportCommitRequest = { rooms };
+    return this.request<ImportCommitResponse>("/api/rooms/import/commit", {
       method: "POST",
       body: JSON.stringify(body),
       signal: opts.signal,

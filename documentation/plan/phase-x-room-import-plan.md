@@ -337,6 +337,7 @@ required before UAT.
   rooms → edit a name + clear a photo to N/A → commit fires `commitRoomImport` with the edited
   payload); `uv run pytest` unaffected
 - **Depends on:** X5
+- **Status:** DONE (2026-06-20)
 
 ### Step X7: Pipeline smoke gate
 - **Type:** code
