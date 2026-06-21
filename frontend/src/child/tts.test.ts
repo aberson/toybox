@@ -39,6 +39,11 @@ function installFakeSynthesis(opts: {
   utteranceCtorThrows?: boolean;
   speakThrows?: boolean;
   voicesChangedEarly?: boolean;
+  // #207: engine in-flight state. The real SpeechSynthesis exposes these
+  // as booleans; left undefined here, they read as falsy ("not in flight")
+  // so the conditional cancel() defaults to its safe no-op path.
+  speaking?: boolean;
+  pending?: boolean;
 } = {}) {
   const utterances: FakeUtteranceShape[] = [];
   const speakSpy = vi.fn();
@@ -73,6 +78,8 @@ function installFakeSynthesis(opts: {
       }
     }),
     cancel: cancelSpy,
+    speaking: opts.speaking,
+    pending: opts.pending,
     ...(opts.addEventListenerExists === false
       ? {}
       : { addEventListener: addEventListenerSpy }),
@@ -365,18 +372,56 @@ describe("tts", () => {
   });
 
   describe("cancel()", () => {
-    it("calls speechSynthesis.cancel()", () => {
-      const fake = installFakeSynthesis();
+    it("calls speechSynthesis.cancel() when an utterance is speaking", () => {
+      const fake = installFakeSynthesis({ speaking: true });
       cancel();
       expect(fake.cancelSpy).toHaveBeenCalledTimes(1);
     });
 
-    it("is safe to call when no utterance is queued (engine throws)", () => {
-      // Stage a synth whose cancel() throws — we should swallow it.
+    it("calls speechSynthesis.cancel() when an utterance is pending (speaking=false)", () => {
+      const fake = installFakeSynthesis({ speaking: false, pending: true });
+      cancel();
+      expect(fake.cancelSpy).toHaveBeenCalledTimes(1);
+    });
+
+    // #207 regression: the iOS cancel-then-speak race only triggers when
+    // cancel() actually invokes the native cancel before a speak(). When
+    // nothing is in flight, cancel() must NOT call the native cancel — that
+    // is what lets the common idle path speak cleanly on iOS Safari.
+    it("does NOT call speechSynthesis.cancel() when the engine is idle (speaking=false, pending=false)", () => {
+      const fake = installFakeSynthesis({ speaking: false, pending: false });
+      cancel();
+      expect(fake.cancelSpy).not.toHaveBeenCalled();
+    });
+
+    it("does NOT call speechSynthesis.cancel() when speaking/pending are unreported (undefined)", () => {
+      const fake = installFakeSynthesis();
+      cancel();
+      expect(fake.cancelSpy).not.toHaveBeenCalled();
+    });
+
+    // #207: the call-site pattern is cancel(); speak();. On an idle engine
+    // the native cancel must be skipped entirely so the new utterance
+    // dispatches without tripping the WebKit canceled-utterance bug.
+    it("idle interrupt-then-speak (the #207 pattern) never invokes native cancel before speak", async () => {
+      const fake = installFakeSynthesis({ speaking: false, pending: false });
+      cancel();
+      const p = speak("hello", { rate: 1, pitch: 1 });
+      expect(fake.cancelSpy).not.toHaveBeenCalled();
+      expect(fake.speakSpy).toHaveBeenCalledTimes(1);
+      fake.utterances[0]!.onend?.();
+      await p;
+    });
+
+    it("is safe to call when the in-flight engine's cancel() throws", () => {
+      // Stage a synth that reports speaking (so the guard lets cancel
+      // through) but whose cancel() throws — we should swallow it.
       (globalThis as { window?: unknown }).window = {
         speechSynthesis: {
           getVoices: () => [],
           speak: vi.fn(),
+          speaking: true,
+          pending: false,
           cancel: () => {
             throw new Error("nothing to cancel");
           },
@@ -390,9 +435,13 @@ describe("tts", () => {
     });
 
     it("rejects an in-flight speak() Promise when cancel() fires its onerror", async () => {
-      const fake = installFakeSynthesis();
+      // speaking=true so the conditional cancel() actually invokes the
+      // native cancel (the path that surfaces onerror on outstanding
+      // utterances).
+      const fake = installFakeSynthesis({ speaking: true });
       const inflight = speak("hello", { rate: 1, pitch: 1 });
       cancel();
+      expect(fake.cancelSpy).toHaveBeenCalledTimes(1);
       // Engines surface cancel() to outstanding utterances via onerror
       // with code "interrupted"; the wrapper must translate that into a
       // typed rejection so K9/K12 callers can distinguish kid-cancel

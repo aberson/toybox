@@ -186,18 +186,56 @@ export function speak(text: string, profile: VoiceProfile): Promise<void> {
 }
 
 /**
- * Interrupt any in-flight speech. Safe to call when nothing is
- * speaking — ``speechSynthesis.cancel()`` is itself idempotent.
- * Pending Promises from outstanding ``speak()`` calls will reject
- * with a "interrupted"-style error via the utterance's ``onerror``.
+ * Interrupt any in-flight speech — but ONLY when the engine is actually
+ * ``speaking`` or has a ``pending`` utterance queued. Safe to call when
+ * nothing is speaking: it becomes a no-op.
+ *
+ * Why the guard (issue #207): on iOS Safari, calling
+ * ``speechSynthesis.cancel()`` immediately followed by ``speak()`` trips a
+ * long-standing WebKit bug where the NEW utterance fires
+ * ``onerror:"canceled"`` (or silently drops with no events, no audio).
+ * Every K9/K12 surface interrupts via the ``cancel(); speak();`` pattern —
+ * ReadMeButton, ClickableText, and ``JokeStep`` (replayJoke + autoplay
+ * cleanup). When nothing is in flight (the common case on iOS), the old
+ * unconditional cancel fired needlessly and triggered the race; gating on
+ * ``speaking || pending`` skips the native cancel entirely so the new
+ * utterance starts clean, while a genuinely in-flight utterance is still
+ * interrupted.
+ *
+ * Centralized here, NOT at each call site: this is the single source of
+ * truth so every current caller benefits and a future ``cancel(); speak()``
+ * caller can't reintroduce the bug. It is deliberately NOT folded into
+ * ``speak()`` itself — ``JokeStep`` queues two ``speak()`` calls
+ * back-to-back and relies on Web Speech queuing, so a self-interrupt inside
+ * ``speak()`` would make the punchline cancel the setup line.
+ *
+ * Pending Promises from outstanding ``speak()`` calls reject with an
+ * "interrupted"-style error via the utterance's ``onerror`` when a cancel
+ * actually fires.
+ *
+ * Limitation: the guard trusts the engine's ``speaking``/``pending`` flags.
+ * This is the mechanism issue #207 prescribes, and the guard is never worse
+ * than the old unconditional cancel — if a flag wrongly reads stuck-true we
+ * fire the native cancel exactly as before (no regression); if it wrongly
+ * reads false mid-utterance we skip the cancel and the new utterance simply
+ * queues after the old one (no #207 race, only a missed interrupt). Real-
+ * device behavior is validated by operator iPad UAT via
+ * ``frontend/public/speech-test.html``, not by these unit tests (Web Speech
+ * audio can't run headless).
  */
 export function cancel(): void {
   if (!hasSynthesis()) return;
+  const synth = window.speechSynthesis;
+  // ``speaking``/``pending`` are spec'd booleans but may be undefined on
+  // partial or test engines; treat undefined as "not in flight" so we
+  // default to the safe no-cancel path.
+  if (!synth.speaking && !synth.pending) return;
   try {
-    window.speechSynthesis.cancel();
+    synth.cancel();
   } catch {
-    // Some engines throw if cancel() is called before any speak()
-    // primed the queue. Swallow — caller's UX is unaffected.
+    // Some engines throw if cancel() is called before any speak() primed
+    // the queue. The in-flight guard should preclude that, but swallow
+    // defensively — a failed interrupt must not break the caller's UX.
   }
 }
 
