@@ -1,16 +1,13 @@
 # Task State
 
-**Task:** "Claude Images" = a third `image_gen_mode` value (`claude_svg`) — Claude-authored animated SVG action sprites; + idle-sprite unbreak
-**Status:** CODE COMPLETE, UNCOMMITTED. Refactored from a separate boolean flag into a mutually-exclusive mode alongside cartoon/composite (operator's request). All gates green: backend 2614 pytest (1 ws_origin flake passes in isolation) / mypy 146 / ruff clean; frontend 800 vitest / typecheck / lint. HEAD still `aa7791f` (only the prior checkpoint committed; feature is uncommitted).
-**Last written:** 2026-06-21T20:25:00Z
-**Session SHA:** aa7791f
+**Task:** "Claude Images" = a third `image_gen_mode` value (`claude_svg`) — Claude-authored animated SVG action sprites; + idle-sprite unbreak; + 429 retry/backoff hardening
+**Status:** CODE COMPLETE, UNCOMMITTED. Mode-based (mutually exclusive w/ cartoon/composite) + 429 hardening done. All gates green: backend 2620 pytest (1 pre-existing `ws_origin` flake — passes in isolation) / mypy 146 / ruff clean; frontend 800 vitest / typecheck / lint. HEAD `1881812` (only checkpoints committed; feature uncommitted).
+**Last written:** 2026-06-21T21:05:00Z
+**Session SHA:** 1881812
 
 ## Next Action
 
-Decide one:
-1. **Commit the feature** (scoped `git add` to the change set below; do NOT `git add -A` — skip CRLF-flapping `shared/*.ts` + parallel-session `room-import.*`).
-2. **(a) 429 hardening** — in worker `_run_one_svg`, map 429 → a clear `rate_limited` error + retry-with-backoff honoring Retry-After, and/or space the 10 per-toy calls. The live run proved the subscription token rate-limits direct /v1/messages (see below).
-3. **Live artifact** — still pending; only works when NOT racing this Claude Code session for the subscription budget. Operator path: Settings → Image-gen mode → "Claude Images" → regenerate a toy's sprites.
+Decide: **commit the feature** (scoped `git add` to the change set below; do NOT `git add -A` — skip CRLF-flapping `shared/*.ts` + parallel-session `room-import.*`). Live genuine-artifact capture still pending (subscription rate-limits direct /v1/messages while a Claude Code session runs); operator path: Settings → Image-gen mode → "Claude Images" → regenerate a toy.
 
 ## WIP
 
@@ -23,6 +20,7 @@ Nothing half-applied. Refactor complete + green. Representative SVG (Claude-auth
 - **REMOVED (was the first cut):** standalone boolean flag claude_images_enabled — core module, api router, migration 0030, ClaudeImagesControl.tsx, all App/SettingsPanel/api wiring, and their tests. Local dev DB residue cleaned (schema_migrations v30 row + settings key deleted → back to v29).
 - **Tests:** test_svg_gen, test_worker_svg (mode_probe="claude_svg"), test_static_mime, image_gen_mode core+api claude_svg coverage, ToyActionSprite preferSvg, StepCard preferSvg integration, ToyActionGrid svg-row, ImageGenModeToggle claude_svg.
 - **Live E2E finding:** OAuth auth path WORKS (429 rate_limit_error, never 401; `oauth-2025-04-20` header makes no difference). Subscription token is rate-limited for direct /v1/messages while this Claude Code session runs → couldn't capture a genuine artifact. Error-handling verified live (429 → row failed, no crash, no breaker trip).
+- **429 hardening (done):** svg_gen retries 429/529 with capped backoff honouring `Retry-After` (_SVG_MAX_ATTEMPTS=3, base 2s, cap 20s — capped so the single-consumer worker isn't stalled), then raises new `SvgRateLimitedError`; worker maps it to a clean `claude_images_rate_limited` failure (operator-readable in the grid, not a raw "HTTP Error 429"). Non-429 HTTPError propagates unchanged. +6 tests (retry-then-succeed, exhausted→rate-limited, non-retryable propagates, _retry_delay honour/cap/exponential, worker rate-limited branch).
 
 ## Dead Ends / Decisions
 - "Claude Images" is a MODE, not a boolean — mutually exclusive with cartoon/composite (operator's call; the worker already treated it that way by short-circuiting).
