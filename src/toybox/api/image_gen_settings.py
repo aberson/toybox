@@ -1,10 +1,12 @@
 """Image-gen mode toggle HTTP API.
 
 ``GET /api/settings/image-gen-mode`` returns the persisted mode;
-``PUT`` accepts a body of ``{mode: "cartoon" | "composite"}``,
+``PUT`` accepts a body of ``{mode: "cartoon" | "composite" | "claude_svg"}``,
 persists it, and emits an ``image_gen.mode`` ws envelope. The PUT is
 parent-scope only — operator-controlled household setting, not a
-session action a child could trigger.
+session action a child could trigger. GET is unauthenticated (household
+read) so the kiosk can prefer the ``.svg`` sprite when mode is
+``claude_svg``.
 
 Distinct from the per-toy regenerate endpoints in :mod:`toybox.api.toys`
 — this only changes the dispatch branch the worker picks for the next
@@ -60,13 +62,13 @@ def get_publisher() -> Publisher | None:
 class ImageGenModeResponse(BaseModel):
     """Wire shape for ``GET`` and ``PUT`` ``/api/settings/image-gen-mode``."""
 
-    mode: Literal["cartoon", "composite"]
+    mode: Literal["cartoon", "composite", "claude_svg"]
 
 
 class ImageGenModeUpdate(BaseModel):
     """Request body for ``PUT /api/settings/image-gen-mode``."""
 
-    mode: Literal["cartoon", "composite"]
+    mode: Literal["cartoon", "composite", "claude_svg"]
 
 
 @router.get("/image-gen-mode", response_model=ImageGenModeResponse)

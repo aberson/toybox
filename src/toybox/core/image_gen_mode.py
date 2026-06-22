@@ -10,7 +10,12 @@ The mode is read fresh per-job by the worker, so the operator can flip
 the toggle and have the next regenerate request honour it without a
 backend restart. ``"cartoon"`` keeps the current capability-driven
 dispatch (Tier B SD 1.5 when capable, Tier C composite when not);
-``"composite"`` forces Tier C even on a capable GPU host. The
+``"composite"`` forces Tier C even on a capable GPU host;
+``"claude_svg"`` ("Claude Images") bypasses the local SD pipeline
+entirely and has Claude draw each sprite as a cartoon SVG via the OAuth
+API (idle slot self-animating) — it needs a Claude token, not a GPU, so
+the worker skips the capability/breaker gates for it. The three modes
+are mutually exclusive — one generation backend at a time. The
 ``env_disabled`` hard-off branch in the worker still wins regardless of
 mode.
 """
@@ -27,14 +32,17 @@ from ..ws.topics import Topic
 
 _logger = logging.getLogger(__name__)
 
-ImageGenMode = Literal["cartoon", "composite"]
+ImageGenMode = Literal["cartoon", "composite", "claude_svg"]
 
 IMAGE_GEN_MODE_CARTOON: ImageGenMode = "cartoon"
 IMAGE_GEN_MODE_COMPOSITE: ImageGenMode = "composite"
+IMAGE_GEN_MODE_CLAUDE_SVG: ImageGenMode = "claude_svg"
 IMAGE_GEN_MODE_DEFAULT: ImageGenMode = IMAGE_GEN_MODE_CARTOON
 
 _SETTINGS_KEY = "image_gen_mode"
-_VALID_MODES: frozenset[str] = frozenset({IMAGE_GEN_MODE_CARTOON, IMAGE_GEN_MODE_COMPOSITE})
+_VALID_MODES: frozenset[str] = frozenset(
+    {IMAGE_GEN_MODE_CARTOON, IMAGE_GEN_MODE_COMPOSITE, IMAGE_GEN_MODE_CLAUDE_SVG}
+)
 
 Publisher = Callable[[Envelope], None]
 
@@ -57,6 +65,8 @@ def current_image_gen_mode(conn: sqlite3.Connection) -> ImageGenMode:
         return IMAGE_GEN_MODE_CARTOON
     if raw == IMAGE_GEN_MODE_COMPOSITE:
         return IMAGE_GEN_MODE_COMPOSITE
+    if raw == IMAGE_GEN_MODE_CLAUDE_SVG:
+        return IMAGE_GEN_MODE_CLAUDE_SVG
     # Truncate the unrecognized value so a corrupt blob doesn't flood
     # the logs. Mirrors the format used in :mod:`toybox.core.mic_state`.
     truncated = raw if isinstance(raw, str) and len(raw) <= 64 else f"{str(raw)[:64]}..."
@@ -77,13 +87,17 @@ def set_image_gen_mode(
     """Persist ``mode`` and emit an ``image_gen.mode`` envelope.
 
     Raises :class:`ValueError` when ``mode`` is not one of the literal
-    values ``"cartoon"`` / ``"composite"``.
+    values ``"cartoon"`` / ``"composite"`` / ``"claude_svg"``.
     """
     if mode not in _VALID_MODES:
         raise ValueError(f"invalid image_gen_mode: {mode!r}")
-    canonical: ImageGenMode = (
-        IMAGE_GEN_MODE_CARTOON if mode == IMAGE_GEN_MODE_CARTOON else IMAGE_GEN_MODE_COMPOSITE
-    )
+    canonical: ImageGenMode
+    if mode == IMAGE_GEN_MODE_CARTOON:
+        canonical = IMAGE_GEN_MODE_CARTOON
+    elif mode == IMAGE_GEN_MODE_COMPOSITE:
+        canonical = IMAGE_GEN_MODE_COMPOSITE
+    else:
+        canonical = IMAGE_GEN_MODE_CLAUDE_SVG
     with conn:
         conn.execute(
             "INSERT INTO settings (key, value) VALUES (?, ?) "
@@ -101,6 +115,7 @@ def set_image_gen_mode(
 
 __all__ = [
     "IMAGE_GEN_MODE_CARTOON",
+    "IMAGE_GEN_MODE_CLAUDE_SVG",
     "IMAGE_GEN_MODE_COMPOSITE",
     "IMAGE_GEN_MODE_DEFAULT",
     "ImageGenMode",

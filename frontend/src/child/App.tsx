@@ -251,6 +251,11 @@ export function App(): JSX.Element {
   // fetch keeps a sane value. Passed to StepCard → ReadMeButton so
   // the TTS call is truncated at the parent-configured limit.
   const [spokenTextLimit, setSpokenTextLimit] = useState<number>(150);
+  // Whether to prefer the Claude-authored ``.svg`` sprite — true only
+  // when the operator picked the ``claude_svg`` image-gen mode. Default
+  // false so a slow / failed bootstrap keeps the common PNG path. Passed
+  // to StepCard → ToyActionSprite as ``preferSvg``.
+  const [preferSvg, setPreferSvg] = useState<boolean>(false);
 
   if (apiRef.current === null) {
     apiRef.current = new ApiClient({
@@ -310,7 +315,7 @@ export function App(): JSX.Element {
         // Phase R Step R2: batch the spoken text limit fetch alongside the
         // feature flag fetches so all six HTTP round-trips fire in parallel.
         // The limit fetch is the last element; its index is ``flagKeys.length``.
-        const [flagResults, limitResult] = await Promise.all([
+        const [flagResults, limitResult, imageGenModeResult] = await Promise.all([
           Promise.allSettled(
             flagKeys.map((key) =>
               api.getFeatureFlag(key, { signal: aborter.signal }),
@@ -323,6 +328,20 @@ export function App(): JSX.Element {
                 // eslint-disable-next-line no-console
                 console.warn(
                   "spoken text limit initial fetch failed, using default",
+                  err,
+                );
+              }
+              return null;
+            }),
+          // Image-gen mode — same fail-soft posture as the
+          // spoken-text-limit fetch (default PNG path stays on failure).
+          api
+            .getImageGenMode({ signal: aborter.signal })
+            .catch((err: unknown) => {
+              if (!isAbortError(err)) {
+                // eslint-disable-next-line no-console
+                console.warn(
+                  "image_gen_mode initial fetch failed, using default",
                   err,
                 );
               }
@@ -355,6 +374,9 @@ export function App(): JSX.Element {
         }
         if (limitResult !== null) {
           setSpokenTextLimit(limitResult.value);
+        }
+        if (imageGenModeResult !== null) {
+          setPreferSvg(imageGenModeResult.mode === "claude_svg");
         }
         const ws = new ChildWsClient({
           url: deriveWsUrl(),
@@ -800,6 +822,9 @@ export function App(): JSX.Element {
               // ReadMeButton truncates TTS at the parent-configured
               // word-boundary limit.
               spokenTextLimit={spokenTextLimit}
+              // Prefer the Claude-authored .svg sprite for the cast when
+              // the operator picked the "claude_svg" image-gen mode.
+              preferSvg={preferSvg}
             />
           </>
         )}

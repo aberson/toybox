@@ -62,6 +62,11 @@ from .models import (
     ImageGenTimeoutError,
     ToyActionStatus,
 )
+from .svg_gen import (
+    ClaudeImagesUnavailable,
+    SvgGenerationError,
+    SvgRateLimitedError,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -111,13 +116,15 @@ def _output_path(toy_id: str) -> Path:
     return _data_root() / "images" / _TOY_ACTIONS_SUBDIR / toy_id
 
 
-def _stored_image_path(toy_id: str, slot: str) -> str:
-    """DB-portable ``image_path`` value for a (toy, slot) PNG.
+def _stored_image_path(toy_id: str, slot: str, ext: str = "png") -> str:
+    """DB-portable ``image_path`` value for a (toy, slot) sprite.
 
     Mirrors :func:`toybox.storage.images.relative_committed_path` —
     forward-slash paths so Windows + Linux dev DBs round-trip cleanly.
+    ``ext`` is ``"png"`` for the local SD pipeline and ``"svg"`` for the
+    Claude-Images path.
     """
-    return f"data/images/{_TOY_ACTIONS_SUBDIR}/{toy_id}/{slot}.png"
+    return f"data/images/{_TOY_ACTIONS_SUBDIR}/{toy_id}/{slot}.{ext}"
 
 
 # Type aliases for the worker constructor.
@@ -151,6 +158,8 @@ class ImageGenWorker:
         | None = None,
         capability_probe: Callable[[], tuple[bool, CapabilityReason, str]] | None = None,
         mode_probe: Callable[[], str] | None = None,
+        svg_generator: Callable[[bytes, str, GenerationContext], Awaitable[str]]
+        | None = None,
         shutdown_grace_sec: float = _DEFAULT_SHUTDOWN_GRACE_SEC,
     ) -> None:
         self._conn_factory = conn_factory
@@ -179,6 +188,12 @@ class ImageGenWorker:
         # conn factory on each dispatch (same per-job freshness as
         # the capability probe).
         self._mode_probe = mode_probe
+        # Claude-Images SVG path override (test affordance, same posture
+        # as the pipeline/composite overrides above). ``svg_generator``
+        # resolves the real :func:`svg_gen.generate_action_svg` lazily on
+        # first dispatch; the SVG path is selected by ``image_gen_mode ==
+        # "claude_svg"`` (read via :meth:`_probe_mode`), not a separate flag.
+        self._svg_generator_override = svg_generator
 
     # ------------------------------------------------------------------
     # Public API
@@ -461,6 +476,35 @@ class ImageGenWorker:
             )
             return
 
+        # Probe the operator's image-gen mode FIRST — it's the single
+        # mutually-exclusive backend selector. Fresh DB read per dispatch
+        # so a toggle takes effect without a restart; run on a thread so a
+        # slow/locked DB doesn't block the loop, and a probe failure must
+        # NOT leave the row stuck in ``queued``.
+        #   - "claude_svg" → Claude draws the sprite as an SVG (needs a
+        #     Claude token, not a GPU) — bypasses the SD capability /
+        #     breaker gates entirely (handled in _run_one_svg).
+        #   - "cartoon"/"composite" → the local SD pipeline below
+        #     (Tier B / Tier C), gated by capability + the breaker.
+        try:
+            mode = await asyncio.to_thread(self._probe_mode)
+        except Exception:  # noqa: BLE001 -- defensive
+            _logger.exception(
+                "image_gen worker: mode probe raised for toy_id=%s slot=%s",
+                toy_id,
+                slot,
+            )
+            await self._mark_failed(
+                toy_id,
+                slot,
+                seed,
+                error="image_gen_mode_probe_failed",
+            )
+            return
+        if mode == "claude_svg":
+            await self._run_one_svg(toy_id, slot, seed)
+            return
+
         breaker = get_image_gen_breaker()
 
         # F.5-3a: probe capability up front so the breaker check below
@@ -492,36 +536,13 @@ class ImageGenWorker:
             )
             return
 
-        # F.5-toggle: operator can FORCE composite output even on a
-        # capable host via ``settings.image_gen_mode = "composite"``.
-        # The env_disabled hard-off branch above still wins regardless
-        # of mode (deliberate — TOYBOX_IMAGE_GEN_ENABLED=false is the
-        # operator's hard kill switch).
-        #
-        # Wrapped in try/except mirroring the capability probe above:
-        # ``_probe_mode`` opens a fresh DB connection per dispatch, so
-        # an OperationalError ("database is locked"), a conn-factory
-        # raise, or any other sqlite hiccup must NOT bubble out of the
-        # consumer task. If it did, the row would be left stuck in
-        # ``queued`` until the next restart-recovery sweep picked it up.
-        # Run the sync probe on a worker thread so a slow / locked DB
-        # doesn't block the event loop, matching the ``_load_toy_context``
-        # / ``_with_conn`` pattern elsewhere in this file.
-        try:
-            mode = await asyncio.to_thread(self._probe_mode)
-        except Exception:  # noqa: BLE001 -- defensive
-            _logger.exception(
-                "image_gen worker: mode probe raised for toy_id=%s slot=%s",
-                toy_id,
-                slot,
-            )
-            await self._mark_failed(
-                toy_id,
-                slot,
-                seed,
-                error="image_gen_mode_probe_failed",
-            )
-            return
+        # F.5-toggle: the operator can FORCE composite output even on a
+        # capable host via ``settings.image_gen_mode = "composite"`` (the
+        # ``mode`` resolved at the top of this method). The env_disabled
+        # hard-off branch above still wins regardless of mode (deliberate
+        # — TOYBOX_IMAGE_GEN_ENABLED=false is the operator's hard kill
+        # switch). ``claude_svg`` already returned above, so here mode is
+        # only ever ``cartoon`` or ``composite``.
         composite_path = (not capable) or (mode == "composite")
 
         # Per-pipeline breaker check. Tier B only — Tier C ignores the
@@ -727,6 +748,19 @@ class ImageGenWorker:
             )
             return
 
+        # Keep exactly one format per slot on disk: drop any stale SVG (or
+        # WEBP) for this slot so the kiosk's svg-first load doesn't surface
+        # an outdated Claude sprite after the operator turns Claude Images
+        # off and regenerates. Best-effort — a missing file is fine.
+        try:
+            await asyncio.to_thread(self._remove_sibling_formats, out_dir, slot, "png")
+        except Exception:  # noqa: BLE001 -- best-effort cleanup
+            _logger.warning(
+                "image_gen worker: sibling-format cleanup failed for %s/%s",
+                toy_id,
+                slot,
+            )
+
         # Commit success.
         stored_path = _stored_image_path(toy_id, slot)
         await self._upsert(
@@ -744,6 +778,160 @@ class ImageGenWorker:
         )
         if not composite_path:
             breaker.check_and_record(success=True)
+
+    async def _run_one_svg(self, toy_id: str, slot: str, seed: int) -> None:
+        """Generate one action sprite as a Claude-authored SVG.
+
+        Parallel to :meth:`_run_one_body`'s SD path but for
+        ``image_gen_mode == "claude_svg"``: no SD capability / breaker
+        gates (SVG needs a Claude OAuth token, not a GPU). On any failure
+        the slot is marked ``failed`` and the kiosk falls back to an
+        existing PNG (or hides the sprite) — Claude outages never trip the
+        SD circuit breaker, which exists to gate GPU/pipeline health.
+        """
+        await self._upsert(toy_id, slot, ToyActionStatus.running, seed=seed)
+        await self._emit_status(toy_id, slot, ToyActionStatus.running)
+
+        try:
+            ctx, reference_bytes = await asyncio.to_thread(
+                self._load_toy_context_sync,
+                toy_id,
+            )
+        except (LookupError, FileNotFoundError, PermissionError, ValueError) as exc:
+            _logger.warning(
+                "image_gen worker (svg): toy lookup failed toy_id=%s slot=%s: %s",
+                toy_id,
+                slot,
+                exc,
+            )
+            await self._mark_failed(toy_id, slot, seed, error=str(exc)[:200])
+            return
+        except Exception as exc:  # noqa: BLE001 -- defensive
+            _logger.exception(
+                "image_gen worker (svg): unexpected error loading context for %s/%s",
+                toy_id,
+                slot,
+            )
+            await self._mark_failed(toy_id, slot, seed, error=str(exc)[:200])
+            return
+
+        generate = self._resolve_svg_generator()
+        try:
+            svg_text = await generate(reference_bytes, slot, ctx)
+        except ClaudeImagesUnavailable as exc:
+            _logger.warning(
+                "image_gen worker (svg): unavailable toy_id=%s slot=%s: %s",
+                toy_id,
+                slot,
+                exc,
+            )
+            await self._mark_failed(
+                toy_id,
+                slot,
+                seed,
+                error="claude_images_unavailable",
+            )
+            return
+        except TimeoutError:
+            _logger.warning(
+                "image_gen worker (svg): timeout toy_id=%s slot=%s",
+                toy_id,
+                slot,
+            )
+            await self._mark_failed(
+                toy_id,
+                slot,
+                seed,
+                error="claude_images_timeout",
+            )
+            return
+        except SvgRateLimitedError as exc:
+            _logger.warning(
+                "image_gen worker (svg): rate limited toy_id=%s slot=%s: %s",
+                toy_id,
+                slot,
+                exc,
+            )
+            await self._mark_failed(
+                toy_id,
+                slot,
+                seed,
+                error="claude_images_rate_limited",
+            )
+            return
+        except SvgGenerationError as exc:
+            _logger.warning(
+                "image_gen worker (svg): generation error toy_id=%s slot=%s: %s",
+                toy_id,
+                slot,
+                exc,
+            )
+            await self._mark_failed(toy_id, slot, seed, error=str(exc)[:200])
+            return
+        except Exception as exc:  # noqa: BLE001 -- one bad gen shouldn't kill the worker
+            _logger.exception(
+                "image_gen worker (svg): generator raised for toy_id=%s slot=%s",
+                toy_id,
+                slot,
+            )
+            await self._mark_failed(toy_id, slot, seed, error=str(exc)[:200])
+            return
+
+        out_dir = _output_path(toy_id)
+        out_path = out_dir / f"{slot}.svg"
+        try:
+            await asyncio.to_thread(self._write_svg, out_path, svg_text)
+        except (FileNotFoundError, PermissionError, OSError) as exc:
+            _logger.exception(
+                "image_gen worker (svg): failed to write SVG for %s/%s",
+                toy_id,
+                slot,
+            )
+            await self._mark_failed(toy_id, slot, seed, error=str(exc)[:200])
+            return
+
+        # Run-time supersede check — if a newer enqueue arrived mid-gen,
+        # delete the SVG we just wrote and skip the done-write.
+        if await self._is_superseded(toy_id, slot, seed=seed):
+            try:
+                await asyncio.to_thread(self._delete_png, out_path)
+            except Exception:  # noqa: BLE001 -- best-effort
+                _logger.warning(
+                    "image_gen worker (svg): failed to delete superseded SVG %s",
+                    out_path,
+                )
+            _logger.info(
+                "image_gen worker (svg): discarded superseded output toy_id=%s slot=%s",
+                toy_id,
+                slot,
+            )
+            return
+
+        # Keep exactly one format per slot on disk: drop any stale PNG/WEBP
+        # so the kiosk's svg-first load wins unambiguously.
+        try:
+            await asyncio.to_thread(self._remove_sibling_formats, out_dir, slot, "svg")
+        except Exception:  # noqa: BLE001 -- best-effort cleanup
+            _logger.warning(
+                "image_gen worker (svg): sibling-format cleanup failed for %s/%s",
+                toy_id,
+                slot,
+            )
+
+        stored_path = _stored_image_path(toy_id, slot, ext="svg")
+        await self._upsert(
+            toy_id,
+            slot,
+            ToyActionStatus.done,
+            image_path=stored_path,
+            seed=seed,
+        )
+        await self._emit_status(
+            toy_id,
+            slot,
+            ToyActionStatus.done,
+            image_path=stored_path,
+        )
 
     async def _mark_cancelled_best_effort(
         self,
@@ -836,6 +1024,22 @@ class ImageGenWorker:
         from .composite import composite_action
 
         return composite_action
+
+    def _resolve_svg_generator(
+        self,
+    ) -> Callable[[bytes, str, GenerationContext], Awaitable[str]]:
+        """Return the SVG-generator callable, honouring the test override.
+
+        Dispatched to when ``image_gen_mode == "claude_svg"``. Production
+        callers pass ``None`` and we resolve the real
+        :func:`svg_gen.generate_action_svg` lazily (it builds the OAuth
+        client on demand).
+        """
+        if self._svg_generator_override is not None:
+            return self._svg_generator_override
+        from .svg_gen import generate_action_svg
+
+        return generate_action_svg
 
     def _probe_capability(self) -> tuple[bool, CapabilityReason, str]:
         """Return the resolved capability, honouring the test override.
@@ -1142,11 +1346,39 @@ class ImageGenWorker:
 
     @staticmethod
     def _delete_png(out_path: Path) -> None:
-        """Delete a PNG. Idempotent — missing file is not an error."""
+        """Delete a sprite file. Idempotent — missing file is not an error.
+
+        Named for the PNG path (its first caller) but used for the SVG
+        path too — it's a generic ``unlink``.
+        """
         try:
             out_path.unlink()
         except FileNotFoundError:
             pass
+
+    @staticmethod
+    def _write_svg(out_path: Path, svg_text: str) -> None:
+        """Write SVG text (UTF-8), creating the parent directory if missing."""
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(svg_text, encoding="utf-8")
+
+    @staticmethod
+    def _remove_sibling_formats(out_dir: Path, slot: str, keep_ext: str) -> None:
+        """Delete other-format sprites for ``slot`` so one format wins on disk.
+
+        The kiosk loads ``<slot>.svg`` first then ``<slot>.png``; a stale
+        sibling left from a previous generation in the other format would
+        make the wrong sprite win after a format-switching regenerate.
+        Best-effort — a missing file is fine.
+        """
+        for ext in ("svg", "png", "webp"):
+            if ext == keep_ext:
+                continue
+            sibling = out_dir / f"{slot}.{ext}"
+            try:
+                sibling.unlink()
+            except FileNotFoundError:
+                pass
 
     @staticmethod
     def _fresh_seed() -> int:

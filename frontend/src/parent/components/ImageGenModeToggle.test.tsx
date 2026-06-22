@@ -30,7 +30,7 @@ afterEach(() => {
 });
 
 describe("ImageGenModeToggle", () => {
-  it("renders both options with their descriptors", async () => {
+  it("renders all three options with their descriptors", async () => {
     const api = buildStubApi("cartoon");
     render(<ImageGenModeToggle api={api as unknown as ApiClient} />);
 
@@ -41,9 +41,36 @@ describe("ImageGenModeToggle", () => {
     const compositeBtn = await screen.findByTestId(
       "image-gen-mode-btn-composite",
     );
+    const claudeBtn = await screen.findByTestId(
+      "image-gen-mode-btn-claude_svg",
+    );
     expect(api.getImageGenMode).toHaveBeenCalled();
     expect(cartoonBtn.textContent).toContain("SD 1.5 stylized");
     expect(compositeBtn.textContent).toContain("Pillow templates");
+    expect(claudeBtn.textContent).toContain("Claude draws");
+  });
+
+  it("calls setImageGenMode('claude_svg') when operator clicks Claude Images", async () => {
+    const api = buildStubApi("cartoon");
+    render(<ImageGenModeToggle api={api as unknown as ApiClient} />);
+    await vi.waitFor(() =>
+      expect(
+        screen.getByTestId("image-gen-mode-btn-cartoon").getAttribute("data-active"),
+      ).toBe("true"),
+    );
+
+    fireEvent.click(screen.getByTestId("image-gen-mode-btn-claude_svg"));
+
+    await vi.waitFor(() =>
+      expect(api.setImageGenMode).toHaveBeenCalledWith("claude_svg"),
+    );
+    await vi.waitFor(() =>
+      expect(
+        screen
+          .getByTestId("image-gen-mode-btn-claude_svg")
+          .getAttribute("data-active"),
+      ).toBe("true"),
+    );
   });
 
   it("reflects the value loaded from getImageGenMode on initial render", async () => {

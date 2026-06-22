@@ -722,10 +722,12 @@ export interface MicEnabledResponse {
 }
 
 // Mirrors backend ``ImageGenMode`` literal alias
-// (toybox/core/image_gen_mode.py): the operator-controlled toggle that
-// forces composite output even on a capable GPU host. Default is
-// ``cartoon``; legacy DBs without the seed row resolve the same.
-export type ImageGenMode = "cartoon" | "composite";
+// (toybox/core/image_gen_mode.py): the operator-controlled, mutually
+// exclusive sprite-generation backend. ``cartoon`` = SD 1.5 (GPU),
+// ``composite`` = Pillow templates (no GPU), ``claude_svg`` = Claude
+// draws an animated SVG via the subscription. Default is ``cartoon``;
+// legacy DBs without the seed row resolve the same.
+export type ImageGenMode = "cartoon" | "composite" | "claude_svg";
 
 export interface ImageGenModeResponse {
   mode: ImageGenMode;
@@ -2093,6 +2095,7 @@ export class ApiClient {
       },
     );
   }
+
 
   // Phase J step J1: play-queue target depth read-write pair. The GET
   // is unauthenticated (matches ``getTranscriptRetention`` — household

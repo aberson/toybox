@@ -130,6 +130,20 @@ def test_put_sets_then_get_returns_new_value(
     assert get_response.json() == {"mode": "composite"}
 
 
+def test_put_accepts_claude_svg_mode(
+    client: TestClient,
+    parent_headers: dict[str, str],
+) -> None:
+    put_response = client.put(
+        "/api/settings/image-gen-mode",
+        json={"mode": "claude_svg"},
+        headers=parent_headers,
+    )
+    assert put_response.status_code == 200
+    assert put_response.json() == {"mode": "claude_svg"}
+    assert client.get("/api/settings/image-gen-mode").json() == {"mode": "claude_svg"}
+
+
 @pytest.mark.parametrize("bad_mode", ["foo", ""])
 def test_put_invalid_mode_rejected(
     client: TestClient,

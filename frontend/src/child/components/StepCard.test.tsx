@@ -96,8 +96,34 @@ describe("StepCard sprite branch", () => {
     const sprite = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
     expect(sprite.dataset["slot"]).toBe("looking");
     expect(sprite.dataset["toyId"]).toBe("toy-abc");
-    // Phase V: initial src is .png during the CSS intro animation phase.
-    // Format transitions to .webp only after animationend fires for idle slot.
+    // Every slot renders the static .png (the broken SVD .webp swap was
+    // removed); the CSS intro animation plays on the same element.
+    expect(sprite.getAttribute("src")).toBe(
+      "/api/static/images/toy_actions/toy-abc/looking.png",
+    );
+  });
+
+  // Integration through the production caller: preferSvg →
+  // ToyActionSprite preferSvg → the sprite loads .svg first.
+  it("prefers the .svg sprite when preferSvg is true", () => {
+    const activity = fakeActivity({
+      toy_ids: ["toy-abc"],
+      steps: [fakeStep({ action_slot: "looking" })],
+    });
+    render(<StepCard activity={activity} preferSvg={true} />);
+    const sprite = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
+    expect(sprite.getAttribute("src")).toBe(
+      "/api/static/images/toy_actions/toy-abc/looking.svg",
+    );
+  });
+
+  it("loads .png directly when preferSvg is false/omitted", () => {
+    const activity = fakeActivity({
+      toy_ids: ["toy-abc"],
+      steps: [fakeStep({ action_slot: "looking" })],
+    });
+    render(<StepCard activity={activity} preferSvg={false} />);
+    const sprite = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
     expect(sprite.getAttribute("src")).toBe(
       "/api/static/images/toy_actions/toy-abc/looking.png",
     );

@@ -62,6 +62,12 @@ export interface StepCardProps {
   // means no truncation (off). Optional + defaults to 0 so existing
   // tests that mount StepCard without an App don't need to thread it.
   spokenTextLimit?: number;
+  // When true the cast sprites prefer the Claude-authored ``<slot>.svg``
+  // (idle self-animating) over the PNG — set when the operator picked the
+  // ``claude_svg`` image-gen mode. Threaded from App.tsx's bootstrap
+  // fetch; optional + default false so layout-only tests don't pay a
+  // wasted ``.svg`` 404.
+  preferSvg?: boolean;
 }
 
 // Step kinds that should get a Read Me button. ``song`` is excluded —
@@ -417,6 +423,9 @@ export function StepCard(props: StepCardProps): JSX.Element {
   // existing tests / non-K-content step renders.
   const songsEnabled = props.songsEnabled !== false;
   const jokesEnabled = props.jokesEnabled !== false;
+  // Prefer the .svg sprite for the cast when set. Default false so the
+  // common (non-claude_svg) path loads .png directly (no .svg 404 churn).
+  const preferSvg = props.preferSvg === true;
   // Phase K K12: auto-advance gating. When a song/joke step renders
   // and its content master is OFF, the kiosk silently advances past
   // it. This must be a STEP-LEVEL gate (active on ``currentStep``),
@@ -668,6 +677,7 @@ export function StepCard(props: StepCardProps): JSX.Element {
                     member.displayName.length > 0 ? member.displayName : undefined
                   }
                   size={spriteSize}
+                  preferSvg={preferSvg}
                 />
               ))}
             </div>
@@ -731,6 +741,7 @@ export function StepCard(props: StepCardProps): JSX.Element {
                     member.displayName.length > 0 ? member.displayName : undefined
                   }
                   size={spriteSize}
+                  preferSvg={preferSvg}
                 />
               ))}
             </div>

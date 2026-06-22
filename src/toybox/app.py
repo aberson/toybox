@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import mimetypes
 import sqlite3
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
@@ -74,8 +75,27 @@ from .ws.topics import Topic
 _logger = logging.getLogger(__name__)
 
 
+def _register_static_mime_types() -> None:
+    """Register content-types Python's ``mimetypes`` registry can miss.
+
+    ``StaticFiles`` derives the ``Content-Type`` header from the stdlib
+    ``mimetypes`` module. On a stock Windows install that registry has no
+    entry for ``.webp`` (served as ``text/plain``) and may lack ``.svg``,
+    so the toy-action sprite mounts hand the browser the wrong type. The
+    browser sniffs and renders anyway, but the header is wrong and any
+    strict consumer (or a future fetch() that trusts the type) breaks.
+    Register both explicitly so the mounts are correct everywhere.
+
+    ``mimetypes.add_type`` is idempotent, so calling this on every
+    ``create_app()`` (the tests build many apps) is safe.
+    """
+    mimetypes.add_type("image/webp", ".webp")
+    mimetypes.add_type("image/svg+xml", ".svg")
+
+
 def create_app() -> FastAPI:
     """Build and return the FastAPI app for the Phase A skeleton."""
+    _register_static_mime_types()
     app = FastAPI(title="toybox", version="0.1.0")
     app.include_router(health_router)
     app.include_router(listening_router)

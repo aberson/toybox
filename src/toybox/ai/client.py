@@ -36,9 +36,16 @@ _logger = logging.getLogger(__name__)
 
 DEFAULT_TEXT_MODEL = "claude-sonnet-4-6"
 DEFAULT_VISION_MODEL = "claude-haiku-4-5-20251001"
+# SVG sprite generation (the "Claude Images" flag) draws a cartoon SVG of
+# the toy from its reference photo — a far harder task than the one-line
+# field-suggestion vision call, so it needs a capable model rather than the
+# haiku vision default. Pinned to Opus 4.8 (the operator's subscription
+# tier) and overridable via env.
+DEFAULT_SVG_MODEL = "claude-opus-4-8"
 
 TEXT_MODEL_ENV = "TOYBOX_CLAUDE_TEXT_MODEL"
 VISION_MODEL_ENV = "TOYBOX_CLAUDE_VISION_MODEL"
+SVG_MODEL_ENV = "TOYBOX_CLAUDE_SVG_MODEL"
 
 # Messages API endpoint + wire-version header. The version pin is the
 # canonical Anthropic-recommended value -- it locks the response shape
@@ -57,6 +64,11 @@ def text_model() -> str:
 def vision_model() -> str:
     """Return the configured vision model id."""
     return os.environ.get(VISION_MODEL_ENV, DEFAULT_VISION_MODEL)
+
+
+def svg_model() -> str:
+    """Return the configured Claude-Images SVG-generation model id."""
+    return os.environ.get(SVG_MODEL_ENV, DEFAULT_SVG_MODEL)
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,8 +119,15 @@ class AIClient(Protocol):
         prompt: str,
         media_type: str = "image/png",
         max_tokens: int = 512,
+        model: str | None = None,
+        system: str | None = None,
     ) -> AIResponse:
-        """Describe ``image_bytes`` against the configured vision model."""
+        """Describe ``image_bytes`` against a vision-capable model.
+
+        ``model`` overrides the default vision model (the Claude-Images
+        SVG path passes :func:`svg_model`); ``system`` adds a system
+        prompt. Both default to the prior behaviour when omitted.
+        """
         ...
 
 
@@ -234,33 +253,36 @@ class AnthropicClient:
         prompt: str,
         media_type: str,
         max_tokens: int,
+        model: str,
+        system: str | None,
     ) -> AIResponse:  # pragma: no cover - exercised only against live API
         import base64
 
         b64 = base64.b64encode(image_bytes).decode("ascii")
-        data = self._post_messages(
-            {
-                "model": vision_model(),
-                "max_tokens": max_tokens,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "image",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": media_type,
-                                    "data": b64,
-                                },
+        payload: dict[str, Any] = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": media_type,
+                                "data": b64,
                             },
-                            {"type": "text", "text": prompt},
-                        ],
-                    }
-                ],
-            }
-        )
-        return AIResponse(text=self._extract_text(data), model=vision_model())
+                        },
+                        {"type": "text", "text": prompt},
+                    ],
+                }
+            ],
+        }
+        if system is not None:
+            payload["system"] = system
+        data = self._post_messages(payload)
+        return AIResponse(text=self._extract_text(data), model=model)
 
     async def describe_image(
         self,
@@ -269,9 +291,17 @@ class AnthropicClient:
         prompt: str,
         media_type: str = "image/png",
         max_tokens: int = 512,
+        model: str | None = None,
+        system: str | None = None,
     ) -> AIResponse:
         return await asyncio.to_thread(
-            self._describe_image_sync, image_bytes, prompt, media_type, max_tokens
+            self._describe_image_sync,
+            image_bytes,
+            prompt,
+            media_type,
+            max_tokens,
+            model or vision_model(),
+            system,
         )
 
 
@@ -333,19 +363,27 @@ class StubClient:
         prompt: str,
         media_type: str = "image/png",
         max_tokens: int = 512,
+        model: str | None = None,
+        system: str | None = None,
     ) -> AIResponse:
+        used_model = model or vision_model()
         self.calls.append(
             (
                 "describe_image",
                 (image_bytes, prompt),
-                {"media_type": media_type, "max_tokens": max_tokens},
+                {
+                    "media_type": media_type,
+                    "max_tokens": max_tokens,
+                    "model": used_model,
+                    "system": system,
+                },
             )
         )
         if self._image_responses:
             text = self._image_responses.pop(0)
         else:
-            text = f"[stub:{vision_model()}] {prompt} ({len(image_bytes)} bytes)"
-        return AIResponse(text=text, model=vision_model())
+            text = f"[stub:{used_model}] {prompt} ({len(image_bytes)} bytes)"
+        return AIResponse(text=text, model=used_model)
 
 
 __all__ = [
@@ -353,12 +391,15 @@ __all__ = [
     "AIMessage",
     "AIResponse",
     "AnthropicClient",
+    "DEFAULT_SVG_MODEL",
     "DEFAULT_TEXT_MODEL",
     "DEFAULT_VISION_MODEL",
+    "SVG_MODEL_ENV",
     "StubClient",
     "SyncAIClient",
     "TEXT_MODEL_ENV",
     "VISION_MODEL_ENV",
+    "svg_model",
     "text_model",
     "vision_model",
 ]

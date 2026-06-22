@@ -4,6 +4,11 @@
 //   1. URL composition + alt text shape (with + without display name)
 //   2. ``onError`` removes the element so a 404 renders gracefully
 //   3. Phase V: CSS intro animation state machine (data-animating attr)
+//
+// The Phase V steady-state ``.webp`` swap (SVD-generated animated idle
+// sprite) was removed after every generated webp came out garbled — the
+// kiosk now renders the static ``.png`` for every slot. These tests pin
+// the png-only contract so the broken swap can't silently return.
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -15,9 +20,6 @@ afterEach(() => {
 });
 
 describe("ToyActionSprite", () => {
-  // Phase V BREAKING CHANGE: initial src is .png (not .webp) because the
-  // intro animation plays with the png; webp is only loaded after
-  // animationend fires for the idle slot.
   it("renders an <img> with the correct src + alt when toyId and slot are set", () => {
     render(
       <ToyActionSprite
@@ -27,7 +29,6 @@ describe("ToyActionSprite", () => {
       />,
     );
     const img = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
-    // Phase V: initial src is .png during the intro animation phase.
     expect(img.getAttribute("src")).toBe(
       "/api/static/images/toy_actions/toy-abc/looking.png",
     );
@@ -41,29 +42,34 @@ describe("ToyActionSprite", () => {
     expect(img.dataset["slot"]).toBe("looking");
   });
 
-  // Phase V: WebP fallback fires only during idle steady state (after
-  // animationend transitions format to webp for idle slot).
-  // Restructured: render with slot="idle", fire animationend to trigger
-  // webp, then fire error to test webp→png fallback.
-  it("falls back to png on webp 404", () => {
-    render(<ToyActionSprite toyId="toy-missing" slot="idle" />);
+  // The idle slot used to swap png→webp after the intro animation. That
+  // swap is gone: idle stays on the static png both at mount and after the
+  // intro animation completes.
+  it("keeps the idle slot on png both before and after the intro animation", () => {
+    render(<ToyActionSprite toyId="toy-1" slot="idle" />);
     const img = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
-    // During intro animation, format is png.
     expect(img.getAttribute("src")).toBe(
-      "/api/static/images/toy_actions/toy-missing/idle.png",
+      "/api/static/images/toy_actions/toy-1/idle.png",
     );
-    // Fire animationend to transition idle slot to webp steady state.
+    // animationend must NOT introduce a .webp (or any other) src swap.
     fireEvent.animationEnd(img);
-    const imgAfterAnim = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
-    expect(imgAfterAnim.getAttribute("src")).toBe(
-      "/api/static/images/toy_actions/toy-missing/idle.webp",
+    const imgAfter = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
+    expect(imgAfter.getAttribute("src")).toBe(
+      "/api/static/images/toy_actions/toy-1/idle.png",
     );
-    // Now fire error to test webp→png fallback.
-    fireEvent.error(imgAfterAnim);
-    const imgAfterError = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
-    expect(imgAfterError.getAttribute("src")).toBe(
-      "/api/static/images/toy_actions/toy-missing/idle.png",
+    expect(imgAfter.getAttribute("src")).not.toContain(".webp");
+  });
+
+  it("hides itself when the idle png 404s (single error → hidden)", () => {
+    const { container } = render(
+      <ToyActionSprite toyId="toy-missing" slot="idle" />,
     );
+    const img = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
+    // No intermediate webp step — one png error goes straight to hidden.
+    fireEvent.error(img);
+    expect(
+      container.querySelector('[data-testid="toy-action-sprite"]'),
+    ).toBeNull();
   });
 
   it("hides itself when png fails to load for a non-idle slot", () => {
@@ -71,8 +77,6 @@ describe("ToyActionSprite", () => {
       <ToyActionSprite toyId="toy-missing" slot="jumping" />,
     );
     const img = screen.getByTestId("toy-action-sprite");
-    // Phase V: non-idle slot has no webp phase — one error event goes
-    // straight from png to hidden.
     fireEvent.error(img);
     expect(
       container.querySelector('[data-testid="toy-action-sprite"]'),
@@ -97,37 +101,27 @@ describe("ToyActionSprite", () => {
     expect(img.alt).toBe("idle");
   });
 
-  // Cache-bust contract: Phase V BREAKING CHANGE — initial src is .png (not .webp).
-  it("appends ?v=<cacheKey> to the initial png src when cacheKey is provided", () => {
-    render(
-      <ToyActionSprite toyId="t" slot="idle" cacheKey="seed-12345" />,
-    );
+  it("appends ?v=<cacheKey> to the png src when cacheKey is provided", () => {
+    render(<ToyActionSprite toyId="t" slot="idle" cacheKey="seed-12345" />);
     const img = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
-    // Phase V: initial src is .png during intro animation.
     expect(img.getAttribute("src")).toBe(
       "/api/static/images/toy_actions/t/idle.png?v=seed-12345",
     );
   });
 
-  // Phase V BREAKING CHANGE: initial src is .png (not .webp).
   it("emits the bare png URL with no query string when cacheKey is omitted", () => {
     render(<ToyActionSprite toyId="t" slot="idle" />);
     const img = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
-    // Phase V: initial src is .png during intro animation.
     expect(img.getAttribute("src")).toBe(
       "/api/static/images/toy_actions/t/idle.png",
     );
   });
 
-  // Phase V BREAKING CHANGE: initial src is .png (not .webp); cacheKey applies
-  // to whichever format is currently active (png during intro, webp after idle
-  // animationend).
   it("URL-encodes the cacheKey value (space and ampersand)", () => {
     const { rerender } = render(
       <ToyActionSprite toyId="t" slot="idle" cacheKey="a b" />,
     );
     let img = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
-    // Phase V: initial src is .png during intro animation.
     expect(img.getAttribute("src")).toBe(
       "/api/static/images/toy_actions/t/idle.png?v=a%20b",
     );
@@ -138,40 +132,7 @@ describe("ToyActionSprite", () => {
     );
   });
 
-  it("applies cacheKey to webp src after idle animationEnd", () => {
-    render(<ToyActionSprite toyId="t" slot="idle" cacheKey="seed-xyz" />);
-    const img = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
-    expect(img.getAttribute("src")).toBe(
-      "/api/static/images/toy_actions/t/idle.png?v=seed-xyz",
-    );
-    fireEvent.animationEnd(img);
-    const imgAfter = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
-    expect(imgAfter.getAttribute("src")).toBe(
-      "/api/static/images/toy_actions/t/idle.webp?v=seed-xyz",
-    );
-  });
-
-  it("hides itself after both webp and png fail in idle steady state", () => {
-    const { container } = render(
-      <ToyActionSprite toyId="toy-missing" slot="idle" />,
-    );
-    const img = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
-    // Fire animationend to enter idle steady-state webp.
-    fireEvent.animationEnd(img);
-    const imgWebp = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
-    expect(imgWebp.getAttribute("src")).toContain(".webp");
-    // webp 404 → falls back to png.
-    fireEvent.error(imgWebp);
-    const imgPng = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
-    expect(imgPng.getAttribute("src")).toContain(".png");
-    // png 404 → hidden.
-    fireEvent.error(imgPng);
-    expect(
-      container.querySelector('[data-testid="toy-action-sprite"]'),
-    ).toBeNull();
-  });
-
-  // ─── Phase V: NEW animation state machine tests ───────────────────────────
+  // ─── Phase V: animation state machine tests ───────────────────────────────
 
   it("plays the intro animation on mount", () => {
     render(<ToyActionSprite toyId="toy-1" slot="looking" />);
@@ -189,21 +150,6 @@ describe("ToyActionSprite", () => {
     expect(imgAfter.hasAttribute("data-animating")).toBe(false);
   });
 
-  it("transitions to webp src after idle intro animation", () => {
-    render(<ToyActionSprite toyId="toy-1" slot="idle" />);
-    const img = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
-    // Initial src is .png during intro animation.
-    expect(img.getAttribute("src")).toBe(
-      "/api/static/images/toy_actions/toy-1/idle.png",
-    );
-    // Fire animationend — idle slot transitions to webp steady state.
-    fireEvent.animationEnd(img);
-    const imgAfter = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
-    expect(imgAfter.getAttribute("src")).toBe(
-      "/api/static/images/toy_actions/toy-1/idle.webp",
-    );
-  });
-
   it("stays on png src after non-idle intro animation ends", () => {
     render(<ToyActionSprite toyId="toy-1" slot="jumping" />);
     const img = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
@@ -214,42 +160,13 @@ describe("ToyActionSprite", () => {
     const imgAfter = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
     // Verify the handler ran: data-animating should be absent.
     expect(imgAfter.hasAttribute("data-animating")).toBe(false);
-    // Non-idle slots stay on .png after intro completes.
     expect(imgAfter.getAttribute("src")).toBe(
       "/api/static/images/toy_actions/toy-1/jumping.png",
     );
   });
 
-  // Reduced-motion guard regression: ToyActionSprite.module.css collapses the
-  // intro to a 0.01s fade under `prefers-reduced-motion: reduce` rather than
-  // using `animation: none` (the ElementCard.tsx convention). `animation: none`
-  // would never emit `animationend`, stranding the idle slot on .png forever.
-  // This test pins the state-machine contract the CSS must preserve: the ONLY
-  // driver of the idle png→webp transition is the `animationend` event — so any
-  // reduced-motion treatment that still fires `animationend` keeps the steady
-  // state reachable. (JSDOM does not evaluate @media or run real CSS timing, so
-  // we assert the event-driven contract directly.)
-  it("reaches the idle webp steady state solely via animationend (reduced-motion-safe)", () => {
-    render(<ToyActionSprite toyId="toy-rm" slot="idle" />);
-    const img = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
-    // Before animationend the slot is stranded on png — this is exactly what a
-    // never-firing animation would leave forever.
-    expect(img.getAttribute("src")).toBe(
-      "/api/static/images/toy_actions/toy-rm/idle.png",
-    );
-    // animationend (which a 0.01s reduced-motion fade still emits) is what
-    // unlocks the webp loop.
-    fireEvent.animationEnd(img);
-    const imgAfter = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
-    expect(imgAfter.getAttribute("src")).toBe(
-      "/api/static/images/toy_actions/toy-rm/idle.webp",
-    );
-  });
-
   it("replays the intro animation when slot prop changes", () => {
-    const { rerender } = render(
-      <ToyActionSprite toyId="toy-1" slot="idle" />,
-    );
+    const { rerender } = render(<ToyActionSprite toyId="toy-1" slot="idle" />);
     const img = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
     // Initial state: animating with idle.
     expect(img.dataset["animating"]).toBe("idle");
@@ -261,7 +178,98 @@ describe("ToyActionSprite", () => {
 
     // Rerender with a new slot — data-animating should reappear with the new value.
     rerender(<ToyActionSprite toyId="toy-1" slot="jumping" />);
-    const imgAfterRerender = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
+    const imgAfterRerender = screen.getByTestId(
+      "toy-action-sprite",
+    ) as HTMLImageElement;
     expect(imgAfterRerender.dataset["animating"]).toBe("jumping");
+  });
+
+  it("clears hidden state when the slot prop changes after a 404", () => {
+    const { rerender, container } = render(
+      <ToyActionSprite toyId="toy-1" slot="idle" />,
+    );
+    const img = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
+    fireEvent.error(img);
+    expect(
+      container.querySelector('[data-testid="toy-action-sprite"]'),
+    ).toBeNull();
+    // A new slot should re-show the element (the new slot may have a sprite).
+    rerender(<ToyActionSprite toyId="toy-1" slot="waving" />);
+    const imgAfter = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
+    expect(imgAfter.getAttribute("src")).toBe(
+      "/api/static/images/toy_actions/toy-1/waving.png",
+    );
+  });
+
+  // ─── Claude Images: preferSvg format chain ────────────────────────────────
+
+  it("loads .svg first when preferSvg is true", () => {
+    render(<ToyActionSprite toyId="toy-1" slot="idle" preferSvg />);
+    const img = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
+    expect(img.getAttribute("src")).toBe(
+      "/api/static/images/toy_actions/toy-1/idle.svg",
+    );
+  });
+
+  it("falls back from .svg to .png on a 404 when preferSvg is true", () => {
+    render(<ToyActionSprite toyId="toy-1" slot="looking" preferSvg />);
+    const img = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
+    expect(img.getAttribute("src")).toContain("looking.svg");
+    fireEvent.error(img);
+    const after = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
+    expect(after.getAttribute("src")).toBe(
+      "/api/static/images/toy_actions/toy-1/looking.png",
+    );
+  });
+
+  it("hides after both .svg and .png 404 when preferSvg is true", () => {
+    const { container } = render(
+      <ToyActionSprite toyId="toy-1" slot="idle" preferSvg />,
+    );
+    const img = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
+    fireEvent.error(img); // svg 404 → png
+    const png = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
+    expect(png.getAttribute("src")).toContain("idle.png");
+    fireEvent.error(png); // png 404 → hidden
+    expect(
+      container.querySelector('[data-testid="toy-action-sprite"]'),
+    ).toBeNull();
+  });
+
+  it("keeps the idle .svg after the intro animation (no raster swap)", () => {
+    render(<ToyActionSprite toyId="toy-1" slot="idle" preferSvg />);
+    const img = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
+    fireEvent.animationEnd(img);
+    const after = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
+    expect(after.getAttribute("src")).toBe(
+      "/api/static/images/toy_actions/toy-1/idle.svg",
+    );
+  });
+
+  it("appends ?v=<cacheKey> to the .svg src when preferSvg + cacheKey", () => {
+    render(<ToyActionSprite toyId="t" slot="idle" preferSvg cacheKey="s9" />);
+    const img = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
+    expect(img.getAttribute("src")).toBe(
+      "/api/static/images/toy_actions/t/idle.svg?v=s9",
+    );
+  });
+
+  it("resets the format chain to png-only when preferSvg flips to false", () => {
+    const { rerender } = render(
+      <ToyActionSprite toyId="toy-1" slot="idle" preferSvg />,
+    );
+    const img = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
+    fireEvent.error(img); // svg → png
+    expect(
+      (screen.getByTestId("toy-action-sprite") as HTMLImageElement).getAttribute(
+        "src",
+      ),
+    ).toContain("idle.png");
+    // Flip the flag off — chain resets to png-only from the first candidate.
+    rerender(<ToyActionSprite toyId="toy-1" slot="idle" preferSvg={false} />);
+    const after = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
+    expect(after.getAttribute("src")).toBe(
+      "/api/static/images/toy_actions/toy-1/idle.png",
+    );
   });
 });

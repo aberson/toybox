@@ -288,6 +288,13 @@ const IMAGE_GEN_MODES: readonly ImageGenModeChoice[] = [
     label: "Composite (offline)",
     description: "Pillow templates + cutout; no GPU, fastest.",
   },
+  {
+    mode: "claude_svg",
+    label: "Claude Images",
+    description:
+      "Claude draws each sprite as a cartoon SVG (idle animates); " +
+      "uses your Claude subscription, no GPU. Regenerate after switching.",
+  },
 ];
 
 export interface ImageGenModeToggleProps {
@@ -363,6 +370,8 @@ export function ImageGenModeToggle(props: ImageGenModeToggleProps): JSX.Element 
         Controls how toy action sprites are rendered. Cartoon uses the
         SD 1.5 stylized pipeline (GPU). Composite stitches Pillow
         templates and a rembg cutout — fastest, runs without a GPU.
+        Claude Images has Claude draw each sprite as an animated cartoon
+        SVG via your subscription (no GPU). One backend at a time.
       </p>
       <div
         data-testid="image-gen-mode-buttons"

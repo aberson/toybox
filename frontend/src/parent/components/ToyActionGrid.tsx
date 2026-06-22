@@ -76,6 +76,10 @@ function renderCellContents(
         size={88}
         style={{ margin: "0 auto" }}
         cacheKey={row.seed != null ? String(row.seed) : undefined}
+        // The stored image_path is the source of truth for which format
+        // was generated: a Claude-Images sprite ends in .svg, the local
+        // SD pipeline ends in .png. No household flag needed here.
+        preferSvg={row.image_path.endsWith(".svg")}
       />
     );
   }

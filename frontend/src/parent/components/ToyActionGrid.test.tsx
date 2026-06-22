@@ -79,6 +79,51 @@ describe("ToyActionGrid", () => {
     expect((sprite as HTMLImageElement).alt).toBe("Mr. Unicorn looking");
   });
 
+  // Wire-shape: the stored image_path now varies by format. The grid must
+  // thread preferSvg from the extension so a Claude-Images (.svg) row loads
+  // the vector sprite and a local-pipeline (.png) row loads the raster.
+  it("loads .svg first for a done row whose image_path ends in .svg", () => {
+    render(
+      <ToyActionGrid
+        toyId="toy-1"
+        actions={[
+          fakeRow({
+            slot: "idle",
+            status: "done",
+            image_path: "data/images/toy_actions/toy-1/idle.svg",
+            seed: 9,
+          }),
+        ]}
+        onRegenerateAll={noop}
+        onRegenerateSlot={noop}
+      />,
+    );
+    const sprite = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
+    expect(sprite.getAttribute("src") ?? "").toContain("/idle.svg");
+  });
+
+  it("loads .png directly for a done row whose image_path ends in .png", () => {
+    render(
+      <ToyActionGrid
+        toyId="toy-1"
+        actions={[
+          fakeRow({
+            slot: "idle",
+            status: "done",
+            image_path: "data/images/toy_actions/toy-1/idle.png",
+            seed: 9,
+          }),
+        ]}
+        onRegenerateAll={noop}
+        onRegenerateSlot={noop}
+      />,
+    );
+    const sprite = screen.getByTestId("toy-action-sprite") as HTMLImageElement;
+    const src = sprite.getAttribute("src") ?? "";
+    expect(src).toContain("/idle.png");
+    expect(src).not.toContain(".svg");
+  });
+
   it("renders a 'running...' status badge for a running cell", () => {
     render(
       <ToyActionGrid

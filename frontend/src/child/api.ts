@@ -257,6 +257,15 @@ export interface SpokenTextLimitResponse {
   value: SpokenTextLimit;
 }
 
+// Image-gen mode (mirrors backend ``ImageGenMode``). The kiosk only
+// cares whether it's ``claude_svg`` (→ prefer the .svg sprite); the
+// other values render the .png as before.
+export type ImageGenMode = "cartoon" | "composite" | "claude_svg";
+
+export interface ImageGenModeResponse {
+  mode: ImageGenMode;
+}
+
 // Step 21: ``POST /api/auth/parent`` is now PIN-gated. The kiosk does
 // not own the PIN and will get its token from the parent UI via the
 // kiosk pairing flow (``POST /api/auth/pair``). Until that landing
@@ -417,6 +426,19 @@ export class ApiClient {
       "/api/settings/spoken-text-limit",
       { method: "GET", signal: opts.signal },
     );
+  }
+
+  // Image-gen mode (unauthenticated household read). The kiosk reads it
+  // so it can prefer the Claude-authored ``.svg`` sprite over the PNG
+  // when the operator picked the "claude_svg" mode — threaded to
+  // StepCard → ToyActionSprite (`preferSvg`).
+  async getImageGenMode(
+    opts: RequestOptions = {},
+  ): Promise<ImageGenModeResponse> {
+    return this.request<ImageGenModeResponse>("/api/settings/image-gen-mode", {
+      method: "GET",
+      signal: opts.signal,
+    });
   }
 
   async getActivity(id: string, opts: RequestOptions = {}): Promise<Activity> {

@@ -10,6 +10,7 @@ import pytest
 
 from toybox.core.image_gen_mode import (
     IMAGE_GEN_MODE_CARTOON,
+    IMAGE_GEN_MODE_CLAUDE_SVG,
     IMAGE_GEN_MODE_COMPOSITE,
     IMAGE_GEN_MODE_DEFAULT,
     current_image_gen_mode,
@@ -48,7 +49,7 @@ def test_current_image_gen_mode_default_when_row_missing(
 
 @pytest.mark.parametrize(
     "mode",
-    [IMAGE_GEN_MODE_CARTOON, IMAGE_GEN_MODE_COMPOSITE],
+    [IMAGE_GEN_MODE_CARTOON, IMAGE_GEN_MODE_COMPOSITE, IMAGE_GEN_MODE_CLAUDE_SVG],
 )
 def test_set_image_gen_mode_round_trip(
     db: sqlite3.Connection,
