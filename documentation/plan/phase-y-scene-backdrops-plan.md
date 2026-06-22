@@ -171,6 +171,7 @@ Built from the `local-sd-kids-ux` investigation set
 - **Done when:** `uv run pytest tests/unit/activities/test_scene_catalog.py`
   passes; `uv run mypy src` clean.
 - **Depends on:** none
+- **Status:** DONE (2026-06-22)
 
 ### Step Y2: Scene generation path + batch CLI
 - **Type:** code
