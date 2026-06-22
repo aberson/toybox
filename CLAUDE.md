@@ -51,7 +51,7 @@ cd frontend; npm run typecheck; npm run lint; npm run test
 - `tests/` — pytest unit + integration
 - `documentation/master-plan.md` — canonical plan + status (the only plan file in `documentation/` root)
 - `documentation/plan/` — reference sub-docs (architecture, data-model, api, runtime, activity-loop, how-to-run, risks, appendix) + active/unbuilt phase plans (`phase-e.md`)
-- `documentation/plan/awaiting-uat/` — phases whose code shipped but operator UAT is still open (O, P, Q, R, S, T, V, W, X)
+- `documentation/plan/awaiting-uat/` — phases whose code shipped but operator UAT is still open (O, P, Q, R, S, T, V, W, X, Y)
 - `documentation/plan/archive/` — completed/superseded phase plans (snapshots)
 - `documentation/runs/` — phase verification artifacts (UAT pass docs, soak runs)
 - `data/` — runtime state (db, images, models, gitignored)
@@ -72,6 +72,7 @@ cd frontend; npm run typecheck; npm run lint; npm run test
 - Plan sub-docs: `documentation/plan/architecture.md`, `data-model.md`, `api.md`, `runtime.md`, `activity-loop.md`, `how-to-run.md`, `risks.md`, `appendix.md`
 - Phase W plan: `documentation/plan/awaiting-uat/phase-w-plan.md` (play depth: dials, STT grading, adventures, boss fights) — W1-W6 CODE-SHIPPED 2026-06-20 (`3b5df17`); W7 UAT in bundle #223
 - Phase X plan: `documentation/plan/awaiting-uat/phase-x-room-import-plan.md` (room import from listing, local-CLIP photo match) — X1-X7 CODE-SHIPPED 2026-06-20 (`87af523`); X8 UAT in bundle #223 (needs `room_classifier --download` first)
+- Phase Y plan: `documentation/plan/awaiting-uat/phase-y-scene-backdrops-plan.md` (scene backdrops behind step card + per-child scene selection) — Y1-Y8 CODE-SHIPPED 2026-06-22 (`f878eb7`); migration 0030 `activities.scene_id`; `scene_catalog` single source of truth + offline `scripts/batch_scenes.py`; resolver chain template scene_id → child interests → default. Manual UAT M1 (#267 render) + M2 (#274 iPad) in the plan's `## Manual UAT` section
 - SWR re-review (latest, 2026-06-17): `documentation/plan/archive/sonnet-window-revisit-plan.md` + `sonnet-window-revisit-findings.md` — Opus re-review of the Sonnet-window phases (R/S/T/U/V + launcher) at master `f6db361`; #238-243 closed; open follow-ups #244 (kiosk parent-token) + #245 (OFFLINE Claude-call bypass)
 - Phase V plan: `documentation/plan/awaiting-uat/phase-v-plan.md` — hybrid SVD-idle + CSS slot-entry; V1/V2 code DONE, V3 iPad UAT (#237) pending operator. (Phase U `documentation/plan/archive/phase-u-plan.md` superseded — AnimateDiff abandoned.)
 - Phase T plan: `documentation/plan/awaiting-uat/phase-t-plan.md` — T1 bundled iPad UAT (#223) + T4 catalog UAT (#226) pending; umbrella #222 open
