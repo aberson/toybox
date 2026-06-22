@@ -1,49 +1,47 @@
 # Task State
 
-**Task:** Toybox — "Claude Images" feature (Claude-authored SVG action sprites) + idle-sprite unbreak
-**Status:** CODE COMPLETE, UNCOMMITTED. All gates green: 2624 pytest (+30) / 804 vitest (+~17), 0 type/lint. About to do a LIVE end-to-end run to render a real Claude SVG before deciding it's good. HEAD still `969404f` (nothing committed this session).
-**Last written:** 2026-06-21T18:30:00Z
-**Session SHA:** 969404f
+**Task:** "Claude Images" = a third `image_gen_mode` value (`claude_svg`) — Claude-authored animated SVG action sprites; + idle-sprite unbreak
+**Status:** CODE COMPLETE, UNCOMMITTED. Refactored from a separate boolean flag into a mutually-exclusive mode alongside cartoon/composite (operator's request). All gates green: backend 2614 pytest (1 ws_origin flake passes in isolation) / mypy 146 / ruff clean; frontend 800 vitest / typecheck / lint. HEAD still `aa7791f` (only the prior checkpoint committed; feature is uncommitted).
+**Last written:** 2026-06-21T20:25:00Z
+**Session SHA:** aa7791f
 
 ## Next Action
 
-Live end-to-end smoke of the Claude Images path (operator opted in):
-1. Bridge a fresh OAuth token: `uv run python scripts/uat/bridge_claude_creds.py` (CLI tokens rotate ~daily), then `uv run python -m toybox.ai --check`.
-2. `uv run python -m toybox.db.migrate` (applies 0030 if not already; DB is at v30 locally).
-3. Enable the flag: `UPDATE settings SET value='true' WHERE key='claude_images_enabled';` (or PUT /api/settings/claude-images-enabled with a parent token).
-4. Start backend (image-gen lifespan must run so the worker exists): `uv run python -m toybox.main --host 127.0.0.1 --port 8000`.
-5. Trigger generation for toy `a7e7bd00cef14285aa98a310f1c58df5` (Sydney Bagheera Pillow): POST /api/toys/{id}/actions/regenerate (parent token) OR per-slot idle. Watch toy_actions rows → expect `image_path` ending `/idle.svg`.
-6. Playwright (via subagent): screenshot `http://127.0.0.1:8000/api/static/images/toy_actions/a7e7bd00cef14285aa98a310f1c58df5/idle.svg` (and a couple non-idle slots) at 112px to see the rendered Claude SVG. Read the screenshot back.
-7. If it looks good → report + offer to commit (scoped `git add` to the change set below). If bad → iterate the prompt in `svg_gen.py` (`build_user_prompt` / `_SYSTEM_PROMPT`).
+Decide one:
+1. **Commit the feature** (scoped `git add` to the change set below; do NOT `git add -A` — skip CRLF-flapping `shared/*.ts` + parallel-session `room-import.*`).
+2. **(a) 429 hardening** — in worker `_run_one_svg`, map 429 → a clear `rate_limited` error + retry-with-backoff honoring Retry-After, and/or space the 10 per-toy calls. The live run proved the subscription token rate-limits direct /v1/messages (see below).
+3. **Live artifact** — still pending; only works when NOT racing this Claude Code session for the subscription budget. Operator path: Settings → Image-gen mode → "Claude Images" → regenerate a toy's sprites.
 
 ## WIP
 
-About to run the live E2E (step 1 above). Nothing half-applied. Feature fully built + tested with StubClient; the ONLY unverified leg is the real OAuth → Claude → SVG call.
+Nothing half-applied. Refactor complete + green. Representative SVG (Claude-authored stand-in) rendered earlier looks great — clean cartoon cat, animates, scales; big win over the SVD blobs. Live pipeline output still unproven (rate-limited).
 
-## Completed (this session — Claude Images)
-- **Unbreak #3/#4:** app.py registers image/webp + image/svg+xml MIME (fixes idle.webp→text/plain); ToyActionSprite dropped the broken SVD .png→.webp swap (idle stays on good .png). +test_static_mime.py.
-- **Backend feature:** core/claude_images_enabled.py (default FALSE, opt-in) + api/claude_images_enabled_settings.py + migration 0030 + app registration; image_gen/svg_gen.py (OAuth vision→cartoon SVG, idle self-animating, sanitized: script/handler/foreignObject/js: stripped); worker.py `_run_one_svg` branch (flag-gated, skips SD GPU/breaker gates, one-format-per-slot on disk); ai/client.py describe_image gained model/system overrides + svg_model() (Opus 4.8).
-- **Frontend feature:** ToyActionSprite `preferSvg` chain (svg→png→hidden); StepCard `claudeImagesEnabled`→preferSvg; child App.tsx + child api.ts standalone bootstrap fetch; ToyActionGrid derives preferSvg from row.image_path; parent api.ts get/setClaudeImagesEnabled; ClaudeImagesControl.tsx toggle in SettingsPanel; parent App.tsx state+bootstrap+handler.
-- **Tests:** backend test_claude_images_enabled (core+api), test_svg_gen, test_worker_svg, test_static_mime; frontend ClaudeImagesControl.test, ToyActionGrid svg-row tests, ToyActionSprite preferSvg tests, StepCard preferSvg integration.
-- (prior session, committed+pushed at master 3fd238f) Phase W + X shipped; #207 fixed; docs refreshed.
+## Completed (this session)
+- **Unbreak #3/#4:** app.py registers image/webp + image/svg+xml MIME; ToyActionSprite dropped the broken SVD .png→.webp swap (idle stays on good .png). +test_static_mime.py.
+- **Claude Images as a MODE (current design):** `image_gen_mode` core extended to `cartoon | composite | claude_svg` (core + api/image_gen_settings Literals + ImageGenModeToggle option + ImageGenMode type both apis). Worker `_run_one_body` now probes mode FIRST; `mode == "claude_svg"` → `_run_one_svg` (skips SD capability/breaker — needs a token not a GPU); cartoon/composite reuse the same probed mode. svg_gen.py unchanged (OAuth vision→sanitized cartoon SVG, idle self-animating). client.py describe_image has model/system overrides + svg_model() (Opus 4.8). One format per slot on disk (sibling cleanup both paths).
+- **Kiosk:** child api getImageGenMode (unauth GET) → App preferSvg = (mode==="claude_svg") → StepCard `preferSvg` → ToyActionSprite svg→png→hidden chain. Parent ToyActionGrid derives preferSvg from row.image_path extension.
+- **REMOVED (was the first cut):** standalone boolean flag claude_images_enabled — core module, api router, migration 0030, ClaudeImagesControl.tsx, all App/SettingsPanel/api wiring, and their tests. Local dev DB residue cleaned (schema_migrations v30 row + settings key deleted → back to v29).
+- **Tests:** test_svg_gen, test_worker_svg (mode_probe="claude_svg"), test_static_mime, image_gen_mode core+api claude_svg coverage, ToyActionSprite preferSvg, StepCard preferSvg integration, ToyActionGrid svg-row, ImageGenModeToggle claude_svg.
+- **Live E2E finding:** OAuth auth path WORKS (429 rate_limit_error, never 401; `oauth-2025-04-20` header makes no difference). Subscription token is rate-limited for direct /v1/messages while this Claude Code session runs → couldn't capture a genuine artifact. Error-handling verified live (429 → row failed, no crash, no breaker trip).
 
 ## Dead Ends / Decisions
-- Claude has NO image-gen API (vision is input-only) — "Claude image" = Claude-authored SVG. Confirmed via claude-api skill, not memory.
-- Flag is backend-read-only for GENERATION; kiosk fetches it standalone (NOT the Phase K cohort) only to set preferSvg. Parent grid uses row.image_path extension instead (no flag needed there).
-- Default OFF: opt-in parallel path; local SD pipeline unchanged when off.
-- Did NOT reformat worker.py — it was already part of the repo's pre-existing `ruff format` drift (104 files); reformatting = huge unrelated diff. New files ARE format-canonical.
+- "Claude Images" is a MODE, not a boolean — mutually exclusive with cartoon/composite (operator's call; the worker already treated it that way by short-circuiting).
+- Claude has NO image-gen API → "Claude image" = Claude-authored SVG (vision input only). Confirmed via claude-api skill.
+- Did NOT add the `oauth-2025-04-20` header to client.py — live test showed it doesn't change the 429; toybox's bare-header pattern is fine (matches toy_vision).
+- Did NOT reformat worker.py — pre-existing repo `ruff format` drift (104 files); new files are format-canonical.
 
 ## Critical Gotchas
-- CRLF churn on frontend/src/shared/{errors,types}.ts shows as "M" with EMPTY git diff — known noise, NOT this session's work; `git checkout --` them (or just don't stage) before any commit.
-- Parallel-session artifacts in tree NOT mine: documentation/runs/2026-06-21-room-import-uat.md + frontend/playwright/room-import.spec.ts (Phase X). Scope `git add` to the change set; do NOT `git add -A`.
-- Live OAuth SVG path is UNVERIFIED by tests (StubClient only). It mirrors toy_vision's OAuth-direct urllib pattern (no SDK, no API key); efficacy depends on that same live path. OAuth tokens rotate ~daily — re-bridge before the live run.
-- Cost: regenerating one toy = 10 Claude vision calls (one/slot) on the subscription.
-- Backend worker needs the image-gen lifespan running (started by `toybox.main`), else get_image_gen_worker() is None and regenerate 503s.
+- CRLF churn on frontend/src/shared/{errors,types}.ts shows "M" with EMPTY diff — known noise, not this work; don't stage.
+- Parallel-session artifacts NOT mine: documentation/runs/2026-06-21-room-import-uat.md + frontend/playwright/room-import.spec.ts. Scope `git add`.
+- Live SVG path UNVERIFIED end-to-end (StubClient tests only). Real call needs an idle subscription (not racing a Claude Code session) + a fresh token (`scripts/uat/bridge_claude_creds.py`, rotates ~daily).
+- Cost: regenerating one toy in claude_svg mode = 10 Claude vision calls.
 
-## Key Files (this change set — for scoped commit)
-- Backend new: src/toybox/core/claude_images_enabled.py, src/toybox/api/claude_images_enabled_settings.py, src/toybox/db/migrations/0030_claude_images_enabled.sql, src/toybox/image_gen/svg_gen.py
-- Backend mod: src/toybox/app.py, src/toybox/ai/client.py, src/toybox/image_gen/worker.py
-- Frontend new: frontend/src/parent/components/ClaudeImagesControl.tsx (+.test)
+## Key Files (change set — for scoped commit)
+- Backend new: src/toybox/image_gen/svg_gen.py
+- Backend mod: src/toybox/app.py (MIME + router list), src/toybox/ai/client.py (svg_model + describe_image overrides), src/toybox/image_gen/worker.py (mode-first dispatch + _run_one_svg), src/toybox/core/image_gen_mode.py (+claude_svg), src/toybox/api/image_gen_settings.py (Literals)
+- Backend deleted: core/claude_images_enabled.py, api/claude_images_enabled_settings.py, db/migrations/0030_claude_images_enabled.sql
 - Frontend mod: child/{App.tsx,api.ts,components/StepCard.tsx,ToyActionSprite.tsx,ToyActionSprite.module.css}; parent/{App.tsx,api.ts,components/SettingsPanel.tsx,ToyActionGrid.tsx}
-- Tests: tests/unit/test_static_mime.py, tests/unit/core/test_claude_images_enabled.py, tests/unit/image_gen/test_svg_gen.py, tests/unit/image_gen/test_worker_svg.py, tests/integration/test_claude_images_enabled_api.py + the frontend .test.tsx siblings above
+- Frontend deleted: parent/components/ClaudeImagesControl.tsx (+.test)
+- Tests new: tests/unit/test_static_mime.py, tests/unit/image_gen/test_svg_gen.py, tests/unit/image_gen/test_worker_svg.py + frontend ToyActionSprite/StepCard/ToyActionGrid/ImageGenModeToggle test updates
+- Tests deleted: tests/unit/core/test_claude_images_enabled.py, tests/integration/test_claude_images_enabled_api.py
 - Tunables: TOYBOX_CLAUDE_SVG_MODEL (default claude-opus-4-8), TOYBOX_CLAUDE_SVG_TIMEOUT_SEC (90)
