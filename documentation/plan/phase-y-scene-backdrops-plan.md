@@ -269,6 +269,7 @@ Built from the `local-sd-kids-ux` investigation set
   `set_ip_adapter_scale`; unset → 0.6; seed passes through unchanged) via the stub.
 - **Done when:** `uv run pytest tests/unit -k image_gen` passes; `mypy src` clean.
 - **Depends on:** none (parallel-safe with Y3–Y6)
+- **Status:** DONE (2026-06-22)
 
 ### Step Y8: End-to-end smoke gate
 - **Type:** code

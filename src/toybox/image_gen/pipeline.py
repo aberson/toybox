@@ -228,6 +228,20 @@ def _build_prompt(slot: str, ctx: GenerationContext) -> str:
     )
 
 
+def _resolve_ipa_scale(ctx: GenerationContext) -> float:
+    """Resolve the IP-Adapter conditioning scale for one generation call.
+
+    Phase Y: returns ``ctx.ipa_scale`` when the caller supplied a per-call
+    override, else the module default :data:`IP_ADAPTER_SCALE` (0.6). Keeping
+    this a tiny pure function makes the override resolution unit-testable
+    without a GPU (the ``set_ip_adapter_scale`` call it feeds lives in the
+    real-pipeline path, exercised on operator hardware).
+    """
+    if ctx.ipa_scale is not None:
+        return ctx.ipa_scale
+    return IP_ADAPTER_SCALE
+
+
 def _invoke_stub(
     reference_bytes: bytes,
     slot: str,
@@ -386,6 +400,12 @@ def _run_pipeline_sync(
     # 3. Build prompt + run generation. Phase P: the rembg cutout is
     #    passed as ``ip_adapter_image`` so IPA Plus carries identity /
     #    colour conditioning instead of the dropped palette-hex tokens.
+    #    Phase Y: set the IPA scale PER CALL (not just at build) so an
+    #    optional ``ctx.ipa_scale`` override takes effect and, equally
+    #    important, a previous call's override does NOT leak onto this
+    #    cached pipeline — every call re-pins the scale to its resolved
+    #    value (the override or the IP_ADAPTER_SCALE default).
+    pipe.set_ip_adapter_scale(_resolve_ipa_scale(ctx))
     prompt = _build_prompt(slot, ctx)
     generator = torch.Generator("cuda").manual_seed(seed)
     try:

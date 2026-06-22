@@ -123,6 +123,13 @@ class GenerationContext:
     toy_display_name: str
     persona_display_name: str | None
     tags: tuple[str, ...]
+    # Phase Y: optional per-call IP-Adapter conditioning-strength override.
+    # ``None`` (every caller today) uses the module-default
+    # ``pipeline.IP_ADAPTER_SCALE`` (0.6) — byte-identical to pre-Y behaviour.
+    # A higher value tightens toy identity at the cost of pose flexibility;
+    # additive infra for future per-scene composited art + coherent multi-
+    # sprite story sets (topic 01). Threaded through ``generate_action``.
+    ipa_scale: float | None = None
 
 
 class ImageGenCapacityError(Exception):
