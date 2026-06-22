@@ -107,4 +107,38 @@ def generate_action_stub(
     return buffer.getvalue()
 
 
-__all__ = ["generate_action_stub"]
+def generate_scene_stub(scene_id: str, prompt: str, seed: int) -> bytes:
+    """Return a deterministic 16×16 **opaque RGB** PNG keyed off ``(scene_id, seed)``.
+
+    Parallel to :func:`generate_action_stub` but for the Phase Y scene-backdrop
+    path (``pipeline.generate_scene``): scenes are opaque full-bleed scenery, so
+    the stub returns RGB (no alpha) — a downstream "scene is opaque" assertion
+    then holds for the placeholder too. ``prompt`` is accepted to match the real
+    signature but is not part of the determinism key.
+
+    Honors the same ``TOYBOX_IMAGE_GEN_STUB_MODE=oom`` /
+    ``TOYBOX_IMAGE_GEN_STUB_DELAY_SEC`` envelope as the action stub.
+    """
+    del prompt  # not part of the determinism key
+
+    if _stub_oom_active():
+        from toybox.image_gen.pipeline import _StubCudaOOM
+
+        raise _StubCudaOOM(f"stub OOM for scene={scene_id!r}")
+
+    delay = _stub_delay_sec()
+    if delay > 0:
+        time.sleep(delay)
+
+    from PIL import Image
+
+    digest = _key_seed(scene_id, seed)
+    needed = 16 * 16 * 3  # RGB, no alpha — scenes are opaque
+    tiled = (digest * ((needed // len(digest)) + 1))[:needed]
+    img = Image.frombytes("RGB", (16, 16), bytes(tiled))
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+__all__ = ["generate_action_stub", "generate_scene_stub"]

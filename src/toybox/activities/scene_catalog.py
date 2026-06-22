@@ -5,7 +5,7 @@ Phase Y adds a full-bleed illustrated **scene backdrop** behind the step card,
 drawn from a small PRE-RENDERED library. This module is the one place that
 defines:
 
-* :data:`SCENE_IDS` — the canonical scene id set. Imported by the batch CLM
+* :data:`SCENE_IDS` — the canonical scene id set. Imported by the batch CLI
   (``scripts/batch_scenes.py``, Y2), the template field + validator (Y3), the
   scene resolver (Y4), and the persist/serialize path (Y5). Defining the set
   ONCE here keeps producer and consumer from drifting (see

@@ -112,6 +112,13 @@ _VALID_CARTOON_MODES: Final[frozenset[str]] = frozenset(
 # lazy import.
 _cached_pipeline: Any = None
 
+# Phase Y: separate cache for the SCENE (backdrop) pipeline. Scenes are opaque
+# full-bleed scenery generated text2img with NO IP-Adapter — keeping a distinct
+# cache from ``_cached_pipeline`` (which has IPA Plus loaded) avoids cross-
+# contaminating the sprite path. Only the offline batch CLI (scripts/
+# batch_scenes.py) builds this; the runtime never generates scenes on demand.
+_cached_scene_pipeline: Any = None
+
 
 def _stub_active() -> bool:
     """Return True iff ``TOYBOX_IMAGE_GEN_STUB`` is set to a truthy value."""
@@ -160,9 +167,7 @@ def _cartoon_mode() -> str:
         return DEFAULT_CARTOON_MODE
     normalized = raw.strip().lower()
     if normalized not in _VALID_CARTOON_MODES:
-        raise ValueError(
-            f"{CARTOON_MODE_ENV}={raw!r} not in {sorted(_VALID_CARTOON_MODES)}"
-        )
+        raise ValueError(f"{CARTOON_MODE_ENV}={raw!r} not in {sorted(_VALID_CARTOON_MODES)}")
     return normalized
 
 
@@ -352,9 +357,7 @@ def _run_pipeline_sync(
         try:
             return _invoke_stub(reference_bytes, slot, seed, ctx)
         except _StubCudaOOM as exc:
-            raise ImageGenCapacityError(
-                f"stub CUDA OOM simulated for slot={slot}"
-            ) from exc
+            raise ImageGenCapacityError(f"stub CUDA OOM simulated for slot={slot}") from exc
 
     # ----------------------------------------------------------------
     # Lazy heavy imports. Mypy's project-level override silences the
@@ -397,9 +400,7 @@ def _run_pipeline_sync(
             width=512,
         )
     except torch.cuda.OutOfMemoryError as exc:
-        raise ImageGenCapacityError(
-            f"CUDA OOM during generation for slot={slot}"
-        ) from exc
+        raise ImageGenCapacityError(f"CUDA OOM during generation for slot={slot}") from exc
     raw_image = result.images[0]
 
     # 4. Second rembg pass to clean residual non-transparent pixels
@@ -456,8 +457,155 @@ async def generate_action(
             timeout=timeout,
         )
     except TimeoutError as exc:
+        raise ImageGenTimeoutError(f"generation exceeded {timeout}s for slot={slot}") from exc
+
+
+def _invoke_scene_stub(scene_id: str, prompt: str, seed: int) -> bytes:
+    """Delegate scene generation to the test stub fixture (Phase Y).
+
+    Mirrors :func:`_invoke_stub` for the scene path. Dynamic import so the
+    production install doesn't require the ``tests`` directory on ``sys.path``.
+    """
+    _logger.warning(
+        "scene-gen running in STUB mode (TOYBOX_IMAGE_GEN_STUB=1) — "
+        "output is a deterministic 16x16 PNG, not real generation"
+    )
+    try:
+        module = importlib.import_module("tests.fixtures.image_gen.stub_pipeline")
+    except ImportError as exc:
+        raise RuntimeError(
+            "TOYBOX_IMAGE_GEN_STUB=1 but tests.fixtures.image_gen.stub_pipeline "
+            "is not importable; the stub is only available in dev/CI checkouts"
+        ) from exc
+    fn = module.generate_scene_stub
+    return bytes(fn(scene_id, prompt, seed))
+
+
+def _build_scene_pipeline(torch_mod: Any) -> Any:
+    """Construct the cartoon text2img pipeline for scene backdrops (Phase Y).
+
+    Identical to :func:`_build_pipeline`'s cartoon-adapter setup EXCEPT it does
+    NOT load IP-Adapter — scenes have no toy reference image, they are pure
+    text2img scenery. Best-effort CUDA cleanup on partial-construction failure.
+    """
+    from diffusers import LCMScheduler, StableDiffusionPipeline
+
+    mode = _cartoon_mode()
+    pipe = None
+    try:
+        if mode == CARTOON_MODE_CHECKPOINT:
+            pipe = StableDiffusionPipeline.from_pretrained(  # type: ignore[no-untyped-call]
+                _cartoon_path(),
+                torch_dtype=torch_mod.float16,
+                variant="fp16",
+                use_safetensors=True,
+                local_files_only=True,
+                safety_checker=None,
+                requires_safety_checker=False,
+            )
+            pipe.load_lora_weights(_lcm_lora_path(), adapter_name="lcm")
+            pipe.set_adapters(["lcm"], adapter_weights=[1.0])
+        else:
+            pipe = StableDiffusionPipeline.from_pretrained(  # type: ignore[no-untyped-call]
+                _base_model_path(),
+                torch_dtype=torch_mod.float16,
+                variant="fp16",
+                use_safetensors=True,
+                local_files_only=True,
+                safety_checker=None,
+                requires_safety_checker=False,
+            )
+            pipe.load_lora_weights(_cartoon_path(), adapter_name="cartoon")
+            pipe.load_lora_weights(_lcm_lora_path(), adapter_name="lcm")
+            pipe.set_adapters(["lcm", "cartoon"], adapter_weights=[1.0, 1.0])
+
+        pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)  # type: ignore[no-untyped-call]
+        pipe.to("cuda")
+        pipe.vae.enable_slicing()
+    except Exception:
+        try:
+            del pipe
+        except NameError:
+            pass
+        try:
+            if torch_mod.cuda.is_available():
+                torch_mod.cuda.empty_cache()
+        except Exception:  # pragma: no cover — defensive
+            pass
+        raise
+    return pipe
+
+
+def _run_scene_sync(scene_id: str, prompt: str, seed: int) -> bytes:
+    """Synchronous scene-backdrop generation; runs inside :func:`asyncio.to_thread`.
+
+    Text2img with the cartoon LCM pipeline, NO IP-Adapter, NO rembg — the output
+    is an OPAQUE RGB PNG (full-bleed scenery). CUDA OOM is caught + re-raised as
+    :class:`ImageGenCapacityError`. Heavy imports stay inside this function so
+    ``import toybox.image_gen.pipeline`` remains cheap.
+    """
+    if _stub_active():
+        try:
+            return _invoke_scene_stub(scene_id, prompt, seed)
+        except _StubCudaOOM as exc:
+            raise ImageGenCapacityError(f"stub CUDA OOM simulated for scene={scene_id}") from exc
+
+    import torch
+    from PIL import Image
+
+    global _cached_scene_pipeline
+    if _cached_scene_pipeline is None:
+        _cached_scene_pipeline = _build_scene_pipeline(torch)
+    pipe = _cached_scene_pipeline
+
+    dim = _output_dim()
+    generator = torch.Generator("cuda").manual_seed(seed)
+    try:
+        result = pipe(
+            prompt=prompt,
+            negative_prompt=DEFAULT_NEGATIVE_PROMPT,
+            generator=generator,
+            num_inference_steps=4,
+            guidance_scale=1.0,
+            height=dim,
+            width=dim,
+        )
+    except torch.cuda.OutOfMemoryError as exc:
+        raise ImageGenCapacityError(
+            f"CUDA OOM during scene generation for scene={scene_id}"
+        ) from exc
+
+    # Scenes are opaque: flatten to RGB (no alpha), no rembg cutout.
+    raw_image = result.images[0].convert("RGB")
+    output_image = raw_image.resize((dim, dim), Image.Resampling.LANCZOS)
+    buffer = io.BytesIO()
+    output_image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+async def generate_scene(scene_id: str, prompt: str, seed: int) -> bytes:
+    """Generate one opaque scene-backdrop PNG end-to-end (Phase Y).
+
+    Offline-only: called by ``scripts/batch_scenes.py`` to pre-render the scene
+    library. The runtime never calls this — it serves the static PNGs. Heavy
+    work runs in :func:`asyncio.to_thread` with the same per-call
+    :func:`asyncio.wait_for` cap as :func:`generate_action`.
+
+    Returns PNG bytes (opaque RGB).
+
+    Raises:
+        ImageGenTimeoutError: When the per-call timeout fires.
+        ImageGenCapacityError: On real or simulated CUDA OOM.
+    """
+    timeout = _timeout_sec()
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(_run_scene_sync, scene_id, prompt, seed),
+            timeout=timeout,
+        )
+    except TimeoutError as exc:
         raise ImageGenTimeoutError(
-            f"generation exceeded {timeout}s for slot={slot}"
+            f"scene generation exceeded {timeout}s for scene={scene_id}"
         ) from exc
 
 
@@ -468,8 +616,9 @@ def reset_pipeline_cache_for_tests() -> None:
     pipeline is never built in CI (no GPU); this is mostly a
     safety hatch for the integration test on operator hardware.
     """
-    global _cached_pipeline
+    global _cached_pipeline, _cached_scene_pipeline
     _cached_pipeline = None
+    _cached_scene_pipeline = None
 
 
 __all__ = [
@@ -497,5 +646,6 @@ __all__ = [
     "STUB_MODE_ENV",
     "TIMEOUT_ENV",
     "generate_action",
+    "generate_scene",
     "reset_pipeline_cache_for_tests",
 ]

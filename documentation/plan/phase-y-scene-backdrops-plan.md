@@ -187,6 +187,7 @@ Built from the `local-sd-kids-ux` investigation set
 - **Done when:** stub-mode CLI run writes `len(SCENE_IDS)` PNGs to a tmp scenes
   dir; `test_lazy_imports` still green (no torch import at module load).
 - **Depends on:** Y1
+- **Status:** DONE (2026-06-22)
 
 ### Step Y3: Template `scene_id` field + validator
 - **Type:** code
