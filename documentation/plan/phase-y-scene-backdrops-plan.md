@@ -201,6 +201,7 @@ Built from the `local-sd-kids-ux` investigation set
 - **Done when:** existing template-load tests pass with the new optional field;
   a template fixture carrying a bad `scene_id` fails validation.
 - **Depends on:** Y1
+- **Status:** DONE (2026-06-22)
 
 ### Step Y4: Scene resolver + interests activation
 - **Type:** code

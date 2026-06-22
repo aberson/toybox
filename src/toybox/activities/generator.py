@@ -181,6 +181,11 @@ class _Template:
     # surface that filters by template themes can read it without
     # re-parsing JSON. ``ending_step`` was removed entirely in L5.
     recommended_themes: tuple[Theme, ...] = ()
+    # Phase Y: optional kiosk scene-backdrop id (validated ∈ SCENE_IDS by the
+    # template validator). ``None`` for every legacy template. Surfaced here so
+    # the propose path (api/activities.py, Y5) can read the authored scene
+    # without re-parsing JSON.
+    scene_id: str | None = None
 
 
 # Cache: (templates_dir, intent) -> list of loaded templates.
@@ -311,6 +316,8 @@ def _parse_template(raw: dict[str, Any], *, source: str = "<inline>") -> _Templa
         # Phase L Step L5 removed the embedded/ending consumers; the
         # field remains for the bias-by-theme picker (Phase G).
         recommended_themes=tuple(template_model.recommended_themes),
+        # Phase Y: carry the (validator-checked) scene id through to the cache.
+        scene_id=template_model.scene_id,
     )
 
 

@@ -490,6 +490,13 @@ class Template(BaseModel):
     # ``Template`` previously dropped this field on the floor, which
     # blocked the validator from seeing it.
     ending_step: EndingStep | None = None
+    # Phase Y: optional kiosk scene-backdrop id. ``None`` for every legacy
+    # template (no backfill); when set it MUST be a member of
+    # ``toybox.activities.scene_catalog.SCENE_IDS`` — that membership check
+    # lives in :func:`toybox.activities._validator.validate_template` (the
+    # scene id set is a Python constant, not expressible in the JSON schema).
+    # Pydantic only gates the type here.
+    scene_id: str | None = None
 
     @model_validator(mode="after")
     def _check_role_uniqueness(self) -> Template:

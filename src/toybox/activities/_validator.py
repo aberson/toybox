@@ -55,6 +55,7 @@ from typing import Final
 from .element_corpus import get_element
 from .models import Step, Template
 from .roles import Role
+from .scene_catalog import SCENE_IDS
 from .slots import KNOWN_SLOTS
 
 
@@ -455,6 +456,17 @@ def validate_template(template: Template) -> None:
     which orchestrates both.
     """
     template_id = template.id
+
+    # ----- (Phase Y) scene_id ∈ SCENE_IDS ----------------------------------
+    # The scene-backdrop id is an optional authored field; when present it must
+    # name a real pre-rendered scene. The id set is a Python constant
+    # (scene_catalog.SCENE_IDS), so this membership check lives here rather than
+    # in the JSON schema. ``None`` (every legacy template) is always allowed.
+    if template.scene_id is not None and template.scene_id not in SCENE_IDS:
+        raise TemplateGraphError(
+            f"template {template_id!r}: scene_id={template.scene_id!r} is not a "
+            f"known scene; valid ids: {', '.join(SCENE_IDS)}"
+        )
 
     # ----- (N2) element_microgame structural gate --------------------------
     # Phase N N2 — when ``template_type === "element_microgame"`` the

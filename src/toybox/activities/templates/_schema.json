@@ -72,6 +72,11 @@
           "uniqueItems": true,
           "default": [],
           "description": "Phase K K3: theme tags. Phase L Step L5 removed the K14 embedded-interjection picker that consumed these; the field is accepted for backward compatibility with the existing template catalog and remains available for future surfaces."
+        },
+        "scene_id": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "Phase Y: optional kiosk scene-backdrop id. Must name a member of toybox.activities.scene_catalog.SCENE_IDS (membership enforced by the Python template validator, not this schema). null/absent for legacy templates."
         }
       }
     },
