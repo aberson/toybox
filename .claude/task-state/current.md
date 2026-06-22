@@ -1,12 +1,15 @@
 # Task State
 
-**Task:** Phase Y (scene backdrops + per-child scene selection) — CODE COMPLETE
-**Status:** /build-phase ran Y1-Y8 to completion. All 8 code steps Status: DONE; issues #265-266, #268-273 closed; umbrella #264. 8 checkpoint commits b53d794..e1025f7 (LOCAL, NOT pushed). Two operator steps remain in the Manual UAT bundle: M1 (Y2-run, #267 — GPU scene-library render) + M2 (Y9, #274 — iPad backdrop UAT). One Y7 regression caught + fixed in-phase (_FakePipe missing set_ip_adapter_scale). Full backend 2670 pass + 1 pre-existing WS-topic flake (passes isolated); frontend 802 pass.
-**Last written:** 2026-06-22T09:30:00Z
-**Session SHA:** e1025f7
+**Task:** Phase Y Manual UAT — operator runs M1 (render) then M2 (iPad backdrop)
+**Status:** Phase Y code COMPLETE + PUSHED at master `1ed45ac` (origin/master up to date). /repo-update done: README + master-plan + CLAUDE.md + memory updated; plan moved to `plan/awaiting-uat/`; umbrella #264 has a code-complete summary comment and stays OPEN until M1/M2 pass. Only the two operator UAT steps remain. backend 2670 + frontend 802 green.
+**Last written:** 2026-06-22T10:00:00Z
+**Session SHA:** 1ed45ac
 
 ## Next Action
-Operator runs the Manual UAT bundle in `documentation/plan/phase-y-scene-backdrops-plan.md` § Manual UAT: **M1** (`uv run python scripts/batch_scenes.py` with the backend stopped → render + eyeball ~8-10 scene PNGs), then **M2** (iPad: backdrop renders behind step card, readable, cast in-style, Child A-vs-Child B scene differs). Then `/repo-update` to push + close umbrella #264. Push is pending operator approval (two phases' worth of local commits: investigation 6dcd80f, Phase Y plan b53d794 + 8 checkpoints).
+Operator runs the Manual UAT bundle in `documentation/plan/awaiting-uat/phase-y-scene-backdrops-plan.md` § Manual UAT, in order:
+- **M1 (#267)** — stop the backend, then `uv run python scripts/batch_scenes.py` → renders ~8-10 scene PNGs to `data/images/scenes/`; parent-eyeball each (age-appropriate + style-cohesive with sprites). `--dry-run` previews.
+- **M2 (#274)** — bring up backend (loopback) + `cd frontend; npm run dev`; propose+approve for Child A then Child B; open the child kiosk on iPad; confirm backdrop renders behind the step card, text readable, cast in-scene, and the interest-selected scene differs (Child A→stage, Child B→lab).
+On PASS: write `documentation/runs/2026-06-22-phase-y-uat.md` and close umbrella #264.
 
 ## Completed (this session)
 - Investigation set (17 files + README) committed 6dcd80f (local).
