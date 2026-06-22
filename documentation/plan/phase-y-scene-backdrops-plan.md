@@ -285,6 +285,7 @@ Built from the `local-sd-kids-ux` investigation set
 - **Done when:** the smoke test passes end-to-end against `create_app()` + a real
   migrated DB; full `uv run pytest` green, no count regression.
 - **Depends on:** Y5, Y6
+- **Status:** DONE (2026-06-22)
 
 ### Step Y2-run: Render the scene library (operator)
 - **Problem:** Run `batch_scenes.py` on the operator GPU to produce the real

@@ -244,6 +244,14 @@ class _FakePipe:
 
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
+        # Phase Y: ``_run_pipeline_sync`` now re-pins the IP-Adapter scale per
+        # call via ``pipe.set_ip_adapter_scale(...)``. Record the values so the
+        # fake mirrors the real diffusers pipe interface (and the default-scale
+        # contract stays assertable).
+        self.ipa_scales: list[float] = []
+
+    def set_ip_adapter_scale(self, scale: float) -> None:
+        self.ipa_scales.append(scale)
 
     def __call__(self, **kwargs: Any) -> _FakeResult:
         # Snapshot the kwargs for later assertions.
