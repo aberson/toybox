@@ -67,6 +67,7 @@ import json
 import logging
 import os
 import random
+import re
 import sqlite3
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -80,6 +81,7 @@ from .generic_descriptors import GENERIC_DESCRIPTORS
 from .joke_corpus import pick_joke
 from .models import Animation
 from .roles import Role
+from .scene_catalog import DEFAULT_SCENE_ID, INTEREST_SCENE_TAGS, scene_for_interest
 from .song_corpus import pick_song
 from .themes import Theme
 from .topic_extract import extract_themes
@@ -168,6 +170,12 @@ class ResolvedChildren:
 
     banned_themes: tuple[str, ...] = ()
     reading_level: ReadingLevel | None = None
+    # Phase Y: normalized interest TOKENS (matched ``INTEREST_SCENE_TAGS`` keys)
+    # aggregated across the dispatch's children, owner-first + first-seen order.
+    # Consumed by :func:`resolve_scene_id` to SELECT a pre-rendered scene
+    # backdrop for the child (a baked PNG can't be re-tinted live). Empty when
+    # no child interest matched a known tag.
+    interests: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -183,6 +191,10 @@ class ChildProfileRow:
 
     id: str
     reading_level: ReadingLevel | None = None
+    # Phase Y: normalized interest tokens for THIS child (matched
+    # ``INTEREST_SCENE_TAGS`` keys, in tag-declaration order). Empty when the
+    # child's free-text ``interests`` matched no known tag.
+    interests: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -504,27 +516,35 @@ def resolve_child_profiles(
     unique = list(dict.fromkeys(child_ids))  # preserve order, dedupe
     placeholders = ",".join("?" * len(unique))
     rows = conn.execute(
-        f"SELECT id, reading_level FROM children WHERE id IN ({placeholders})",
+        f"SELECT id, reading_level, interests FROM children WHERE id IN ({placeholders})",
         unique,
     ).fetchall()
+    # Index by id so we can iterate in the caller's child_ids order — the first
+    # child is the activity owner, and Phase Y's interest aggregation is
+    # owner-first (the SQL ``IN`` clause returns rows in arbitrary order).
+    rows_by_id = {str(row["id"]): row for row in rows}
     profiles: list[ChildProfileRow] = []
-    for row in rows:
-        reading_level_raw = row["reading_level"]
-        reading_level: ReadingLevel | None = _coerce_reading_level(reading_level_raw)
+    for child_id in unique:
+        row = rows_by_id.get(child_id)
+        if row is None:
+            continue
+        reading_level: ReadingLevel | None = _coerce_reading_level(row["reading_level"])
         profiles.append(
             ChildProfileRow(
                 id=str(row["id"]),
                 reading_level=reading_level,
+                interests=normalize_interests(row["interests"]),
             )
         )
     aggregated = aggregate_child_constraints(profiles)
-    # Splice the global banned_themes onto the aggregated reading-level
-    # result. aggregate_child_constraints no longer touches banned_themes
-    # (it operates on the per-child reading_level only) so this is the
-    # single seam between the two sources.
+    # Splice the global banned_themes onto the aggregated reading-level +
+    # interests result. aggregate_child_constraints no longer touches
+    # banned_themes (it operates on the per-child reading_level + interests
+    # only) so this is the single seam between the two sources.
     return ResolvedChildren(
         banned_themes=banned_themes,
         reading_level=aggregated.reading_level,
+        interests=aggregated.interests,
     )
 
 
@@ -543,18 +563,22 @@ def _banned_themes_from_settings(conn: sqlite3.Connection) -> tuple[str, ...]:
 def aggregate_child_constraints(
     profiles: Sequence[ChildProfileRow],
 ) -> ResolvedChildren:
-    """Aggregate reading_level (MINIMUM) across child profiles.
+    """Aggregate reading_level (MINIMUM) + interests (ordered union) across profiles.
 
     Phase H Step H4 (migration 0009) moved banned_themes out of the
     per-child rows into a household-global setting, so this helper no
     longer touches them — :func:`resolve_child_profiles` is the seam
-    that splices the global value onto the aggregated reading-level
-    result.
+    that splices the global value onto the aggregated reading-level +
+    interests result.
 
     Reading level: minimum of present values
     (``pre-reader`` < ``early-reader`` < ``fluent``); unknown/null
     values do NOT participate (a child with no level set doesn't drag
     the rest down to "no constraint").
+
+    Interests (Phase Y): first-seen ordered union of each profile's interest
+    tokens, in ``profiles`` order. The caller passes profiles owner-first, so
+    the activity owner's interests win ties in :func:`resolve_scene_id`.
 
     Empty ``profiles`` returns a default :class:`ResolvedChildren`.
     """
@@ -562,17 +586,72 @@ def aggregate_child_constraints(
         return ResolvedChildren()
     chosen: ReadingLevel | None = None
     best_rank: int | None = None
+    interests: list[str] = []
     for p in profiles:
         cur = p.reading_level
-        if cur is None:
-            continue
-        rank = _READING_LEVEL_ORDER[cur]
-        if best_rank is None or rank < best_rank:
-            best_rank = rank
-            chosen = cur
+        if cur is not None:
+            rank = _READING_LEVEL_ORDER[cur]
+            if best_rank is None or rank < best_rank:
+                best_rank = rank
+                chosen = cur
+        for token in p.interests:
+            if token not in interests:
+                interests.append(token)
     return ResolvedChildren(
         reading_level=chosen,
+        interests=tuple(interests),
     )
+
+
+def normalize_interests(raw: str | None) -> tuple[str, ...]:
+    """Extract known interest TOKENS from a child's free-text ``interests``.
+
+    Scans ``raw`` (case-insensitively) for each :data:`INTEREST_SCENE_TAGS` key
+    appearing as a whole word/phrase and returns the matched keys in tag-
+    declaration order. This is the SAFE normalization the scene resolver relies
+    on: free text can only ever map to a FIXED allowlist of interest tokens (and
+    thence to a known scene id) — a typo or hostile string can never inject a
+    free prompt (see ``04-content-safety-guardrails-primer``). Whole-word
+    matching (``\\b``) avoids false positives like "park" inside "sparkle".
+
+    Returns an empty tuple for ``None`` / empty / no-match input.
+    """
+    if not raw or not raw.strip():
+        return ()
+    text = raw.lower()
+    matched: list[str] = []
+    for key in INTEREST_SCENE_TAGS:
+        # Keys may be multi-word (e.g. "periodic table"); escape + word-bound.
+        if re.search(rf"\b{re.escape(key)}\b", text) and key not in matched:
+            matched.append(key)
+    return tuple(matched)
+
+
+def resolve_scene_id(
+    template_scene_id: str | None,
+    resolved: ResolvedChildren,
+    default: str = DEFAULT_SCENE_ID,
+) -> str:
+    """Resolve the kiosk scene-backdrop id for an activity (Phase Y).
+
+    Priority chain:
+
+    1. ``template_scene_id`` — an explicit author choice always wins (already
+       validated ∈ ``SCENE_IDS`` at template load by ``validate_template``).
+    2. The first child-interest token (owner-first per
+       :func:`aggregate_child_constraints`) that maps to a scene via
+       :func:`toybox.activities.scene_catalog.scene_for_interest`.
+    3. ``default`` (``DEFAULT_SCENE_ID``).
+
+    Always returns a non-empty scene id.
+    """
+    if template_scene_id:
+        return template_scene_id
+    for token in resolved.interests:
+        scene = scene_for_interest(token)
+        if scene is not None:
+            return scene
+    return default
 
 
 def _template_haystack(template_id: str, template_title: str) -> str:
@@ -1909,8 +1988,10 @@ __all__ = [
     "aggregate_child_constraints",
     "apply_banned_themes_filter",
     "build_claude_directive",
+    "normalize_interests",
     "recent_transcript_texts",
     "resolve_child_profiles",
+    "resolve_scene_id",
     "resolve_reward",
     "resolve_role_slots",
     "resolve_rooms",

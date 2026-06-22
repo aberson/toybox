@@ -220,6 +220,7 @@ Built from the `local-sd-kids-ux` investigation set
   (incl. existing `ResolvedChildren` construction sites — additive field must not
   break positional callers).
 - **Depends on:** Y1
+- **Status:** DONE (2026-06-22)
 
 ### Step Y5: Persist + serialize scene
 - **Type:** code
