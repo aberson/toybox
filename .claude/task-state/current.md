@@ -1,45 +1,44 @@
 # Task State
 
-**Task:** "Claude Images" = a third `image_gen_mode` value (`claude_svg`) — Claude-authored animated SVG action sprites; + idle-sprite unbreak; + 429 retry/backoff hardening
-**Status:** CODE COMPLETE, UNCOMMITTED. Mode-based (mutually exclusive w/ cartoon/composite) + 429 hardening done. All gates green: backend 2620 pytest (1 pre-existing `ws_origin` flake — passes in isolation) / mypy 146 / ruff clean; frontend 800 vitest / typecheck / lint. HEAD `1881812` (only checkpoints committed; feature uncommitted).
-**Last written:** 2026-06-21T21:05:00Z
-**Session SHA:** 1881812
+**Task:** Claude Images / sprite-gen overhaul — SHIPPED + committed
+**Status:** DONE + COMMITTED to master at `4d592ae` (NOT pushed — no push without ask). Image-gen now has three mutually-exclusive modes (cartoon=local SD [default] / composite / claude_svg=Claude SVG, opt-in best-effort). Broken SVD .webp removed; kiosk shows good static .png with a model-free CSS idle-bob. Gates green: backend 2620 pytest (1 pre-existing ws_origin flake, green solo) / mypy / ruff; frontend 800 vitest / typecheck / lint.
+**Last written:** 2026-06-22T05:35:00Z
+**Session SHA:** 4d592ae
 
 ## Next Action
 
-Decide: **commit the feature** (scoped `git add` to the change set below; do NOT `git add -A` — skip CRLF-flapping `shared/*.ts` + parallel-session `room-import.*`). Live genuine-artifact capture still pending (subscription rate-limits direct /v1/messages while a Claude Code session runs); operator path: Settings → Image-gen mode → "Claude Images" → regenerate a toy.
+Nothing required — feature is committed. Open/optional:
+1. **Operator UAT (reliable path):** mode is back to `cartoon` (local SD) in the DB. Regenerate a toy's sprites → kiosk shows the static PNG cast with a gentle idle bob. This is the dependable, free, on-device path.
+2. **claude_svg is best-effort:** it 429s on the subscription OAuth token (direct /v1/messages is rate-limited for subscription tokens). Failed slots fall back to PNG. If we want it reliable, switch its transport to the **`claude` CLI** (PROVEN to work — generated a clean cartoon SVG of the toy from the photo, no 429). Not done (the user chose local-default + keep claude_svg as optional).
+3. **Top-fidelity option (paid):** Gemini Flash Image does true raster image-to-image but needs a PAID Google AI Studio key (~$0.04/img); the Google-Pro *subscription* does NOT grant API access. Not built.
+4. Push when ready (`git push`), after resolving the parallel-session situation below.
 
 ## WIP
-
-Nothing half-applied. Refactor complete + green. Representative SVG (Claude-authored stand-in) rendered earlier looks great — clean cartoon cat, animates, scales; big win over the SVD blobs. Live pipeline output still unproven (rate-limited).
+Nothing in flight. Session at a clean, committed stopping point.
 
 ## Completed (this session)
-- **Unbreak #3/#4:** app.py registers image/webp + image/svg+xml MIME; ToyActionSprite dropped the broken SVD .png→.webp swap (idle stays on good .png). +test_static_mime.py.
-- **Claude Images as a MODE (current design):** `image_gen_mode` core extended to `cartoon | composite | claude_svg` (core + api/image_gen_settings Literals + ImageGenModeToggle option + ImageGenMode type both apis). Worker `_run_one_body` now probes mode FIRST; `mode == "claude_svg"` → `_run_one_svg` (skips SD capability/breaker — needs a token not a GPU); cartoon/composite reuse the same probed mode. svg_gen.py unchanged (OAuth vision→sanitized cartoon SVG, idle self-animating). client.py describe_image has model/system overrides + svg_model() (Opus 4.8). One format per slot on disk (sibling cleanup both paths).
-- **Kiosk:** child api getImageGenMode (unauth GET) → App preferSvg = (mode==="claude_svg") → StepCard `preferSvg` → ToyActionSprite svg→png→hidden chain. Parent ToyActionGrid derives preferSvg from row.image_path extension.
-- **REMOVED (was the first cut):** standalone boolean flag claude_images_enabled — core module, api router, migration 0030, ClaudeImagesControl.tsx, all App/SettingsPanel/api wiring, and their tests. Local dev DB residue cleaned (schema_migrations v30 row + settings key deleted → back to v29).
-- **Tests:** test_svg_gen, test_worker_svg (mode_probe="claude_svg"), test_static_mime, image_gen_mode core+api claude_svg coverage, ToyActionSprite preferSvg, StepCard preferSvg integration, ToyActionGrid svg-row, ImageGenModeToggle claude_svg.
-- **Live E2E finding:** OAuth auth path WORKS (429 rate_limit_error, never 401; `oauth-2025-04-20` header makes no difference). Subscription token is rate-limited for direct /v1/messages while this Claude Code session runs → couldn't capture a genuine artifact. Error-handling verified live (429 → row failed, no crash, no breaker trip).
-- **429 hardening (done):** svg_gen retries 429/529 with capped backoff honouring `Retry-After` (_SVG_MAX_ATTEMPTS=3, base 2s, cap 20s — capped so the single-consumer worker isn't stalled), then raises new `SvgRateLimitedError`; worker maps it to a clean `claude_images_rate_limited` failure (operator-readable in the grid, not a raw "HTTP Error 429"). Non-429 HTTPError propagates unchanged. +6 tests (retry-then-succeed, exhausted→rate-limited, non-retryable propagates, _retry_delay honour/cap/exponential, worker rate-limited branch).
+- Unbreak: static-mount MIME (image/webp + image/svg+xml); removed broken SVD .webp idle swap.
+- CSS idle-bob (reduced-motion-safe) on the kiosk idle sprite — model-free animation, replaces the webp.
+- `claude_svg` as a third image_gen_mode (worker mode-first dispatch + _run_one_svg + svg_gen with sanitize + 429/529 retry/backoff → `claude_images_rate_limited`); kiosk/grid prefer .svg (svg→png→hidden). Cartoon stays default.
+- Removed the first-cut standalone boolean flag entirely (folded into image_gen_mode per operator request).
+- Live findings: direct-API OAuth works auth-wise but is rate-limited (429) for subscription tokens; the `claude` CLI path works; Gemini image-gen is paid-tier only.
+- Committed scoped: `4d592ae` (23 files). Reset DB image_gen_mode → cartoon.
 
 ## Dead Ends / Decisions
-- "Claude Images" is a MODE, not a boolean — mutually exclusive with cartoon/composite (operator's call; the worker already treated it that way by short-circuiting).
-- Claude has NO image-gen API → "Claude image" = Claude-authored SVG (vision input only). Confirmed via claude-api skill.
-- Did NOT add the `oauth-2025-04-20` header to client.py — live test showed it doesn't change the 429; toybox's bare-header pattern is fine (matches toy_vision).
-- Did NOT reformat worker.py — pre-existing repo `ruff format` drift (104 files); new files are format-canonical.
+- Subscription OAuth tokens (Claude AND Google) are UI entitlements, NOT programmatic API access — both throttle/deny direct API image-gen. Lesson: a consumer subscription ≠ an API key.
+- Claude has no raster image-gen (vision is input-only) → "Claude image" = SVG. Gemini CAN do raster i2i but paid-only.
+- Decision: local SD (cartoon) is the correct DEFAULT for this local-first device; claude_svg optional best-effort; CSS bob for animation (no generative model needed).
 
 ## Critical Gotchas
-- CRLF churn on frontend/src/shared/{errors,types}.ts shows "M" with EMPTY diff — known noise, not this work; don't stage.
-- Parallel-session artifacts NOT mine: documentation/runs/2026-06-21-room-import-uat.md + frontend/playwright/room-import.spec.ts. Scope `git add`.
-- Live SVG path UNVERIFIED end-to-end (StubClient tests only). Real call needs an idle subscription (not racing a Claude Code session) + a fresh token (`scripts/uat/bridge_claude_creds.py`, rotates ~daily).
-- Cost: regenerating one toy in claude_svg mode = 10 Claude vision calls.
+- **PARALLEL SESSION active on master:** a `uat-ui` skill iteration committed `9cedbb1` (.claude/skills/uat-ui/SKILL.md) mid-work, and `.claude/skills/uat-ui/evals/` is untracked. It races the git index (my first commit attempt failed on lock contention). Coordinate before pushing; don't `git add -A`.
+- CRLF churn on frontend/src/shared/{errors,types}.ts shows "M" with empty diff — known noise, never stage.
+- Parallel-session/earlier untracked NOT this work: documentation/runs/2026-06-21-room-import-uat.md, frontend/playwright/room-import.spec.ts.
+- PowerShell mangles multi-line `git commit -m` (splits into pathspecs) — use `git commit -F <file>`.
+- claude_svg via direct API = rate-limited; cartoon/composite are the reliable backends.
 
-## Key Files (change set — for scoped commit)
-- Backend new: src/toybox/image_gen/svg_gen.py
-- Backend mod: src/toybox/app.py (MIME + router list), src/toybox/ai/client.py (svg_model + describe_image overrides), src/toybox/image_gen/worker.py (mode-first dispatch + _run_one_svg), src/toybox/core/image_gen_mode.py (+claude_svg), src/toybox/api/image_gen_settings.py (Literals)
-- Backend deleted: core/claude_images_enabled.py, api/claude_images_enabled_settings.py, db/migrations/0030_claude_images_enabled.sql
-- Frontend mod: child/{App.tsx,api.ts,components/StepCard.tsx,ToyActionSprite.tsx,ToyActionSprite.module.css}; parent/{App.tsx,api.ts,components/SettingsPanel.tsx,ToyActionGrid.tsx}
-- Frontend deleted: parent/components/ClaudeImagesControl.tsx (+.test)
-- Tests new: tests/unit/test_static_mime.py, tests/unit/image_gen/test_svg_gen.py, tests/unit/image_gen/test_worker_svg.py + frontend ToyActionSprite/StepCard/ToyActionGrid/ImageGenModeToggle test updates
-- Tests deleted: tests/unit/core/test_claude_images_enabled.py, tests/integration/test_claude_images_enabled_api.py
-- Tunables: TOYBOX_CLAUDE_SVG_MODEL (default claude-opus-4-8), TOYBOX_CLAUDE_SVG_TIMEOUT_SEC (90)
+## Key Files
+- Mode core: src/toybox/core/image_gen_mode.py (cartoon|composite|claude_svg)
+- SVG gen: src/toybox/image_gen/svg_gen.py (+ retry/backoff); worker dispatch: src/toybox/image_gen/worker.py (_run_one_svg)
+- Kiosk: frontend/src/child/components/ToyActionSprite.{tsx,module.css} (preferSvg chain + idle-bob), StepCard.tsx
+- Parent toggle: frontend/src/parent/components/SettingsPanel.tsx (ImageGenModeToggle, 3 options)
+- Tunables: TOYBOX_CLAUDE_SVG_MODEL (claude-opus-4-8), TOYBOX_CLAUDE_SVG_TIMEOUT_SEC (90)
