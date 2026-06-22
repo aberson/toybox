@@ -254,6 +254,7 @@ Built from the `local-sd-kids-ux` investigation set
   (UI is PIN/kiosk-gated — runtime reviewers can't reach it, so review is `code`
   + the Y9 iPad UAT, per `feedback_buildstep_pin_gate_blocks_ui_evidence`.)
 - **Depends on:** Y5
+- **Status:** DONE (2026-06-22)
 
 ### Step Y7: Identity infrastructure (seed + IPA-scale override)
 - **Type:** code

@@ -133,6 +133,41 @@ const FULL_BLEED_CONTENT_STYLE: CSSProperties = {
   boxSizing: "border-box",
   padding:
     "env(safe-area-inset-top, 32px) env(safe-area-inset-right, 32px) env(safe-area-inset-bottom, 32px) env(safe-area-inset-left, 32px)",
+  // Phase Y: lift the content (card + avatar + sprites) ABOVE the scene
+  // backdrop layer (zIndex 0). When no backdrop renders the stacking context
+  // is harmless — the content simply sits above the persona gradient as before.
+  position: "relative",
+  zIndex: 1,
+};
+
+// Phase Y: full-viewport scene backdrop. A static <img> (no animation —
+// nothing for prefers-reduced-motion to disable) behind the step card +
+// cast, so the toys stand IN the scene instead of on a flat gradient. Only
+// rendered when the active activity carries a ``scene_url``; otherwise the
+// kiosk keeps the prior persona-gradient look. ``objectFit: cover`` fills the
+// viewport at any aspect ratio.
+const SCENE_BACKDROP_STYLE: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  width: "100%",
+  height: "100%",
+  objectFit: "cover",
+  zIndex: 0,
+  pointerEvents: "none",
+  userSelect: "none",
+};
+
+// Phase Y: readability scrim — a subtle translucent-white wash over the
+// backdrop so a busy scene doesn't fight the step-card text. Light enough
+// (0.18) that the cast still reads as "in the scene". The StepCard's own
+// rgba(255,255,255,0.82) card carries the bulk of the text contrast; this is
+// the gentle second layer. Static, pointer-transparent.
+const SCENE_SCRIM_STYLE: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(255,255,255,0.18)",
+  zIndex: 0,
+  pointerEvents: "none",
 };
 
 // Single source of truth for "the kiosk is currently displaying an
@@ -758,12 +793,36 @@ export function App(): JSX.Element {
     return typeof anim === "string" && anim.length > 0 ? anim : "float";
   })();
 
+  // Phase Y: the scene-backdrop URL for the active activity, or null. Only an
+  // active (approved/running) activity that carries a resolved ``scene_url``
+  // renders a backdrop; idle / terminal / legacy (no scene) keep the prior
+  // flat persona-gradient look.
+  const sceneBackdropUrl =
+    showActive &&
+    activity !== null &&
+    typeof activity.scene_url === "string" &&
+    activity.scene_url.length > 0
+      ? activity.scene_url
+      : null;
+
   return (
     <main
       data-testid="child-root"
       style={fullBleedStyle}
       {...featureFlagDatasetAttrs}
     >
+      {sceneBackdropUrl !== null && (
+        <>
+          <img
+            data-testid="scene-backdrop"
+            src={sceneBackdropUrl}
+            alt=""
+            aria-hidden="true"
+            style={SCENE_BACKDROP_STYLE}
+          />
+          <div data-testid="scene-scrim" aria-hidden="true" style={SCENE_SCRIM_STYLE} />
+        </>
+      )}
       <div style={FULL_BLEED_CONTENT_STYLE}>
         {activity === null && (
           <section
