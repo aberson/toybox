@@ -174,6 +174,12 @@ export interface Activity {
   // Phase K K5: comma-separated cast summary string. Optional + may be
   // "" when ``roles`` is empty.
   cast_summary?: string;
+  // Phase Y: kiosk scene-backdrop URL, denormalized from the persisted
+  // ``activities.scene_id`` (``/api/static/images/scenes/<scene_id>.png``).
+  // null/absent when no scene resolved (legacy rows) — the kiosk renders no
+  // backdrop (prior flat-gradient look). StepCard reads this as the
+  // full-viewport backdrop ``<img>`` src.
+  scene_url?: string | null;
 }
 
 export interface VersionConflictBody {

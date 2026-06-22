@@ -629,7 +629,7 @@ def normalize_interests(raw: str | None) -> tuple[str, ...]:
 
 def resolve_scene_id(
     template_scene_id: str | None,
-    resolved: ResolvedChildren,
+    resolved: ResolvedChildren | None,
     default: str = DEFAULT_SCENE_ID,
 ) -> str:
     """Resolve the kiosk scene-backdrop id for an activity (Phase Y).
@@ -647,10 +647,11 @@ def resolve_scene_id(
     """
     if template_scene_id:
         return template_scene_id
-    for token in resolved.interests:
-        scene = scene_for_interest(token)
-        if scene is not None:
-            return scene
+    if resolved is not None:
+        for token in resolved.interests:
+            scene = scene_for_interest(token)
+            if scene is not None:
+                return scene
     return default
 
 

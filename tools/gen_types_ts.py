@@ -298,6 +298,10 @@ def _build_types_ts_content() -> str:
         "  steps: ActivityStep[];\n"
         "  template_id: string | null;\n"
         "  recommended_themes: string[];\n"
+        "  // Phase Y: kiosk scene-backdrop URL\n"
+        "  // (/api/static/images/scenes/<scene_id>.png); null when no scene\n"
+        "  // resolved (legacy rows) — the kiosk then renders no backdrop.\n"
+        "  scene_url: string | null;\n"
         "}\n"
     )
 

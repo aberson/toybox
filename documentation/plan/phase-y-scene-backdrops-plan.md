@@ -237,6 +237,7 @@ Built from the `local-sd-kids-ux` investigation set
   persisted AND the Activity wire response carries the matching `scene_url`;
   codegen drift check clean.
 - **Depends on:** Y3, Y4
+- **Status:** DONE (2026-06-22)
 
 ### Step Y6: Kiosk backdrop layer
 - **Type:** code

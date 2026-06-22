@@ -49,6 +49,7 @@ from ..activities.content_resolver import (
     resolve_reward,
     resolve_role_slots,
     resolve_rooms,
+    resolve_scene_id,
     resolve_toys,
 )
 from ..activities.element_corpus import get_element
@@ -486,6 +487,12 @@ class ActivityResponse(BaseModel):
     # row is template-less. List of plain strings (Theme.value); the
     # wire shape deliberately does NOT leak the Theme enum class name.
     recommended_themes: list[str] = Field(default_factory=list)
+    # Phase Y: kiosk scene-backdrop URL, denormalized from the persisted
+    # ``activities.scene_id`` (``/api/static/images/scenes/<scene_id>.png``).
+    # ``None`` for legacy rows / rows with no resolved scene — the kiosk then
+    # renders no backdrop (prior flat-gradient look). The kiosk reads this
+    # directly as the ``<img>`` src for the full-viewport backdrop layer (Y6).
+    scene_url: str | None = None
 
 
 class ProposeRequest(BaseModel):
@@ -1296,6 +1303,15 @@ def _row_to_response(
                 theme.value for theme in template_for_themes.recommended_themes
             ]
 
+    # Phase Y: denormalize the persisted scene_id to a static backdrop URL.
+    # Read defensively via row.keys() — the column is present on ``SELECT *``
+    # fetches (the activity GET/list paths) but a narrower SELECT might omit it.
+    scene_url_value: str | None = None
+    if "scene_id" in row.keys():
+        raw_scene_id = row["scene_id"]
+        if isinstance(raw_scene_id, str):
+            scene_url_value = _scene_url_for(raw_scene_id)
+
     return ActivityResponse(
         id=activity_id,
         state=state,
@@ -1319,6 +1335,7 @@ def _row_to_response(
         template_id=template_id,
         recommended_themes=recommended_themes_value,
         reward_type=reward_type_value,
+        scene_url=scene_url_value,
     )
 
 
@@ -1366,6 +1383,7 @@ def _persist_activity(
     toy_ids: Sequence[str] = (),
     slot_fills: dict[str, str] | None = None,
     adventure: bool = False,
+    scene_id: str | None = None,
 ) -> None:
     """Insert one ``activities`` row plus ONLY the first step row.
 
@@ -1408,8 +1426,8 @@ def _persist_activity(
             "INSERT INTO activities "
             "(id, session_id, state, version, summary, persona_id, child_ids, room_ids, "
             " toy_ids, intent_source, created_at, started_at, ended_at, slot_fills_json, "
-            " adventure) "
-            "VALUES (?, ?, ?, 1, ?, ?, ?, NULL, ?, ?, ?, NULL, NULL, ?, ?)",
+            " adventure, scene_id) "
+            "VALUES (?, ?, ?, 1, ?, ?, ?, NULL, ?, ?, ?, NULL, NULL, ?, ?, ?)",
             (
                 activity_id,
                 session_id,
@@ -1422,6 +1440,7 @@ def _persist_activity(
                 created_at,
                 slot_fills_blob,
                 1 if adventure else 0,
+                scene_id,
             ),
         )
         # Phase G G2 — lazy step insertion. We INSERT only ``steps[0]``;
@@ -1934,6 +1953,23 @@ _STANDALONE_INTENTS: frozenset[str] = frozenset({_STANDALONE_SONG_INTENT, _STAND
 # ONE place so a future mount-path move (e.g. CDN cutover) is a single
 # edit (code-quality.md §2).
 _SONG_AUDIO_URL_PREFIX = "/api/static/songs/audio"
+# Phase Y: scene-backdrop static path prefix. A persisted ``scene_id`` is
+# denormalized to ``<prefix>/<scene_id>.png`` on the wire; the file is served
+# by the existing ``/api/static/images`` mount (app.py) from
+# ``data/images/scenes/``.
+_SCENE_IMAGE_URL_PREFIX = "/api/static/images/scenes"
+
+
+def _scene_url_for(scene_id: str | None) -> str | None:
+    """Denormalize a persisted ``scene_id`` to its static backdrop URL.
+
+    Returns ``None`` for a NULL/empty scene id so the kiosk renders no
+    backdrop. ``scene_id`` values are validated (∈ SCENE_IDS, filename-safe
+    lowercase) at template load, so no escaping is needed here.
+    """
+    if not scene_id:
+        return None
+    return f"{_SCENE_IMAGE_URL_PREFIX}/{scene_id}.png"
 
 
 def _standalone_surface_enabled(conn: sqlite3.Connection, intent: str) -> bool:
@@ -2765,6 +2801,15 @@ def _do_propose(
             "metadata": metadata,
             "template_id": activity.template_id,
         }
+    # Phase Y: resolve the kiosk scene-backdrop. Chain = the picked template's
+    # authored scene_id (validated ∈ SCENE_IDS at load) -> the running child's
+    # interests -> DEFAULT_SCENE_ID. ``template_for_roles`` is the picked
+    # template (None when renamed/removed between runs); ``resolved_children``
+    # carries the owner-first interest tokens.
+    scene_id_value = resolve_scene_id(
+        template_for_roles.scene_id if template_for_roles is not None else None,
+        resolved_children,
+    )
     _persist_activity(
         conn,
         activity_id=activity.id,
@@ -2776,6 +2821,7 @@ def _do_propose(
         state=PROPOSED_STATE,
         toy_ids=list(activity.toy_ids),
         slot_fills=slot_fills_arg,
+        scene_id=scene_id_value,
     )
 
     # Phase L Step L5: the K14 ending auto-append surface was deleted —

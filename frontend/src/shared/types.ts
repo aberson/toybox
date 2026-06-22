@@ -161,6 +161,10 @@ export interface Activity {
   steps: ActivityStep[];
   template_id: string | null;
   recommended_themes: string[];
+  // Phase Y: kiosk scene-backdrop URL
+  // (/api/static/images/scenes/<scene_id>.png); null when no scene
+  // resolved (legacy rows) — the kiosk then renders no backdrop.
+  scene_url: string | null;
 }
 
 /**
