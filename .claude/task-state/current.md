@@ -1,32 +1,30 @@
 # Task State
 
-**Task:** Phase Y Manual UAT — operator runs M1 (render) then M2 (iPad backdrop)
-**Status:** Phase Y code COMPLETE + PUSHED at master `1ed45ac` (origin/master up to date). /repo-update done: README + master-plan + CLAUDE.md + memory updated; plan moved to `plan/awaiting-uat/`; umbrella #264 has a code-complete summary comment and stays OPEN until M1/M2 pass. Only the two operator UAT steps remain. backend 2670 + frontend 802 green.
-**Last written:** 2026-06-22T10:00:00Z
-**Session SHA:** 1ed45ac
+**Task:** Phase Y — COMPLETE (code + Manual UAT M1/M2 PASS). Awaiting operator direction on the next work item.
+**Status:** Phase Y fully done 2026-06-23. M1 (#267 scene render) + M2 (#274 iPad backdrop) both PASS — run doc `documentation/runs/2026-06-23-phase-y-uat.md`. Umbrella #264 closed; #267 + #274 closed; #271 (Y6 code-step whose close was missed during /build-phase) closed retroactively. Plan moved `awaiting-uat/` → `archive/`. master + origin in sync.
+**Last written:** 2026-06-23T19:29:23Z
+**Session SHA:** (set by close-out commit)
 
 ## Next Action
-Operator runs the Manual UAT bundle in `documentation/plan/awaiting-uat/phase-y-scene-backdrops-plan.md` § Manual UAT, in order:
-- **M1 (#267)** — stop the backend, then `uv run python scripts/batch_scenes.py` → renders ~8-10 scene PNGs to `data/images/scenes/`; parent-eyeball each (age-appropriate + style-cohesive with sprites). `--dry-run` previews.
-- **M2 (#274)** — bring up backend (loopback) + `cd frontend; npm run dev`; propose+approve for Child A then Child B; open the child kiosk on iPad; confirm backdrop renders behind the step card, text readable, cast in-scene, and the interest-selected scene differs (Child A→stage, Child B→lab).
-On PASS: write `documentation/runs/2026-06-22-phase-y-uat.md` and close umbrella #264.
+Operator to choose the next work item. Recommended options, grounded in open GitHub issues:
+1. **Build Phase E** (local model + tool-loop) — the next BUILDABLE code phase. `documentation/plan/phase-e.md`; master-plan says "Step 27 free to resume" (≥50-SFT-row gate cut 2026-05-21). Autonomous via `/plan-expedite --plan documentation/plan/phase-e.md` → `/build-phase`.
+2. **Fix open production follow-ups** (both code, autonomous): #245 (OFFLINE `listening_mode` privacy bypassed by background Claude calls — S2 animator + judge; privacy gap on a family-private product) and #244 (R3 Q&A gate UI-enforced, not credential-enforced, until Phase D Step 20 child-token pairing).
+3. **Clear the awaiting-UAT backlog** — bundle #223 (R/S/O/T/V/W/X iPad UAT; needs operator on iPad + `room_classifier --download`). Separately: Phase P #189/#191 (hardware-bound render + UAT), Phase Q #202/#205 (operator generators + Coqui MP3 render).
 
-## Completed (this session)
-- Investigation set (17 files + README) committed 6dcd80f (local).
-- /plan-feature → Phase Y plan; /plan-expedite (review+wrap READY, repo-sync #264-274).
-- /build-phase Y1-Y8: scene_catalog (Y1) → generate_scene + batch_scenes CLI (Y2) → template scene_id + validator (Y3) → resolver + interests activation (Y4) → migration 0030 + wire scene_url + codegen (Y5) → kiosk backdrop layer (Y6) → IPA-scale override infra (Y7) → smoke gate (Y8). Each: gates green + code-review PASS + scoped checkpoint commit.
+## Completed (Phase Y — this arc)
+- Investigation set → /plan-feature → /plan-expedite (#264–274) → /build-phase Y1–Y8 (8 scoped checkpoint commits, each gates-green + code-review PASS) → /repo-update → Manual UAT M1/M2 PASS → close-out.
+- Code under test: master `f878eb7`. backend 2,670 pytest + frontend 802 vitest; mypy/ruff clean (modulo pre-existing generator.py/models.py ruff-format debt).
 
 ## Dead Ends / Decisions
-- Pre-render scene library ONLY; runtime serves static PNGs via /api/static/images (covers data/images/scenes/). No new mount.
-- scene_id is a first-class activities column (migration 0030), not a slot_fills_json reserved key.
-- ruff format swept PRE-EXISTING debt into generator.py + models.py — reverted both to keep diffs scoped (HEAD already fails `ruff format --check` on those files; not mine to fix).
-- Y6 kiosk uses --reviewers code (PIN-gated); Y9 iPad UAT is the visual gate.
+- Pre-render scene library ONLY; runtime serves static PNGs via existing `/api/static/images` mount. No new mount.
+- `scene_id` is a first-class `activities` column (migration 0030), not a `slot_fills_json` key.
+- `ruff format` swept PRE-EXISTING debt into generator.py + models.py — do NOT `ruff format` those whole files (HEAD already fails `ruff format --check` there); scope edits.
 
 ## Critical Gotchas
-- **PARALLEL SESSION on master** (uat-ui). Never `git add -A`; scope every add. CRLF flap on frontend/src/shared/{errors,types}.ts — never stage (Y5 staged types.ts ONLY for the real scene_url change; errors.ts left alone).
-- WS-topic timing tests (test_ws_toy_actions_topic, test_ws_heartbeat) are flaky under full-suite load — pass in isolation. Pre-existing, not Phase Y.
-- 10 LOCAL commits unpushed (6dcd80f + b53d794 + 8 checkpoints). Push only on operator OK.
+- **PARALLEL uat-ui session on master.** NEVER `git add -A`; scope every add. CRLF flap on `frontend/src/shared/{errors,types}.ts` — never stage. Untracked `.claude/skills/uat-ui/evals/`, `documentation/runs/2026-06-21-room-import-uat.md`, `frontend/playwright/room-import.spec.ts`, `.plan-expedite-state.phase-x-done` belong to the parallel session — leave them.
+- WS-topic timing tests (test_ws_toy_actions_topic, test_ws_heartbeat) flake under full-suite load; pass in isolation. Pre-existing, not Phase Y.
 
 ## Key Files
-- Phase Y plan + Manual UAT: `documentation/plan/phase-y-scene-backdrops-plan.md`
+- Phase Y plan (archived): `documentation/plan/archive/phase-y-scene-backdrops-plan.md`
+- UAT run doc: `documentation/runs/2026-06-23-phase-y-uat.md`
 - Scene seams: `src/toybox/activities/{scene_catalog,content_resolver,_validator,generator,models}.py`, `src/toybox/image_gen/{pipeline,models}.py`, `src/toybox/api/activities.py`, `scripts/batch_scenes.py`, migration `0030_activities_scene_id.sql`, `frontend/src/child/App.tsx`
