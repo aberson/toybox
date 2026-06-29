@@ -162,7 +162,7 @@ def test_child_interest_drives_scene_when_template_has_none(
                 "(id, display_name, birthdate, pronouns, reading_level, "
                 " interests, comfort, notes) "
                 "VALUES (?, ?, NULL, NULL, NULL, ?, NULL, NULL)",
-                ("rocket", "Child B", "loves the periodic table"),
+                ("child-b", "Child B", "loves the periodic table"),
             )
     finally:
         conn.close()
@@ -174,7 +174,7 @@ def test_child_interest_drives_scene_when_template_has_none(
             "slot": None,
             "hour": 12,
             "seed": 3,
-            "context": {"child_ids": ["rocket"]},
+            "context": {"child_ids": ["child-b"]},
         },
         headers=parent_headers,
     )

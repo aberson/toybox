@@ -25,6 +25,16 @@ frontend/tsconfig.tsbuildinfo
 *.log
 npm-debug.log*
 
+# SQLite databases are runtime artifacts and may hold child PII, PIN hashes, and
+# token hashes. Never track one anywhere. The data/* rule below is root-anchored
+# and historically missed nested runtime dirs (e.g. frontend/data/); these globs
+# close that hole regardless of where the backend's cwd places the DB.
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
 # Toybox runtime data (gitignore everything in data/ except the
 # directory placeholders so the model-cache layout is shipped in git
 # but the binaries themselves stay out of the repo).

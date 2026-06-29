@@ -15,7 +15,13 @@ from .connection import connect
 from .slugs import InvalidDisplayNameError, derive_slug
 
 DB_PATH_ENV = "TOYBOX_DB_PATH"
-DEFAULT_DB_PATH = Path("data") / "toybox.db"
+# Anchor the default to the repo root (this file is …/src/toybox/db/__init__.py,
+# so parents[3] is the repo root), NOT the process cwd. A cwd-relative default let
+# a backend started from the frontend/ directory write the live DB into the tracked
+# frontend/data/ tree; pairing this with the *.db gitignore guard makes an accidental
+# commit of a kid-data-bearing DB structurally impossible.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_DB_PATH = _REPO_ROOT / "data" / "toybox.db"
 
 
 def resolve_db_path() -> Path:

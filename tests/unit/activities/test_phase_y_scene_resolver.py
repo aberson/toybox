@@ -90,9 +90,9 @@ def test_custom_default_honored() -> None:
 
 
 def test_aggregate_unions_interests_owner_first() -> None:
-    ama = ChildProfileRow(id="ama", interests=("dancing",))
-    rocket = ChildProfileRow(id="rocket", interests=("periodic table",))
-    agg = aggregate_child_constraints([ama, rocket])
+    child_a = ChildProfileRow(id="child-a", interests=("dancing",))
+    child_b = ChildProfileRow(id="child-b", interests=("periodic table",))
+    agg = aggregate_child_constraints([child_a, child_b])
     assert agg.interests == ("dancing", "periodic table")
     # Owner (first profile) interest wins the scene pick.
     assert resolve_scene_id(None, agg) == "stage"
@@ -141,21 +141,21 @@ def _insert_child(
 
 
 def test_resolve_child_profiles_reads_interests(conn: sqlite3.Connection) -> None:
-    _insert_child(conn, child_id="rocket", interests="loves the periodic table and space")
-    out = resolve_child_profiles(conn, ["rocket"])
+    _insert_child(conn, child_id="child-b", interests="loves the periodic table and space")
+    out = resolve_child_profiles(conn, ["child-b"])
     assert "periodic table" in out.interests
     assert resolve_scene_id(None, out) == "lab"
 
 
 def test_resolve_child_profiles_owner_first_across_children(conn: sqlite3.Connection) -> None:
-    _insert_child(conn, child_id="ama", interests="dancing and lol dolls")
-    _insert_child(conn, child_id="rocket", interests="periodic table")
-    # Owner (first in child_ids) is Child A -> her interest wins the scene pick.
-    out = resolve_child_profiles(conn, ["ama", "rocket"])
+    _insert_child(conn, child_id="child-a", interests="dancing and lol dolls")
+    _insert_child(conn, child_id="child-b", interests="periodic table")
+    # Owner (first in child_ids) is Child A -> their interest wins the scene pick.
+    out = resolve_child_profiles(conn, ["child-a", "child-b"])
     assert out.interests[0] == "dancing"
     assert resolve_scene_id(None, out) == "stage"
     # Reversing the owner flips the pick.
-    out2 = resolve_child_profiles(conn, ["rocket", "ama"])
+    out2 = resolve_child_profiles(conn, ["child-b", "child-a"])
     assert out2.interests[0] == "periodic table"
     assert resolve_scene_id(None, out2) == "lab"
 
