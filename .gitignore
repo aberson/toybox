@@ -91,6 +91,7 @@ data/images/rewards/
 data/images/rooms/
 data/images/toys/
 data/images/toy_actions/
+data/images/scenes/
 # Step (c) + (d): allow data/images/elements/ but only for the 14
 # canonical PNGs.
 !data/images/elements/
