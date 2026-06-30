@@ -202,16 +202,28 @@ function avatarLetter(activity: Activity | null): string {
 }
 
 function avatarImage(activity: Activity | null): string | null {
-  // The Activity wire shape doesn't include a persona object yet
-  // (M5 will land the library + avatar paths). When it does, we look
-  // it up under metadata.persona.avatar_image_path; otherwise fall
-  // back to the colored letter circle.
+  // metadata.persona carries the library persona summary (id +
+  // avatar_image_path). The DB stores avatar_image_path as the
+  // library-relative source ("library/avatars/<id>.png"); the loader
+  // copies each avatar to data/images/personas/<id>.png, served by the
+  // backend's /api/static/images mount. Build that served URL from the
+  // persona id. PersonaAvatar falls back to the letter circle if the
+  // image 404s (onError), so a missing avatar degrades gracefully.
   if (activity === null) return null;
   const meta = activity.metadata as Record<string, unknown>;
   const persona = meta["persona"];
   if (typeof persona === "object" && persona !== null) {
-    const path = (persona as Record<string, unknown>)["avatar_image_path"];
-    if (typeof path === "string" && path.length > 0) return path;
+    const rec = persona as Record<string, unknown>;
+    const path = rec["avatar_image_path"];
+    const id = rec["id"];
+    if (
+      typeof path === "string" &&
+      path.length > 0 &&
+      typeof id === "string" &&
+      id.length > 0
+    ) {
+      return `/api/static/images/personas/${id}.png`;
+    }
   }
   return null;
 }

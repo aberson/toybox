@@ -16,8 +16,8 @@ Both share types, ws envelopes, and the same FastAPI backend — one async proce
 <table>
 <tr>
 <td width="25%" valign="top" align="center">
-<a href="documentation/images/kiosk-persona-detective.png"><img src="documentation/images/kiosk-persona-detective.png" alt="Child kiosk showing the Detective persona avatar over a scene backdrop with a large step card" width="100%"></a>
-<br/><sub><b>Personas</b><br/>Each AI persona gets its own avatar, color, and voice on the kiosk</sub>
+<a href="documentation/images/personas-grid.png"><img src="documentation/images/personas-grid.png" alt="Four illustrated AI persona avatars — Inspector Pip the detective, Marvelous the Wizard, Princess Lyra, and Professor Iridia" width="100%"></a>
+<br/><sub><b>Personas</b><br/>Four AI characters the child picks — each with an illustrated avatar, color, and voice</sub>
 </td>
 <td width="25%" valign="top" align="center">
 <a href="data/images/elements/h-1.png"><img src="data/images/elements/h-1.png" alt="Hydrogen element sprite — Pillow text overlay composited over an SD 1.5 + LCM-LoRA diffusion" width="100%"></a>
@@ -28,7 +28,7 @@ Both share types, ws envelopes, and the same FastAPI backend — one async proce
 <br/><sub><b>Toy action sprites</b><br/>10 action poses overlay on the active toy mid-activity</sub>
 </td>
 <td width="25%" valign="top" align="center">
-<a href="documentation/images/kiosk-persona-periodic.png"><img src="documentation/images/kiosk-persona-periodic.png" alt="Child kiosk at iPad landscape — persona avatar, scene backdrop, and a large readable step card" width="100%"></a>
+<a href="documentation/images/kiosk-persona.png"><img src="documentation/images/kiosk-persona.png" alt="Child kiosk at iPad landscape — Inspector Pip persona avatar over a scene backdrop with a large readable step card" width="100%"></a>
 <br/><sub><b>iPad kiosk</b><br/>Full-bleed PWA over LAN, locked to one app via Guided Access</sub>
 </td>
 </tr>
@@ -440,5 +440,5 @@ MIT — see [LICENSE](LICENSE). Family-private project; the code is MIT but no w
 ## Acknowledgments
 
 - Built alongside two kids who actually play with it.
-- Persona avatars are color-coded placeholder tiles (letter + gradient) for now; element sprites composited from Stable Diffusion 1.5 + LCM-LoRA + Pillow text overlay.
+- Persona avatars and element sprites are generated locally with Stable Diffusion 1.5 + LCM-LoRA (`scripts/generate_persona_avatars.py`, `scripts/generate_element_sprites.py`); element sprites add a Pillow periodic-table-cell overlay.
 - Songs voiced via Coqui XTTS-v2.
