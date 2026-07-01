@@ -36,7 +36,7 @@ Both share types, ws envelopes, and the same FastAPI backend — one async proce
 
 > **25 → 1,361 activity templates** across 14 phases shipped, fully on-device. Catalog grows by parent approvals → labeled events → SFT corpus, waiting on ≥50 rows before LoRA fine-tune kicks in (Phase E).
 >
-> **iPad UAT 11/12 PASS** at Phase M close (2026-05-18) — kiosk runs as a Guided Access app on a real iPad over Wi-Fi LAN. **2,670 pytest + 802 vitest** green at master `f878eb7` (2026-06-22); Phase Y (scene backdrops) is **complete** (Manual UAT M1+M2 PASS 2026-06-23); Phase W (play depth) and Phase X (room import) are code-shipped and awaiting iPad UAT ([#223](https://github.com/aberson/toybox/issues/223)). Fully offline once whisper-small + persona avatars + element sprites are cached locally.
+> **iPad UAT 11/12 PASS** at Phase M close (2026-05-18) — kiosk runs as a Guided Access app on a real iPad over Wi-Fi LAN. **2,670 pytest + 802 vitest** green on master (2026-06-22); Phase Y (scene backdrops) is **complete** (Manual UAT M1+M2 PASS 2026-06-23); Phase W (play depth) and Phase X (room import) are code-shipped and awaiting iPad UAT ([#223](https://github.com/aberson/toybox/issues/223)). Fully offline once whisper-small + persona avatars + element sprites are cached locally.
 
 ## What makes this different
 
@@ -194,7 +194,7 @@ So toybox listens locally (silero-VAD + faster-whisper, no audio leaves the box)
 - **Play depth (Phase W, 2026-06-20)** — parent-involvement + game-complexity dials, a linear↔non-linear toggle, Whisper/STT Q&A answer-grading (off/lenient/strict), a dynamic hybrid online/offline adventure engine, and interactive boss-fight climaxes. **2,469 pytest + 780 vitest** at close.
 - **Room import (Phase X, 2026-06-20)** — paste a real-estate listing's HTML/photo URLs → auto-named rooms with **local-CLIP** (ONNX, no cloud) photo→room matching behind an SSRF-guarded fetcher; per-room type + a "stay out" toggle that excludes a room from play. **2,586 pytest + 787 vitest** at close.
 - **Scene backdrops (Phase Y, 2026-06-22)** — a pre-rendered cartoon scene library (`scene_catalog`, offline `batch_scenes.py`, no-IPA `generate_scene`) renders a full-bleed backdrop behind the kiosk step card so the cast stands *in* a place. Which scene is picked chains template `scene_id` → the running child's **interests** (free text → allowlisted tokens → scene) → default; persisted on `activities.scene_id` (migration 0030) + served via the existing `/api/static/images` mount. Plus per-call IP-Adapter-scale infra for future per-scene composited art. **2,670 pytest + 802 vitest** at close. ✅ **Complete** — Manual UAT M1 (render) + M2 (iPad) PASS 2026-06-23.
-- **In flight: Phase E** — Local model fine-tune via LoRA. Backend substrate already shipped in two carve-outs ([Step 28](https://github.com/aberson/toybox/issues), [Step 27 / E3 at `4f735a0`](https://github.com/aberson/toybox/commit/4f735a0)). Full ship gated on ≥50 SFT-filter rows in `labeled_events` — populated naturally as parents tag activities.
+- **In flight: Phase E** — Local model fine-tune via LoRA. Backend substrate already shipped in two carve-outs ([Step 28](https://github.com/aberson/toybox/issues), Step 27 / E3). Full ship gated on ≥50 SFT-filter rows in `labeled_events` — populated naturally as parents tag activities.
 
 ---
 
