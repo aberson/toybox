@@ -43,7 +43,10 @@ export interface ReadMeButtonProps {
 //   - ``limit`` is 0 or falsy (off)
 //   - ``text.length <= limit`` (already short enough)
 // Appends ``…`` (U+2026) when truncation occurs.
-function truncateAtWordBoundary(text: string, limit: number): string {
+// Exported so ``ChoiceReadButton`` (the per-option read-aloud bubble)
+// applies the SAME parent-configured spoken-text limit — one source of
+// truth for the truncation rule.
+export function truncateAtWordBoundary(text: string, limit: number): string {
   if (!limit || text.length <= limit) return text;
   // Slice to the limit first, then walk back to the last space so we
   // don't cut mid-word. If no space is found (one very long word),

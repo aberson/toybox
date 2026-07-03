@@ -83,6 +83,14 @@ if ($LanIp) {
     Write-Host "============================================================" -ForegroundColor Green
     Write-Host "  iPad child kiosk:  http://$LanIp`:4000/child" -ForegroundColor Green
     Write-Host "============================================================" -ForegroundColor Green
+} else {
+    # Test mode (loopback): the child kiosk runs on THIS machine, not the iPad.
+    Write-Host ""
+    Write-Host "============================================================" -ForegroundColor Green
+    Write-Host "  TEST MODE (loopback only - nothing reachable from the iPad)" -ForegroundColor Green
+    Write-Host "  Parent UI:          http://localhost:4000/parent" -ForegroundColor Green
+    Write-Host "  Local child kiosk:  http://localhost:4000/child" -ForegroundColor Green
+    Write-Host "============================================================" -ForegroundColor Green
 }
 Write-Host ""
 Read-Host "Press Enter to close this launcher (servers keep running in their own windows)"

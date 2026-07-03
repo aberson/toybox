@@ -4,6 +4,7 @@ import type { Activity, ActivityStep } from "../api";
 import { getVoiceProfile, type PersonaMetadata } from "../persona-voice";
 import type { VoiceProfile } from "../tts";
 import { ChoiceButton, type ChoiceResult } from "./ChoiceButton";
+import { ChoiceReadButton } from "./ChoiceReadButton";
 import { ClickableText } from "./ClickableText";
 import { ElementCard } from "./ElementCard";
 import { JokeStep, replayJoke } from "./JokeStep";
@@ -783,30 +784,64 @@ export function StepCard(props: StepCardProps): JSX.Element {
             marginTop: "clamp(8px, 1.5vh, 24px)",
           }}
         >
-          {choices.map((choice) => (
-            <ChoiceButton
-              key={choice.choice_index}
-              label={choice.label}
-              choiceIndex={choice.choice_index}
-              onChoose={props.onChoose!}
-              // Disable EVERY button (including the in-flight one) when
-              // any choice is being processed. The in-flight button's
-              // own internal ``busy`` already disables it locally, but
-              // gating it via the App-level prop too is defensive and
-              // means siblings + self share one disable signal — no
-              // gap between the two for a tap to slip through.
-              disabled={
-                props.choosingIndex !== undefined &&
-                props.choosingIndex !== null
-              }
-              // Phase K K9: thread the voice profile + flag so the
-              // label renders as ClickableText. ChoiceButton handles
-              // the off-state by rendering the bare label string —
-              // pre-K9 layout intact.
-              voiceProfile={voiceProfile}
-              clickableWordsEnabled={clickableWordsEnabled}
-            />
-          ))}
+          {choices.map((choice) => {
+            const choiceButton = (
+              <ChoiceButton
+                key={choice.choice_index}
+                label={choice.label}
+                choiceIndex={choice.choice_index}
+                onChoose={props.onChoose!}
+                // Disable EVERY button (including the in-flight one) when
+                // any choice is being processed. The in-flight button's
+                // own internal ``busy`` already disables it locally, but
+                // gating it via the App-level prop too is defensive and
+                // means siblings + self share one disable signal — no
+                // gap between the two for a tap to slip through.
+                disabled={
+                  props.choosingIndex !== undefined &&
+                  props.choosingIndex !== null
+                }
+                // Phase K K9: thread the voice profile + flag so the
+                // label renders as ClickableText. ChoiceButton handles
+                // the off-state by rendering the bare label string —
+                // pre-K9 layout intact.
+                voiceProfile={voiceProfile}
+                clickableWordsEnabled={clickableWordsEnabled}
+              />
+            );
+            // Read-aloud split: when the household Read Me flag is on,
+            // each option gets its own read-aloud bubble NEXT TO the
+            // choice pill (the bottom-left "?" reads only the prompt
+            // body). The bubble is a SIBLING inside a row wrapper —
+            // never a child of the ChoiceButton (nested <button>s are
+            // invalid HTML and a read tap must not advance the
+            // activity). Flag off → the bare ChoiceButton renders with
+            // no wrapper, keeping the pre-split DOM byte-identical
+            // (K9 convention: an absent flag adds NO DOM nodes).
+            if (!readMeButtonEnabled) return choiceButton;
+            return (
+              <div
+                key={choice.choice_index}
+                data-testid="choice-row"
+                style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 10,
+                  width: "100%",
+                }}
+              >
+                {choiceButton}
+                <ChoiceReadButton
+                  label={choice.label}
+                  choiceIndex={choice.choice_index}
+                  profile={voiceProfile}
+                  enabled={readMeButtonEnabled}
+                  limit={props.spokenTextLimit ?? 0}
+                />
+              </div>
+            );
+          })}
         </div>
       )}
       {/*

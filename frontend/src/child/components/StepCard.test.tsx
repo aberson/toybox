@@ -11,7 +11,7 @@
 
 import type { JSX } from "react";
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { currentStepHasElement } from "../App";
@@ -802,6 +802,117 @@ describe("StepCard K9 — ClickableText threading", () => {
     expect(wordTexts).toContain("Sneak");
     expect(wordTexts).toContain("Penguin");
     expect(wordTexts).toContain("Charge");
+  });
+});
+
+// Read-aloud split: the bottom-left "?" reads the prompt body only;
+// each option gets its OWN read bubble next to its ChoiceButton, gated
+// by the same read_me_button_enabled flag. Integration through the
+// production caller — StepCard composes ChoiceButton + ChoiceReadButton
+// into the choice rows, so these tests exercise the real wiring (a
+// unit-tested ChoiceReadButton that StepCard never mounts would be a
+// silent-wiring failure).
+
+describe("StepCard — per-choice read-aloud bubbles", () => {
+  const forkActivity = (): Activity =>
+    fakeActivity({
+      steps: [
+        fakeStep({
+          choices: [
+            { label: "Sneak past Penguin", choice_index: 0 },
+            { label: "Charge in bravely", choice_index: 1 },
+          ],
+        }),
+      ],
+    });
+
+  it("mounts one choice-read-button per choice when readMeButtonEnabled=true", () => {
+    render(
+      <StepCard
+        activity={forkActivity()}
+        onAdvance={vi.fn()}
+        onChoose={vi.fn()}
+        readMeButtonEnabled={true}
+      />,
+    );
+    const bubbles = screen.getAllByTestId("choice-read-button");
+    expect(bubbles).toHaveLength(2);
+    expect(bubbles[0]!.getAttribute("data-choice-index")).toBe("0");
+    expect(bubbles[1]!.getAttribute("data-choice-index")).toBe("1");
+    // Each bubble sits in a row wrapper alongside its ChoiceButton.
+    expect(screen.getAllByTestId("choice-row")).toHaveLength(2);
+    // The prompt's own Read Me bubble still mounts — the split keeps
+    // BOTH affordances (one for the prompt, one per option).
+    expect(screen.getByTestId("read-me-button")).not.toBeNull();
+  });
+
+  it("mounts NO choice-read-buttons (and no row wrappers) when readMeButtonEnabled=false", () => {
+    render(
+      <StepCard
+        activity={forkActivity()}
+        onAdvance={vi.fn()}
+        onChoose={vi.fn()}
+        readMeButtonEnabled={false}
+      />,
+    );
+    expect(screen.queryAllByTestId("choice-read-button")).toHaveLength(0);
+    // Flag off adds NO DOM nodes — the bare ChoiceButtons render with
+    // no wrapper, byte-identical to the pre-split stack.
+    expect(screen.queryAllByTestId("choice-row")).toHaveLength(0);
+    expect(screen.getAllByTestId("choice-button")).toHaveLength(2);
+  });
+
+  it("tapping a bubble speaks THAT option's label and does NOT advance", async () => {
+    const tts = await import("../tts");
+    const onChoose = vi.fn(async () => "ok" as const);
+    render(
+      <StepCard
+        activity={forkActivity()}
+        onAdvance={vi.fn()}
+        onChoose={onChoose}
+        readMeButtonEnabled={true}
+      />,
+    );
+    const bubbles = screen.getAllByTestId("choice-read-button");
+    fireEvent.click(bubbles[1]!);
+    expect(tts.speak).toHaveBeenCalledWith(
+      "Charge in bravely",
+      expect.anything(),
+    );
+    // The read tap must never fire the choice POST — the bubble is a
+    // sibling of the ChoiceButton, not a nested tap surface.
+    expect(onChoose).not.toHaveBeenCalled();
+  });
+
+  it("threads spokenTextLimit through to the bubbles (label truncated)", async () => {
+    const tts = await import("../tts");
+    render(
+      <StepCard
+        activity={forkActivity()}
+        onAdvance={vi.fn()}
+        onChoose={vi.fn()}
+        readMeButtonEnabled={true}
+        spokenTextLimit={8}
+      />,
+    );
+    fireEvent.click(screen.getAllByTestId("choice-read-button")[0]!);
+    // "Sneak past Penguin" sliced to 8 = "Sneak pa", last space at 5
+    // → "Sneak" + "…" (same word-boundary rule as ReadMeButton).
+    expect(tts.speak).toHaveBeenCalledWith("Sneak…", expect.anything());
+  });
+
+  it("linear steps (no choices) mount no bubbles even with the flag on", () => {
+    const activity = fakeActivity({
+      steps: [fakeStep({ body: "Look at the stars." })],
+    });
+    render(
+      <StepCard
+        activity={activity}
+        onAdvance={vi.fn()}
+        readMeButtonEnabled={true}
+      />,
+    );
+    expect(screen.queryAllByTestId("choice-read-button")).toHaveLength(0);
   });
 });
 
