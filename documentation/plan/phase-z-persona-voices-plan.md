@@ -241,6 +241,7 @@ computes hashes.
 - **Produces:** `src/toybox/tts/{engine,__main__}.py`; `tts` extra; `neural_voice` end-to-end schema; casting defaults; stub-mode tests
 - **Done when:** `uv run python -m toybox.tts --download --dry-run` prints targets without the extra installed (lazy-import idiom); stub synth round-trips a valid WAV in pytest; codegen hook regenerates types.ts with `neural_voice`; loader upserts the new JSON field (migration test extended)
 - **Depends on:** none (parallel-safe with Z1/Z2)
+- **Status:** DONE (2026-07-03)
 
 <!-- autofix-applied: 2026-07-03 -->
 ### Step Z4: Clip cache + synth worker + enqueue hooks + wire shape

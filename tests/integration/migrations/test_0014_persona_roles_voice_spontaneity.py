@@ -162,7 +162,9 @@ def test_new_persona_rows_can_supply_explicit_json(conn: sqlite3.Connection) -> 
                 None,
                 "2026-05-14T00:00:00Z",
                 '{"friend":1.5}',
-                '{"rate":1.0,"pitch":1.0}',
+                # Phase Z Z3: neural_voice rides in the same JSON column
+                # (no SQL migration) — pin that the column stores it as-is.
+                '{"neural_voice":"af_heart","pitch":1.0,"rate":1.0}',
                 '{"jokes":0.1,"songs":0.2}',
             ),
         )
@@ -173,5 +175,5 @@ def test_new_persona_rows_can_supply_explicit_json(conn: sqlite3.Connection) -> 
     ).fetchone()
     assert row is not None
     assert row["role_weights"] == '{"friend":1.5}'
-    assert row["voice_profile"] == '{"rate":1.0,"pitch":1.0}'
+    assert row["voice_profile"] == '{"neural_voice":"af_heart","pitch":1.0,"rate":1.0}'
     assert row["spontaneity_rates"] == '{"jokes":0.1,"songs":0.2}'

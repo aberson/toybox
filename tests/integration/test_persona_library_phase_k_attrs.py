@@ -45,6 +45,8 @@ def db(tmp_path: Path) -> Iterator[sqlite3.Connection]:
 
 
 # Plan §5 verbatim table — these are the acceptance numerics.
+# ``neural_voice`` values are the Phase Z Z3 casting defaults
+# (phase-z-persona-voices-plan.md §6; Z7 operator audition may remap).
 EXPECTED_PERSONA_ATTRS: dict[str, dict[str, object]] = {
     "princess": {
         "role_weights": {
@@ -53,7 +55,7 @@ EXPECTED_PERSONA_ATTRS: dict[str, dict[str, object]] = {
             "helper_townsperson": 1.2,
             "big_bad_boss": 0.3,
         },
-        "voice_profile": {"rate": 1.0, "pitch": 1.4},
+        "voice_profile": {"rate": 1.0, "pitch": 1.4, "neural_voice": "af_bella"},
         "spontaneity_rates": {"jokes": 0.05, "songs": 0.15},
     },
     "wizard": {
@@ -63,7 +65,7 @@ EXPECTED_PERSONA_ATTRS: dict[str, dict[str, object]] = {
             "big_bad_boss": 1.2,
             "frenemy": 1.1,
         },
-        "voice_profile": {"rate": 0.9, "pitch": 0.7},
+        "voice_profile": {"rate": 0.9, "pitch": 0.7, "neural_voice": "am_michael"},
         "spontaneity_rates": {"jokes": 0.10, "songs": 0.05},
     },
     "detective": {
@@ -73,7 +75,7 @@ EXPECTED_PERSONA_ATTRS: dict[str, dict[str, object]] = {
             "frenemy": 1.3,
             "sidekick": 1.0,
         },
-        "voice_profile": {"rate": 1.1, "pitch": 0.9},
+        "voice_profile": {"rate": 1.1, "pitch": 0.9, "neural_voice": "am_puck"},
         "spontaneity_rates": {"jokes": 0.0, "songs": 0.0},
     },
     "periodic_table": {
@@ -82,7 +84,7 @@ EXPECTED_PERSONA_ATTRS: dict[str, dict[str, object]] = {
             "helper_townsperson": 1.3,
             "friend": 1.0,
         },
-        "voice_profile": {"rate": 1.2, "pitch": 1.0},
+        "voice_profile": {"rate": 1.2, "pitch": 1.0, "neural_voice": "bf_emma"},
         "spontaneity_rates": {"jokes": 0.10, "songs": 0.0},
     },
 }
@@ -115,6 +117,9 @@ def test_loader_persists_new_columns_for_built_in_personas(
         assert isinstance(expected_voice, dict)
         assert voice_profile.rate == expected_voice["rate"], persona_id
         assert voice_profile.pitch == expected_voice["pitch"], persona_id
+        # Phase Z Z3: the loader upserts the new neural_voice key and it
+        # round-trips through the canonical parse helper.
+        assert voice_profile.neural_voice == expected_voice["neural_voice"], persona_id
 
         spontaneity = parse_spontaneity_rates(row["spontaneity_rates"])
         expected_spontaneity = expected["spontaneity_rates"]

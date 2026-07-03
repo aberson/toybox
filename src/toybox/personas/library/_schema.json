@@ -119,6 +119,12 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128
+        },
+        "neural_voice": {
+          "type": "string",
+          "description": "Phase Z Z3 — Kokoro voice id (e.g. am_michael); absent = default af_heart.",
+          "minLength": 1,
+          "maxLength": 64
         }
       }
     },

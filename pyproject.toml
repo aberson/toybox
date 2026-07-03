@@ -21,6 +21,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Phase Z Z3: Kokoro-82M neural TTS (CPU onnxruntime; onnxruntime
+# itself is already a core dep). kokoro-onnx is the small MIT wrapper
+# around the Apache-2.0 Kokoro weights; soundfile encodes the float
+# sample buffer to WAV. Both import lazily — see src/toybox/tts/.
+tts = [
+    "kokoro-onnx>=0.4",
+    "soundfile>=0.12",
+]
 image_gen = [
     "torch>=2.6",
     "torchvision",
@@ -111,6 +119,10 @@ module = [
     "diffusers.*",
     "transformers",
     "rembg",
+    # tts extras (optional, Phase Z): kokoro-onnx + soundfile ship no
+    # py.typed marker; same uniform ignore rationale as image_gen.
+    "kokoro_onnx",
+    "soundfile",
 ]
 ignore_missing_imports = true
 

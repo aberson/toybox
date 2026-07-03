@@ -8,10 +8,12 @@ Migration 0014 adds three JSON-typed TEXT columns to ``personas``:
 
 These models validate at the API + loader boundaries (per the
 migration's docstring: "Numeric ranges are NOT enforced at the SQL
-layer"). They are also the source of truth for the Pydantic-to-TS
-codegen hook (invariant 9) — :class:`VoiceProfile` and
-:class:`SpontaneityRates` show up verbatim in
-``frontend/src/shared/types.ts`` after Phase K's codegen pass.
+layer"). :class:`VoiceProfile` is additionally the source of truth for
+the Pydantic-to-TS codegen hook (invariant 9): as of Phase Z Z3,
+``tools/gen_types_ts.py`` walks its fields and emits the interface
+into ``frontend/src/shared/types.ts``. :class:`SpontaneityRates` is
+NOT emitted — it is consumed Python-side only (the K15 advance
+engine); the kiosk never reads it from the wire.
 
 Module placement decision (per problem statement): persona JSON
 column shapes live alongside the persona library, not under
@@ -86,6 +88,14 @@ class VoiceProfile(BaseModel):
     ``rate`` and ``pitch`` are required and constrained to the
     phase-k-plan §5 bounds; ``voice_name`` is optional (some browsers
     expose named voices, others only the system default).
+
+    Phase Z Z3: ``neural_voice`` is the persona's Kokoro voice id
+    (e.g. ``am_michael``) for the server-rendered clip path. Optional
+    with default ``None`` so every pre-Z3 persisted voice_profile JSON
+    (rate/pitch[/voice_name] only) still parses under
+    ``extra="forbid"`` — the field is additive-safe. ``None`` means
+    "use :data:`toybox.tts.engine.DEFAULT_NEURAL_VOICE`" (resolved by
+    the Z4 consumer, not here, so the fallback has one home).
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -93,6 +103,7 @@ class VoiceProfile(BaseModel):
     rate: float = Field(ge=_VOICE_RATE_MIN, le=_VOICE_RATE_MAX)
     pitch: float = Field(ge=_VOICE_PITCH_MIN, le=_VOICE_PITCH_MAX)
     voice_name: str | None = Field(default=None, min_length=1, max_length=128)
+    neural_voice: str | None = Field(default=None, min_length=1, max_length=64)
 
 
 class SpontaneityRates(BaseModel):

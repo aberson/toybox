@@ -16,8 +16,9 @@ Resume if session lost: `/build-phase --plan documentation/plan/phase-z-persona-
 - Step Z2 (#4) PASS iter 2/3: truncateSpokenText sentence-boundary truncation (last ./!/? ≤ limit, word-boundary fallback byte-identical to pre-Z2, … retained); 157-char operator regression pinned. Iter-2 fixes: SpokenTextLimitControl help copy + 4 stale word-boundary phrasings, mutation-proven discriminating fixtures, limit+1 off-by-one pin, duplicate trim. vitest 836 (+16). Frontend-only (0 backend files). Checkpoint pending commit; #4 closing.
 
 ## WIP
-**Current:** Step Z3 (#5): Kokoro TTS engine substrate + neural_voice schema
-**Approach:** Build src/toybox/tts/{engine,__main__}.py (lazy Kokoro-82M via kokoro-onnx CPU, provider seam, is_tts_capable probe, TOYBOX_TTS_STUB=1), tts optional extra + mypy overrides, VoiceProfile.neural_voice (pydantic + _schema.json + codegen types.ts), casting defaults in 4 library JSONs, stub-mode tests. Watch: codegen regenerates frontend/src/shared/types.ts — that file MUST be merged this step (unlike Z1's EOL-only noise).
+**Current:** Step Z4 (#6): clip cache + synth worker + enqueue hooks + wire shape
+**Approach:** Build tts/cache.py (data/tts/<voice>/<sha16>.wav, ONE TTS_AUDIO_URL_PREFIX constant, clip_url/clip_path) + tts/worker.py (asyncio queue drain, skip-if-exists, fire-and-forget, capability-gated no-op); mount /api/static/tts (check_dir=False) + worker lifecycle in app.py; enqueue+persist spoken_audio_url (jokes: setup/punchline pair) at post_approve (S2 pattern, before WS broadcast), _insert_adventure_beat, _parent_insert_finish→_insert_interjection_step_row, _insert_reward_step_as_current (between resolve_reward and INSERT). Persona voice from activity persona neural_voice, default af_heart. Integration test approve→metadata URLs→worker renders→GET 200 WAV on stub.
+**Z4 handoff notes (from bug reviewer):** engine lazy-init has no lock — fine for single-asyncio-worker Z4 design, add threading.Lock ONLY if synthesize ever runs in a threadpool. synthesize() non-ValueError exceptions propagate raw — Z4 worker must catch-and-degrade. room_classifier downloader shares the truncated-download latent flaw (pre-existing; phase follow-up candidate). test_ws_origin flakes under full-suite load (passes isolated) — pre-existing, same class as ws_heartbeat.
 
 ## Dead Ends (Z2, for the record)
 - ChoiceReadButton fixture "Go left. Stop. Then run..." limit 12: word-boundary revert passes ALL its tests (last space adjacent to terminator) — fixtures must make old/new outputs DIFFER.
@@ -28,6 +29,8 @@ Resume if session lost: `/build-phase --plan documentation/plan/phase-z-persona-
 - Kokoro CPU-only in-process; GPU flip = provider-seam config later, NOT scoped.
 
 ## Critical Gotchas
+- **Bare `uv sync` STRIPS extras from master's venv** (removed torch/diffusers mid-Z3 → mypy showed the 4 unused-ignore artifacts + GPU tests would skip). After any pyproject/uv.lock merge: `uv sync --extra image_gen`. Keep the `tts` extra UNINSTALLED (operator installs at Z7; stub tests + lazy-import tests assume base env).
+- **PowerShell native-arg quoting mangles embedded double quotes in `git commit -m @'...'@`** (Z2 checkpoint failed with pathspec errors) — always write the message to a file and use `git commit --file`.
 - **PARALLEL uat-ui session artifacts:** untracked `.claude/skills/uat-ui/evals/` — NEVER commit; never `git add -A` on master; scope every add.
 - **CRLF flap on `frontend/src/shared/{errors,types}.ts`:** show M with ZERO content diff — never stage unless a step actually regenerates codegen (Z3 will).
 - Worktree venv lacks image_gen extra → mypy shows 4 unused-type-ignore errors in image_gen/animate.py + 4 GPU tests skip there; both CLEAN on master full venv. Judge worktree gates accordingly for every Z step.

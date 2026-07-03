@@ -35,8 +35,9 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import types
 from pathlib import Path
-from typing import get_args
+from typing import Any, Union, get_args, get_origin
 
 # Run-time import of the role taxonomy so changes to roles.py
 # automatically flow into the generated types.ts — there is no
@@ -55,6 +56,7 @@ from toybox.activities.roles import (  # noqa: E402
     ROLE_DISPLAY_NAMES,
     Role,
 )
+from toybox.personas.models import VoiceProfile  # noqa: E402
 
 TYPES_TS_PATH = REPO_ROOT / "frontend" / "src" / "shared" / "types.ts"
 
@@ -86,6 +88,49 @@ def _emit_role_display_names_const() -> str:
         # literals and escapes any embedded special characters.
         lines.append(f"  {value}: {json.dumps(display)},")
     lines.append("};")
+    return "\n".join(lines)
+
+
+_TS_SCALARS: dict[type, str] = {str: "string", float: "number", int: "number", bool: "boolean"}
+
+
+def _ts_type_for_annotation(annotation: Any) -> str:
+    """Map a resolved Pydantic field annotation to its TS type string.
+
+    Handles the scalar types + ``X | None`` unions the persona-side
+    models use. Raises on anything else so a future model change that
+    this emitter can't represent fails LOUDLY at codegen time instead
+    of silently emitting a wrong type.
+    """
+    if annotation in _TS_SCALARS:
+        return _TS_SCALARS[annotation]
+    if isinstance(annotation, types.UnionType) or get_origin(annotation) is Union:
+        parts: list[str] = []
+        for arg in get_args(annotation):
+            if arg is type(None):
+                parts.append("null")
+            else:
+                parts.append(_ts_type_for_annotation(arg))
+        return " | ".join(parts)
+    raise TypeError(
+        f"gen_types_ts has no TS mapping for annotation {annotation!r}; "
+        "extend _ts_type_for_annotation before regenerating"
+    )
+
+
+def _emit_voice_profile_interface() -> str:
+    """Emit the ``VoiceProfile`` interface from the Pydantic model.
+
+    Phase Z Z3: walks :class:`toybox.personas.models.VoiceProfile`'s
+    fields at generation time (definition order — stable) so the wire
+    shape has ONE source of truth per code-quality.md §2. Optional
+    fields (default ``None``) are emitted as ``name?: T | null``.
+    """
+    lines: list[str] = ["export interface VoiceProfile {"]
+    for name, field in VoiceProfile.model_fields.items():
+        optional_marker = "" if field.is_required() else "?"
+        lines.append(f"  {name}{optional_marker}: {_ts_type_for_annotation(field.annotation)};")
+    lines.append("}")
     return "\n".join(lines)
 
 
@@ -338,6 +383,21 @@ def _build_types_ts_content() -> str:
         "}\n"
     )
 
+    voice_profile_block = (
+        "\n/**\n"
+        " * Phase Z Z3 — persona TTS voice profile wire shape, derived at\n"
+        " * codegen time from ``toybox.personas.models.VoiceProfile``\n"
+        " * (the pydantic validator for the ``personas.voice_profile``\n"
+        " * JSON column and the ``metadata.persona.voice_profile``\n"
+        " * envelope). Snake_case wire form — distinct from the kiosk's\n"
+        " * camelCase ``VoiceProfile`` in ``child/tts.ts``, which is the\n"
+        " * SpeechSynthesis-side shape ``persona-voice.ts`` normalizes\n"
+        " * into. ``neural_voice`` is the persona's Kokoro voice id;\n"
+        " * absent/null means the server default (``af_heart``).\n"
+        " */\n"
+        f"{_emit_voice_profile_interface()}\n"
+    )
+
     return (
         header
         + choice_step
@@ -346,6 +406,7 @@ def _build_types_ts_content() -> str:
         + reward_block
         + activity_block
         + catalog_block
+        + voice_profile_block
     )
 
 

@@ -197,3 +197,21 @@ export interface CatalogResponse {
   entries: CatalogEntry[];
   total: number;
 }
+
+/**
+ * Phase Z Z3 — persona TTS voice profile wire shape, derived at
+ * codegen time from ``toybox.personas.models.VoiceProfile``
+ * (the pydantic validator for the ``personas.voice_profile``
+ * JSON column and the ``metadata.persona.voice_profile``
+ * envelope). Snake_case wire form — distinct from the kiosk's
+ * camelCase ``VoiceProfile`` in ``child/tts.ts``, which is the
+ * SpeechSynthesis-side shape ``persona-voice.ts`` normalizes
+ * into. ``neural_voice`` is the persona's Kokoro voice id;
+ * absent/null means the server default (``af_heart``).
+ */
+export interface VoiceProfile {
+  rate: number;
+  pitch: number;
+  voice_name?: string | null;
+  neural_voice?: string | null;
+}

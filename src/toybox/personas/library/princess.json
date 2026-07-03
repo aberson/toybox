@@ -18,7 +18,8 @@
   },
   "voice_profile": {
     "rate": 1.0,
-    "pitch": 1.4
+    "pitch": 1.4,
+    "neural_voice": "af_bella"
   },
   "spontaneity_rates": {
     "jokes": 0.05,

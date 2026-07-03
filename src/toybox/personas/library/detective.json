@@ -18,7 +18,8 @@
   },
   "voice_profile": {
     "rate": 1.1,
-    "pitch": 0.9
+    "pitch": 0.9,
+    "neural_voice": "am_puck"
   },
   "spontaneity_rates": {
     "jokes": 0.0,

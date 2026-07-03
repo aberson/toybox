@@ -102,6 +102,31 @@ def test_voice_profile_rejects_extra_fields() -> None:
 
 
 # ---------------------------------------------------------------------------
+# VoiceProfile.neural_voice (Phase Z Z3)
+# ---------------------------------------------------------------------------
+
+
+def test_voice_profile_neural_voice_defaults_to_none() -> None:
+    profile = VoiceProfile(rate=1.0, pitch=1.0)
+    assert profile.neural_voice is None
+
+
+def test_voice_profile_accepts_neural_voice() -> None:
+    profile = VoiceProfile(rate=0.9, pitch=0.7, neural_voice="am_michael")
+    assert profile.neural_voice == "am_michael"
+
+
+def test_voice_profile_rejects_empty_neural_voice() -> None:
+    with pytest.raises(ValidationError):
+        VoiceProfile(rate=1.0, pitch=1.0, neural_voice="")
+
+
+def test_voice_profile_rejects_overlong_neural_voice() -> None:
+    with pytest.raises(ValidationError):
+        VoiceProfile(rate=1.0, pitch=1.0, neural_voice="x" * 65)
+
+
+# ---------------------------------------------------------------------------
 # SpontaneityRates
 # ---------------------------------------------------------------------------
 
@@ -177,6 +202,27 @@ def test_parse_voice_profile_valid_payload() -> None:
     assert profile is not None
     assert profile.rate == 1.0
     assert profile.pitch == 1.4
+
+
+def test_parse_voice_profile_pre_z3_persisted_json_still_parses() -> None:
+    """Regression (phase-z-plan §8): pre-Z3 persisted voice_profile JSON
+    (rate/pitch[/voice_name] only, no ``neural_voice``) must decode under
+    ``extra="forbid"`` — the Z3 field is optional-with-default, so the
+    schema change is additive-safe for replayed old envelopes."""
+    legacy = parse_voice_profile('{"rate": 0.9, "pitch": 0.7}')
+    assert legacy is not None
+    assert legacy.neural_voice is None
+
+    legacy_named = parse_voice_profile('{"rate": 1.1, "pitch": 0.9, "voice_name": "Daniel"}')
+    assert legacy_named is not None
+    assert legacy_named.voice_name == "Daniel"
+    assert legacy_named.neural_voice is None
+
+
+def test_parse_voice_profile_round_trips_neural_voice() -> None:
+    profile = parse_voice_profile('{"rate": 1.2, "pitch": 1.0, "neural_voice": "bf_emma"}')
+    assert profile is not None
+    assert profile.neural_voice == "bf_emma"
 
 
 def test_parse_spontaneity_rates_null_returns_zero_zero() -> None:

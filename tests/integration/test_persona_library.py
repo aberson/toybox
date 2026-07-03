@@ -149,6 +149,27 @@ def test_persona_jsons_match_schema() -> None:
     validator = Draft202012Validator(schema)
     for persona in _load_shipped_personas():
         validator.validate(persona)
+        # Phase Z Z3: every shipped persona carries a Kokoro casting
+        # default. The values are pinned (loader round-trip) in
+        # test_persona_library_phase_k_attrs.py; here we pin presence so
+        # schema validation above provably covers the new key on all 4.
+        voice_profile = persona["voice_profile"]
+        assert isinstance(voice_profile, dict), persona["id"]
+        assert isinstance(voice_profile.get("neural_voice"), str), persona["id"]
+
+
+def test_voice_profile_schema_still_rejects_unknown_keys() -> None:
+    """``voice_profile`` keeps ``additionalProperties: false`` after the
+    Z3 ``neural_voice`` addition — a typo'd key (e.g. ``nueral_voice``)
+    must fail validation, not silently ship."""
+    from jsonschema.exceptions import ValidationError
+
+    schema = json.loads((LIBRARY_DIR / SCHEMA_FILENAME).read_text(encoding="utf-8"))
+    validator = Draft202012Validator(schema)
+    persona = json.loads((LIBRARY_DIR / "wizard.json").read_text(encoding="utf-8"))
+    persona["voice_profile"]["nueral_voice"] = "am_michael"
+    with pytest.raises(ValidationError):
+        validator.validate(persona)
 
 
 def test_library_personas_have_null_avatar_hash(db: sqlite3.Connection, tmp_path: Path) -> None:

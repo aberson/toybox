@@ -1730,14 +1730,15 @@ def _build_role_assignments(
 def _decode_voice_profile_for_wire(raw: object, *, persona_id: str) -> dict[str, Any] | None:
     """Decode a ``personas.voice_profile`` column value for the wire envelope.
 
-    Returns a plain JSON object (``{rate, pitch[, voice_name]}``) or
-    ``None`` for NULL / invalid column values. CRITICAL: never returns
-    the raw JSON *string* — the kiosk's typeof-number guard in
+    Returns a plain JSON object
+    (``{rate, pitch[, voice_name][, neural_voice]}``) or ``None`` for
+    NULL / invalid column values. CRITICAL: never returns the raw JSON
+    *string* — the kiosk's typeof-number guard in
     ``frontend/src/child/persona-voice.ts`` silently rejects a string
     payload and falls back to the default profile, which is exactly the
     Phase Z Z1 bug this helper exists to fix. ``exclude_none=True``
-    drops the optional ``voice_name`` when unset so the envelope stays
-    minimal.
+    drops the optional ``voice_name`` / ``neural_voice`` (Z3) keys when
+    unset so the envelope stays minimal.
 
     Invalid persisted JSON (corrupt row, out-of-range values) degrades
     to ``None`` with a WARNING — propose must never 500 on bad catalog

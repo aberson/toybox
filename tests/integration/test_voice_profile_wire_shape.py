@@ -54,10 +54,13 @@ _INSERT_PERSONA_SQL = (
     "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
 )
 
-# Mirrors the shipped wizard library persona (rate 0.9 / pitch 0.7) so the
-# fixture exercises realistic non-default values that can't be confused
-# with the kiosk's ``{rate: 1.0, pitch: 1.0}`` default.
-_WIZARD_VOICE_JSON = '{"rate": 0.9, "pitch": 0.7}'
+# Mirrors the shipped wizard library persona (rate 0.9 / pitch 0.7, Z3
+# neural_voice casting am_michael) so the fixture exercises realistic
+# non-default values that can't be confused with the kiosk's
+# ``{rate: 1.0, pitch: 1.0}`` default. The princess fixture deliberately
+# OMITS neural_voice so the absent-field (exclude_none) wire shape stays
+# pinned alongside the present-field one.
+_WIZARD_VOICE_JSON = '{"rate": 0.9, "pitch": 0.7, "neural_voice": "am_michael"}'
 _PRINCESS_VOICE_JSON = '{"rate": 1.0, "pitch": 1.4, "voice_name": "Samantha"}'
 
 
@@ -104,8 +107,15 @@ def _assert_full_persona_envelope(
     expected_rate: float,
     expected_pitch: float,
     surface: str,
+    expected_neural_voice: str | None = None,
 ) -> None:
-    """Assert the complete Z1 persona envelope shape on one wire surface."""
+    """Assert the complete Z1 persona envelope shape on one wire surface.
+
+    Phase Z Z3: when ``expected_neural_voice`` is given, the decoded
+    ``voice_profile`` must carry it as a typed str; when ``None``, the
+    key must be ABSENT (``exclude_none`` drops unset optionals — the
+    kiosk never sees ``neural_voice: null`` from a pre-Z3 profile).
+    """
     assert isinstance(persona_meta, dict), (
         f"[{surface}] metadata.persona must be an object; got {persona_meta!r}"
     )
@@ -131,6 +141,17 @@ def _assert_full_persona_envelope(
     assert isinstance(vp.get("pitch"), (int, float)) and not isinstance(vp.get("pitch"), bool), vp
     assert vp["rate"] == expected_rate, vp
     assert vp["pitch"] == expected_pitch, vp
+    if expected_neural_voice is not None:
+        assert isinstance(vp.get("neural_voice"), str), (
+            f"[{surface}] neural_voice must arrive as a typed str; got "
+            f"{vp.get('neural_voice')!r} in {vp!r}"
+        )
+        assert vp["neural_voice"] == expected_neural_voice, vp
+    else:
+        assert "neural_voice" not in vp, (
+            f"[{surface}] a profile authored without neural_voice must not "
+            f"carry the key on the wire (exclude_none contract); got {vp!r}"
+        )
 
 
 def _propose(
@@ -201,6 +222,7 @@ def test_random_persona_voice_profile_rides_propose_ws_and_get(
         display_name="Marvelous the Wizard",
         expected_rate=0.9,
         expected_pitch=0.7,
+        expected_neural_voice="am_michael",
         surface="propose response",
     )
     # The wizard fixture has no voice_name — exclude_none must drop the
@@ -217,6 +239,7 @@ def test_random_persona_voice_profile_rides_propose_ws_and_get(
         display_name="Marvelous the Wizard",
         expected_rate=0.9,
         expected_pitch=0.7,
+        expected_neural_voice="am_michael",
         surface="WS activity.state",
     )
 
@@ -230,6 +253,7 @@ def test_random_persona_voice_profile_rides_propose_ws_and_get(
         display_name="Marvelous the Wizard",
         expected_rate=0.9,
         expected_pitch=0.7,
+        expected_neural_voice="am_michael",
         surface="REST GET",
     )
 
@@ -344,6 +368,7 @@ def test_pinned_persona_standalone_path_hydrates_full_envelope(
         display_name="Marvelous the Wizard",
         expected_rate=0.9,
         expected_pitch=0.7,
+        expected_neural_voice="am_michael",
         surface="pinned standalone propose",
     )
 
@@ -380,6 +405,7 @@ def test_pinned_persona_adventure_path_hydrates_full_envelope(
         display_name="Marvelous the Wizard",
         expected_rate=0.9,
         expected_pitch=0.7,
+        expected_neural_voice="am_michael",
         surface="pinned adventure propose",
     )
 
@@ -527,6 +553,7 @@ def test_dispatcher_path_writes_full_persona_envelope(
             display_name="Marvelous the Wizard",
             expected_rate=0.9,
             expected_pitch=0.7,
+            expected_neural_voice="am_michael",
             surface="dispatcher persisted summary",
         )
         # Phase N D1 behavior preserved: reasoning synthesized from the
@@ -542,6 +569,7 @@ def test_dispatcher_path_writes_full_persona_envelope(
             display_name="Marvelous the Wizard",
             expected_rate=0.9,
             expected_pitch=0.7,
+            expected_neural_voice="am_michael",
             surface="dispatcher WS activity.state",
         )
     finally:
@@ -618,7 +646,11 @@ def test_hydrate_helper_row_shape_direct(db_path: Path) -> None:
             "avatar_image_path",
             "voice_profile",
         }
-        assert meta["voice_profile"] == {"rate": 0.9, "pitch": 0.7}
+        assert meta["voice_profile"] == {
+            "rate": 0.9,
+            "pitch": 0.7,
+            "neural_voice": "am_michael",
+        }
         assert _hydrate_persona_meta_by_id(conn, "absent") is None
     finally:
         conn.close()

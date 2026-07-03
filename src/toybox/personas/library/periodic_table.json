@@ -17,7 +17,8 @@
   },
   "voice_profile": {
     "rate": 1.2,
-    "pitch": 1.0
+    "pitch": 1.0,
+    "neural_voice": "bf_emma"
   },
   "spontaneity_rates": {
     "jokes": 0.10,

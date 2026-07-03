@@ -18,7 +18,8 @@
   },
   "voice_profile": {
     "rate": 0.9,
-    "pitch": 0.7
+    "pitch": 0.7,
+    "neural_voice": "am_michael"
   },
   "spontaneity_rates": {
     "jokes": 0.10,

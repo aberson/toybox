@@ -15,7 +15,7 @@ repos:
         entry: python tools/gen_types_ts.py
         language: system
         pass_filenames: false
-        files: ^(src/toybox/core/errors\.py|src/toybox/activities/models\.py|tools/gen_.*\.py)$
+        files: ^(src/toybox/core/errors\.py|src/toybox/activities/models\.py|src/toybox/personas/models\.py|tools/gen_.*\.py)$
 
       - id: toybox-ruff-format
         name: ruff format (check)
