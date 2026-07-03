@@ -27,16 +27,17 @@
 import type { CSSProperties, JSX } from "react";
 
 import { cancel, speak, type VoiceProfile } from "../tts";
-import { truncateAtWordBoundary } from "./ReadMeButton";
+import { truncateSpokenText } from "./ReadMeButton";
 
 export interface ChoiceReadButtonProps {
   label: string;
   choiceIndex: number;
   profile: VoiceProfile;
   enabled: boolean;
-  // Parent-configured spoken text limit (Phase R R2) — applied to the
-  // label before ``speak()`` exactly like ReadMeButton applies it to
-  // the step body. ``0`` (or omitted) means no truncation.
+  // Parent-configured spoken text limit (Phase R R2; sentence-aware
+  // since Phase Z Z2) — applied to the label before ``speak()`` exactly
+  // like ReadMeButton applies it to the step body. ``0`` (or omitted)
+  // means no truncation.
   limit?: number;
 }
 
@@ -60,7 +61,7 @@ export function ChoiceReadButton(
     // ClickableText, or the prompt bubble mid-utterance) so this
     // option's read starts cleanly from the beginning.
     cancel();
-    const spokenText = truncateAtWordBoundary(label, limit);
+    const spokenText = truncateSpokenText(label, limit);
     // Swallow rejections — see ClickableText for the rationale.
     void speak(spokenText, profile).catch(() => {});
   };

@@ -891,7 +891,8 @@ export function App(): JSX.Element {
               jokesEnabled={featureFlags.jokes_enabled}
               // Phase R Step R2: thread the spoken text limit so
               // ReadMeButton truncates TTS at the parent-configured
-              // word-boundary limit.
+              // limit (Phase Z Z2: sentence-boundary cut, word-boundary
+              // fallback).
               spokenTextLimit={spokenTextLimit}
               // Prefer the Claude-authored .svg sprite for the cast when
               // the operator picked the "claude_svg" image-gen mode.

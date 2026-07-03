@@ -30,28 +30,63 @@ export interface ReadMeButtonProps {
   profile: VoiceProfile;
   enabled: boolean;
   // Phase R Step R2: optional character limit for spoken text. When > 0,
-  // the text is truncated at a word boundary at or below ``limit`` chars
-  // and a ``…`` is appended before passing to ``speak()``. The full
-  // ``text`` remains visible on screen — truncation only affects the TTS
-  // call. ``0`` (or omitted) means no truncation.
+  // the text is truncated to at most ``limit`` chars (Phase Z Z2: at the
+  // last sentence boundary at or below the limit, word boundary as the
+  // fallback) and a ``…`` is appended before passing to ``speak()``. The
+  // full ``text`` remains visible on screen — truncation only affects
+  // the TTS call. ``0`` (or omitted) means no truncation.
   limit?: number;
 }
 
-// Truncate ``text`` to at most ``limit`` characters at a word boundary.
-// Finds the last space at or before position ``limit`` and splits there.
-// Returns ``text`` unchanged when:
-//   - ``limit`` is 0 or falsy (off)
-//   - ``text.length <= limit`` (already short enough)
-// Appends ``…`` (U+2026) when truncation occurs.
+// Truncate ``text`` to at most ``limit`` characters for speech.
+//
+// Phase Z Z2 (#4): sentence-boundary-aware. The Phase R R2 rule cut at
+// the last WORD boundary, which stopped mid-sentence — the operator
+// heard a 157-char step body spoken as "…What does Miss" (limit 150
+// severed the final question "What does Miss Maple think?"). The Web
+// Speech fallback path must never stop mid-sentence when a sentence
+// boundary is available. Rules, in order:
+//   - ``limit`` is 0 or falsy (off): return ``text`` unchanged.
+//   - ``text.length <= limit`` (already short enough): return unchanged.
+//   - Cut at the LAST ``.`` / ``!`` / ``?`` at or below ``limit`` — the
+//     terminator itself stays in the spoken text.
+//   - No sentence terminator at or below ``limit`` (the first sentence
+//     alone exceeds the limit): fall back to the R2 word-boundary cut —
+//     last space at or below ``limit``, hard cut at ``limit`` when the
+//     slice has no space at all (one very long word).
+//   - Appends ``…`` (U+2026) whenever truncation occurs (both cut kinds).
+//
+// Deliberately a simple last-terminator rule — no NLP:
+//   - Abbreviation-like periods ("Dr.", "Mr.") COUNT as terminators; a
+//     cut there still lands on a natural spoken pause, which beats a
+//     mid-clause stop.
+//   - A closing quote/paren AFTER the terminator ('He said "Stop!"') is
+//     dropped from the spoken text — punctuation isn't voiced, so the
+//     omission is inaudible.
+//   - Ellipsis characters (U+2026 ``…``) in the SOURCE text are NOT
+//     terminators; an ASCII ``...`` run ends on its final ``.``.
+//
 // Exported so ``ChoiceReadButton`` (the per-option read-aloud bubble)
 // applies the SAME parent-configured spoken-text limit — one source of
 // truth for the truncation rule.
-export function truncateAtWordBoundary(text: string, limit: number): string {
+export function truncateSpokenText(text: string, limit: number): string {
   if (!limit || text.length <= limit) return text;
-  // Slice to the limit first, then walk back to the last space so we
-  // don't cut mid-word. If no space is found (one very long word),
-  // fall back to a hard cut at ``limit``.
   const slice = text.slice(0, limit);
+  // Last sentence terminator within the limit. ``> 0`` (not ``>= 0``)
+  // so a leading terminator can't yield a punctuation-only cut — the
+  // same degenerate-cut guard the word-boundary path uses below.
+  const lastTerminator = Math.max(
+    slice.lastIndexOf("."),
+    slice.lastIndexOf("!"),
+    slice.lastIndexOf("?"),
+  );
+  if (lastTerminator > 0) {
+    // +1 keeps the terminator itself in the spoken text.
+    return text.slice(0, lastTerminator + 1) + "…";
+  }
+  // Word-boundary fallback (pre-Z2 R2 behavior): walk back to the last
+  // space so we don't cut mid-word. If no space is found (one very
+  // long word), fall back to a hard cut at ``limit``.
   const lastSpace = slice.lastIndexOf(" ");
   const cutAt = lastSpace > 0 ? lastSpace : limit;
   return text.slice(0, cutAt) + "…";
@@ -79,7 +114,7 @@ export function ReadMeButton(props: ReadMeButtonProps): JSX.Element | null {
     cancel();
     // Apply the spoken text limit before TTS. Truncation happens here
     // (not on the visible text) so the full body stays on screen.
-    const spokenText = truncateAtWordBoundary(text, limit);
+    const spokenText = truncateSpokenText(text, limit);
     // Swallow rejections — see ClickableText for the rationale.
     void speak(spokenText, profile).catch(() => {});
   };

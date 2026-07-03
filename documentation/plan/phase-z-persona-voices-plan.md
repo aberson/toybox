@@ -230,6 +230,7 @@ computes hashes.
 - **Produces:** fallback speech never stops mid-sentence
 - **Done when:** vitest includes the "What does Miss Maple think?" regression (spoken text ends at a sentence boundary); both caller test suites green
 - **Depends on:** none
+- **Status:** DONE (2026-07-03)
 
 <!-- autofix-applied: 2026-07-03 -->
 ### Step Z3: Kokoro TTS engine substrate + voice-id schema

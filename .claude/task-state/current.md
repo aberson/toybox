@@ -12,11 +12,15 @@ Resume if session lost: `/build-phase --plan documentation/plan/phase-z-persona-
 ## Completed
 - [d2bca48] Pre-flight disposition (plan §8 prerequisite): ChoiceReadButton(+test) + StepCard read-aloud split + ReadMeButton export + launcher banner committed. Gates: tsc/eslint clean, vitest 817. NOTE: launch-toybox.ps1 banner belonged to the parallel uat-ui session — swept into this commit (benign, coherent, gates green); flag in final report.
 - Baseline gates on master @ d2bca48: pytest 2671 passed / mypy clean / ruff check clean. Pre-existing `ruff format --check` drift on 100 files (ruff 0.15.12 floats via >=0.4) — OUT OF SCOPE, noted for housekeeping.
-- Step Z1 (#3) PASS iter 1/3: voice_profile decoded-object wire-through on all 3 persona-envelope paths (random SELECT, pinned _hydrate_persona_meta_by_id ×3 propose flows, dispatcher full envelope); RewardStep DEFAULT_VOICE_PROFILE dedup + threading. Post-merge master gates: pytest 2680 (+9) / vitest 820 (+3) / mypy / ruff / tsc / eslint all green. 4 reviewers approved, 0 high/medium findings.
+- Step Z1 (#3) PASS iter 1/3: voice_profile decoded-object wire-through on all 3 persona-envelope paths (random SELECT, pinned _hydrate_persona_meta_by_id ×3 propose flows, dispatcher full envelope); RewardStep DEFAULT_VOICE_PROFILE dedup + threading. Post-merge master gates: pytest 2680 (+9) / vitest 820 (+3) / mypy / ruff / tsc / eslint all green. 4 reviewers approved, 0 high/medium findings. Checkpoint cfe2cba, #3 closed.
+- Step Z2 (#4) PASS iter 2/3: truncateSpokenText sentence-boundary truncation (last ./!/? ≤ limit, word-boundary fallback byte-identical to pre-Z2, … retained); 157-char operator regression pinned. Iter-2 fixes: SpokenTextLimitControl help copy + 4 stale word-boundary phrasings, mutation-proven discriminating fixtures, limit+1 off-by-one pin, duplicate trim. vitest 836 (+16). Frontend-only (0 backend files). Checkpoint pending commit; #4 closing.
 
 ## WIP
-**Current:** Step Z2 (#4): sentence-boundary-aware fallback truncation
-**Approach:** Replace truncateAtWordBoundary (ReadMeButton.tsx) with sentence-aware truncation (last ./!/? at or below limit; word-boundary fallback for over-limit first sentence; keep … and limit=0/short passthroughs); update both callers (ReadMeButton, ChoiceReadButton) + tests incl. the 157-char "What does Miss Maple think?" regression.
+**Current:** Step Z3 (#5): Kokoro TTS engine substrate + neural_voice schema
+**Approach:** Build src/toybox/tts/{engine,__main__}.py (lazy Kokoro-82M via kokoro-onnx CPU, provider seam, is_tts_capable probe, TOYBOX_TTS_STUB=1), tts optional extra + mypy overrides, VoiceProfile.neural_voice (pydantic + _schema.json + codegen types.ts), casting defaults in 4 library JSONs, stub-mode tests. Watch: codegen regenerates frontend/src/shared/types.ts — that file MUST be merged this step (unlike Z1's EOL-only noise).
+
+## Dead Ends (Z2, for the record)
+- ChoiceReadButton fixture "Go left. Stop. Then run..." limit 12: word-boundary revert passes ALL its tests (last space adjacent to terminator) — fixtures must make old/new outputs DIFFER.
 
 ## Dead Ends / Decisions (carried from Phase Z prep)
 - iPad Web Speech voice identity is a DEAD END — server-rendered Kokoro clips are the path.

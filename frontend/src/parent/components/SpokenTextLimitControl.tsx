@@ -131,8 +131,9 @@ export function SpokenTextLimitControl(
         }}
       >
         Maximum characters spoken when the kid taps Read Me. Text is
-        truncated at a word boundary; the full text stays visible on
-        screen. &quot;off&quot; speaks the full body.
+        truncated at a sentence boundary, falling back to a word
+        boundary; the full text stays visible on screen. &quot;off&quot;
+        speaks the full body.
       </p>
       <div
         data-testid="spoken-text-limit-buttons"

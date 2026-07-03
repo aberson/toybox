@@ -155,7 +155,7 @@ describe("ChoiceReadButton — click handler", () => {
     );
   });
 
-  it("applies the spoken-text limit to the label (word-boundary + '…')", () => {
+  it("applies the spoken-text limit to the label (word-boundary fallback + '…')", () => {
     render(
       <ChoiceReadButton
         label="Hello world, this is a long choice."
@@ -166,9 +166,32 @@ describe("ChoiceReadButton — click handler", () => {
       />,
     );
     fireEvent.click(screen.getByTestId("choice-read-button"));
-    // Slice "Hello wo" → lastSpace at 5 → "Hello" + "…" (same rule as
-    // ReadMeButton — one shared truncateAtWordBoundary).
+    // No sentence terminator at or below limit 8 → word-boundary
+    // fallback: slice "Hello wo" → lastSpace at 5 → "Hello" + "…"
+    // (same rule as ReadMeButton — one shared truncateSpokenText).
     expect(tts.speak).toHaveBeenCalledWith("Hello…", TEST_PROFILE);
+  });
+
+  it("cuts the label at the last sentence boundary below the limit (Phase Z Z2)", () => {
+    render(
+      <ChoiceReadButton
+        label="Go left. Then run to the big red door."
+        choiceIndex={0}
+        profile={TEST_PROFILE}
+        enabled={true}
+        limit={14}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("choice-read-button"));
+    // Same input/limit as ReadMeButton's sentence-boundary component
+    // test — pins that BOTH bubbles share the ONE sentence-aware
+    // truncation function (truncateSpokenText, exported from
+    // ReadMeButton): the "." at index 7 is the only terminator at or
+    // below 14, so the spoken label is the complete first sentence.
+    // The fixture discriminates from the old word-boundary rule, which
+    // would cut at the space at index 13 and speak "Go left. Then…" —
+    // a fork or revert of the shared truncation logic fails here.
+    expect(tts.speak).toHaveBeenCalledWith("Go left.…", TEST_PROFILE);
   });
 
   it("limit=0 (off): speak() receives the full label unchanged", () => {

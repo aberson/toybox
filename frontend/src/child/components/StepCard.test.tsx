@@ -898,7 +898,9 @@ describe("StepCard — per-choice read-aloud bubbles", () => {
     );
     fireEvent.click(screen.getAllByTestId("choice-read-button")[0]!);
     // "Sneak past Penguin" sliced to 8 = "Sneak pa", last space at 5
-    // → "Sneak" + "…" (same word-boundary rule as ReadMeButton).
+    // → "Sneak" + "…" (same rule — one shared truncateSpokenText — as
+    // ReadMeButton; no terminator within the limit, so the
+    // word-boundary fallback applies).
     expect(tts.speak).toHaveBeenCalledWith("Sneak…", expect.anything());
   });
 

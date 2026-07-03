@@ -175,7 +175,7 @@ describe("Kiosk R2 — spoken text limit bootstrap threading", () => {
     });
   });
 
-  it("fetched limit=10: clicking Read Me speaks text truncated at word boundary", async () => {
+  it("fetched limit=10: clicking Read Me speaks truncated text (word-boundary fallback)", async () => {
     stubBootstrapFetch(10);
     await bootKioskAndSeedActivity();
     await waitFor(() => {

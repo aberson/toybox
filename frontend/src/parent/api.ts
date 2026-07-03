@@ -766,9 +766,10 @@ export interface SearchResponse {
 // Phase R Step R2: spoken text character limit. The wire body is
 // ``{value: <preset>}`` in both directions, mirroring the GET/PUT
 // pair on transcript-retention. ``0`` means "off" (no truncation);
-// other values are the max character count before word-boundary
-// truncation kicks in for TTS. The child kiosk fetches this on boot
-// and passes it to ReadMeButton.
+// other values are the max character count before TTS truncation
+// kicks in (Phase Z Z2: sentence-boundary cut, word-boundary
+// fallback). The child kiosk fetches this on boot and passes it to
+// ReadMeButton.
 export type SpokenTextLimit = 0 | 50 | 100 | 150 | 250;
 
 export interface SpokenTextLimitResponse {
