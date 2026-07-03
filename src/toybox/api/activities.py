@@ -111,6 +111,7 @@ from ..core.version_check import (
     if_match_version_dependency,
 )
 from ..db import connect, resolve_db_path
+from ..personas import parse_voice_profile
 from ..ws.envelope import build_envelope
 from ..ws.server import get_pubsub
 from ..ws.topics import Topic
@@ -1726,27 +1727,114 @@ def _build_role_assignments(
     return slot_fills_overlay, role_records, cast_summary
 
 
+def _decode_voice_profile_for_wire(raw: object, *, persona_id: str) -> dict[str, Any] | None:
+    """Decode a ``personas.voice_profile`` column value for the wire envelope.
+
+    Returns a plain JSON object (``{rate, pitch[, voice_name]}``) or
+    ``None`` for NULL / invalid column values. CRITICAL: never returns
+    the raw JSON *string* — the kiosk's typeof-number guard in
+    ``frontend/src/child/persona-voice.ts`` silently rejects a string
+    payload and falls back to the default profile, which is exactly the
+    Phase Z Z1 bug this helper exists to fix. ``exclude_none=True``
+    drops the optional ``voice_name`` when unset so the envelope stays
+    minimal.
+
+    Invalid persisted JSON (corrupt row, out-of-range values) degrades
+    to ``None`` with a WARNING — propose must never 500 on bad catalog
+    data, and ``voice_profile: null`` already means "system default" on
+    the kiosk (see ``getVoiceProfile``).
+    """
+    if raw is None:
+        return None
+    try:
+        profile = parse_voice_profile(str(raw))
+    except (ValueError, ValidationError):
+        _logger.warning(
+            "personas.voice_profile for %r is invalid JSON/shape; "
+            "sending voice_profile=null on the wire",
+            persona_id,
+            exc_info=True,
+        )
+        return None
+    if profile is None:
+        return None
+    return profile.model_dump(exclude_none=True)
+
+
+def _persona_row_to_meta(row: sqlite3.Row) -> dict[str, Any]:
+    """Build the wire persona envelope from a ``personas`` row.
+
+    Single source of truth for the ``metadata["persona"]`` shape — the
+    random pick (:func:`_pick_random_library_persona`), the pinned-id
+    hydration (:func:`_hydrate_persona_meta_by_id`), and the
+    listening-trigger path (``main._persist_dispatcher_activity``) all
+    splice this exact dict, so the kiosk sees one envelope shape
+    regardless of how the persona was chosen. ``voice_profile`` is a
+    DECODED object (or ``null``), never the persisted JSON string.
+    """
+    persona_id = str(row["id"])
+    return {
+        "id": persona_id,
+        "display_name": str(row["display_name"]),
+        "archetype": row["archetype"],
+        "avatar_image_path": row["avatar_image_path"],
+        "voice_profile": _decode_voice_profile_for_wire(
+            row["voice_profile"], persona_id=persona_id
+        ),
+    }
+
+
 def _pick_random_library_persona(conn: sqlite3.Connection) -> dict[str, Any] | None:
     """Pick a random ``source='library'`` persona for variety on propose.
 
-    Returns a small dict (id, display_name, archetype, avatar_image_path)
-    or ``None`` when the personas table has no library rows (e.g. fresh
-    DB before the loader ran). Used to drive avatar variety on the
-    kiosk; activity content is still template-driven.
+    Returns the wire persona envelope (id, display_name, archetype,
+    avatar_image_path, decoded voice_profile — see
+    :func:`_persona_row_to_meta`) or ``None`` when the personas table
+    has no library rows (e.g. fresh DB before the loader ran). Used to
+    drive avatar + voice variety on the kiosk; activity content is
+    still template-driven.
     """
     row = conn.execute(
-        "SELECT id, display_name, archetype, avatar_image_path "
+        "SELECT id, display_name, archetype, avatar_image_path, voice_profile "
         "FROM personas WHERE source = 'library' "
         "ORDER BY RANDOM() LIMIT 1"
     ).fetchone()
     if row is None:
         return None
-    return {
-        "id": str(row["id"]),
-        "display_name": str(row["display_name"]),
-        "archetype": row["archetype"],
-        "avatar_image_path": row["avatar_image_path"],
-    }
+    return _persona_row_to_meta(row)
+
+
+def _hydrate_persona_meta_by_id(conn: sqlite3.Connection, persona_id: str) -> dict[str, Any] | None:
+    """Build the wire persona envelope for an explicitly-pinned persona id.
+
+    Phase Z Z1: when a caller supplies ``body.persona_id`` the propose
+    paths used to leave ``persona_meta = None`` — no
+    ``metadata["persona"]`` envelope at all, which is why pinned
+    personas fell back to the letter avatar and default voice on the
+    kiosk. Hydrating through the same :func:`_persona_row_to_meta`
+    shape as the random pick closes that asymmetry.
+
+    Returns ``None`` when the row is absent or the read fails —
+    matching the broader "propose never 500s on missing catalog data"
+    contract (see :func:`_load_persona_role_weights`); the kiosk's
+    letter-avatar fallback handles a missing envelope.
+    """
+    try:
+        row = conn.execute(
+            "SELECT id, display_name, archetype, avatar_image_path, voice_profile "
+            "FROM personas WHERE id = ?",
+            (persona_id,),
+        ).fetchone()
+    except sqlite3.Error:
+        _logger.warning(
+            "persona hydration read failed for %r; omitting persona envelope",
+            persona_id,
+            exc_info=True,
+        )
+        return None
+    if row is None:
+        return None
+    return _persona_row_to_meta(row)
 
 
 def _resolve_local_dispatch(dispatch: Any) -> Any:
@@ -2040,7 +2128,9 @@ def _do_propose_standalone(
     """
     # Persona pick mirrors the template flow so the kiosk avatar still
     # varies across propose calls. Falls through to no persona when the
-    # library is empty.
+    # library is empty. Phase Z Z1: a caller-pinned persona_id hydrates
+    # the SAME envelope shape as the random pick — pre-Z1 the pinned
+    # path emitted no envelope at all (letter-avatar fallback bug).
     effective_persona_id = body.persona_id
     persona_meta: dict[str, Any] | None = None
     if effective_persona_id is None:
@@ -2048,6 +2138,8 @@ def _do_propose_standalone(
         if picked is not None:
             effective_persona_id = picked["id"]
             persona_meta = picked
+    else:
+        persona_meta = _hydrate_persona_meta_by_id(conn, effective_persona_id)
 
     # Catalog toys — only needed by the joke path for {toy} substitution.
     # Best-effort: a corrupt toy row mustn't break propose, so we degrade
@@ -2228,6 +2320,8 @@ def _do_propose_adventure(
     ``None`` so the GET path falls back to ``_fetch_steps`` (the persisted
     beat row is the source of truth — same as the standalone surface).
     """
+    # Phase Z Z1: pinned persona_id hydrates the same envelope shape as
+    # the random pick (see _do_propose_standalone for rationale).
     effective_persona_id = body.persona_id
     persona_meta: dict[str, Any] | None = None
     if effective_persona_id is None:
@@ -2235,6 +2329,8 @@ def _do_propose_adventure(
         if picked is not None:
             effective_persona_id = picked["id"]
             persona_meta = picked
+    else:
+        persona_meta = _hydrate_persona_meta_by_id(conn, effective_persona_id)
 
     # Resolve the cast (toy display names) best-effort — a corrupt toy row
     # must not break propose; the engine falls back to generic descriptors
@@ -2398,7 +2494,9 @@ def _do_propose(
     # Caller-pinned persona wins; otherwise pick a fresh library one
     # so the kiosk avatar varies across propose calls. Falls through to
     # no persona when the library is empty (kiosk fallback letter
-    # handles that case).
+    # handles that case). Phase Z Z1: the pinned branch hydrates the
+    # same envelope shape as the random pick — pre-Z1 it emitted no
+    # metadata["persona"] at all (letter-avatar + default-voice bug).
     effective_persona_id = body.persona_id
     persona_meta: dict[str, Any] | None = None
     if effective_persona_id is None:
@@ -2406,6 +2504,8 @@ def _do_propose(
         if picked is not None:
             effective_persona_id = picked["id"]
             persona_meta = picked
+    else:
+        persona_meta = _hydrate_persona_meta_by_id(conn, effective_persona_id)
     # Step 19: resolve real catalog content (toys, rooms, children)
     # BEFORE generating. The resolver is best-effort — sqlite errors
     # log WARNING and degrade to empty inputs (placeholder vocabulary)

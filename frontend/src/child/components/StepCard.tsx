@@ -578,6 +578,7 @@ export function StepCard(props: StepCardProps): JSX.Element {
           key={`reward-${previewStep.seq}`}
           metadata={previewStep.metadata ?? null}
           onAdvance={props.onAdvance}
+          voiceProfile={voiceProfile}
         />
       )}
       {stepKind === "song" && previewStep !== null && (

@@ -18,19 +18,19 @@
 //
 // Delegation prop mapping. JokeStep wants ``setup, punchline,
 // profile, clickableWordsEnabled``; SongPlayer wants ``src, title,
-// onEnded``. RewardStep is mounted from StepCard which doesn't
-// thread persona voice profile or the word-tap flag into this
-// branch yet (the reward beat is a *single-mount* finale rather than
-// a normal step's full TTS + interactivity stack). We pass a
-// neutral default profile and ``clickableWordsEnabled=false`` so the
-// joke reward speaks (the K8 substrate is already unlocked by the
-// kid's "I'm Ready!" tap earlier in the activity) without surfacing
-// a tap-to-read affordance that competes with the auto-advance.
+// onEnded``. Phase Z Z1: StepCard now threads its persona-resolved
+// voice profile into this branch (``voiceProfile`` prop), so the joke
+// reward speaks with the activity's persona voice like every other
+// speech surface. We keep ``clickableWordsEnabled=false`` so the joke
+// reward speaks (the K8 substrate is already unlocked by the kid's
+// "I'm Ready!" tap earlier in the activity) without surfacing a
+// tap-to-read affordance that competes with the auto-advance.
 
 import { useEffect, useRef, type CSSProperties, type JSX } from "react";
 
 import type { Animation } from "../../shared/types";
 import { REWARD_ANIMATIONS } from "../animations/rewardAnimations";
+import { DEFAULT_VOICE_PROFILE } from "../persona-voice";
 import type { VoiceProfile } from "../tts";
 import { JokeStep } from "./JokeStep";
 import { NextStepButton } from "./NextStepButton";
@@ -43,13 +43,6 @@ import { SongPlayer } from "./SongPlayer";
 // with the linear NextStepButton at the StepCard level; SongPlayer
 // has its own Next button gated on ``onended``).
 const PICTURE_AUTO_ADVANCE_MS = 6000;
-
-// Neutral default voice profile for the joke reward. The kiosk's
-// step-level voice profile lives on StepCard's persona resolution;
-// the reward beat is a single-shot finale where we don't have a
-// per-reward persona, so we use the default profile shape (matches
-// what ``getVoiceProfile(null)`` returns at runtime).
-const DEFAULT_VOICE_PROFILE: VoiceProfile = { rate: 1.0, pitch: 1.0 };
 
 // One reward step's worth of metadata. Mirrors the L4 backend wire
 // shape; consumers read it defensively (every field may be absent
@@ -78,6 +71,14 @@ export interface RewardStepProps {
   // step flow. Optional so layout-only tests can mount without
   // an App.
   onAdvance?: () => void;
+  // Phase Z Z1: the persona-resolved voice profile, threaded by
+  // StepCard (which resolves it once per render via
+  // ``getVoiceProfile``). Drives the joke reward's spoken setup/
+  // punchline so the reward beat matches the persona voice used by
+  // every other speech surface. Optional so layout-only tests can
+  // mount without a profile — the canonical DEFAULT_VOICE_PROFILE
+  // from ``persona-voice.ts`` (one source of truth) is the fallback.
+  voiceProfile?: VoiceProfile;
 }
 
 // Defensive readers — every key may be absent on a malformed
@@ -116,7 +117,7 @@ function readRewardKind(
 }
 
 export function RewardStep(props: RewardStepProps): JSX.Element | null {
-  const { metadata, onAdvance } = props;
+  const { metadata, onAdvance, voiceProfile = DEFAULT_VOICE_PROFILE } = props;
   // Defensive: metadata may be null/undefined on a malformed
   // envelope. Render nothing rather than crashing — the StepCard
   // dispatch already gate the mount on kind === "reward" so a
@@ -166,7 +167,7 @@ export function RewardStep(props: RewardStepProps): JSX.Element | null {
         <JokeStep
           setup={setup}
           punchline={punchline}
-          profile={DEFAULT_VOICE_PROFILE}
+          profile={voiceProfile}
           clickableWordsEnabled={false}
         />
         {/* Joke rewards don't have an internal Next affordance the way

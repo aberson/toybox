@@ -918,6 +918,30 @@ def _persist_dispatcher_activity(
     trigger_phrase = intent.phrase if intent.phrase else intent.slot
     if trigger_phrase is not None and trigger_phrase.strip():
         metadata["trigger_phrase"] = trigger_phrase.strip()
+    # Phase Z Z1: hydrate the FULL persona envelope (id, display_name,
+    # archetype, avatar_image_path, decoded voice_profile) via the same
+    # helper the propose paths use, and write it into
+    # ``metadata["persona"]`` — pre-Z1 this path built a
+    # display_name-only dict consumed ONLY by ``_build_persona_reasoning``
+    # and never wrote the envelope, so trigger-originated activities
+    # rendered the letter-avatar fallback with the default voice on the
+    # kiosk. Hydration is best-effort (missing/corrupt persona row →
+    # ``None`` → no envelope, mirroring the propose paths' empty-library
+    # fall-through); the "persona" guard keeps a dispatcher-supplied
+    # envelope (e.g. a future Claude-path emission) authoritative.
+    #
+    # Late import mirrors the pre-Z1 ``_build_persona_reasoning`` import:
+    # keeps main.py free of a module-level dependency on the API layer.
+    from .api.activities import (  # noqa: PLC0415
+        _build_persona_reasoning,
+        _hydrate_persona_meta_by_id,
+    )
+
+    persona_meta: dict[str, Any] | None = None
+    if activity.persona_id is not None:
+        persona_meta = _hydrate_persona_meta_by_id(conn, activity.persona_id)
+    if persona_meta is not None and "persona" not in metadata:
+        metadata["persona"] = persona_meta
     if "persona_reasoning" not in metadata:
         # Phase N D1 fix: synthesize from the persona's ``display_name``
         # (parent-facing) rather than the raw ``persona_id`` slug. Pre-fix
@@ -926,7 +950,7 @@ def _persist_dispatcher_activity(
         # this?" panel — a less-noticed flavour of the same UAT D1 bug
         # the propose path was fixed for. Production callers always have
         # the personas table seeded by the lifespan loader, so the
-        # display-name lookup hits in practice; tests that construct an
+        # hydration above hits in practice; tests that construct an
         # Activity with a persona_id that isn't in the DB fall through
         # to the intent-only sentinel via the ``_build_persona_reasoning``
         # priority list (caller_supplied → display_name → "matched on
@@ -934,21 +958,6 @@ def _persist_dispatcher_activity(
         # the two writers (propose path + dispatcher path) byte-identical
         # in shape; future edits to the synthesis format land in one
         # place.
-        from .api.activities import _build_persona_reasoning  # noqa: PLC0415
-
-        persona_meta: dict[str, Any] | None = None
-        if activity.persona_id is not None:
-            try:
-                row = conn.execute(
-                    "SELECT display_name FROM personas WHERE id = ?",
-                    (activity.persona_id,),
-                ).fetchone()
-            except sqlite3.Error:
-                row = None
-            if row is not None:
-                display_name_raw = row["display_name"]
-                if isinstance(display_name_raw, str) and display_name_raw:
-                    persona_meta = {"display_name": display_name_raw}
         metadata["persona_reasoning"] = _build_persona_reasoning(
             caller_supplied=None,
             intent=intent.name,

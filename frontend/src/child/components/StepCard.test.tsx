@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { currentStepHasElement } from "../App";
 import type { Activity, ActivityStep } from "../api";
+import * as tts from "../tts";
 import { PersonaAvatar } from "./PersonaAvatar";
 import { StepCard } from "./StepCard";
 
@@ -1251,6 +1252,49 @@ describe("StepCard L10 — reward step dispatch", () => {
     // No linear NextStepButton — the picture variant uses its own
     // 6s timer + tap-to-advance.
     expect(screen.queryByTestId("next-step-button")).toBeNull();
+  });
+
+  // Phase Z Z1: integration through the production caller — StepCard
+  // resolves the persona voice profile ONCE per render (getVoiceProfile)
+  // and must thread it into the RewardStep mount so the joke reward
+  // speaks with the persona voice, not the default. Pre-Z1 RewardStep
+  // hardcoded a duplicate default profile, so a persona activity's joke
+  // reward silently spoke at rate/pitch 1.0.
+  it("threads the persona-resolved voice profile into the joke reward's speech", () => {
+    vi.mocked(tts.speak).mockClear();
+    const activity = fakeActivity({
+      metadata: {
+        persona: {
+          id: "wizard",
+          display_name: "Marvelous the Wizard",
+          // Decoded wire shape per Z1 (an object, never a string).
+          voice_profile: { rate: 0.9, pitch: 0.7 },
+        },
+      },
+      steps: [
+        {
+          ...fakeStep({ body: "Joke time" }),
+          kind: "reward",
+          metadata: {
+            reward_kind: "joke",
+            reward_id: "joke-1",
+            image_url: null,
+            animation: null,
+            audio_url: null,
+            body: "Joke time",
+            setup: "Why did the wizard whisper?",
+            punchline: "Low pitch, slow rate.",
+          },
+        } as ActivityStep,
+      ],
+    });
+    render(<StepCard activity={activity} onAdvance={vi.fn()} />);
+    // JokeStep auto-speaks the setup on mount; the profile must be the
+    // persona-resolved one StepCard derived from metadata.persona.
+    expect(tts.speak).toHaveBeenCalledWith("Why did the wizard whisper?", {
+      rate: 0.9,
+      pitch: 0.7,
+    });
   });
 });
 

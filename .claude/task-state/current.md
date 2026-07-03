@@ -1,42 +1,39 @@
 # Task State
 
-**Task:** Phase Z — persona voices (server-rendered Kokoro TTS + voice wire-through). Plan staged + synced; next is the automated build span.
-**Status:** IN_PROGRESS — /plan-feature + /plan-expedite chain DONE 2026-07-03 (plan-review READY auto-fixed 14; plan-wrap READY auto-fixed 4; repo-sync minted umbrella #2 + steps #3-#12; plan Issue: lines backfilled). Plan: `documentation/plan/phase-z-persona-voices-plan.md`. Build NOT started.
-**Last written:** 2026-07-03T17:50:00Z
-**Session SHA:** b00c4db
+**Task:** /build-phase --plan documentation/plan/phase-z-persona-voices-plan.md (Phase Z persona voices, goal-driven span Z1..Z7-prep; STOP before operator Z7/Z8/Z9)
+**Status:** IN_PROGRESS — Z1 DONE (PASS iter 1/3, all 4 reviewers approved, merged + gates green on master); dispatching Z2 next
+**Last written:** 2026-07-03T20:10:00Z
+**Session SHA:** d2bca48 (Z1 checkpoint commit pending)
 
 ## Next Action
-1. **Operator pre-flight (BLOCKING for Z2/Z5):** disposition the uncommitted working-tree edits overlapping Phase Z targets — `frontend/src/child/components/ReadMeButton.tsx` + `StepCard.tsx`(+test) modified, `ChoiceReadButton.tsx`(+test) UNTRACKED (likely the parallel uat-ui session's; see Gotchas). Commit or revert BEFORE /build-phase — worktree builds branch from committed state.
-2. Then run (same window):
-   `/goal "Phase Z automated steps Z1-Z7-prep are all marked Status: DONE in documentation/plan/phase-z-persona-voices-plan.md (issues #3-#9 closed), and backend gates (uv run pytest / uv run mypy src / uv run ruff check .) plus frontend gates (npm run test / typecheck / lint) exit 0 — STOP before operator steps Z7/Z8/Z9 (issues #10-#12); those are an operator handoff, not part of this goal"`
-   `/build-phase --plan documentation/plan/phase-z-persona-voices-plan.md`
+Checkpoint-commit Z1 (scoped add: 9 merged files + plan + current.md), close #3, remove worktree_z1, then /build-step Z2 (#4, sentence-boundary truncation, --reviewers code).
+Resume if session lost: `/build-phase --plan documentation/plan/phase-z-persona-voices-plan.md --resume Z2`
 
-## Completed (Phase Z prep — this arc)
-- 2026-07-03: Voice survey (6-agent workflow) → findings memory `project_voice_survey_2026-07-03.md`. Root causes: voice_profile never SELECTed by `_pick_random_library_persona`; iPad Web Speech cannot do voice identity; truncation cut = spoken-text-limit 150 at word boundary (operator's "What does Miss" example = exactly 157 chars).
-- 2026-07-03: /plan-feature conversation (4 operator decisions: surfaces = step bodies + jokes; casting = defaults + audition; clips always full text; Kokoro CPU in-process) → plan authored.
-- 2026-07-03: /plan-expedite chain: plan-review autofix (Type: fields ×7, main.py trigger-path correction — it writes NO metadata["persona"] at all, StepCard mount :914-921, concrete Z4 hook lines, 2 risk rows), plan-wrap autofix (VoiceProfile shape table, clip metadata key names pinned: spoken_audio_url / spoken_audio_setup_url / spoken_audio_punchline_url, RTF+G2P glosses), repo-sync (umbrella #2, steps #3-#12, all bodies rich, --ui deliberately omitted per PIN-gate precedent).
+## Completed
+- [d2bca48] Pre-flight disposition (plan §8 prerequisite): ChoiceReadButton(+test) + StepCard read-aloud split + ReadMeButton export + launcher banner committed. Gates: tsc/eslint clean, vitest 817. NOTE: launch-toybox.ps1 banner belonged to the parallel uat-ui session — swept into this commit (benign, coherent, gates green); flag in final report.
+- Baseline gates on master @ d2bca48: pytest 2671 passed / mypy clean / ruff check clean. Pre-existing `ruff format --check` drift on 100 files (ruff 0.15.12 floats via >=0.4) — OUT OF SCOPE, noted for housekeeping.
+- Step Z1 (#3) PASS iter 1/3: voice_profile decoded-object wire-through on all 3 persona-envelope paths (random SELECT, pinned _hydrate_persona_meta_by_id ×3 propose flows, dispatcher full envelope); RewardStep DEFAULT_VOICE_PROFILE dedup + threading. Post-merge master gates: pytest 2680 (+9) / vitest 820 (+3) / mypy / ruff / tsc / eslint all green. 4 reviewers approved, 0 high/medium findings.
 
-## Completed (Phase Y — prior arc)
-- Phase Y fully done 2026-06-23 (M1 #267 + M2 #274 PASS; run doc `documentation/runs/2026-06-23-phase-y-uat.md`; umbrella #264 closed). Master `f878eb7` → `fc84e02` (persona art) → `b00c4db` (go-public docs).
+## WIP
+**Current:** Step Z2 (#4): sentence-boundary-aware fallback truncation
+**Approach:** Replace truncateAtWordBoundary (ReadMeButton.tsx) with sentence-aware truncation (last ./!/? at or below limit; word-boundary fallback for over-limit first sentence; keep … and limit=0/short passthroughs); update both callers (ReadMeButton, ChoiceReadButton) + tests incl. the 157-char "What does Miss Maple think?" regression.
 
-## Dead Ends / Decisions
-- iPad Web Speech voice identity is a DEAD END (premium voices walled off; voiceURI unreliable; iOS-version regressions) — do not revisit; server-rendered clips are the path.
-- Piper rejected (robotic prosody + fork went GPL-3.0); XTTS-v2/F5-TTS rejected (non-commercial weights, repo is public); Zonos rejected (16 GB VRAM).
-- Kokoro runs CPU-only in-process (kokoro-onnx on core onnxruntime) — GPU flip is a provider-seam config change later, NOT scoped.
-- Never enqueue TTS in the propose path (proposals speculative); enqueue at approve/beat-insert/joke-insert/reward-resolve only.
-- Pre-render scene library ONLY; runtime serves static PNGs via existing mounts (Phase Y decision, still holds).
+## Dead Ends / Decisions (carried from Phase Z prep)
+- iPad Web Speech voice identity is a DEAD END — server-rendered Kokoro clips are the path.
+- Never enqueue TTS in the propose path; enqueue at approve/beat-insert/joke-insert/reward-resolve only.
+- Kokoro CPU-only in-process; GPU flip = provider-seam config later, NOT scoped.
 
 ## Critical Gotchas
-- **PARALLEL uat-ui session on master.** NEVER `git add -A`; scope every add. CRLF flap on `frontend/src/shared/{errors,types}.ts` — never stage. Untracked `.claude/skills/uat-ui/evals/` + modified `scripts/launch-toybox.ps1` belong to it — leave them.
-- **Uncommitted Z2/Z5-target files** (ReadMeButton/StepCard modified, ChoiceReadButton untracked) — MUST be dispositioned before /build-phase; recorded in plan §8 + umbrella #2 pre-flight note.
-- Z4 shares `src/toybox/api/activities.py` with Z1 — build Z4 AFTER Z1 merges (declared in issues #6/#3).
-- Wire-shape trap: voice_profile must be spliced as a DECODED object; kiosk typeof-number guard silently rejects raw JSON strings (persona-voice.ts:95-97).
-- `ruff format` debt in generator.py/models.py is PRE-EXISTING — scope edits, never format whole files.
-- WS-topic timing tests (test_ws_toy_actions_topic, test_ws_heartbeat) flake under full-suite load; pass in isolation. Pre-existing.
+- **PARALLEL uat-ui session artifacts:** untracked `.claude/skills/uat-ui/evals/` — NEVER commit; never `git add -A` on master; scope every add.
+- **CRLF flap on `frontend/src/shared/{errors,types}.ts`:** show M with ZERO content diff — never stage unless a step actually regenerates codegen (Z3 will).
+- Worktree venv lacks image_gen extra → mypy shows 4 unused-type-ignore errors in image_gen/animate.py + 4 GPU tests skip there; both CLEAN on master full venv. Judge worktree gates accordingly for every Z step.
+- WS timing tests (test_ws_toy_actions_topic, test_ws_heartbeat) flake under full-suite load; pass in isolation. Pre-existing.
+- Z4 shares activities.py with Z1 — Z4 builds only AFTER Z1 merges (sequential order handles this).
+- Wire-shape trap: voice_profile must be a DECODED object on the wire; kiosk typeof-number guard rejects raw JSON strings (persona-voice.ts:95-97).
+- Baseline counts: pytest 2671 (master full venv), vitest 817 (pre-Z1).
 
 ## Key Files
 - Phase Z plan: `documentation/plan/phase-z-persona-voices-plan.md` (umbrella #2; steps #3-#12)
-- Survey memory: `~/.claude/projects/c--Users-abero-dev-toybox/memory/project_voice_survey_2026-07-03.md`
-- Z1 seams: `src/toybox/api/activities.py` (:1729 picker; pinned :2044/:2231/:2402), `src/toybox/main.py:863`, `frontend/src/child/components/RewardStep.tsx:52`
+- Z1 seams: `src/toybox/api/activities.py` (:1729 picker; pinned callers ~:2047/:2234/:2405), `src/toybox/main.py:863`, `frontend/src/child/components/RewardStep.tsx`
 - Z4 hooks: activities.py post_approve :2932 (S2 pattern :3047), `_insert_adventure_beat` :4726, `_parent_insert_finish` :3695, `_insert_reward_step_as_current` :5346
 - Kiosk speech seams: `frontend/src/child/{tts.ts,persona-voice.ts}`, `components/{ReadMeButton,ChoiceReadButton,JokeStep,StepCard,RewardStep}.tsx`, `sfx.ts` + `KioskPinPrompt.tsx:69`

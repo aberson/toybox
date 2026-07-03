@@ -219,6 +219,7 @@ computes hashes.
 - **Produces:** distinct per-persona rate/pitch on the device voice; pinned personas get avatar + voice envelope; wire-shape integration tests
 - **Done when:** pytest wire-shape tests pass (random + pinned + trigger paths); vitest RewardStep threads persona profile; full gates green
 - **Depends on:** none
+- **Status:** DONE (2026-07-03)
 
 <!-- autofix-applied: 2026-07-03 -->
 ### Step Z2: Sentence-boundary-aware fallback truncation

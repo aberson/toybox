@@ -13,6 +13,11 @@
 //   - Song-reward delegates to <SongPlayer> with audio_url + body.
 //   - Malformed envelope (missing metadata / unknown reward_kind)
 //     renders the inert sentinel.
+//   - Phase Z Z1: the joke reward speaks with the ``voiceProfile``
+//     prop threaded by StepCard, and the no-prop fallback is the
+//     CANONICAL persona-voice DEFAULT_VOICE_PROFILE (identity
+//     assertion — one-source-of-truth rule; a re-duplicated local
+//     constant would fail the ``toBe``).
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import {
@@ -26,6 +31,9 @@ import {
 
 import type { Animation } from "../../shared/types";
 import { REWARD_ANIMATIONS } from "../animations/rewardAnimations";
+import { DEFAULT_VOICE_PROFILE } from "../persona-voice";
+import * as tts from "../tts";
+import type { VoiceProfile } from "../tts";
 import { RewardStep } from "./RewardStep";
 
 // Mock the TTS substrate — JokeStep speaks on mount; tests should
@@ -256,6 +264,54 @@ describe("RewardStep — joke reward", () => {
     render(<RewardStep metadata={metadata} onAdvance={vi.fn()} />);
     expect(screen.getByTestId("joke-setup").textContent).toBe(
       "Knock knock.",
+    );
+  });
+});
+
+describe("RewardStep — Phase Z Z1 voice-profile threading", () => {
+  const jokeMetadata = {
+    reward_kind: "joke",
+    reward_id: "joke-1",
+    image_url: null,
+    animation: null,
+    audio_url: null,
+    body: "Setup fallback",
+    setup: "Why did the wizard whisper?",
+    punchline: "Low pitch, slow rate.",
+  };
+
+  it("threads the StepCard-resolved voiceProfile into the JokeStep speak call", () => {
+    // The persona-resolved profile StepCard computes via
+    // ``getVoiceProfile`` — distinct non-default values so a silent
+    // fall-through to the default profile fails loudly.
+    const personaProfile: VoiceProfile = { rate: 0.9, pitch: 0.7 };
+    render(
+      <RewardStep
+        metadata={jokeMetadata}
+        onAdvance={vi.fn()}
+        voiceProfile={personaProfile}
+      />,
+    );
+    // JokeStep auto-speaks the setup on mount with the threaded profile.
+    expect(tts.speak).toHaveBeenCalledWith(
+      "Why did the wizard whisper?",
+      personaProfile,
+    );
+    // Identity, not just deep-equality: the profile object must be
+    // passed through unmodified (no re-wrap that could drop fields).
+    expect(vi.mocked(tts.speak).mock.calls[0]?.[1]).toBe(personaProfile);
+  });
+
+  it("falls back to the CANONICAL DEFAULT_VOICE_PROFILE by identity when no prop is given", () => {
+    // One-source-of-truth regression pin (code-quality.md §2): the
+    // pre-Z1 RewardStep carried a local duplicate
+    // ``{rate: 1.0, pitch: 1.0}`` constant. ``toBe`` (identity, not
+    // ``toEqual``) fails if anyone re-introduces a structurally-equal
+    // duplicate instead of importing from persona-voice.ts.
+    render(<RewardStep metadata={jokeMetadata} onAdvance={vi.fn()} />);
+    expect(tts.speak).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(tts.speak).mock.calls[0]?.[1]).toBe(
+      DEFAULT_VOICE_PROFILE,
     );
   });
 });

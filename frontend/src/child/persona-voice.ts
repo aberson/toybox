@@ -10,14 +10,13 @@
 //
 // Wire shape expectations:
 //   ``activity.metadata.persona`` is an object containing AT LEAST
-//   ``{ id: string, display_name: string }`` today; Phase K K1 has
-//   already shipped the persona library's ``voice_profile`` field
-//   (``{rate, pitch, voice_name?}`` or null) but the backend's
-//   ``_pick_random_library_persona`` does not yet splice it into the
-//   wire envelope. Until then (K9 or K12 will extend it when a real
-//   consumer needs it), this resolver returns the default profile —
-//   matching the persona-library schema's "NULL = system default"
-//   contract.
+//   ``{ id: string, display_name: string }``. Since Phase Z Z1 the
+//   backend splices a DECODED ``voice_profile`` object
+//   (``{rate, pitch, voice_name?}`` or null) into the envelope on all
+//   three persona paths (random pick, pinned persona_id, listening
+//   trigger). ``null`` (or absent, on pre-Z1 persisted rows) means
+//   "system default" — this resolver returns the default profile per
+//   the persona-library schema's "NULL = system default" contract.
 //
 // Default profile = ``{rate: 1.0, pitch: 1.0}`` — matches the
 // browser's default ``SpeechSynthesisUtterance`` initial values, so

@@ -654,12 +654,13 @@ def test_resolved_persona_is_periodic_table(
 
     Approach: stage a SINGLE-PERSONA library (Iridia only) so the
     propose handler's ``_pick_random_library_persona`` path
-    deterministically picks her. Caller-pinned ``persona_id`` populates
-    ``activity.persona_id`` on the wire BUT does NOT populate
-    ``metadata.persona`` (see src/toybox/api/activities.py:2004-2010
-    asymmetry) — staging a single-persona library is the only way to
-    make BOTH surfaces consistent for the smoke gate without changing
-    production code.
+    deterministically picks her. (Historical note: this staging was
+    originally the ONLY way to make both wire surfaces consistent —
+    pre-Phase-Z a caller-pinned ``persona_id`` populated
+    ``activity.persona_id`` but NOT ``metadata.persona``. Z1 closed
+    that asymmetry via ``_hydrate_persona_meta_by_id``; the
+    random-pick staging is kept because it also exercises the
+    library-pick path this smoke gate is about.)
     """
     template_id = "element_microgame_h_1"
     payload = _extract_template_payload("request_activity", template_id)
