@@ -11,7 +11,8 @@
 // Phase L Step L5 removed the three Phase K play-surface flags
 // (``play_embedded_enabled``, ``play_endings_enabled``,
 // ``play_spontaneity_enabled``) when jokes/songs migrated to
-// per-activity reward types. Five flags remain.
+// per-activity reward types. Phase Z Z6 added ``neural_voice_enabled``
+// (the kiosk-wide clip gate). Six flags total.
 //
 // Two tests pin the contract:
 //
@@ -54,6 +55,8 @@ const FLAG_PATHS: ReadonlyArray<readonly [string, string]> = [
   ["play_standalone_enabled", "/api/settings/play-standalone-enabled"],
   ["clickable_words_enabled", "/api/settings/clickable-words-enabled"],
   ["read_me_button_enabled", "/api/settings/read-me-button-enabled"],
+  // Phase Z Z6: neural-voice clip gate.
+  ["neural_voice_enabled", "/api/settings/neural-voice-enabled"],
 ];
 
 interface FetchStubArgs {
@@ -100,14 +103,16 @@ function stubKioskBootstrapFetch(args: FetchStubArgs = {}): {
             { status, headers: { "Content-Type": "application/json" } },
           );
         }
-        // Default body per the backend's seeded migration: all five
-        // surviving flags default to true after Phase L Step L5.
+        // Default body per the backend's seeded migrations: all six
+        // surviving flags default to true (Phase L Step L5 removed the
+        // lone opt-in flag; Phase Z Z6 added neural_voice_enabled).
         const defaultByPath: Record<string, boolean> = {
           "/api/settings/jokes-enabled": true,
           "/api/settings/songs-enabled": true,
           "/api/settings/play-standalone-enabled": true,
           "/api/settings/clickable-words-enabled": true,
           "/api/settings/read-me-button-enabled": true,
+          "/api/settings/neural-voice-enabled": true,
         };
         const seeded = defaultByPath[path] ?? true;
         const value = args.flagValues?.[path] ?? seeded;
@@ -159,6 +164,7 @@ describe("Kiosk K2 bootstrap — feature flag parallel fetch", () => {
         "/api/settings/play-standalone-enabled": false,
         "/api/settings/clickable-words-enabled": false,
         "/api/settings/read-me-button-enabled": false,
+        "/api/settings/neural-voice-enabled": false,
       },
     });
     await bootKioskWithPin();
@@ -177,6 +183,9 @@ describe("Kiosk K2 bootstrap — feature flag parallel fetch", () => {
       ).toBe("false");
       expect(
         root!.getAttribute("data-flag-read-me-button-enabled"),
+      ).toBe("false");
+      expect(
+        root!.getAttribute("data-flag-neural-voice-enabled"),
       ).toBe("false");
     });
   });

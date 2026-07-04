@@ -89,6 +89,7 @@ function stubBootstrapFetch(opts: {
         opts.clickableWordsValue ?? true,
       "/api/settings/read-me-button-enabled":
         opts.readMeButtonValue ?? true,
+      "/api/settings/neural-voice-enabled": true,
     };
     for (const [path, value] of Object.entries(defaultByPath)) {
       if (url.endsWith(path)) {

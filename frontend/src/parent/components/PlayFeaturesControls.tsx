@@ -1,11 +1,12 @@
-// Phase K step K2 (Phase L step L8): three parent-controlled feature-
-// flag toggles. Originally eight; L5 removed play_embedded_enabled +
-// play_endings_enabled + play_spontaneity_enabled when jokes/songs
-// became per-activity reward types. L8 then moved ``jokes_enabled`` +
-// ``songs_enabled`` out of this component and into the new
-// ``RewardsSection`` header — their state still lives in App.tsx's
-// lifted ``featureFlags`` dict so the Phase L bootstrap parallel-fetch
-// still seeds five values, but only THREE flags render here.
+// Phase K step K2 (Phase L step L8, Phase Z Z6): four parent-controlled
+// feature-flag toggles. Originally eight; L5 removed
+// play_embedded_enabled + play_endings_enabled +
+// play_spontaneity_enabled when jokes/songs became per-activity reward
+// types. L8 then moved ``jokes_enabled`` + ``songs_enabled`` out of
+// this component and into the new ``RewardsSection`` header — their
+// state still lives in App.tsx's lifted ``featureFlags`` dict so the
+// bootstrap parallel-fetch still seeds every flag. Z6 added the
+// ``neural_voice_enabled`` toggle, so FOUR flags render here.
 //
 // Pattern mirrors PlayQueueSettingsControls.tsx (Phase J J10) — the
 // parent (App.tsx → SettingsPanel) holds the source-of-truth bool
@@ -63,7 +64,7 @@ const ROW_STYLE: CSSProperties = {
   borderTop: "1px solid #f3f4f6",
 };
 
-// Single source of truth for the three flag setters routed from
+// Single source of truth for the four flag setters routed from
 // ``ApiClient``. The key is the canonical Pydantic name (matches the
 // settings table row); the API client setter method name follows the
 // same convention as Phase J's ``setPlayCadenceSeconds``. Phase L L5
@@ -74,7 +75,8 @@ const ROW_STYLE: CSSProperties = {
 type FlagSetterName =
   | "setPlayStandaloneEnabled"
   | "setClickableWordsEnabled"
-  | "setReadMeButtonEnabled";
+  | "setReadMeButtonEnabled"
+  | "setNeuralVoiceEnabled";
 
 interface FeatureToggleSpec {
   key: PhaseKFeatureFlag;
@@ -109,15 +111,22 @@ export const FEATURE_TOGGLES: readonly FeatureToggleSpec[] = [
     hint: "Watermarked Read Me bubble on each text-bearing step card. When off, the bubble is hidden.",
     setter: "setReadMeButtonEnabled",
   },
+  // Phase Z Z6: neural-voice clip gate.
+  {
+    key: "neural_voice_enabled",
+    label: "Neural voice",
+    hint: "Kiosk speech uses the persona's neural voice clips. When off, all speech falls back to the device voice.",
+    setter: "setNeuralVoiceEnabled",
+  },
 ];
 
 export interface PlayFeaturesControlsProps {
   api: Pick<ApiClient, FlagSetterName>;
   // The lifted, source-of-truth values for the surviving flags. The
   // ``values`` dict still keys on ``PhaseKFeatureFlag`` (the full
-  // five-key union) so App.tsx can pass its single ``featureFlags``
+  // six-key union) so App.tsx can pass its single ``featureFlags``
   // state object to BOTH this component and RewardsSection without
-  // slicing — this component only reads the three keys it renders.
+  // slicing — this component only reads the four keys it renders.
   // Seeded by App.tsx's bootstrap parallel-fetch; updated via
   // ``onValueChanged`` after each successful PUT.
   values: Record<PhaseKFeatureFlag, boolean>;
@@ -165,7 +174,7 @@ function FeatureToggleRow(props: FeatureToggleRowProps): JSX.Element {
       abortRef.current = controller;
       setPendingValue(next);
       setError(null);
-      // Setter shape is identical for all 5: ``(value, opts) =>
+      // Setter shape is identical for every flag: ``(value, opts) =>
       // Promise<FeatureFlagResponse>``. Cast through `Pick<ApiClient,
       // FlagSetterName>` so we only need to widen at the boundary.
       //

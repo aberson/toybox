@@ -79,6 +79,7 @@ function stubFetchAndCaptureAdvance(): FetchCall[] {
       "/api/settings/play-spontaneity-enabled": false,
       "/api/settings/clickable-words-enabled": true,
       "/api/settings/read-me-button-enabled": true,
+      "/api/settings/neural-voice-enabled": true,
     };
     for (const [path, value] of Object.entries(flagDefaults)) {
       if (url.endsWith(path)) {

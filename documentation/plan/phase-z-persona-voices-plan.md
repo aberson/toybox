@@ -277,6 +277,7 @@ kiosk never computes hashes.
 - **Produces:** flag end-to-end; parent can force the device voice
 - **Done when:** flag OFF routes all surfaces to Web Speech (vitest); settings PUT/GET pytest; migration seed test
 - **Depends on:** Z5
+- **Status:** DONE (2026-07-03)
 
 <!-- autofix-applied: 2026-07-03 -->
 ### Step Z7-prep: Audition batch script

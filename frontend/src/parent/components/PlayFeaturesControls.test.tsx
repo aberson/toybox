@@ -6,6 +6,7 @@
 // L8 reduced the FEATURE_TOGGLES list from FIVE entries to THREE: the
 // ``jokes_enabled`` + ``songs_enabled`` master toggles moved out of
 // this component and into ``RewardsSection`` (Kids & Toyboxes → Rewards).
+// Phase Z Z6 then added the ``neural_voice_enabled`` toggle (→ FOUR).
 // The error-path test that used to drive ``jokes_enabled`` now drives
 // ``play_standalone_enabled`` — the wiring is identical so any
 // surviving regression still surfaces here.
@@ -33,7 +34,8 @@ import {
 type StubApi = Record<
   | "setPlayStandaloneEnabled"
   | "setClickableWordsEnabled"
-  | "setReadMeButtonEnabled",
+  | "setReadMeButtonEnabled"
+  | "setNeuralVoiceEnabled",
   Mock
 >;
 
@@ -48,16 +50,20 @@ function buildStubApi(): StubApi {
     setReadMeButtonEnabled: vi.fn(
       async (v: boolean) => ({ value: v }),
     ) as Mock,
+    setNeuralVoiceEnabled: vi.fn(
+      async (v: boolean) => ({ value: v }),
+    ) as Mock,
   };
 }
 
-// The three flags this component still owns after Phase L Step L8.
-// ``jokes_enabled`` + ``songs_enabled`` are validated by
-// RewardsSection.test.tsx.
+// The four flags this component owns after Phase L Step L8 + Phase Z
+// Z6 (``neural_voice_enabled``). ``jokes_enabled`` + ``songs_enabled``
+// are validated by RewardsSection.test.tsx.
 const ALL_FLAG_KEYS: readonly PhaseKFeatureFlag[] = [
   "play_standalone_enabled",
   "clickable_words_enabled",
   "read_me_button_enabled",
+  "neural_voice_enabled",
 ];
 
 afterEach(() => {
@@ -70,14 +76,15 @@ describe("PlayFeaturesControls — canonical flag list", () => {
     expect(FEATURE_TOGGLES.map((t) => t.key)).toEqual(ALL_FLAG_KEYS);
   });
 
-  it("FEATURE_TOGGLES contains exactly three entries (NOT five — L8 moved jokes/songs to RewardsSection)", () => {
+  it("FEATURE_TOGGLES contains exactly four entries (NOT six — L8 moved jokes/songs to RewardsSection)", () => {
     // Pin against accidental re-introduction of the master toggles
     // that L8 moved out. A regression that re-adds ``jokes_enabled``
     // or ``songs_enabled`` here would silently produce duplicate
     // toggles (one in PlayFeaturesControls, one in RewardsSection)
     // racing the same lifted state. Code-quality §2: one source of
-    // truth per data-shape constant.
-    expect(FEATURE_TOGGLES).toHaveLength(3);
+    // truth per data-shape constant. Phase Z Z6 added the
+    // ``neural_voice_enabled`` toggle (three → four).
+    expect(FEATURE_TOGGLES).toHaveLength(4);
     expect(FEATURE_TOGGLES.map((t) => t.key)).not.toContain("jokes_enabled");
     expect(FEATURE_TOGGLES.map((t) => t.key)).not.toContain("songs_enabled");
   });
@@ -95,6 +102,7 @@ describe("PlayFeaturesControls — canonical flag list", () => {
       play_standalone_enabled: true,
       clickable_words_enabled: true,
       read_me_button_enabled: true,
+      neural_voice_enabled: true,
     });
   });
 });

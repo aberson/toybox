@@ -25,6 +25,7 @@ import pytest
 from toybox.core import (
     clickable_words_enabled,
     jokes_enabled,
+    neural_voice_enabled,
     play_standalone_enabled,
     read_me_button_enabled,
     songs_enabled,
@@ -43,15 +44,17 @@ class FlagFixture:
     default: bool
 
 
-# Canonical fixture list — one row per surviving Phase K feature flag.
-# All five default to True after the L5 removal of the three Phase K
-# play-surface flags.
+# Canonical fixture list — one row per surviving Phase K feature flag
+# (+ the Phase Z Z6 ``neural_voice_enabled`` addition). All six default
+# to True after the L5 removal of the three Phase K play-surface flags.
 FLAGS: list[FlagFixture] = [
     FlagFixture(jokes_enabled, "jokes_enabled", True),
     FlagFixture(songs_enabled, "songs_enabled", True),
     FlagFixture(play_standalone_enabled, "play_standalone_enabled", True),
     FlagFixture(clickable_words_enabled, "clickable_words_enabled", True),
     FlagFixture(read_me_button_enabled, "read_me_button_enabled", True),
+    # Phase Z Z6: neural-voice clip gate — migration 0031 seeds.
+    FlagFixture(neural_voice_enabled, "neural_voice_enabled", True),
 ]
 
 
@@ -215,7 +218,9 @@ def test_migration_seeds_match_defaults(db: sqlite3.Connection) -> None:
     """
     for flag in FLAGS:
         row = db.execute("SELECT value FROM settings WHERE key = ?", (flag.key,)).fetchone()
-        assert row is not None, f"migration 0015 must seed {flag.key}"
+        assert row is not None, (
+            f"the seed migration (0015; 0031 for neural_voice) must seed {flag.key}"
+        )
         raw = row["value"] if isinstance(row, sqlite3.Row) else row[0]
         expected = "true" if flag.default else "false"
         assert raw == expected, f"settings.{flag.key} seeded {raw!r}, expected {expected!r}"

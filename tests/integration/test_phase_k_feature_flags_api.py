@@ -27,6 +27,9 @@ from toybox.api.clickable_words_enabled_settings import (
     get_db as clickable_words_enabled_get_db,
 )
 from toybox.api.jokes_enabled_settings import get_db as jokes_enabled_get_db
+from toybox.api.neural_voice_enabled_settings import (
+    get_db as neural_voice_enabled_get_db,
+)
 from toybox.api.play_standalone_enabled_settings import (
     get_db as play_standalone_enabled_get_db,
 )
@@ -75,6 +78,13 @@ FLAG_ENDPOINTS: list[FlagEndpoint] = [
         "/api/settings/read-me-button-enabled",
         True,
         read_me_button_enabled_get_db,
+    ),
+    # Phase Z Z6: neural-voice clip gate for the kiosk speech surfaces.
+    FlagEndpoint(
+        "neural_voice_enabled",
+        "/api/settings/neural-voice-enabled",
+        True,
+        neural_voice_enabled_get_db,
     ),
 ]
 

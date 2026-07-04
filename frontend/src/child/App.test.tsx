@@ -76,6 +76,7 @@ function stubFetchCapturingAuthCalls(
       "/api/settings/play-standalone-enabled": true,
       "/api/settings/clickable-words-enabled": true,
       "/api/settings/read-me-button-enabled": true,
+      "/api/settings/neural-voice-enabled": true,
     };
     for (const [path, value] of Object.entries(k2DefaultFlags)) {
       if (url.endsWith(path)) {

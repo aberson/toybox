@@ -2247,6 +2247,31 @@ export class ApiClient {
     );
   }
 
+  // Phase Z Z6: neural-voice clip gate. When off, every kiosk speech
+  // surface routes straight to Web Speech (no Z5 clip attempts).
+  async getNeuralVoiceEnabled(
+    opts: RequestOptions = {},
+  ): Promise<FeatureFlagResponse> {
+    return this.request<FeatureFlagResponse>(
+      "/api/settings/neural-voice-enabled",
+      { method: "GET", signal: opts.signal },
+    );
+  }
+
+  async setNeuralVoiceEnabled(
+    value: boolean,
+    opts: RequestOptions = {},
+  ): Promise<FeatureFlagResponse> {
+    return this.request<FeatureFlagResponse>(
+      "/api/settings/neural-voice-enabled",
+      {
+        method: "PUT",
+        body: JSON.stringify({ value }),
+        signal: opts.signal,
+      },
+    );
+  }
+
   // Phase J step J5: REST seed for the scrolling queue + active card.
   // The backend returns ``{items: Activity[], active: Activity | null}``
   // when ``include_active=true``; otherwise ``{items: [...]}`` with

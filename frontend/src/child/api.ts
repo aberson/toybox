@@ -262,6 +262,7 @@ export const KIOSK_FEATURE_FLAG_PATHS: Readonly<
   play_standalone_enabled: "/api/settings/play-standalone-enabled",
   clickable_words_enabled: "/api/settings/clickable-words-enabled",
   read_me_button_enabled: "/api/settings/read-me-button-enabled",
+  neural_voice_enabled: "/api/settings/neural-voice-enabled",
 };
 
 // Phase R Step R2: spoken text character limit wire shape. The kiosk

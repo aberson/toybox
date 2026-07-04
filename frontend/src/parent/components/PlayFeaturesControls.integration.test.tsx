@@ -171,14 +171,17 @@ describe("PlayFeaturesControls — integration with real ApiClient", () => {
       />,
     );
     // Map of snake_case flag key → expected kebab-case URL fragment.
-    // L8 removed jokes_enabled + songs_enabled from this section; the
-    // map covers only the three flags PlayFeaturesControls still
-    // renders. Use Partial<...> so the type stays in lockstep with
-    // PhaseKFeatureFlag even though jokes/songs aren't keys here.
+    // L8 removed jokes_enabled + songs_enabled from this section; Z6
+    // added neural_voice_enabled, so the map covers the four flags
+    // PlayFeaturesControls renders. Use Partial<...> so the type stays
+    // in lockstep with PhaseKFeatureFlag even though jokes/songs
+    // aren't keys here.
     const expectedUrl: Partial<Record<PhaseKFeatureFlag, string>> = {
       play_standalone_enabled: "/api/settings/play-standalone-enabled",
       clickable_words_enabled: "/api/settings/clickable-words-enabled",
       read_me_button_enabled: "/api/settings/read-me-button-enabled",
+      // Phase Z Z6: neural-voice clip gate.
+      neural_voice_enabled: "/api/settings/neural-voice-enabled",
     };
     for (const spec of FEATURE_TOGGLES) {
       const target = !PHASE_K_FEATURE_FLAG_DEFAULTS[spec.key];

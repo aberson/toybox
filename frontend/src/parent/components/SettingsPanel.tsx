@@ -444,6 +444,7 @@ export interface SettingsPanelProps {
     | "setPlayStandaloneEnabled"
     | "setClickableWordsEnabled"
     | "setReadMeButtonEnabled"
+    | "setNeuralVoiceEnabled"
     | "setSpokenTextLimit"
     | "setParentInvolvement"
     | "setGameComplexity"

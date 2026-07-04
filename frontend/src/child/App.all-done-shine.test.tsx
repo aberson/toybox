@@ -90,6 +90,7 @@ function stubBootstrapFetch(): void {
       "/api/settings/play-standalone-enabled": true,
       "/api/settings/clickable-words-enabled": true,
       "/api/settings/read-me-button-enabled": true,
+      "/api/settings/neural-voice-enabled": true,
     };
     for (const [path, value] of Object.entries(flagPaths)) {
       if (url.endsWith(path)) {

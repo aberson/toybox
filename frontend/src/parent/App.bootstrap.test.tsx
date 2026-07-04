@@ -230,6 +230,8 @@ function stubFullAuthFetch(opts: FetchOpts = {}): Mock {
       "/api/settings/play-spontaneity-enabled": false,
       "/api/settings/clickable-words-enabled": true,
       "/api/settings/read-me-button-enabled": true,
+      // Phase Z Z6: neural-voice clip gate (default true).
+      "/api/settings/neural-voice-enabled": true,
     };
     for (const [path, value] of Object.entries(featureFlagDefaults)) {
       if (url.endsWith(path)) {
@@ -336,9 +338,9 @@ describe("App bootstrap parallel-fetch happy path (J8)", () => {
         u.endsWith("/api/activities/proposed?include_active=true"),
       ).length,
     ).toBe(1);
-    // Phase L Step L8: the bootstrap parallel-fetch still seeds the
-    // FIVE surviving feature flags exactly once each, even though
-    // ``jokes_enabled`` + ``songs_enabled`` no longer drive
+    // Phase L Step L8 + Phase Z Z6: the bootstrap parallel-fetch
+    // seeds the SIX surviving feature flags exactly once each, even
+    // though ``jokes_enabled`` + ``songs_enabled`` no longer drive
     // PlayFeaturesControls (they moved to RewardsSection). App.tsx's
     // lifted ``featureFlags`` dict is the single source of truth for
     // BOTH consumers; if a future regression dropped the jokes/songs
@@ -350,6 +352,7 @@ describe("App bootstrap parallel-fetch happy path (J8)", () => {
       "/api/settings/play-standalone-enabled",
       "/api/settings/clickable-words-enabled",
       "/api/settings/read-me-button-enabled",
+      "/api/settings/neural-voice-enabled",
     ]) {
       expect(urls.filter((u) => u.endsWith(path)).length).toBe(1);
     }

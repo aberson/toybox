@@ -93,6 +93,7 @@ function stubBootstrapFetch(spokenTextLimitValue: number): Mock {
       "/api/settings/play-spontaneity-enabled": false,
       "/api/settings/clickable-words-enabled": false,
       "/api/settings/read-me-button-enabled": true,
+      "/api/settings/neural-voice-enabled": true,
     };
     for (const [path, value] of Object.entries(flagPaths)) {
       if (url.endsWith(path)) {

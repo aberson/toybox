@@ -422,6 +422,7 @@ export function App(): JSX.Element {
         playStandaloneResult,
         clickableWordsResult,
         readMeButtonResult,
+        neuralVoiceResult,
         rewardsListResult,
         spokenTextLimitResult,
         parentInvolvementResult,
@@ -438,16 +439,18 @@ export function App(): JSX.Element {
         ),
         // Phase K step K2: feature flags fetched in parallel alongside
         // the existing settings GETs. Phase L Step L5 removed the three
-        // Phase K play-surface flags; the remaining five share the same
-        // independent-result handling so a single bad endpoint doesn't
-        // poison the others — optimistic defaults (matching the
-        // backend's seeded migration 0015 values) stay in place when a
-        // probe rejects.
+        // Phase K play-surface flags and Phase Z Z6 added the neural-
+        // voice gate; the six flags share the same independent-result
+        // handling so a single bad endpoint doesn't poison the others —
+        // optimistic defaults (matching the backend's seeded migration
+        // values) stay in place when a probe rejects.
         api.getJokesEnabled({ signal: aborter.signal }),
         api.getSongsEnabled({ signal: aborter.signal }),
         api.getPlayStandaloneEnabled({ signal: aborter.signal }),
         api.getClickableWordsEnabled({ signal: aborter.signal }),
         api.getReadMeButtonEnabled({ signal: aborter.signal }),
+        // Phase Z Z6: neural-voice clip gate joined the flag batch.
+        api.getNeuralVoiceEnabled({ signal: aborter.signal }),
         // Phase L L9: seed ``activeRewardsCount`` so the suggestion
         // card's reward dropdown can pre-compute picture eligibility.
         // Failures fall through to the ``null`` default, which is
@@ -493,9 +496,9 @@ export function App(): JSX.Element {
           targetDepthResult.reason,
         );
       }
-      // Phase K step K2: fold the eight feature-flag results into one
+      // Phase K step K2: fold the feature-flag results into one
       // setState call so a partial-fetch only fires one render rather
-      // than eight cascading ones. Each ``fulfilled`` row overwrites
+      // than several cascading ones. Each ``fulfilled`` row overwrites
       // its matching default in the working snapshot; rejections fall
       // through (the default seeded above stays in place) with a
       // single console.warn per failing flag so a bad bootstrap is
@@ -508,6 +511,7 @@ export function App(): JSX.Element {
         ["play_standalone_enabled", playStandaloneResult],
         ["clickable_words_enabled", clickableWordsResult],
         ["read_me_button_enabled", readMeButtonResult],
+        ["neural_voice_enabled", neuralVoiceResult],
       ];
       const nextFlags: PhaseKFeatureFlags = {
         ...PHASE_K_FEATURE_FLAG_DEFAULTS,

@@ -61,6 +61,7 @@ function stubBootstrapFetch(): Mock {
       "/api/settings/play-standalone-enabled": { value: true },
       "/api/settings/clickable-words-enabled": { value: false },
       "/api/settings/read-me-button-enabled": { value: false },
+      "/api/settings/neural-voice-enabled": { value: true },
       "/api/settings/spoken-text-limit": { value: 150 },
     };
     for (const [path, body] of Object.entries(defaultPaths)) {

@@ -45,6 +45,7 @@ import pytest
 from toybox.core import (
     clickable_words_enabled,
     jokes_enabled,
+    neural_voice_enabled,
     play_standalone_enabled,
     read_me_button_enabled,
     songs_enabled,
@@ -73,6 +74,8 @@ def _backend_canonical_defaults() -> dict[str, bool]:
         "play_standalone_enabled": (play_standalone_enabled.PLAY_STANDALONE_ENABLED_DEFAULT),
         "clickable_words_enabled": (clickable_words_enabled.CLICKABLE_WORDS_ENABLED_DEFAULT),
         "read_me_button_enabled": read_me_button_enabled.READ_ME_BUTTON_ENABLED_DEFAULT,
+        # Phase Z Z6: neural-voice clip gate for the kiosk speech surfaces.
+        "neural_voice_enabled": neural_voice_enabled.NEURAL_VOICE_ENABLED_DEFAULT,
     }
 
 

@@ -38,6 +38,9 @@ from .api.image_gen_settings import router as image_gen_settings_router
 from .api.jokes_enabled_settings import router as jokes_enabled_settings_router
 from .api.listening import router as listening_router
 from .api.metrics import router as metrics_router
+from .api.neural_voice_enabled_settings import (
+    router as neural_voice_enabled_settings_router,
+)
 from .api.parent_involvement_settings import (
     router as parent_involvement_settings_router,
 )
@@ -133,13 +136,15 @@ def create_app() -> FastAPI:
     # false the climax is an ordinary adventure_beat (W4 behavior). GET is
     # household-read, PUT is parent-scope.
     app.include_router(boss_fights_enabled_settings_router)
-    # Phase K Step K2 + Phase L Step L5: five parent-controlled feature
+    # Phase K Step K2 + Phase L Step L5: six parent-controlled feature
     # flags (originally eight; L5 removed the three Phase K play-surface
     # flags as part of re-framing jokes/songs as per-activity reward
-    # types). Order within the cohort is alphabetical so the router list
-    # stays mechanically scannable.
+    # types; Phase Z Z6 added ``neural_voice_enabled``). Order within
+    # the cohort is alphabetical so the router list stays mechanically
+    # scannable.
     app.include_router(clickable_words_enabled_settings_router)
     app.include_router(jokes_enabled_settings_router)
+    app.include_router(neural_voice_enabled_settings_router)
     app.include_router(play_standalone_enabled_settings_router)
     app.include_router(read_me_button_enabled_settings_router)
     app.include_router(songs_enabled_settings_router)

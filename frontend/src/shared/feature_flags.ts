@@ -24,13 +24,16 @@
 //
 // Defaults mirror documentation/phase-k-plan.md §5 and the seeded
 // migration 0015 row values exactly. All true after Phase L Step L5.
+// Phase Z Z6 added ``neural_voice_enabled`` (migration 0031, default
+// true) — the kiosk-wide gate for Z5 neural-voice clip playback.
 
 export type PhaseKFeatureFlag =
   | "jokes_enabled"
   | "songs_enabled"
   | "play_standalone_enabled"
   | "clickable_words_enabled"
-  | "read_me_button_enabled";
+  | "read_me_button_enabled"
+  | "neural_voice_enabled";
 
 export type PhaseKFeatureFlags = Record<PhaseKFeatureFlag, boolean>;
 
@@ -44,4 +47,5 @@ export const PHASE_K_FEATURE_FLAG_DEFAULTS: PhaseKFeatureFlags = {
   play_standalone_enabled: true,
   clickable_words_enabled: true,
   read_me_button_enabled: true,
+  neural_voice_enabled: true,
 };

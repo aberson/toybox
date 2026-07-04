@@ -283,10 +283,11 @@ export function App(): JSX.Element {
   const [pinPromptVisible, setPinPromptVisible] = useState(false);
   const [pinPromptError, setPinPromptError] = useState<string | null>(null);
   const [bootCounter, setBootCounter] = useState(0);
-  // Phase K step K2: eight parent-controlled feature flags fetched on
-  // mount. Seeded optimistically from KIOSK_FEATURE_FLAG_DEFAULTS
-  // (matching backend migration 0015) so a slow / failed bootstrap
-  // fetch never paints a value the kid wouldn't have seen anyway.
+  // Phase K step K2: the parent-controlled feature flags (six after
+  // Phase L L5 + Phase Z Z6) fetched on mount. Seeded optimistically
+  // from KIOSK_FEATURE_FLAG_DEFAULTS (matching the backend migration
+  // seeds) so a slow / failed bootstrap fetch never paints a value the
+  // kid wouldn't have seen anyway.
   // Later K-steps (K9 click-to-read, K12 song/joke step kinds, K13
   // standalone surface, K14/K15 embedded + spontaneity hooks) consume
   // these flags via prop drilling — no React context per K2 plan.
@@ -303,16 +304,16 @@ export function App(): JSX.Element {
   // false so a slow / failed bootstrap keeps the common PNG path. Passed
   // to StepCard → ToyActionSprite as ``preferSvg``.
   const [preferSvg, setPreferSvg] = useState<boolean>(false);
-  // Phase Z Z5: neural-voice clip gate — the SINGLE place the kiosk
-  // sources it, threaded to StepCard → every speech surface. Defaults
-  // ON because the Z4 wire already carries clip URLs and the plan ships
-  // the parent flag defaulted ON. TODO(Z6): fetch the
-  // ``neural_voice_enabled`` parent flag on bootstrap (the
-  // add-parent-feature-flag recipe adds it to the flag fetch batch
-  // above) and replace this constant state with the fetched value —
-  // the setter is intentionally omitted until then so the wiring point
-  // is unmistakable.
-  const [neuralVoiceEnabled] = useState<boolean>(true);
+  // Phase Z Z6: neural-voice clip gate — the SINGLE place the kiosk
+  // sources it, threaded to StepCard → every speech surface. Sourced
+  // from the bootstrap-fetched ``featureFlags`` snapshot (the
+  // ``neural_voice_enabled`` parent flag joined the K2 parallel fetch;
+  // migration 0031 seeds it ON). The optimistic default is ON so a
+  // slow / failed bootstrap keeps the Z5 clip path — the Z4 wire
+  // already carries clip URLs and every surface falls back to Web
+  // Speech on clip failure anyway. Off routes ALL speech surfaces to
+  // Web Speech via Z5's ``effectiveClipUrl`` gate.
+  const neuralVoiceEnabled = featureFlags.neural_voice_enabled;
 
   if (apiRef.current === null) {
     apiRef.current = new ApiClient({
@@ -355,8 +356,8 @@ export function App(): JSX.Element {
         setPinPromptVisible(false);
         setPinPromptError(null);
         useChildStore.getState().setToken(tokenResp);
-        // Phase K step K2: parallel-fetch the eight feature flags
-        // before WS construction. Each rejection is handled
+        // Phase K step K2: parallel-fetch the feature flags before
+        // WS construction. Each rejection is handled
         // independently (matches the parent App.tsx pattern) so one
         // bad endpoint doesn't poison the others — the optimistic
         // defaults stay in place. ``Promise.allSettled`` swallows
@@ -368,10 +369,13 @@ export function App(): JSX.Element {
           "play_standalone_enabled",
           "clickable_words_enabled",
           "read_me_button_enabled",
+          // Phase Z Z6: neural-voice clip gate (StepCard → every
+          // speech surface routes to Web Speech when false).
+          "neural_voice_enabled",
         ];
         // Phase R Step R2: batch the spoken text limit fetch alongside the
-        // feature flag fetches so all six HTTP round-trips fire in parallel.
-        // The limit fetch is the last element; its index is ``flagKeys.length``.
+        // feature flag fetches so every settings round-trip fires in
+        // parallel.
         const [flagResults, limitResult, imageGenModeResult] = await Promise.all([
           Promise.allSettled(
             flagKeys.map((key) =>
@@ -907,8 +911,8 @@ export function App(): JSX.Element {
               // Prefer the Claude-authored .svg sprite for the cast when
               // the operator picked the "claude_svg" image-gen mode.
               preferSvg={preferSvg}
-              // Phase Z Z5: neural-voice clip gate (see the state's
-              // TODO(Z6) — the parent flag wires in here).
+              // Phase Z Z6: neural-voice clip gate, sourced from the
+              // bootstrap-fetched ``neural_voice_enabled`` parent flag.
               neuralVoiceEnabled={neuralVoiceEnabled}
             />
           </>
