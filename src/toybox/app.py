@@ -67,6 +67,8 @@ from .image_gen.worker import (
     stop_image_gen_worker,
 )
 from .storage.images import images_root
+from .tts.cache import TTS_AUDIO_URL_PREFIX, clips_root
+from .tts.worker import TtsWorker, start_tts_worker, stop_tts_worker
 from .ws.envelope import build_envelope
 from .ws.server import build_router as build_ws_router
 from .ws.server import get_pubsub
@@ -91,6 +93,11 @@ def _register_static_mime_types() -> None:
     """
     mimetypes.add_type("image/webp", ".webp")
     mimetypes.add_type("image/svg+xml", ".svg")
+    # Phase Z Z4: TTS clips are WAV. Python's stdlib registry maps
+    # ``.wav`` to ``audio/x-wav`` on some platforms and the Windows
+    # registry can override it arbitrarily — pin the modern type so the
+    # kiosk's HTMLAudioElement always sees ``audio/wav``.
+    mimetypes.add_type("audio/wav", ".wav")
 
 
 def create_app() -> FastAPI:
@@ -185,6 +192,22 @@ def create_app() -> FastAPI:
         "/api/static/songs/audio",
         StaticFiles(directory=str(songs_audio_root()), check_dir=False),
         name="songs_audio",
+    )
+
+    # Phase Z Z4 — Static read-only mount for the server-rendered TTS
+    # clip cache (``data/tts/<voice>/<sha16>.wav``, written by the
+    # background synth worker). Mirrors the songs mount idiom above.
+    # The mount path IS the one ``TTS_AUDIO_URL_PREFIX`` constant every
+    # producer derives ``spoken_*_url`` metadata from (cache.py owns
+    # it; a grep-gate test pins the literal to that single file), so
+    # the served path and the persisted URLs can never drift.
+    # ``check_dir=False`` keeps the app bootable before the worker has
+    # rendered its first clip; a URL whose clip isn't rendered yet
+    # 404s, which is the kiosk's designed Web Speech fallback.
+    app.mount(
+        TTS_AUDIO_URL_PREFIX,
+        StaticFiles(directory=str(clips_root()), check_dir=False),
+        name="tts_clips",
     )
 
     # Phase M Step M3 — Static read-only mount for the bundled element
@@ -299,6 +322,32 @@ async def image_gen_worker_lifespan(app: FastAPI) -> AsyncIterator[ImageGenWorke
 
 
 # ---------------------------------------------------------------------
+# Phase Z Step Z4 — TTS synth worker lifespan
+# ---------------------------------------------------------------------
+
+
+@contextlib.asynccontextmanager
+async def tts_worker_lifespan(app: FastAPI) -> AsyncIterator[TtsWorker]:
+    """Start the TTS synth worker; stop on shutdown. Composable.
+
+    Mirrors :func:`image_gen_worker_lifespan` in shape. The worker is
+    started unconditionally — when TTS is not capable on this host the
+    enqueue path no-ops (capability check at enqueue), so the consumer
+    task sits parked on an empty ``queue.get()`` (blocked, not
+    spinning) and costs nothing. No restart recovery is needed: jobs
+    are in-memory only, and a lost job just leaves the persisted
+    ``spoken_*_url`` pointing at a 404 → the kiosk's designed Web
+    Speech fallback.
+    """
+    del app  # not used; kept for the lifespan signature contract.
+    worker = await start_tts_worker()
+    try:
+        yield worker
+    finally:
+        await stop_tts_worker()
+
+
+# ---------------------------------------------------------------------
 # Phase I Step I2 — transcript retention sweep lifespan
 # ---------------------------------------------------------------------
 
@@ -337,4 +386,5 @@ __all__ = [
     "default_worker_emit",
     "image_gen_worker_lifespan",
     "transcript_sweep_lifespan",
+    "tts_worker_lifespan",
 ]

@@ -62,7 +62,12 @@ from .ai.judge import judge_and_persist
 from .ai.labeled_events import GeneratorContext, record_generation
 from .ai.oauth import load_token
 from .api.metrics import get_metrics_breaker
-from .app import create_app, image_gen_worker_lifespan, transcript_sweep_lifespan
+from .app import (
+    create_app,
+    image_gen_worker_lifespan,
+    transcript_sweep_lifespan,
+    tts_worker_lifespan,
+)
 from .audio.capture import MicCapture
 from .audio.pipeline import TranscriptPipeline
 from .audio.stt import WhisperTranscriber
@@ -603,6 +608,9 @@ def _build_smoke_lifespan(
             # Phase I Step I2: drive transcript retention sweep in --smoke too
             # so the E2E harness exercises the same wiring as production.
             await stack.enter_async_context(transcript_sweep_lifespan(app))
+            # Phase Z Z4: TTS synth worker — enqueue is capability-gated,
+            # so on a host without the tts extra this is a parked task.
+            await stack.enter_async_context(tts_worker_lifespan(app))
 
             try:
                 yield
@@ -1190,7 +1198,13 @@ async def _metrics_lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     pubsub = get_pubsub()
     try:
-        async with image_gen_worker_lifespan(app), transcript_sweep_lifespan(app):
+        async with (
+            image_gen_worker_lifespan(app),
+            transcript_sweep_lifespan(app),
+            # Phase Z Z4: TTS synth worker. Enqueue is capability-gated,
+            # so a host without the tts extra parks the consumer task.
+            tts_worker_lifespan(app),
+        ):
             task = start_metrics_publisher(pubsub, deps)
             try:
                 yield

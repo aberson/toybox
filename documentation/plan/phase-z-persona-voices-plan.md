@@ -139,9 +139,12 @@ migration seed for `neural_voice_enabled` (via the `add-parent-feature-flag` rec
 
 Per-step clip metadata keys (written into step `metadata_json` at enqueue time, Z4): plain
 steps get `spoken_audio_url`; joke-kind steps (incl. reward jokes) get
-`spoken_audio_setup_url` + `spoken_audio_punchline_url`. All values are
-`/api/static/tts/<voice>/<sha16>.wav` paths derived via `clip_url()` — the kiosk never
-computes hashes.
+`spoken_audio_setup_url` + `spoken_audio_punchline_url`. Plain steps additionally carry
+`spoken_choice_audio_urls` — a `list[str]` aligned index-for-index with the step's `choices`
+(present only when the step has choices) — and `spoken_question_audio_url` (present only when
+the step carries R3 question text). Song steps and non-joke reward steps get NO spoken keys.
+All values are `/api/static/tts/<voice>/<sha16>.wav` paths derived via `clip_url()` — the
+kiosk never computes hashes.
 
 - **`src/toybox/tts/engine.py`** — Kokoro-82M wrapper behind a provider seam
   (`synthesize(text, voice) -> bytes` WAV 24 kHz mono). Lazy model load on first call;
@@ -252,6 +255,7 @@ computes hashes.
 - **Produces:** `tts/{cache,worker}.py`; static mount; enqueue hooks; `spoken_audio_url` wire shape; producer→consumer integration test
 - **Done when:** integration test passes end-to-end on the stub; approve latency unchanged (enqueue is non-blocking, asserted); no URL-prefix constant duplication (grep gate in test)
 - **Depends on:** Z3
+- **Status:** DONE (2026-07-03)
 
 <!-- autofix-applied: 2026-07-03 -->
 ### Step Z5: Kiosk clip playback with fallback

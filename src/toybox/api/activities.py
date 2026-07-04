@@ -112,6 +112,9 @@ from ..core.version_check import (
 )
 from ..db import connect, resolve_db_path
 from ..personas import parse_voice_profile
+from ..tts.cache import clip_url, is_safe_voice_id
+from ..tts.engine import DEFAULT_NEURAL_VOICE
+from ..tts.worker import enqueue_clip
 from ..ws.envelope import build_envelope
 from ..ws.server import get_pubsub
 from ..ws.topics import Topic
@@ -353,6 +356,19 @@ class ActivityStepResponse(BaseModel):
     #   * ``punchline`` (str)  — reveal beat for joke step.
     #   * ``interjection`` (str) — embedded|ending|parent|spontaneity (K14/K15).
     #   * ``source_id`` (str)  — corpus entry id (K14/K15 telemetry).
+    #
+    # Phase Z Z4 spoken-clip keys (all values derived server-side via
+    # ``toybox.tts.cache.clip_url``; the kiosk never computes hashes;
+    # a not-yet-rendered clip 404s → Web Speech fallback):
+    #
+    #   * ``spoken_audio_url`` (str) — clip of the step body (plain
+    #     steps incl. adventure/boss beats; NOT song/joke/reward).
+    #   * ``spoken_choice_audio_urls`` (list[str]) — clips of the
+    #     choice labels, aligned index-for-index with ``choices``.
+    #   * ``spoken_question_audio_url`` (str) — clip of the R3
+    #     question text.
+    #   * ``spoken_audio_setup_url`` / ``spoken_audio_punchline_url``
+    #     (str) — joke-kind steps (incl. joke rewards) only.
     #
     # ``None`` on legacy rows / steps with no per-step metadata.
     metadata: dict[str, Any] | None = None
@@ -965,6 +981,253 @@ def _resolve_element_id_for_persisted_step(
     return None
 
 
+# ---------------------------------------------------------------------
+# Phase Z Step Z4 — spoken-clip wire shape + background synth enqueue
+# ---------------------------------------------------------------------
+#
+# Wire contract (phase-z plan §5; consumed by the Z5 kiosk):
+#
+#   * plain steps (template steps, adventure/boss beats, forks):
+#       ``spoken_audio_url``           — clip of the step body
+#       ``spoken_choice_audio_urls``   — list[str] aligned index-for-
+#                                        index with ``choices`` (only
+#                                        when the step has choices)
+#       ``spoken_question_audio_url``  — clip of the R3 question text
+#                                        (only when the step has one)
+#   * joke steps (kind="joke", incl. reward jokes):
+#       ``spoken_audio_setup_url`` + ``spoken_audio_punchline_url``
+#   * song steps and non-joke reward steps: NO keys — songs own their
+#     mp3 (``metadata.audio_url``) and picture rewards have no speech.
+#
+# Every value is derived server-side via ``toybox.tts.cache.clip_url``
+# (the kiosk never computes hashes) and persisted even when the clip
+# isn't rendered yet — an unrendered clip 404s and the kiosk falls
+# back to Web Speech by design. URL persistence is deliberately NOT
+# capability-gated (the wire shape stays deterministic across hosts;
+# capability gates the WORKER enqueue instead), and enqueueing NEVER
+# happens in the propose path (proposals are speculative — plan §6).
+
+
+def _neural_voice_from_summary(summary_raw: object) -> str:
+    """Resolve the activity's Kokoro voice from its summary envelope.
+
+    Reads ``metadata.persona.voice_profile.neural_voice`` out of the
+    persisted ``activities.summary`` JSON envelope; every missing /
+    malformed / unsafe shape degrades to :data:`DEFAULT_NEURAL_VOICE`
+    (``af_heart``) — voice resolution must never 500 a mutation.
+    """
+    if not summary_raw or not isinstance(summary_raw, str):
+        return DEFAULT_NEURAL_VOICE
+    try:
+        payload = json.loads(summary_raw)
+    except json.JSONDecodeError:
+        return DEFAULT_NEURAL_VOICE
+    if not isinstance(payload, dict):
+        return DEFAULT_NEURAL_VOICE
+    metadata = payload.get("metadata")
+    if not isinstance(metadata, dict):
+        return DEFAULT_NEURAL_VOICE
+    persona = metadata.get("persona")
+    if not isinstance(persona, dict):
+        return DEFAULT_NEURAL_VOICE
+    voice_profile = persona.get("voice_profile")
+    if not isinstance(voice_profile, dict):
+        return DEFAULT_NEURAL_VOICE
+    neural_voice = voice_profile.get("neural_voice")
+    if isinstance(neural_voice, str) and is_safe_voice_id(neural_voice):
+        return neural_voice
+    return DEFAULT_NEURAL_VOICE
+
+
+def _activity_neural_voice(conn: sqlite3.Connection, activity_id: str) -> str:
+    """Voice for ``activity_id`` (summary lookup + default fallback)."""
+    row = conn.execute(
+        "SELECT summary FROM activities WHERE id = ?",
+        (activity_id,),
+    ).fetchone()
+    if row is None:
+        return DEFAULT_NEURAL_VOICE
+    return _neural_voice_from_summary(row["summary"])
+
+
+def _tts_clip_annotations(
+    *,
+    voice: str,
+    kind: str | None,
+    body: str | None,
+    choice_labels: Sequence[str] | None,
+    question: str | None,
+    metadata: dict[str, Any] | None,
+) -> tuple[dict[str, Any], list[str]]:
+    """Build the spoken-clip metadata keys + synth texts for ONE step.
+
+    Pure single source of truth for the Z4 wire shape (module comment
+    above) — every producer site (approve annotation, lazy template
+    insert, adventure beat, interjection insert, reward resolve, and
+    the preview render) funnels through here so the keys can't drift
+    between sites.
+
+    Returns ``(keys_to_merge_into_metadata, texts_to_enqueue)``. The
+    texts list is exactly the set of texts whose URLs were emitted, so
+    callers enqueue precisely what they persisted.
+    """
+    keys: dict[str, Any] = {}
+    texts: list[str] = []
+
+    def _add(key: str, text: object) -> None:
+        if isinstance(text, str) and text.strip():
+            keys[key] = clip_url(voice, text)
+            texts.append(text)
+
+    if kind == "song":
+        # Songs own their audio surface (pre-rendered mp3) — never TTS.
+        return keys, texts
+    if kind == "joke":
+        # Interjection/standalone joke shape: body IS the setup, the
+        # punchline rides in metadata (K13/K14 contract).
+        _add("spoken_audio_setup_url", body)
+        _add("spoken_audio_punchline_url", (metadata or {}).get("punchline"))
+        return keys, texts
+    if kind == "reward":
+        # Only joke rewards speak; song rewards carry ``audio_url`` and
+        # picture rewards have no speech surface (plan §6 site d).
+        if (metadata or {}).get("reward_kind") != "joke":
+            return keys, texts
+        _add("spoken_audio_setup_url", (metadata or {}).get("setup"))
+        _add("spoken_audio_punchline_url", (metadata or {}).get("punchline"))
+        return keys, texts
+
+    # Plain step (template text/fork, adventure_beat, boss_fight, ...).
+    _add("spoken_audio_url", body)
+    if choice_labels:
+        choice_urls: list[str] = []
+        for label in choice_labels:
+            choice_urls.append(clip_url(voice, label))
+            texts.append(label)
+        keys["spoken_choice_audio_urls"] = choice_urls
+    _add("spoken_question_audio_url", question)
+    return keys, texts
+
+
+def _decode_choice_labels(choices_json_raw: object) -> list[str] | None:
+    """Decode a persisted ``choices_json`` cell to its raw label list.
+
+    ``choices_json`` is a JSON array of rendered label strings (the G3
+    persistence shape). Tolerant of NULL / malformed cells — returns
+    ``None`` so the annotation simply skips choice clips for that row.
+    """
+    if not choices_json_raw or not isinstance(choices_json_raw, str):
+        return None
+    try:
+        decoded = json.loads(choices_json_raw)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(decoded, list):
+        return None
+    return [str(label) for label in decoded]
+
+
+def _annotate_and_enqueue_step_tts_clips(
+    conn: sqlite3.Connection,
+    activity_id: str,
+    voice: str,
+) -> None:
+    """Persist spoken-clip URLs onto every persisted step row, then
+    enqueue the synth jobs fire-and-forget.
+
+    The S2 persist-then-broadcast pattern
+    (:func:`_annotate_and_persist_step_animations`): the metadata
+    UPDATE lands BEFORE the caller's ``_emit_state`` so the WS payload
+    reflects the persisted rows. Rows whose annotation produces no
+    keys (songs, non-joke rewards) are left byte-identical.
+    """
+    step_rows = conn.execute(
+        "SELECT seq, body, kind, choices_json, question, metadata_json "
+        "FROM activity_steps WHERE activity_id = ? ORDER BY seq ASC",
+        (activity_id,),
+    ).fetchall()
+    texts: list[str] = []
+    with conn:
+        for row in step_rows:
+            existing = _decode_step_metadata_json(row["metadata_json"])
+            keys, row_texts = _tts_clip_annotations(
+                voice=voice,
+                kind=row["kind"],
+                body=row["body"],
+                choice_labels=_decode_choice_labels(row["choices_json"]),
+                question=row["question"],
+                metadata=existing,
+            )
+            texts.extend(row_texts)
+            if not keys:
+                continue
+            merged: dict[str, Any] = dict(existing) if existing else {}
+            merged.update(keys)
+            conn.execute(
+                "UPDATE activity_steps SET metadata_json = ? WHERE activity_id = ? AND seq = ?",
+                (json.dumps(merged, sort_keys=True), activity_id, int(row["seq"])),
+            )
+    for text in texts:
+        enqueue_clip(text, voice)
+
+
+def _enqueue_template_plan_tts_clips(
+    template_id: str | None,
+    slot_fills_raw: str | None,
+    voice: str,
+) -> None:
+    """Pre-render clips for the FULL template plan at approve time.
+
+    Template steps 2..N are lazily inserted only when the child
+    advances (:func:`_insert_next_step`), but their rendered texts are
+    fully known at approve — enqueueing all of them here gives the
+    CPU synth (RTF ≈ 1.1) a head start so clips are usually ready
+    before the child reaches the step. ENQUEUE ONLY — nothing to
+    persist yet; the lazy insert stamps the (identical, content-
+    hash-keyed) URLs onto the row when it materialises.
+    """
+    plan = _render_template_plan_steps(template_id, slot_fills_raw)
+    if plan is None:
+        return
+    for step in plan:
+        _, texts = _tts_clip_annotations(
+            voice=voice,
+            kind=step.kind,
+            body=step.body,
+            choice_labels=([choice.label for choice in step.choices] if step.choices else None),
+            question=step.question,
+            metadata=step.metadata,
+        )
+        for text in texts:
+            enqueue_clip(text, voice)
+
+
+def _persist_and_enqueue_tts_on_approve(
+    conn: sqlite3.Connection,
+    activity_id: str,
+    row: sqlite3.Row,
+) -> None:
+    """Approve-time TTS hook (enqueue site a — plan §6).
+
+    Annotates + enqueues every persisted step row, then pre-renders
+    the not-yet-inserted remainder of the template plan. Voice comes
+    from the activity's persona envelope with the default-voice
+    fallback. Called between the state transition and the WS
+    broadcast, matching the S2 animation hook's slot.
+    """
+    summary_raw = row["summary"] if "summary" in row.keys() else None
+    voice = _neural_voice_from_summary(summary_raw)
+    _annotate_and_enqueue_step_tts_clips(conn, activity_id, voice)
+    template_id = _extract_template_id_from_summary(summary_raw)
+    if template_id is not None:
+        slot_fills_raw = row["slot_fills_json"] if "slot_fills_json" in row.keys() else None
+        _enqueue_template_plan_tts_clips(
+            template_id,
+            str(slot_fills_raw) if slot_fills_raw is not None else None,
+            voice,
+        )
+
+
 def _fetch_steps(
     conn: sqlite3.Connection,
     activity_id: str,
@@ -1013,6 +1276,8 @@ def _fetch_steps(
 def _render_template_plan_steps(
     template_id: str | None,
     slot_fills_raw: str | None,
+    *,
+    neural_voice: str | None = None,
 ) -> list[ActivityStepResponse] | None:
     """Phase G G2.5: render the full template step plan for preview.
 
@@ -1067,6 +1332,29 @@ def _render_template_plan_steps(
         # kiosk's ElementCard renders identically on preview and at
         # runtime.
         preview_metadata = _enrich_element_metadata(None, step.element_id)
+        # Phase Z Z4 — derive the spoken-clip URLs on the preview wire
+        # too. The kiosk renders ``approved`` activities (store.ts
+        # RENDERABLE_STATES) whose steps come from THIS preview path,
+        # so without this the child's Read Me tap in the pre-first-
+        # advance window would always fall back to the device voice.
+        # Derivation (same ``_tts_clip_annotations`` single source of
+        # truth) is byte-identical to what the lazy insert persists —
+        # content-hash keys can't drift. NOTE: this runs for
+        # ``proposed`` previews as well; that only exposes derived
+        # URLs (no synth is enqueued anywhere in the propose path).
+        if neural_voice is not None:
+            tts_keys, _texts = _tts_clip_annotations(
+                voice=neural_voice,
+                kind=None,
+                body=body,
+                choice_labels=([choice.label for choice in choices] if choices else None),
+                question=step.question,
+                metadata=preview_metadata,
+            )
+            if tts_keys:
+                merged_preview: dict[str, Any] = dict(preview_metadata) if preview_metadata else {}
+                merged_preview.update(tts_keys)
+                preview_metadata = merged_preview
         rendered.append(
             ActivityStepResponse(
                 seq=idx + 1,
@@ -1246,7 +1534,13 @@ def _row_to_response(
     steps: list[ActivityStepResponse] | None = None
     if template_id is not None and state in (STATE_PROPOSED, STATE_APPROVED):
         slot_fills_raw = row["slot_fills_json"] if "slot_fills_json" in row.keys() else None
-        steps = _render_template_plan_steps(template_id, slot_fills_raw)
+        # Phase Z Z4: thread the persona voice so the preview steps carry
+        # the same derived spoken-clip URLs the persisted rows get.
+        steps = _render_template_plan_steps(
+            template_id,
+            slot_fills_raw,
+            neural_voice=_neural_voice_from_summary(summary_raw),
+        )
     if steps is None:
         # Phase M Step M3 — thread template_id so the runtime read can
         # resolve per-step element_id via the template lookup. Falls
@@ -3151,6 +3445,13 @@ def post_approve(
         row["persona_id"] if "persona_id" in row.keys() else None,
         sync_client,
     )
+    # Phase Z Z4 (enqueue site a): persist spoken-clip URLs onto every
+    # persisted step row + fire-and-forget the synth jobs (bodies,
+    # choice labels, question text — full template plan pre-rendered).
+    # Same persist-then-broadcast slot as the S2 hook above; the
+    # enqueue never blocks this handler (bounded queue, thread-safe
+    # put, capability-gated no-op).
+    _persist_and_enqueue_tts_on_approve(conn, activity_id, row)
     response = _row_to_response(conn, row)
     _emit_state(pubsub, response)
     return response
@@ -4000,8 +4301,28 @@ def _insert_interjection_step_row(
     )
 
     metadata = interjection_row.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        metadata = {}
+
+    # Phase Z Z4 (enqueue site c): joke interjections get the
+    # setup/punchline clip pair (body IS the setup; punchline rides in
+    # the K14 metadata). Song interjections are skipped entirely —
+    # they already carry the pre-rendered mp3 ``audio_url``, and
+    # ``_tts_clip_annotations`` returns no keys/texts for kind="song".
+    tts_voice = _activity_neural_voice(conn, activity_id)
+    tts_keys, tts_texts = _tts_clip_annotations(
+        voice=tts_voice,
+        kind=interjection_row.get("kind"),
+        body=interjection_row["body"],
+        choice_labels=None,  # interjections never branch
+        question=None,
+        metadata=metadata,
+    )
+    if tts_keys:
+        metadata = {**metadata, **tts_keys}
+
     metadata_blob: str | None
-    if isinstance(metadata, dict) and metadata:
+    if metadata:
         metadata_blob = json.dumps(metadata, sort_keys=True)
     else:
         metadata_blob = None
@@ -4025,6 +4346,8 @@ def _insert_interjection_step_row(
             metadata_blob,
         ),
     )
+    for text in tts_texts:
+        enqueue_clip(text, tts_voice)
 
 
 def _insert_next_step(
@@ -4086,11 +4409,28 @@ def _insert_next_step(
     # raising.
     step_question = getattr(template_step, "question", None)
     step_expected_answer = getattr(template_step, "expected_answer", None)
+    # Phase Z Z4: stamp the spoken-clip URLs onto the lazily-inserted
+    # row. The clips themselves were (usually) already enqueued at
+    # approve time via ``_enqueue_template_plan_tts_clips`` — content-
+    # hash keying makes the URLs derived here byte-identical — but we
+    # re-enqueue defensively (skip-if-exists makes it free) so
+    # activities approved pre-Z4 or across a restart still self-heal.
+    tts_voice = _activity_neural_voice(conn, activity_id)
+    rendered_choice_labels = json.loads(choices_blob) if choices_blob else None
+    tts_keys, tts_texts = _tts_clip_annotations(
+        voice=tts_voice,
+        kind=None,
+        body=body_text,
+        choice_labels=rendered_choice_labels,
+        question=step_question if isinstance(step_question, str) else None,
+        metadata=None,
+    )
+    metadata_blob = json.dumps(tts_keys, sort_keys=True) if tts_keys else None
     conn.execute(
         "INSERT INTO activity_steps "
         "(id, activity_id, seq, body, sfx, expected_action, current, action_slot, "
-        " choices_json, step_template_id, question, expected_answer) "
-        "VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)",
+        " choices_json, step_template_id, question, expected_answer, metadata_json) "
+        "VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)",
         (
             str(uuid.uuid4()),
             activity_id,
@@ -4103,8 +4443,11 @@ def _insert_next_step(
             template_step.id,
             step_question,
             step_expected_answer,
+            metadata_blob,
         ),
     )
+    for text in tts_texts:
+        enqueue_clip(text, tts_voice)
 
 
 @router.post("/{activity_id}/advance", response_model=ActivityResponse)
@@ -4862,11 +5205,28 @@ def _insert_adventure_beat(
         f"UPDATE activity_steps SET {', '.join(prev_set_clauses)} WHERE activity_id = ? AND id = ?",
         prev_params,
     )
+    # Phase Z Z4 (enqueue site b): beats are generated DURING play, so
+    # this insert is the only moment their texts exist — persist the
+    # spoken-clip URLs on the new row and enqueue the synth jobs. The
+    # clip usually isn't ready when the child first sees the beat
+    # (CPU RTF ≈ 1.1); the 404 → Web Speech fallback is structural
+    # here (plan §2). ``beat.kind`` ("adventure_beat" / "boss_fight")
+    # takes the plain-step key shape.
+    tts_voice = _activity_neural_voice(conn, activity_id)
+    tts_keys, tts_texts = _tts_clip_annotations(
+        voice=tts_voice,
+        kind=beat.kind,
+        body=beat.body,
+        choice_labels=list(beat.choices) if beat.choices is not None else None,
+        question=None,
+        metadata=None,
+    )
+    metadata_blob = json.dumps(tts_keys, sort_keys=True) if tts_keys else None
     conn.execute(
         "INSERT INTO activity_steps "
         "(id, activity_id, seq, body, sfx, expected_action, current, action_slot, "
         " choices_json, step_template_id, kind, metadata_json, question, expected_answer) "
-        "VALUES (?, ?, ?, ?, NULL, NULL, 1, NULL, ?, NULL, ?, NULL, NULL, NULL)",
+        "VALUES (?, ?, ?, ?, NULL, NULL, 1, NULL, ?, NULL, ?, ?, NULL, NULL)",
         (
             str(uuid.uuid4()),
             activity_id,
@@ -4874,8 +5234,11 @@ def _insert_adventure_beat(
             beat.body,
             choices_blob,
             beat.kind,
+            metadata_blob,
         ),
     )
+    for text in tts_texts:
+        enqueue_clip(text, tts_voice)
 
 
 def _advance_adventure(
@@ -5536,6 +5899,24 @@ def _insert_reward_step_as_current(
         return False
 
     metadata = _build_reward_step_metadata(resolved)
+    # Phase Z Z4 (enqueue site d): joke rewards get the setup/punchline
+    # spoken-clip pair merged into the step metadata (between
+    # resolve_reward above and the INSERT below); the synth jobs are
+    # enqueued fire-and-forget AFTER the INSERT commits, matching every
+    # other producer site's persist-then-enqueue ordering. Song rewards
+    # keep their mp3 ``audio_url`` and picture rewards have no speech —
+    # ``_tts_clip_annotations`` returns no keys for either, leaving
+    # this metadata byte-identical to the pre-Z4 shape.
+    tts_voice = _neural_voice_from_summary(summary_raw)
+    tts_keys, tts_texts = _tts_clip_annotations(
+        voice=tts_voice,
+        kind="reward",
+        body=None,
+        choice_labels=None,
+        question=None,
+        metadata=metadata,
+    )
+    metadata.update(tts_keys)
     metadata_blob = json.dumps(metadata, sort_keys=True)
     # Reward body text on the kiosk-rendered ``activity_steps.body``
     # field: this is what the kiosk's default text dispatcher would
@@ -5587,6 +5968,11 @@ def _insert_reward_step_as_current(
                 "UPDATE rewards SET last_used_at = ? WHERE id = ?",
                 (_now_iso(), resolved.reward_id),
             )
+    # Phase Z Z4: enqueue after the transaction above committed so a
+    # failed INSERT never renders orphan clips (persist-then-enqueue,
+    # consistent with the other producer sites).
+    for text in tts_texts:
+        enqueue_clip(text, tts_voice)
     return True
 
 
