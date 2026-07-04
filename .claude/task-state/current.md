@@ -7,7 +7,7 @@
 
 ## Next Action
 Operator: run Manual UAT M1 (voice audition, #10) per the plan's `## Manual UAT` section — `uv sync --extra tts`, `python -m toybox.tts --download`, `scripts/batch_tts_audition.py`, listen + sign off casting. Then M2 (real-engine smoke, #11), then M3 (iPad UAT, #12).
-After UAT: `/repo-update` to update docs/README, commit posterity, and push (7 local checkpoint commits are unpushed).
+/repo-update + /session-wrap already run 2026-07-03: docs wrapped, posterity #13 closed, ALL commits pushed (origin/master = 40b4a0e). After M1-M3 pass: record casting in the plan, archive the plan, close umbrella #2.
 
 ## Completed
 - [d2bca48] Pre-flight disposition (plan §8 prerequisite): ChoiceReadButton(+test) + StepCard read-aloud split + ReadMeButton export + launcher banner committed. Gates: tsc/eslint clean, vitest 817. NOTE: launch-toybox.ps1 banner belonged to the parallel uat-ui session — swept into this commit (benign, coherent, gates green); flag in final report.
@@ -24,9 +24,12 @@ After UAT: `/repo-update` to update docs/README, commit posterity, and push (7 l
 
 ## WIP
 (none — automated span complete; operator handoff)
-**Approach:** Build frontend/src/child/clip-audio.ts (one shared HTMLAudioElement primed at PIN-gate gesture next to sfx.ts unlockAudio(); playClip(url) rejects on 404/decode/interrupt). Update ReadMeButton, JokeStep (autoplay sequencing + replay, preserve #207 cancel semantics), ChoiceReadButton, StepCard threading: step carries spoken_audio_url AND neural_voice_enabled ON → play clip with FULL text contract (no truncation); any failure/missing URL → Web Speech path (Z2 truncation there only). Clip playback interrupts Web Speech and vice versa (single audio focus). NOTE: neural_voice_enabled flag ships in Z6 — Z5 should thread a boolean prop defaulting ON (or read a store field defaulting true) so Z6 can wire the real flag.
-**Z5 contract:** kiosk consumes spoken_audio_url / spoken_audio_setup_url / spoken_audio_punchline_url / spoken_choice_audio_urls (aligned with choices) / spoken_question_audio_url; URLs may 404 until worker renders (fallback designed); approved template activities render from the PREVIEW path (store.ts RENDERABLE_STATES) which carries derived URLs.
-**Z4 handoff notes (from bug reviewer):** engine lazy-init has no lock — fine for single-asyncio-worker Z4 design, add threading.Lock ONLY if synthesize ever runs in a threadpool. synthesize() non-ValueError exceptions propagate raw — Z4 worker must catch-and-degrade. room_classifier downloader shares the truncated-download latent flaw (pre-existing; phase follow-up candidate). test_ws_origin flakes under full-suite load (passes isolated) — pre-existing, same class as ws_heartbeat.
+
+## Open follow-up candidates (surfaced during Phase Z, not scoped)
+- room_classifier downloader shares the truncated-download flaw fixed in toybox.tts.__main__ (Content-Length shortfall check) — port the fix.
+- `spoken_question_audio_url` is produced but unconsumed — question text is never spoken on the kiosk; a question read-aloud bubble is a possible Z-follow-up (note in api.ts).
+- Repo-wide `ruff format --check` drift (~100 files, ruff 0.15.12 via >=0.4 float) — housekeeping pass candidate.
+- Master-plan/README still reference OLD-repo issue numbers (#223 bundle etc.) that 404 after the delete+recreate go-public flip — operator decision: re-mint a UAT bundle issue in the new repo or accept as archaeology.
 
 ## Dead Ends (Z2, for the record)
 - ChoiceReadButton fixture "Go left. Stop. Then run..." limit 12: word-boundary revert passes ALL its tests (last space adjacent to terminator) — fixtures must make old/new outputs DIFFER.
