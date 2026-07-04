@@ -1,6 +1,6 @@
 # Task State
 
-**Task:** /build-phase --plan documentation/plan/phase-z-persona-voices-plan.md (Phase Z persona voices, goal-driven span Z1..Z7-prep; STOP before operator Z7/Z8/Z9)
+**Task:** /build-phase --plan documentation/plan/awaiting-uat/phase-z-persona-voices-plan.md (Phase Z persona voices, goal-driven span Z1..Z7-prep; STOP before operator Z7/Z8/Z9)
 **Status:** COMPLETE — all 7 automated steps Z1..Z7-prep DONE, issues #3-#9 closed; final master gates green; operator handoff = plan `## Manual UAT` M1(Z7 #10) → M2(Z8 #11) → M3(Z9 #12)
 **Last written:** 2026-07-03T23:50:00Z
 **Session SHA:** Z7-prep checkpoint (after 330fc9a)
@@ -48,7 +48,7 @@ After UAT: `/repo-update` to update docs/README, commit posterity, and push (7 l
 - Baseline counts: pytest 2671 (master full venv), vitest 817 (pre-Z1).
 
 ## Key Files
-- Phase Z plan: `documentation/plan/phase-z-persona-voices-plan.md` (umbrella #2; steps #3-#12)
+- Phase Z plan: `documentation/plan/awaiting-uat/phase-z-persona-voices-plan.md` (umbrella #2; steps #3-#12)
 - Z1 seams: `src/toybox/api/activities.py` (:1729 picker; pinned callers ~:2047/:2234/:2405), `src/toybox/main.py:863`, `frontend/src/child/components/RewardStep.tsx`
 - Z4 hooks: activities.py post_approve :2932 (S2 pattern :3047), `_insert_adventure_beat` :4726, `_parent_insert_finish` :3695, `_insert_reward_step_as_current` :5346
 - Kiosk speech seams: `frontend/src/child/{tts.ts,persona-voice.ts}`, `components/{ReadMeButton,ChoiceReadButton,JokeStep,StepCard,RewardStep}.tsx`, `sfx.ts` + `KioskPinPrompt.tsx:69`

@@ -1,6 +1,6 @@
 # toybox
 
-![Python](https://img.shields.io/badge/python-3.12-blue) [![linux-tests](https://github.com/aberson/toybox/actions/workflows/linux-tests.yml/badge.svg?branch=master)](https://github.com/aberson/toybox/actions/workflows/linux-tests.yml) [![frontend-tests](https://github.com/aberson/toybox/actions/workflows/frontend-tests.yml/badge.svg?branch=master)](https://github.com/aberson/toybox/actions/workflows/frontend-tests.yml) ![pytest](https://img.shields.io/badge/pytest-2586%20passing-brightgreen) ![vitest](https://img.shields.io/badge/vitest-791%20passing-brightgreen) ![Local-first](https://img.shields.io/badge/local--first-family%20private-purple) ![License](https://img.shields.io/badge/license-MIT-blue)
+![Python](https://img.shields.io/badge/python-3.12-blue) [![linux-tests](https://github.com/aberson/toybox/actions/workflows/linux-tests.yml/badge.svg?branch=master)](https://github.com/aberson/toybox/actions/workflows/linux-tests.yml) [![frontend-tests](https://github.com/aberson/toybox/actions/workflows/frontend-tests.yml/badge.svg?branch=master)](https://github.com/aberson/toybox/actions/workflows/frontend-tests.yml) ![pytest](https://img.shields.io/badge/pytest-2788%20passing-brightgreen) ![vitest](https://img.shields.io/badge/vitest-897%20passing-brightgreen) ![Local-first](https://img.shields.io/badge/local--first-family%20private-purple) ![License](https://img.shields.io/badge/license-MIT-blue)
 
 A local-first home AI that watches for play opportunities, suggests structured activities to a parent, and runs the approved ones on a child kiosk featuring AI personas.
 
@@ -36,7 +36,7 @@ Both share types, ws envelopes, and the same FastAPI backend — one async proce
 
 > **25 → 1,361 activity templates** across 14 phases shipped, fully on-device. Catalog grows by parent approvals → labeled events → SFT corpus, waiting on ≥50 rows before LoRA fine-tune kicks in (Phase E).
 >
-> **iPad UAT 11/12 PASS** at Phase M close (2026-05-18) — kiosk runs as a Guided Access app on a real iPad over Wi-Fi LAN. **2,670 pytest + 802 vitest** green on master (2026-06-22); Phase Y (scene backdrops) is **complete** (Manual UAT M1+M2 PASS 2026-06-23); Phase W (play depth) and Phase X (room import) are code-shipped and awaiting iPad UAT ([#223](https://github.com/aberson/toybox/issues/223)). Fully offline once whisper-small + persona avatars + element sprites are cached locally.
+> **iPad UAT 11/12 PASS** at Phase M close (2026-05-18) — kiosk runs as a Guided Access app on a real iPad over Wi-Fi LAN. **2,788 pytest + 897 vitest** green on master (2026-07-03); Phase Z (persona voices — server-rendered Kokoro-82M neural TTS clips with Web Speech fallback, issues #3–#9 closed) is **code-shipped** awaiting its voice audition + iPad UAT ([#10](https://github.com/aberson/toybox/issues/10)–[#12](https://github.com/aberson/toybox/issues/12)); Phase Y (scene backdrops) is **complete** (Manual UAT M1+M2 PASS 2026-06-23); Phase W (play depth) and Phase X (room import) are code-shipped and awaiting iPad UAT ([#223](https://github.com/aberson/toybox/issues/223)). Fully offline once whisper-small + persona avatars + element sprites are cached locally — and every persona voice clip renders on-CPU at home.
 
 ## What makes this different
 
