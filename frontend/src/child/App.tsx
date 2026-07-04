@@ -303,6 +303,16 @@ export function App(): JSX.Element {
   // false so a slow / failed bootstrap keeps the common PNG path. Passed
   // to StepCard → ToyActionSprite as ``preferSvg``.
   const [preferSvg, setPreferSvg] = useState<boolean>(false);
+  // Phase Z Z5: neural-voice clip gate — the SINGLE place the kiosk
+  // sources it, threaded to StepCard → every speech surface. Defaults
+  // ON because the Z4 wire already carries clip URLs and the plan ships
+  // the parent flag defaulted ON. TODO(Z6): fetch the
+  // ``neural_voice_enabled`` parent flag on bootstrap (the
+  // add-parent-feature-flag recipe adds it to the flag fetch batch
+  // above) and replace this constant state with the fetched value —
+  // the setter is intentionally omitted until then so the wiring point
+  // is unmistakable.
+  const [neuralVoiceEnabled] = useState<boolean>(true);
 
   if (apiRef.current === null) {
     apiRef.current = new ApiClient({
@@ -897,6 +907,9 @@ export function App(): JSX.Element {
               // Prefer the Claude-authored .svg sprite for the cast when
               // the operator picked the "claude_svg" image-gen mode.
               preferSvg={preferSvg}
+              // Phase Z Z5: neural-voice clip gate (see the state's
+              // TODO(Z6) — the parent flag wires in here).
+              neuralVoiceEnabled={neuralVoiceEnabled}
             />
           </>
         )}

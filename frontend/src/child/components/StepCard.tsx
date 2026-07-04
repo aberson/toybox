@@ -1,6 +1,12 @@
 import { useEffect, useRef, type JSX } from "react";
 
 import type { Activity, ActivityStep } from "../api";
+import {
+  readSpokenAudioUrl,
+  readSpokenChoiceAudioUrls,
+  readSpokenPunchlineAudioUrl,
+  readSpokenSetupAudioUrl,
+} from "../clip-audio";
 import { getVoiceProfile, type PersonaMetadata } from "../persona-voice";
 import type { VoiceProfile } from "../tts";
 import { ChoiceButton, type ChoiceResult } from "./ChoiceButton";
@@ -69,6 +75,14 @@ export interface StepCardProps {
   // fetch; optional + default false so layout-only tests don't pay a
   // wasted ``.svg`` 404.
   preferSvg?: boolean;
+  // Phase Z Z5: neural-voice gate for the clip-playback surfaces
+  // (ReadMeButton / ChoiceReadButton / JokeStep / reward jokes).
+  // Optional + DEFAULT TRUE — unlike the K-flags above, absence means
+  // "clips on" because the Z4 wire already carries clip URLs and the
+  // gate's parent flag only ships in Z6 (which threads the fetched
+  // value from App). Off → every surface uses Web Speech directly, no
+  // clip attempts.
+  neuralVoiceEnabled?: boolean;
 }
 
 // Step kinds that should get a Read Me button. ``song`` is excluded —
@@ -427,6 +441,25 @@ export function StepCard(props: StepCardProps): JSX.Element {
   // Prefer the .svg sprite for the cast when set. Default false so the
   // common (non-claude_svg) path loads .png directly (no .svg 404 churn).
   const preferSvg = props.preferSvg === true;
+  // Phase Z Z5: neural-voice gate (default TRUE — see the prop doc) +
+  // the per-step clip URLs from the Z4 wire shape, read once per render
+  // through the shared accessors (clip-audio.ts owns the key literals).
+  // ALL clips read from ``previewStep`` — the ONE step object whose
+  // text the speech surfaces render. That single source is safe for
+  // the choice bubbles too: ``choices`` above only renders when
+  // ``currentStep !== null``, and in that case ``previewStep`` IS
+  // ``currentStep`` by construction (``previewStep = currentStep ??
+  // steps[0]``), so the URL list stays index-aligned with the SAME
+  // step the labels come from. Reading the choice list from
+  // ``currentStep`` separately would be a two-source split that can
+  // never diverge — and therefore can never be tested.
+  const neuralVoiceEnabled = props.neuralVoiceEnabled !== false;
+  const stepClipUrl = readSpokenAudioUrl(previewStep?.metadata);
+  const jokeSetupClipUrl = readSpokenSetupAudioUrl(previewStep?.metadata);
+  const jokePunchlineClipUrl = readSpokenPunchlineAudioUrl(
+    previewStep?.metadata,
+  );
+  const choiceClipUrls = readSpokenChoiceAudioUrls(previewStep?.metadata);
   // Phase K K12: auto-advance gating. When a song/joke step renders
   // and its content master is OFF, the kiosk silently advances past
   // it. This must be a STEP-LEVEL gate (active on ``currentStep``),
@@ -579,6 +612,9 @@ export function StepCard(props: StepCardProps): JSX.Element {
           metadata={previewStep.metadata ?? null}
           onAdvance={props.onAdvance}
           voiceProfile={voiceProfile}
+          // Phase Z Z5: reward jokes read their own clip URLs from the
+          // metadata prop above; only the gate threads through.
+          neuralVoiceEnabled={neuralVoiceEnabled}
         />
       )}
       {stepKind === "song" && previewStep !== null && (
@@ -601,6 +637,12 @@ export function StepCard(props: StepCardProps): JSX.Element {
           punchline={readJokePunchline(previewStep)}
           profile={voiceProfile}
           clickableWordsEnabled={clickableWordsEnabled}
+          // Phase Z Z5: neural clips for the two beats (Z4 wire shape);
+          // JokeStep sequences setup → beat → punchline on both the
+          // clip and Web Speech paths and falls back per beat.
+          setupClipUrl={jokeSetupClipUrl}
+          punchlineClipUrl={jokePunchlineClipUrl}
+          neuralVoiceEnabled={neuralVoiceEnabled}
         />
       )}
       {/*
@@ -839,6 +881,13 @@ export function StepCard(props: StepCardProps): JSX.Element {
                   profile={voiceProfile}
                   enabled={readMeButtonEnabled}
                   limit={props.spokenTextLimit ?? 0}
+                  // Phase Z Z5: the ``choice_index``-aligned entry of
+                  // ``spoken_choice_audio_urls`` (the serializer derives
+                  // choice_index from array position, so it doubles as
+                  // the list index). Missing/short list → null → the
+                  // bubble stays on the Web Speech path.
+                  clipUrl={choiceClipUrls[choice.choice_index] ?? null}
+                  neuralVoiceEnabled={neuralVoiceEnabled}
                 />
               </div>
             );
@@ -910,6 +959,11 @@ export function StepCard(props: StepCardProps): JSX.Element {
           punchline={readJokePunchline(previewStep)}
           profile={voiceProfile}
           enabled={readMeButtonEnabled}
+          // Phase Z Z5: the replay plays the same clips the autoplay
+          // used (sequential setup → punchline; per-beat fallback).
+          setupClipUrl={jokeSetupClipUrl}
+          punchlineClipUrl={jokePunchlineClipUrl}
+          neuralVoiceEnabled={neuralVoiceEnabled}
         />
       )}
       {showReadMe && stepKind !== "joke" && (
@@ -918,6 +972,10 @@ export function StepCard(props: StepCardProps): JSX.Element {
           profile={voiceProfile}
           enabled={readMeButtonEnabled}
           limit={props.spokenTextLimit ?? 0}
+          // Phase Z Z5: neural clip for the step body (Z4 wire shape);
+          // full-text clip first, truncated Web Speech fallback.
+          clipUrl={stepClipUrl}
+          neuralVoiceEnabled={neuralVoiceEnabled}
         />
       )}
     </section>
@@ -937,16 +995,34 @@ interface JokeReadMeButtonProps {
   punchline: string;
   profile: VoiceProfile;
   enabled: boolean;
+  // Phase Z Z5: clip URLs + gate for the replay path — threaded to
+  // ``replayJoke`` so a tap replays the same neural clips the autoplay
+  // used (sequential, per-beat Web Speech fallback).
+  setupClipUrl?: string | null;
+  punchlineClipUrl?: string | null;
+  neuralVoiceEnabled?: boolean;
 }
 
 function JokeReadMeButton(props: JokeReadMeButtonProps): JSX.Element | null {
-  const { setup, punchline, profile, enabled } = props;
+  const {
+    setup,
+    punchline,
+    profile,
+    enabled,
+    setupClipUrl = null,
+    punchlineClipUrl = null,
+    neuralVoiceEnabled = true,
+  } = props;
   if (!enabled) return null;
   const handleClick = (): void => {
-    // ``replayJoke`` itself calls cancel() before issuing the two
-    // utterances, so a rapid double-tap surfaces cleanly as
-    // "restart from the setup."
-    replayJoke(setup, punchline, profile);
+    // ``replayJoke`` itself takes audio focus (cancel()/playClip's
+    // interrupt) before issuing the two beats, so a rapid double-tap
+    // surfaces cleanly as "restart from the setup."
+    replayJoke(setup, punchline, profile, {
+      setupClipUrl,
+      punchlineClipUrl,
+      neuralVoiceEnabled,
+    });
   };
   return (
     <>

@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import type { CSSProperties, JSX } from "react";
 
+import { primeClipAudio } from "../clip-audio";
 import { unlockAudio } from "../sfx";
 
 // Mirrors the backend's PIN format constraint
@@ -67,6 +68,10 @@ export function KioskPinPrompt(props: KioskPinPromptProps): JSX.Element {
     // guaranteed user-gesture event, so prime the SFX cache here
     // before the bootstrap kicks in (which happens off-gesture).
     unlockAudio();
+    // Phase Z Z5: the voice-clip element needs its OWN in-gesture prime —
+    // iOS unlock is per-element, so unlockAudio's SFX elements don't
+    // cover the shared clip element (the sfx.ts lesson).
+    primeClipAudio();
     onSubmit(pin);
   }, [pin, onSubmit]);
 

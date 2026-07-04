@@ -26,6 +26,12 @@
 
 import type { CSSProperties, JSX } from "react";
 
+import {
+  effectiveClipUrl,
+  isClipInterrupted,
+  playClip,
+  stopClip,
+} from "../clip-audio";
 import { cancel, speak, type VoiceProfile } from "../tts";
 import { truncateSpokenText } from "./ReadMeButton";
 
@@ -37,8 +43,18 @@ export interface ChoiceReadButtonProps {
   // Parent-configured spoken text limit (Phase R R2; sentence-aware
   // since Phase Z Z2) — applied to the label before ``speak()`` exactly
   // like ReadMeButton applies it to the step body. ``0`` (or omitted)
-  // means no truncation.
+  // means no truncation. Phase Z Z5: fallback path only — the neural
+  // clip always speaks the full label.
   limit?: number;
+  // Phase Z Z5: server-rendered neural clip for THIS choice's label —
+  // the ``choiceIndex``-aligned entry of the step's
+  // ``metadata.spoken_choice_audio_urls`` (StepCard does the index
+  // lookup so this component stays index-blind, same as ``label``).
+  // Failure/absence falls back to the Web Speech path above.
+  clipUrl?: string | null;
+  // Phase Z Z5: neural-voice gate — defaults TRUE; Z6 wires the
+  // ``neural_voice_enabled`` parent flag. Off → no clip attempts.
+  neuralVoiceEnabled?: boolean;
 }
 
 const HIT_TARGET_PX = 44;
@@ -50,13 +66,24 @@ const BASE_OPACITY = 0.6;
 export function ChoiceReadButton(
   props: ChoiceReadButtonProps,
 ): JSX.Element | null {
-  const { label, choiceIndex, profile, enabled, limit = 0 } = props;
+  const {
+    label,
+    choiceIndex,
+    profile,
+    enabled,
+    limit = 0,
+    clipUrl = null,
+    neuralVoiceEnabled = true,
+  } = props;
   if (!enabled) return null;
   // A blank label has nothing to speak — mirror StepCard's "no body,
   // no Read Me" suppression rather than mounting a dead button.
   if (label.length === 0) return null;
 
-  const handleClick = (): void => {
+  // Phase Z Z5: Web Speech path — pre-Z5 behavior, now also the clip
+  // fallback. stopClip() keeps single audio focus (see ReadMeButton).
+  const speakFallback = (): void => {
+    stopClip();
     // Interrupt any in-flight speech (double-tap, a word tap from
     // ClickableText, or the prompt bubble mid-utterance) so this
     // option's read starts cleanly from the beginning.
@@ -64,6 +91,21 @@ export function ChoiceReadButton(
     const spokenText = truncateSpokenText(label, limit);
     // Swallow rejections — see ClickableText for the rationale.
     void speak(spokenText, profile).catch(() => {});
+  };
+
+  const handleClick = (): void => {
+    // Phase Z Z5: clip-first, mirroring ReadMeButton — full label on
+    // the clip path (no truncation), Web Speech fallback on any clip
+    // failure except interruption (another surface took focus).
+    const effective = effectiveClipUrl(neuralVoiceEnabled, clipUrl);
+    if (effective !== null) {
+      void playClip(effective).catch((err: unknown) => {
+        if (isClipInterrupted(err)) return;
+        speakFallback();
+      });
+      return;
+    }
+    speakFallback();
   };
 
   // Hover / focus / active opacity flip via a scoped class — same

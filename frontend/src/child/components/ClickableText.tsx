@@ -26,6 +26,7 @@
 
 import { useState, type JSX, type MouseEvent } from "react";
 
+import { stopClip } from "../clip-audio";
 import { cancel, speak, type VoiceProfile } from "../tts";
 
 export interface ClickableTextProps {
@@ -101,6 +102,13 @@ export function ClickableText(props: ClickableTextProps): JSX.Element {
     setTimeout(() => {
       setFlashedIndex((prev) => (prev === index ? null : prev));
     }, OUTLINE_MS);
+    // Phase Z Z5: word taps stay Web Speech BY DESIGN (pre-rendering
+    // every tappable word is combinatorial), but they still take audio
+    // focus — a persona clip playing on the shared element (step body,
+    // choice label, joke beat) must stop before the word speaks, or
+    // the two talk over each other. Same single-audio-focus rule as
+    // every other Web-Speech path (clip-audio.ts contract 3).
+    stopClip();
     // Interrupt any in-flight speech (e.g. a previous word still being
     // read) so the new word's audio is immediate. ``cancel`` is itself
     // idempotent — safe to call when nothing is speaking.

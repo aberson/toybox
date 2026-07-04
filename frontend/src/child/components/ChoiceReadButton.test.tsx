@@ -25,9 +25,34 @@ vi.mock("../tts", async () => {
   };
 });
 
+// Phase Z Z5: partial-mock the clip substrate (same seam as
+// ReadMeButton.test.tsx) — playClip/stopClip mocked, the pure
+// isClipInterrupted / effectiveClipUrl kept real.
+vi.mock("../clip-audio", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../clip-audio")>();
+  return {
+    ...actual,
+    playClip: vi.fn(async () => undefined),
+    stopClip: vi.fn(),
+  };
+});
+
+import * as clipAudio from "../clip-audio";
 import * as tts from "../tts";
 
 const TEST_PROFILE: VoiceProfile = { rate: 1.0, pitch: 1.0 };
+
+// Interruption rejection built from the substrate's own exported marker
+// (one source of truth; the partial mock spreads the actual module, so
+// the constant rides through and the REAL isClipInterrupted matches it).
+const INTERRUPTED = new Error(clipAudio.CLIP_INTERRUPTED_MESSAGE);
+
+const CLIP_URL = "/api/static/tts/am_puck/1234abcd5678ef00.wav";
+
+async function flush(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+}
 
 afterEach(() => {
   cleanup();
@@ -226,5 +251,99 @@ describe("ChoiceReadButton — click handler", () => {
     ).not.toThrow();
     await Promise.resolve();
     expect(tts.speak).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not attempt a clip when no clipUrl is threaded (pre-Z5 speak path)", () => {
+    render(
+      <ChoiceReadButton
+        label="anything"
+        choiceIndex={0}
+        profile={TEST_PROFILE}
+        enabled={true}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("choice-read-button"));
+    expect(clipAudio.playClip).not.toHaveBeenCalled();
+    expect(tts.speak).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Phase Z Z5 — clip-first with Web Speech fallback (mirrors the
+// ReadMeButton matrix; the label is this surface's "full text").
+describe("ChoiceReadButton — Z5 neural clip path", () => {
+  it("prefers the clip when clipUrl is present and the gate is on — full label, no truncation", () => {
+    render(
+      <ChoiceReadButton
+        label="Go left. Then run to the big red door."
+        choiceIndex={0}
+        profile={TEST_PROFILE}
+        enabled={true}
+        // A limit that WOULD truncate on the speech path — proving the
+        // clip path ignores it (server clips render the full label).
+        limit={14}
+        clipUrl={CLIP_URL}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("choice-read-button"));
+    expect(clipAudio.playClip).toHaveBeenCalledTimes(1);
+    expect(clipAudio.playClip).toHaveBeenCalledWith(CLIP_URL);
+    expect(tts.speak).not.toHaveBeenCalled();
+  });
+
+  it("falls back to TRUNCATED Web Speech when the clip rejects (404-until-rendered)", async () => {
+    vi.mocked(clipAudio.playClip).mockRejectedValueOnce(
+      new Error("clip-audio: load or decode error"),
+    );
+    render(
+      <ChoiceReadButton
+        label="Go left. Then run to the big red door."
+        choiceIndex={0}
+        profile={TEST_PROFILE}
+        enabled={true}
+        limit={14}
+        clipUrl={CLIP_URL}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("choice-read-button"));
+    await flush();
+    // Z2 sentence-aware truncation applies on the fallback ONLY.
+    expect(tts.speak).toHaveBeenCalledWith("Go left.…", TEST_PROFILE);
+    expect(clipAudio.stopClip).toHaveBeenCalled();
+    expect(tts.cancel).toHaveBeenCalled();
+  });
+
+  it("does NOT fall back when the clip rejection is an interruption", async () => {
+    vi.mocked(clipAudio.playClip).mockRejectedValueOnce(INTERRUPTED);
+    render(
+      <ChoiceReadButton
+        label="anything"
+        choiceIndex={0}
+        profile={TEST_PROFILE}
+        enabled={true}
+        clipUrl={CLIP_URL}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("choice-read-button"));
+    await flush();
+    expect(tts.speak).not.toHaveBeenCalled();
+  });
+
+  it("neuralVoiceEnabled=false routes straight to Web Speech — no clip attempt", () => {
+    render(
+      <ChoiceReadButton
+        label="Take the mountain pass"
+        choiceIndex={1}
+        profile={TEST_PROFILE}
+        enabled={true}
+        clipUrl={CLIP_URL}
+        neuralVoiceEnabled={false}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("choice-read-button"));
+    expect(clipAudio.playClip).not.toHaveBeenCalled();
+    expect(tts.speak).toHaveBeenCalledWith(
+      "Take the mountain pass",
+      TEST_PROFILE,
+    );
   });
 });

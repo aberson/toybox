@@ -30,6 +30,10 @@ import { useEffect, useRef, type CSSProperties, type JSX } from "react";
 
 import type { Animation } from "../../shared/types";
 import { REWARD_ANIMATIONS } from "../animations/rewardAnimations";
+import {
+  readSpokenPunchlineAudioUrl,
+  readSpokenSetupAudioUrl,
+} from "../clip-audio";
 import { DEFAULT_VOICE_PROFILE } from "../persona-voice";
 import type { VoiceProfile } from "../tts";
 import { JokeStep } from "./JokeStep";
@@ -79,6 +83,14 @@ export interface RewardStepProps {
   // mount without a profile — the canonical DEFAULT_VOICE_PROFILE
   // from ``persona-voice.ts`` (one source of truth) is the fallback.
   voiceProfile?: VoiceProfile;
+  // Phase Z Z5: neural-voice gate, threaded by StepCard (default TRUE;
+  // Z6 wires the ``neural_voice_enabled`` parent flag). The reward
+  // joke's clip URLs ride on this step's own ``metadata``
+  // (``spoken_audio_setup_url`` / ``spoken_audio_punchline_url`` — the
+  // Z4 producer treats reward jokes like any joke-kind step), so only
+  // the gate needs a prop; the URLs are read below alongside the other
+  // metadata keys.
+  neuralVoiceEnabled?: boolean;
 }
 
 // Defensive readers — every key may be absent on a malformed
@@ -117,7 +129,12 @@ function readRewardKind(
 }
 
 export function RewardStep(props: RewardStepProps): JSX.Element | null {
-  const { metadata, onAdvance, voiceProfile = DEFAULT_VOICE_PROFILE } = props;
+  const {
+    metadata,
+    onAdvance,
+    voiceProfile = DEFAULT_VOICE_PROFILE,
+    neuralVoiceEnabled = true,
+  } = props;
   // Defensive: metadata may be null/undefined on a malformed
   // envelope. Render nothing rather than crashing — the StepCard
   // dispatch already gate the mount on kind === "reward" so a
@@ -169,6 +186,13 @@ export function RewardStep(props: RewardStepProps): JSX.Element | null {
           punchline={punchline}
           profile={voiceProfile}
           clickableWordsEnabled={false}
+          // Phase Z Z5: reward jokes carry the same setup/punchline
+          // clip keys as kind=joke steps (one Z4 producer for both) —
+          // read from THIS step's metadata via the shared accessors so
+          // the key literals live in one place (clip-audio.ts).
+          setupClipUrl={readSpokenSetupAudioUrl(metadata)}
+          punchlineClipUrl={readSpokenPunchlineAudioUrl(metadata)}
+          neuralVoiceEnabled={neuralVoiceEnabled}
         />
         {/* Joke rewards don't have an internal Next affordance the way
             SongPlayer does — surface the linear NextStepButton so the

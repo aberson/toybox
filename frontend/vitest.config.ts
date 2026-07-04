@@ -12,10 +12,13 @@ export default defineConfig({
     // (no DOM needed); Step 18's .test.tsx files mount React components
     // and need a DOM. ws.test.ts files instantiate CloseEvent (not a
     // Node global on Node 20) so route them to happy-dom as well.
+    // clip-audio.test.ts (Phase Z Z5) needs a real `window` object to
+    // stage its window.Audio fake on — same happy-dom routing.
     environment: "node",
     environmentMatchGlobs: [
       ["src/**/*.test.tsx", "happy-dom"],
       ["src/**/ws.test.ts", "happy-dom"],
+      ["src/**/clip-audio.test.ts", "happy-dom"],
     ],
   },
 });

@@ -28,9 +28,36 @@ vi.mock("../tts", async () => {
   };
 });
 
+// Phase Z Z5: partial-mock the clip substrate — playClip/stopClip are
+// the DOM-touching seams; isClipInterrupted + effectiveClipUrl are pure
+// and kept REAL so the fallback-decision logic under test is the
+// production logic, not a mock restatement.
+vi.mock("../clip-audio", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../clip-audio")>();
+  return {
+    ...actual,
+    playClip: vi.fn(async () => undefined),
+    stopClip: vi.fn(),
+  };
+});
+
+import * as clipAudio from "../clip-audio";
 import * as tts from "../tts";
 
 const TEST_PROFILE: VoiceProfile = { rate: 1.0, pitch: 1.0 };
+
+// Interruption rejection built from the substrate's own exported marker
+// (one source of truth; the partial mock spreads the actual module, so
+// the constant rides through and the REAL isClipInterrupted matches it).
+const INTERRUPTED = new Error(clipAudio.CLIP_INTERRUPTED_MESSAGE);
+
+const CLIP_URL = "/api/static/tts/af_heart/abc123def456ab00.wav";
+
+// Flush pending microtasks so a playClip rejection's fallback lands.
+async function flush(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+}
 
 afterEach(() => {
   cleanup();
@@ -423,5 +450,105 @@ describe("ReadMeButton — click handler", () => {
     ).not.toThrow();
     await Promise.resolve();
     expect(tts.speak).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not attempt a clip when no clipUrl is threaded (pre-Z5 speak path)", () => {
+    render(
+      <ReadMeButton text="anything" profile={TEST_PROFILE} enabled={true} />,
+    );
+    fireEvent.click(screen.getByTestId("read-me-button"));
+    expect(clipAudio.playClip).not.toHaveBeenCalled();
+    expect(tts.speak).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Phase Z Z5 — clip-first with Web Speech fallback.
+describe("ReadMeButton — Z5 neural clip path", () => {
+  // 157 chars — long enough that a limit=150 fallback truncates, which
+  // is exactly the discrimination the full-text contract needs: the
+  // CLIP path must never truncate (the server renders the full text),
+  // the FALLBACK path must (Z2 sentence-aware rule).
+  const LONG_BODY =
+    "Miss Maple the wise old owl lands on the branch beside you. " +
+    "She hoots softly and points her wing at the puzzle pieces on the rug. " +
+    "What does Miss Maple think?";
+
+  it("prefers the clip when clipUrl is present (neuralVoiceEnabled DEFAULTS TRUE) — full text contract, no speak call", () => {
+    // The render deliberately OMITS neuralVoiceEnabled: the clip being
+    // preferred here is also the proof the gate defaults ON (Z6 wires
+    // the parent flag; until then absent-prop must mean clips-on).
+    render(
+      <ReadMeButton
+        text={LONG_BODY}
+        profile={TEST_PROFILE}
+        enabled={true}
+        limit={150}
+        clipUrl={CLIP_URL}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("read-me-button"));
+    expect(clipAudio.playClip).toHaveBeenCalledTimes(1);
+    expect(clipAudio.playClip).toHaveBeenCalledWith(CLIP_URL);
+    // No Web Speech, hence no truncation — the clip IS the full text.
+    expect(tts.speak).not.toHaveBeenCalled();
+  });
+
+  it("falls back to TRUNCATED Web Speech when the clip rejects (404-until-rendered is designed)", async () => {
+    vi.mocked(clipAudio.playClip).mockRejectedValueOnce(
+      new Error("clip-audio: load or decode error"),
+    );
+    render(
+      <ReadMeButton
+        text={LONG_BODY}
+        profile={TEST_PROFILE}
+        enabled={true}
+        limit={150}
+        clipUrl={CLIP_URL}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("read-me-button"));
+    await flush();
+    // The fallback applies the Z2 sentence-aware limit — the clip path
+    // above proved the same fixture speaks in full.
+    expect(tts.speak).toHaveBeenCalledWith(
+      "Miss Maple the wise old owl lands on the branch beside you. " +
+        "She hoots softly and points her wing at the puzzle pieces on the rug.…",
+      TEST_PROFILE,
+    );
+    // Single audio focus on the speech path: stopClip before speak.
+    expect(clipAudio.stopClip).toHaveBeenCalled();
+    expect(tts.cancel).toHaveBeenCalled();
+  });
+
+  it("does NOT fall back when the clip rejection is an interruption (focus moved on purpose)", async () => {
+    vi.mocked(clipAudio.playClip).mockRejectedValueOnce(INTERRUPTED);
+    render(
+      <ReadMeButton
+        text="anything"
+        profile={TEST_PROFILE}
+        enabled={true}
+        clipUrl={CLIP_URL}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("read-me-button"));
+    await flush();
+    expect(tts.speak).not.toHaveBeenCalled();
+  });
+
+  it("neuralVoiceEnabled=false routes straight to Web Speech — no clip attempt", () => {
+    render(
+      <ReadMeButton
+        text="Go left. Then run to the big red door."
+        profile={TEST_PROFILE}
+        enabled={true}
+        limit={14}
+        clipUrl={CLIP_URL}
+        neuralVoiceEnabled={false}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("read-me-button"));
+    expect(clipAudio.playClip).not.toHaveBeenCalled();
+    // The flag-off path keeps the Z2 truncation semantics.
+    expect(tts.speak).toHaveBeenCalledWith("Go left.…", TEST_PROFILE);
   });
 });

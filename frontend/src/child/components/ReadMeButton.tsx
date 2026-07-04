@@ -23,6 +23,12 @@
 
 import type { CSSProperties, JSX } from "react";
 
+import {
+  effectiveClipUrl,
+  isClipInterrupted,
+  playClip,
+  stopClip,
+} from "../clip-audio";
 import { cancel, speak, type VoiceProfile } from "../tts";
 
 export interface ReadMeButtonProps {
@@ -35,7 +41,22 @@ export interface ReadMeButtonProps {
   // fallback) and a ``…`` is appended before passing to ``speak()``. The
   // full ``text`` remains visible on screen — truncation only affects
   // the TTS call. ``0`` (or omitted) means no truncation.
+  // Phase Z Z5: the limit applies ONLY to the Web Speech fallback path —
+  // the neural clip (``clipUrl``) always renders the FULL visible text
+  // server-side, so the spoken-vs-screen contract can never mismatch on
+  // the primary path.
   limit?: number;
+  // Phase Z Z5: server-rendered neural clip for the step body
+  // (``step.metadata.spoken_audio_url``, threaded by StepCard). When
+  // present AND the neural-voice gate is on, a tap plays the clip; any
+  // clip failure (404-until-rendered is DESIGNED behavior, decode,
+  // autoplay-block) falls back to the Web Speech path above. Absent /
+  // null → Web Speech directly.
+  clipUrl?: string | null;
+  // Phase Z Z5: neural-voice gate. Defaults TRUE; Z6 wires the
+  // ``neural_voice_enabled`` parent flag into this prop (App → StepCard
+  // → here). Off → no clip attempts, straight to Web Speech.
+  neuralVoiceEnabled?: boolean;
 }
 
 // Truncate ``text`` to at most ``limit`` characters for speech.
@@ -104,10 +125,23 @@ const HIT_TARGET_PX = 48;
 const BASE_OPACITY = 0.6;
 
 export function ReadMeButton(props: ReadMeButtonProps): JSX.Element | null {
-  const { text, profile, enabled, limit = 0 } = props;
+  const {
+    text,
+    profile,
+    enabled,
+    limit = 0,
+    clipUrl = null,
+    neuralVoiceEnabled = true,
+  } = props;
   if (!enabled) return null;
 
-  const handleClick = (): void => {
+  // Phase Z Z5: Web Speech path — the pre-Z5 behavior, now also the
+  // fallback for a failed/missing clip. ``stopClip()`` keeps single
+  // audio focus (a still-playing clip must not talk over the
+  // utterance); ``cancel()`` interrupts in-flight speech exactly as
+  // before (#207 guard lives inside tts.ts).
+  const speakFallback = (): void => {
+    stopClip();
     // Interrupt any in-flight speech (e.g. the kid hit ReadMe twice in
     // succession, or a word tap from ClickableText is mid-utterance)
     // so the read-me starts cleanly from the beginning.
@@ -117,6 +151,28 @@ export function ReadMeButton(props: ReadMeButtonProps): JSX.Element | null {
     const spokenText = truncateSpokenText(text, limit);
     // Swallow rejections — see ClickableText for the rationale.
     void speak(spokenText, profile).catch(() => {});
+  };
+
+  const handleClick = (): void => {
+    // Phase Z Z5: prefer the neural clip when the wire carries one and
+    // the gate is on. The clip speaks the FULL visible text (rendered
+    // server-side) — no truncation on this path; the parent's spoken-
+    // text limit keeps meaning only for the fallback. ``playClip``
+    // itself takes audio focus (cancels speech + interrupts a prior
+    // clip), so no cancel() here.
+    const effective = effectiveClipUrl(neuralVoiceEnabled, clipUrl);
+    if (effective !== null) {
+      void playClip(effective).catch((err: unknown) => {
+        // Interruption = another surface took focus on purpose (e.g. a
+        // second tap's own playClip). Falling back would speak over it.
+        if (isClipInterrupted(err)) return;
+        // 404 (clip not rendered yet — designed degrade), decode error,
+        // autoplay-block: the kid still gets the device voice.
+        speakFallback();
+      });
+      return;
+    }
+    speakFallback();
   };
 
   // Hover / focus / active styling is hard to express inline (React

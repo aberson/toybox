@@ -266,6 +266,7 @@ kiosk never computes hashes.
 - **Produces:** `clip-audio.ts`; clip-first speech surfaces; fallback chain; vitest coverage incl. 404-fallback and joke sequencing
 - **Done when:** vitest: clip preferred when URL present, Web Speech fallback on 404/flag-off/no-URL, joke setup→punchline order preserved on both paths; full gates green
 - **Depends on:** Z4 (wire shape), Z2 (fallback truncation)
+- **Status:** DONE (2026-07-03)
 
 <!-- autofix-applied: 2026-07-03 -->
 ### Step Z6: `neural_voice_enabled` parent flag

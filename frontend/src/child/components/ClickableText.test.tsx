@@ -30,6 +30,18 @@ vi.mock("../tts", async () => {
   };
 });
 
+// Phase Z Z5: word taps stay Web Speech, but they must take audio
+// focus from a playing persona clip (stopClip before speak). Partial
+// mock — only the DOM-touching seam is replaced.
+vi.mock("../clip-audio", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../clip-audio")>();
+  return {
+    ...actual,
+    stopClip: vi.fn(),
+  };
+});
+
+import * as clipAudio from "../clip-audio";
 import * as tts from "../tts";
 
 const TEST_PROFILE: VoiceProfile = { rate: 1.0, pitch: 1.0 };
@@ -109,6 +121,27 @@ describe("ClickableText — enabled (flag on)", () => {
     const cancelMock = tts.cancel as unknown as { mock: { invocationCallOrder: number[] } };
     const speakMock = tts.speak as unknown as { mock: { invocationCallOrder: number[] } };
     expect(cancelMock.mock.invocationCallOrder[0]!).toBeLessThan(
+      speakMock.mock.invocationCallOrder[0]!,
+    );
+  });
+
+  it("stops a playing clip on word tap (Phase Z Z5 single audio focus)", () => {
+    render(
+      <ClickableText text="hello world" profile={TEST_PROFILE} enabled={true} />,
+    );
+    const [firstWord] = screen.getAllByTestId("clickable-word");
+    fireEvent.click(firstWord!);
+    // A persona clip on the shared element (step body / choice label /
+    // joke beat) must stop before the word speaks — otherwise the two
+    // play simultaneously. stopClip precedes speak.
+    expect(clipAudio.stopClip).toHaveBeenCalledTimes(1);
+    const stopClipMock = clipAudio.stopClip as unknown as {
+      mock: { invocationCallOrder: number[] };
+    };
+    const speakMock = tts.speak as unknown as {
+      mock: { invocationCallOrder: number[] };
+    };
+    expect(stopClipMock.mock.invocationCallOrder[0]!).toBeLessThan(
       speakMock.mock.invocationCallOrder[0]!,
     );
   });

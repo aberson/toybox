@@ -52,6 +52,22 @@ vi.mock("../tts", async () => {
   };
 });
 
+// Phase Z Z5: partial-mock the clip substrate so the threading tests
+// below can observe playClip without a fake HTMLAudioElement (the
+// substrate has its own coverage in clip-audio.test.ts). The pure
+// accessors/gate stay real — StepCard's metadata reads under test are
+// the production reads.
+vi.mock("../clip-audio", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../clip-audio")>();
+  return {
+    ...actual,
+    playClip: vi.fn(async () => undefined),
+    stopClip: vi.fn(),
+  };
+});
+
+import * as clipAudio from "../clip-audio";
+
 afterEach(() => {
   cleanup();
 });
@@ -1646,5 +1662,254 @@ describe("StepCard boss-fight variant (Phase W Step W5)", () => {
       />,
     );
     expect(screen.getByTestId("read-me-button")).toBeTruthy();
+  });
+});
+
+// Phase Z Z5 — clip-URL threading. StepCard is the hub that reads the
+// Z4 wire keys off step metadata (via the clip-audio accessors) and
+// threads them + the neural-voice gate to every speech surface. These
+// are integration tests through the production caller: real StepCard,
+// real accessor reads, mocked playClip/speak seams.
+describe("StepCard Z5 — spoken-audio clip threading", () => {
+  const BODY_CLIP = "/api/static/tts/af_heart/aaaa000011112222.wav";
+  const SETUP_CLIP = "/api/static/tts/af_bella/bbbb333344445555.wav";
+  const PUNCHLINE_CLIP = "/api/static/tts/af_bella/cccc666677778888.wav";
+  const CHOICE_CLIP_0 = "/api/static/tts/am_puck/dddd9999aaaabbbb.wav";
+  const CHOICE_CLIP_1 = "/api/static/tts/am_puck/eeeeccccddddeeee.wav";
+
+  beforeEach(() => {
+    vi.mocked(clipAudio.playClip).mockClear();
+    vi.mocked(clipAudio.stopClip).mockClear();
+    vi.mocked(tts.speak).mockClear();
+    vi.mocked(tts.cancel).mockClear();
+  });
+
+  it("threads spoken_audio_url into the ReadMeButton (tap plays the clip, no speak)", () => {
+    const activity = fakeActivity({
+      steps: [
+        fakeStep({
+          body: "A long and winding step body.",
+          metadata: { spoken_audio_url: BODY_CLIP },
+        }),
+      ],
+    });
+    render(
+      <StepCard
+        activity={activity}
+        onAdvance={vi.fn()}
+        readMeButtonEnabled={true}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("read-me-button"));
+    expect(clipAudio.playClip).toHaveBeenCalledWith(BODY_CLIP);
+    expect(tts.speak).not.toHaveBeenCalled();
+  });
+
+  it("ReadMeButton stays on Web Speech when the step metadata carries no spoken_audio_url", () => {
+    const activity = fakeActivity({
+      steps: [fakeStep({ body: "No clip here.", metadata: {} })],
+    });
+    render(
+      <StepCard
+        activity={activity}
+        onAdvance={vi.fn()}
+        readMeButtonEnabled={true}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("read-me-button"));
+    expect(clipAudio.playClip).not.toHaveBeenCalled();
+    expect(tts.speak).toHaveBeenCalledWith("No clip here.", expect.anything());
+  });
+
+  it("neuralVoiceEnabled={false} routes the ReadMeButton to Web Speech even when a clip exists", () => {
+    const activity = fakeActivity({
+      steps: [
+        fakeStep({
+          body: "Flag off body.",
+          metadata: { spoken_audio_url: BODY_CLIP },
+        }),
+      ],
+    });
+    render(
+      <StepCard
+        activity={activity}
+        onAdvance={vi.fn()}
+        readMeButtonEnabled={true}
+        neuralVoiceEnabled={false}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("read-me-button"));
+    expect(clipAudio.playClip).not.toHaveBeenCalled();
+    expect(tts.speak).toHaveBeenCalledWith("Flag off body.", expect.anything());
+  });
+
+  it("threads the index-aligned spoken_choice_audio_urls entry into each choice bubble", () => {
+    const activity = fakeActivity({
+      steps: [
+        fakeStep({
+          choices: [
+            { label: "Sneak past Penguin", choice_index: 0 },
+            { label: "Charge in bravely", choice_index: 1 },
+          ],
+          metadata: {
+            spoken_choice_audio_urls: [CHOICE_CLIP_0, CHOICE_CLIP_1],
+          },
+        }),
+      ],
+    });
+    render(
+      <StepCard
+        activity={activity}
+        onAdvance={vi.fn()}
+        onChoose={vi.fn()}
+        readMeButtonEnabled={true}
+      />,
+    );
+    const bubbles = screen.getAllByTestId("choice-read-button");
+    // Index alignment: bubble N plays URL N (the Z4 contract).
+    fireEvent.click(bubbles[1]!);
+    expect(clipAudio.playClip).toHaveBeenCalledTimes(1);
+    expect(clipAudio.playClip).toHaveBeenCalledWith(CHOICE_CLIP_1);
+    fireEvent.click(bubbles[0]!);
+    expect(clipAudio.playClip).toHaveBeenCalledTimes(2);
+    expect(clipAudio.playClip).toHaveBeenLastCalledWith(CHOICE_CLIP_0);
+    expect(tts.speak).not.toHaveBeenCalled();
+  });
+
+  it("a choice beyond the URL list's length falls back to Web Speech (no clip attempt)", () => {
+    const activity = fakeActivity({
+      steps: [
+        fakeStep({
+          choices: [
+            { label: "Sneak past Penguin", choice_index: 0 },
+            { label: "Charge in bravely", choice_index: 1 },
+          ],
+          // Truncated list — only choice 0 has a rendered clip.
+          metadata: { spoken_choice_audio_urls: [CHOICE_CLIP_0] },
+        }),
+      ],
+    });
+    render(
+      <StepCard
+        activity={activity}
+        onAdvance={vi.fn()}
+        onChoose={vi.fn()}
+        readMeButtonEnabled={true}
+      />,
+    );
+    fireEvent.click(screen.getAllByTestId("choice-read-button")[1]!);
+    expect(clipAudio.playClip).not.toHaveBeenCalled();
+    expect(tts.speak).toHaveBeenCalledWith(
+      "Charge in bravely",
+      expect.anything(),
+    );
+  });
+
+  it("threads setup/punchline clips into the JokeStep autoplay (setup clip on mount, no speak)", () => {
+    const activity = fakeActivity({
+      steps: [
+        fakeStep({
+          kind: "joke",
+          body: "Why did the robot cross the road?",
+          metadata: {
+            punchline: "It was programmed to.",
+            spoken_audio_setup_url: SETUP_CLIP,
+            spoken_audio_punchline_url: PUNCHLINE_CLIP,
+          },
+        }),
+      ],
+    });
+    render(<StepCard activity={activity} onAdvance={vi.fn()} />);
+    expect(clipAudio.playClip).toHaveBeenCalledWith(SETUP_CLIP);
+    expect(tts.speak).not.toHaveBeenCalled();
+  });
+
+  it("threads the clips into the joke ReadMe replay (replayJoke plays the setup clip again)", () => {
+    const activity = fakeActivity({
+      steps: [
+        fakeStep({
+          kind: "joke",
+          body: "Setup line.",
+          metadata: {
+            punchline: "Punchline line.",
+            spoken_audio_setup_url: SETUP_CLIP,
+            spoken_audio_punchline_url: PUNCHLINE_CLIP,
+          },
+        }),
+      ],
+    });
+    render(
+      <StepCard
+        activity={activity}
+        onAdvance={vi.fn()}
+        readMeButtonEnabled={true}
+      />,
+    );
+    // Autoplay already used the setup clip once on mount.
+    expect(clipAudio.playClip).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByTestId("read-me-button"));
+    expect(clipAudio.playClip).toHaveBeenCalledTimes(2);
+    expect(clipAudio.playClip).toHaveBeenLastCalledWith(SETUP_CLIP);
+    expect(tts.speak).not.toHaveBeenCalled();
+  });
+
+  it("reward jokes read their own metadata clips (RewardStep → JokeStep threading)", () => {
+    const activity = fakeActivity({
+      steps: [
+        {
+          ...fakeStep({ body: "Joke time" }),
+          kind: "reward",
+          metadata: {
+            reward_kind: "joke",
+            reward_id: "joke-1",
+            image_url: null,
+            animation: null,
+            audio_url: null,
+            body: "Joke time",
+            setup: "Why did the reward giggle?",
+            punchline: "It was tickled pink.",
+            spoken_audio_setup_url: SETUP_CLIP,
+            spoken_audio_punchline_url: PUNCHLINE_CLIP,
+          },
+        } as ActivityStep,
+      ],
+    });
+    render(<StepCard activity={activity} onAdvance={vi.fn()} />);
+    // The reward joke's autoplay prefers ITS setup clip — proof the
+    // Z4 keys on the reward step's metadata reached the JokeStep mount.
+    expect(clipAudio.playClip).toHaveBeenCalledWith(SETUP_CLIP);
+    expect(tts.speak).not.toHaveBeenCalled();
+  });
+
+  it("neuralVoiceEnabled={false} sends the reward joke to Web Speech (gate threads through RewardStep)", () => {
+    const activity = fakeActivity({
+      steps: [
+        {
+          ...fakeStep({ body: "Joke time" }),
+          kind: "reward",
+          metadata: {
+            reward_kind: "joke",
+            reward_id: "joke-1",
+            body: "Joke time",
+            setup: "Why did the reward giggle?",
+            punchline: "It was tickled pink.",
+            spoken_audio_setup_url: SETUP_CLIP,
+            spoken_audio_punchline_url: PUNCHLINE_CLIP,
+          },
+        } as ActivityStep,
+      ],
+    });
+    render(
+      <StepCard
+        activity={activity}
+        onAdvance={vi.fn()}
+        neuralVoiceEnabled={false}
+      />,
+    );
+    expect(clipAudio.playClip).not.toHaveBeenCalled();
+    expect(tts.speak).toHaveBeenCalledWith(
+      "Why did the reward giggle?",
+      expect.anything(),
+    );
   });
 });

@@ -113,6 +113,20 @@ export interface ActivityStep {
   //   * ``element_symbol`` (string) — display-case symbol (e.g. ``Au``).
   //   * ``element_name`` (string) — common name (e.g. ``Gold``).
   //   * ``element_atomic_number`` (number) — atomic number (1-118).
+  //
+  // Phase Z Z4/Z5: server-rendered neural TTS clip URLs (all
+  // ``/api/static/tts/<voice>/<sha16>.wav``; a URL may 404 until the
+  // background worker renders it — the kiosk falls back to Web Speech,
+  // designed behavior). Read via the typed accessors in
+  // ``clip-audio.ts`` (the one place the key literals live):
+  //   * ``spoken_audio_url`` (string) — plain step body clip.
+  //   * ``spoken_audio_setup_url`` / ``spoken_audio_punchline_url``
+  //     (string) — joke-kind steps, incl. reward jokes.
+  //   * ``spoken_choice_audio_urls`` (string[]) — aligned
+  //     index-for-index with ``choices``.
+  //   * ``spoken_question_audio_url`` (string) — present when the step
+  //     carries R3 question text; NOT yet consumed (question text is
+  //     rendered, never spoken — no kiosk surface exists today).
   metadata?: Record<string, unknown> | null;
   // Phase M Step M3: optional reference to a Periodic Table element
   // corpus entry. When non-null, the kiosk's StepCard renders an

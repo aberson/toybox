@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { primeClipAudio } from "../clip-audio";
 import { unlockAudio } from "../sfx";
 import { KioskPinPrompt } from "./KioskPinPrompt";
 
@@ -8,9 +9,17 @@ vi.mock("../sfx", () => ({
   unlockAudio: vi.fn(),
 }));
 
+// Phase Z Z5: the voice-clip element's gesture prime happens at the
+// same PIN-submit gesture (iOS unlock is per-element — unlockAudio's
+// SFX elements don't cover the shared clip element).
+vi.mock("../clip-audio", () => ({
+  primeClipAudio: vi.fn(),
+}));
+
 afterEach(() => {
   cleanup();
   vi.mocked(unlockAudio).mockClear();
+  vi.mocked(primeClipAudio).mockClear();
 });
 
 describe("KioskPinPrompt", () => {
@@ -52,7 +61,7 @@ describe("KioskPinPrompt", () => {
     ).toMatch(/Wrong PIN/);
   });
 
-  it("primes iOS audio (calls unlockAudio) when the form submits with a valid PIN", () => {
+  it("primes iOS audio (calls unlockAudio AND primeClipAudio) when the form submits with a valid PIN", () => {
     const onSubmit = vi.fn();
     render(<KioskPinPrompt onSubmit={onSubmit} />);
     const input = screen.getByTestId("kiosk-pin-prompt-input") as HTMLInputElement;
@@ -60,9 +69,11 @@ describe("KioskPinPrompt", () => {
     fireEvent.click(screen.getByTestId("kiosk-pin-prompt-submit"));
     expect(onSubmit).toHaveBeenCalledWith("1357");
     expect(vi.mocked(unlockAudio)).toHaveBeenCalledTimes(1);
+    // Phase Z Z5: the shared clip element gets its OWN in-gesture prime.
+    expect(vi.mocked(primeClipAudio)).toHaveBeenCalledTimes(1);
   });
 
-  it("does not call unlockAudio when the PIN is rejected client-side", () => {
+  it("does not call unlockAudio/primeClipAudio when the PIN is rejected client-side", () => {
     const onSubmit = vi.fn();
     render(<KioskPinPrompt onSubmit={onSubmit} />);
     const input = screen.getByTestId("kiosk-pin-prompt-input") as HTMLInputElement;
@@ -70,5 +81,6 @@ describe("KioskPinPrompt", () => {
     fireEvent.click(screen.getByTestId("kiosk-pin-prompt-submit"));
     expect(onSubmit).not.toHaveBeenCalled();
     expect(vi.mocked(unlockAudio)).not.toHaveBeenCalled();
+    expect(vi.mocked(primeClipAudio)).not.toHaveBeenCalled();
   });
 });
